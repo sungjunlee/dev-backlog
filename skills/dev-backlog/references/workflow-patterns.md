@@ -9,7 +9,7 @@ Common patterns for GitHub Issues + sprint file workflow.
 3. **Assign issues** — `gh issue edit <N> --milestone "Sprint W13"`
 4. **Prioritize** — add `priority:high/medium/low` labels
 5. **Pull to local** — sync milestone issues to `backlog/tasks/`
-6. **Create sprint file** — run `uv run scripts/sprint-init.py "Sprint W13"` or write manually:
+6. **Create sprint file** — run `./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"` or write manually:
    - Set Goal (one sentence)
    - Order issues into Batches (group small tasks for one session)
    - Estimate time per task
@@ -22,11 +22,12 @@ gh issue list --milestone "Sprint W13" --json number,title,labels --jq '.[] | "\
 
 ## Session Start
 
-1. Read `backlog/sprints/<current>.md` — the sprint file has everything
-2. Find where you left off: last Progress entry + first unchecked batch
-3. If a batch is mid-way, check the task file for AC progress
+1. Read `backlog/sprints/_context.md` if it exists — project-level knowledge
+2. Read the active sprint file (`status: active` in frontmatter) — plan, progress, context
+3. Find where you left off: last Progress entry + first unchecked batch
+4. If a batch is mid-way, check the task file for AC progress
 
-One file, full picture. No need to query GitHub unless you suspect changes.
+Two files at most, full picture. No need to query GitHub unless you suspect changes.
 
 ## Session End
 

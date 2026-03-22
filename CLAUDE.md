@@ -7,9 +7,9 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 ```
 skills/
   dev-backlog/
-    SKILL.md               ← Core process (~240 lines)
+    SKILL.md               ← Core process (~290 lines)
     references/            ← Detailed specs (on-demand)
-    scripts/               ← Deterministic bash helpers
+    scripts/               ← Deterministic helpers (node + bash)
 ```
 
 ## Key Design Decisions

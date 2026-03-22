@@ -282,8 +282,8 @@ If you discover it's bigger than expected, that's when you create a sprint file.
 
 ## Scripts (deterministic, no LLM needed)
 
-All scripts are executable directly (`./scripts/sync-pull.py`) or via `uv run`/`python`.
+All scripts are executable directly (`./scripts/sync-pull.js`) or via `node`.
 
 - `scripts/status.sh` — Quick project status from local files + GitHub
-- `scripts/sync-pull.py [PREFIX]` — Pull open GitHub issues to local backlog/tasks/
-- `scripts/sprint-init.py "Sprint W13"` — Generate sprint file skeleton from milestone issues
+- `scripts/sync-pull.js [PREFIX]` — Pull open GitHub issues to local backlog/tasks/
+- `scripts/sprint-init.js "auth-system" [--milestone "Name"]` — Generate sprint file skeleton

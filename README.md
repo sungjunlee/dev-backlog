@@ -26,6 +26,8 @@ Local (execution hub — how to do it)
 
 ## Sprint File Example
 
+Filename: `2026-03-auth-system.md`
+
 ```markdown
 ---
 milestone: Sprint W13
@@ -34,7 +36,7 @@ started: 2026-03-22
 due: 2026-03-28
 ---
 
-# Sprint W13: Auth + API Foundation
+# Auth + API Foundation
 
 ## Goal
 Users can log in and access protected API endpoints.
@@ -77,8 +79,8 @@ skills/dev-backlog/
 │   └── workflow-patterns.md     ← Sprint planning, triage, retro
 └── scripts/
     ├── status.sh                ← Quick project status (bash)
-    ├── sync-pull.py             ← Pull GitHub issues to local (uv/python)
-    └── sprint-init.py           ← Generate sprint skeleton (uv/python)
+    ├── sync-pull.js             ← Pull GitHub issues to local (node)
+    └── sprint-init.js           ← Generate sprint skeleton (node)
 ```
 
 ## Design Philosophy
