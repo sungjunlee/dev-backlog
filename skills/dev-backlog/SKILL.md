@@ -208,6 +208,7 @@ When starting a new sprint:
 
 ### Work — Execute a Batch
 
+**Option A: Do it yourself (Claude Code)**
 1. Read sprint file → find current batch
 2. For each issue in the batch:
    - Update GitHub label: `gh issue edit <N> --add-label "status:in-progress"`
@@ -218,6 +219,15 @@ When starting a new sprint:
    - Update sprint file Plan checkboxes
    - Add Progress entry with date and summary
    - Push meaningful updates to GitHub: `gh issue comment <N> --body "summary"`
+
+**Option B: Delegate to Codex (via dev-relay)**
+1. Read sprint file → find current batch
+2. For each issue: extract AC from task file → construct dispatch prompt (AC = Done Criteria)
+3. Dispatch via `dev-relay/scripts/dispatch.js` (background for parallel tasks)
+4. Review PR when Codex finishes (independent review in fresh context)
+5. Merge + update sprint file Progress/Running Context
+
+See the dev-relay skill for the full dispatch → review → merge process.
 
 Small tasks in a batch flow naturally — finish one, check it off, start the next. The sprint file's batch grouping makes this explicit.
 
