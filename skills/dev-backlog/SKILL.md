@@ -180,11 +180,13 @@ Task files get AC checkboxes updated during work. Everything else (notes, decisi
 
 ### Orient — Starting a Session
 
-1. Read `backlog/sprints/_context.md` if it exists — project-level knowledge.
-2. Find the active sprint: the file in `backlog/sprints/` with `status: active` in frontmatter.
-3. Read it — plan, progress, running context. You now know where you are.
-4. Find where you left off: last Progress entry + first unchecked item in Plan.
-5. If no sprint file exists, check GitHub: `gh issue list --state open --json number,title,labels,milestone`
+1. If `backlog/` doesn't exist → Bootstrap: `mkdir -p backlog/{sprints,tasks,completed}`
+2. Read `backlog/sprints/_context.md` if it exists — project-level knowledge.
+3. Find the active sprint: the file in `backlog/sprints/` with `status: active` in frontmatter.
+4. If no active sprint → check GitHub for open issues → proceed to **Plan — Sprint**.
+5. Read sprint file — plan, progress, running context. You now know where you are.
+6. Find where you left off: last Progress entry + first unchecked item in Plan.
+7. If all Plan items are checked → proceed to **Complete** (close sprint).
 
 Two files at most (`_context.md` + active sprint), full picture.
 
@@ -216,6 +218,7 @@ When starting a new sprint:
    - Update GitHub label: `gh issue edit <N> --add-label "status:in-progress"`
    - Read task file for AC and description
    - Do the work. Check off AC in the task file as you go.
+   - Commit with `Fixes #<N>` (one commit per issue)
    - Add to sprint file's **Running Context** when you discover something that affects later tasks
 3. When batch is done:
    - Update sprint file Plan checkboxes
@@ -224,26 +227,24 @@ When starting a new sprint:
 
 **Option B: Delegate to Codex (via dev-relay)**
 1. Read sprint file → find current batch
-2. For each issue: extract AC from task file → construct dispatch prompt (AC = Done Criteria)
-3. Dispatch via `dev-relay/scripts/dispatch.js` (background for parallel tasks)
-4. Review PR when Codex finishes (independent review in fresh context)
-5. Merge + update sprint file Progress/Running Context
-
-See the dev-relay skill for the full dispatch → review → merge process.
+2. For each issue: extract AC from task file → Done Criteria
+3. Follow the **dev-relay** skill's dispatch process (Plan + Contract → Dispatch → Review → Merge)
+4. After each merge, update sprint file: Plan checkbox, Progress entry, Running Context
 
 Small tasks in a batch flow naturally — finish one, check it off, start the next. The sprint file's batch grouping makes this explicit.
 
 ### Complete — Close Issues
 
+Per issue:
 1. All AC checked in task file
 2. Commit/PR with `Fixes #<N>`
-3. Move task file: `backlog/tasks/` → `backlog/completed/`
-4. Check off in sprint Plan
-5. If the sprint is done: set `status: completed`, write a final Progress entry
+3. Check off in sprint Plan + add Progress entry
 
 When the whole sprint closes:
-- The sprint file becomes a permanent record of decisions, context, and progression.
-- Review Running Context — promote project-level entries to `_context.md` so future sprints inherit them.
+1. Set sprint `status: completed`, write a final Progress entry
+2. Move completed task files: `backlog/tasks/` → `backlog/completed/`
+3. Review Running Context — promote project-level entries to `_context.md`
+4. The sprint file becomes a permanent record. Don't delete it.
 
 ### Sync — GitHub ↔ Local
 
@@ -261,6 +262,12 @@ Not everything needs a sprint. For a one-off bug fix or quick task:
 3. Done. No sprint file, no local task file needed.
 
 If you discover it's bigger than expected, that's when you create a sprint file.
+
+### Unplanned Work — Mid-Sprint Scope Change
+
+- **Small (< 1hr):** Use Quick Fix above — no sprint file change needed.
+- **Belongs in current sprint:** Add to the Plan as a new batch at the current position. Note in Progress: "Scope change: #50 added (urgent bug from QA)"
+- **Big enough for its own sprint:** Close current sprint early → start a new one.
 
 ### Next — What to Work On
 
