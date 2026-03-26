@@ -217,7 +217,8 @@ When starting a new sprint:
 2. For each issue in the batch:
    - Update GitHub label: `gh issue edit <N> --add-label "status:in-progress"`
    - Read task file for AC and description
-   - Do the work. Check off AC in the task file as you go.
+   - Do the work.
+   - Verify: run tests, confirm each AC item is met, then check off AC in the task file.
    - Commit with `Fixes #<N>` (one commit per issue)
    - Add to sprint file's **Running Context** when you discover something that affects later tasks
 3. When batch is done:
@@ -303,6 +304,8 @@ If you discover it's bigger than expected, that's when you create a sprint file.
 
 All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, not the target project). Run from the target project root.
 
-- `scripts/status.sh` — Quick project status from local files + GitHub
+- `scripts/init.sh [project-name]` — Bootstrap `backlog/` directory with config.yml
+- `scripts/next.sh` — Show next actionable batch from active sprint (zero LLM cost)
+- `scripts/status.sh` — Project status from sprint file + GitHub
 - `scripts/sync-pull.js [PREFIX] [--update]` — Pull open GitHub issues to local backlog/tasks/. `--update` refreshes frontmatter of existing files while preserving local AC checkboxes.
 - `scripts/sprint-init.js "auth-system" [--milestone "Name"]` — Generate sprint file skeleton
