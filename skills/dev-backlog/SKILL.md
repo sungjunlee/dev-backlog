@@ -51,17 +51,15 @@ backlog/
 └── config.yml            # Project config
 ```
 
-Setup: see `references/file-format.md` for config.yml and task file format.
-GitHub labels: see `references/github-sync.md` for one-time label setup.
-Optional CLI: `npm i -g backlog.md && backlog init`
+**Bootstrap (first time):** If `backlog/` doesn't exist, create it: `mkdir -p backlog/{sprints,tasks,completed}`. See `references/file-format.md` for config.yml and task file format. See `references/github-sync.md` for one-time label setup.
 
 ### sprints/ Rules
 
 - **One active sprint at a time.** The file with `status: active` is the current sprint.
-- **Naming: `YYYY-MM-<topic>.md`** — date prefix로 시기 추적 + topic으로 내용 파악.
-  - 과제 중심: `2026-03-auth-system.md`, `2026-04-payment-integration.md`
-  - 기간 중심: `2026-03-W13-misc.md`, `2026-03-tech-debt.md`
-  - 파일명만 보고 "언제 무슨 일을 했는지" 알 수 있어야 함.
+- **Naming: `YYYY-MM-<topic>.md`** — date prefix for timeline, topic for content.
+  - Task-focused: `2026-03-auth-system.md`, `2026-04-payment-integration.md`
+  - Time-focused: `2026-03-W13-misc.md`, `2026-03-tech-debt.md`
+  - The filename alone should tell you "when and what was worked on."
 - **`_context.md`** holds knowledge that outlives any single sprint — architecture decisions, conventions, recurring gotchas. Sprint-specific context stays in the sprint file's Running Context; project-level context goes here.
 - **Completed sprints stay.** They're the record of what happened, what was decided, and why. Don't delete them.
 
@@ -200,6 +198,7 @@ Two files at most (`_context.md` + active sprint), full picture.
 
 When starting a new sprint:
 
+0. If an active sprint exists, set its `status: completed` and write a final Progress entry first.
 1. Create GitHub milestone: `gh api repos/{owner}/{repo}/milestones -f title="Sprint W13" -f due_on="2026-03-28"`
 2. Assign issues: `gh issue edit <N> --milestone "Sprint W13"`
 3. Pull issues to `backlog/tasks/`
@@ -295,8 +294,8 @@ If you discover it's bigger than expected, that's when you create a sprint file.
 
 ## Scripts (deterministic, no LLM needed)
 
-All scripts are executable directly (`./scripts/sync-pull.js`) or via `node`.
+All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, not the target project). Run from the target project root.
 
 - `scripts/status.sh` — Quick project status from local files + GitHub
-- `scripts/sync-pull.js [PREFIX]` — Pull open GitHub issues to local backlog/tasks/
+- `scripts/sync-pull.js [PREFIX] [--update]` — Pull open GitHub issues to local backlog/tasks/. `--update` refreshes frontmatter of existing files while preserving local AC checkboxes.
 - `scripts/sprint-init.js "auth-system" [--milestone "Name"]` — Generate sprint file skeleton

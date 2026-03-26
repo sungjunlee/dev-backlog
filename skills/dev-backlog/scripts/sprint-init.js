@@ -63,8 +63,8 @@ function getMilestoneIssues() {
 
 function estimateSize(labels) {
   for (const l of labels) {
-    if (l.includes("bug")) return "~30min";
-    if (l.includes("chore")) return "~15min";
+    if (l === "bug" || l === "type:bug") return "~30min";
+    if (l === "chore" || l === "type:chore") return "~15min";
   }
   return "";
 }
