@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 # Show next actionable work from the active sprint file.
 # Zero LLM cost — pure file parsing.
 #
@@ -14,7 +15,7 @@ if [ ! -d "$SPRINTS_DIR" ]; then
 fi
 
 # Find active sprint file (status: active in frontmatter)
-ACTIVE=$(grep -rl "^status: active" "$SPRINTS_DIR"/*.md 2>/dev/null | grep -v _context.md | head -1)
+ACTIVE=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: active" {} \; 2>/dev/null | head -1)
 
 if [ -z "$ACTIVE" ]; then
   echo "No active sprint found."

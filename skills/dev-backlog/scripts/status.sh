@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 # Project status from sprint file + GitHub + local files.
 # Usage: bash scripts/status.sh [backlog-dir]
 
@@ -8,7 +9,7 @@ SPRINTS_DIR="$BACKLOG_DIR/sprints"
 # --- Active Sprint ---
 echo "=== Active Sprint ==="
 if [ -d "$SPRINTS_DIR" ]; then
-  ACTIVE=$(grep -rl "^status: active" "$SPRINTS_DIR"/*.md 2>/dev/null | grep -v _context.md | head -1)
+  ACTIVE=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: active" {} \; 2>/dev/null | head -1)
   if [ -n "$ACTIVE" ]; then
     SPRINT_NAME=$(basename "$ACTIVE" .md)
     TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null || echo 0)
@@ -51,22 +52,22 @@ gh issue list --state open --limit 20 --json number,title,labels,milestone --jq 
 echo ""
 echo "=== Local Files ==="
 if [ -d "$BACKLOG_DIR/tasks" ]; then
-  total=$(ls "$BACKLOG_DIR/tasks/"*.md 2>/dev/null | wc -l | tr -d ' ')
-  todo=$(grep -l "^status: .*To Do" "$BACKLOG_DIR/tasks/"*.md 2>/dev/null | wc -l | tr -d ' ')
-  inprog=$(grep -l "^status: .*In Progress" "$BACKLOG_DIR/tasks/"*.md 2>/dev/null | wc -l | tr -d ' ')
+  total=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+  todo=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*To Do" {} \; 2>/dev/null | wc -l | tr -d ' ')
+  inprog=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*In Progress" {} \; 2>/dev/null | wc -l | tr -d ' ')
   echo "Tasks: $total total, $todo To Do, $inprog In Progress"
 else
   echo "No backlog/tasks/ directory"
 fi
 
 if [ -d "$BACKLOG_DIR/completed" ]; then
-  done_count=$(ls "$BACKLOG_DIR/completed/"*.md 2>/dev/null | wc -l | tr -d ' ')
+  done_count=$(find "$BACKLOG_DIR/completed" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
   echo "Completed: $done_count"
 fi
 
 # --- Past Sprints ---
 if [ -d "$SPRINTS_DIR" ]; then
-  PAST=$(grep -rl "^status: completed" "$SPRINTS_DIR"/*.md 2>/dev/null | grep -v _context.md | wc -l | tr -d ' ')
+  PAST=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: completed" {} \; 2>/dev/null | wc -l | tr -d ' ')
   if [ "$PAST" -gt 0 ]; then
     echo "Past sprints: $PAST"
   fi
