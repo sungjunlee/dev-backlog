@@ -9,7 +9,7 @@
  * Filename: YYYY-MM-<topic>.md
  */
 
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -39,10 +39,10 @@ function slugify(text) {
 
 function getMilestoneDue() {
   try {
-    const out = execSync(
-      `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="${MILESTONE}") | .due_on'`,
-      { encoding: "utf-8" }
-    ).trim();
+    const jqFilter = `.[] | select(.title=="${MILESTONE.replace(/"/g, '\\"')}") | .due_on`;
+    const out = execFileSync("gh", [
+      "api", "repos/{owner}/{repo}/milestones", "--jq", jqFilter
+    ], { encoding: "utf-8" }).trim();
     return out ? out.slice(0, 10) : "TBD";
   } catch {
     return "TBD";
@@ -51,10 +51,10 @@ function getMilestoneDue() {
 
 function getMilestoneIssues() {
   try {
-    const out = execSync(
-      `gh issue list --milestone "${MILESTONE}" --state open --json number,title,labels`,
-      { encoding: "utf-8" }
-    );
+    const out = execFileSync("gh", [
+      "issue", "list", "--milestone", MILESTONE,
+      "--state", "open", "--json", "number,title,labels"
+    ], { encoding: "utf-8" });
     return JSON.parse(out);
   } catch {
     return [];

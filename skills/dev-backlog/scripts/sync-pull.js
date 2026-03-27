@@ -9,7 +9,7 @@
  *   --update    Update existing files (frontmatter only; preserves local AC checkboxes)
  */
 
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -33,10 +33,10 @@ function escapeYaml(text) {
 
 function getOpenIssues() {
   try {
-    const out = execSync(
-      'gh issue list --state open --limit 100 --json number,title,body,labels,milestone,assignees',
-      { encoding: "utf-8" }
-    );
+    const out = execFileSync("gh", [
+      "issue", "list", "--state", "open", "--limit", "100",
+      "--json", "number,title,body,labels,milestone,assignees"
+    ], { encoding: "utf-8" });
     return JSON.parse(out);
   } catch (e) {
     console.error(`gh error: ${e.message}`);

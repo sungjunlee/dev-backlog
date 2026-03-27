@@ -1,21 +1,9 @@
 ---
 name: dev-backlog
-description: Manage development work through GitHub Issues + local sprint files. GitHub Issues/Milestones are the source of truth for task definitions; local sprint files are where execution happens — batching, ordering, notes, context, and progress tracking. Use whenever the user wants to create issues, plan sprints, check what to work on, review progress, sync with GitHub, or manage milestones. Triggers on "what should I work on", "create an issue", "plan sprint", "show backlog", "sync tasks", "다음 작업", "이슈 만들어", "스프린트 계획", "백로그". Even if the user just mentions tasks or issues casually, consider whether this skill applies.
-version: 0.3.1
+description: Manage development work through GitHub Issues + local sprint files. Issues/Milestones are the source of truth; local sprint files handle execution — batching, ordering, context, and progress. Use for creating issues, planning sprints, checking what to work on, reviewing progress, syncing with GitHub, managing milestones, backlog, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
-  related-skills: dev-relay
-  integration-points: sprint-file, github-issues
-triggers:
-  - "create an issue"
-  - "create a task"
-  - "what should I work on"
-  - "show backlog"
-  - "plan sprint"
-  - "sync tasks"
-  - "이슈 만들어"
-  - "백로그"
-  - "스프린트"
-  - "다음 작업"
+  related-skills: "relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
 
 # Dev Backlog
