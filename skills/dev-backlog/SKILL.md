@@ -1,5 +1,6 @@
 ---
 name: dev-backlog
+argument-hint: "[orient|plan|work|next|sync] [issue-number]"
 description: Manage development work through GitHub Issues + local sprint files. Issues/Milestones are the source of truth; local sprint files handle execution — batching, ordering, context, and progress. Use for creating issues, planning sprints, checking what to work on, reviewing progress, syncing with GitHub, managing milestones, backlog, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
