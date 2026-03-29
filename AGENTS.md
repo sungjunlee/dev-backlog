@@ -7,7 +7,7 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 ```
 skills/
   dev-backlog/
-    SKILL.md               ← Core process (~290 lines)
+    SKILL.md               ← Core process (~194 lines)
     references/            ← Detailed specs (on-demand)
     scripts/               ← Deterministic helpers (node + bash)
 ```
@@ -18,7 +18,7 @@ skills/
 - **Sprint files = execution hub** (how to do it, context, notes, progress)
 - **Task files = thin GitHub mirror** (sync cache, AC checkboxes only)
 - **Backlog.md compatible** — task file format follows Backlog.md; sprints/ is a custom addition
-- **Cross-platform** — works on Codex and Codex (both have `gh` CLI)
+- **Cross-platform** — works on Claude Code and Codex (both have `gh` CLI)
 - **Explicit sync** — pull/push is manual; no silent background sync
 
 ## Two-Layer Architecture
