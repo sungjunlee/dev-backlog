@@ -56,7 +56,7 @@ function main() {
   const PREFIX = args.find((a) => !a.startsWith("-")) || "BACK";
   const TASKS_DIR = path.join("backlog", "tasks");
 
-  fs.mkdirSync(TASKS_DIR, { recursive: true });
+  if (!DRY_RUN) fs.mkdirSync(TASKS_DIR, { recursive: true });
 
   function getOpenIssues() {
     try {

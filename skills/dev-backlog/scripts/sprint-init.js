@@ -47,7 +47,7 @@ function main() {
   }
 
   const SPRINTS_DIR = path.join("backlog", "sprints");
-  fs.mkdirSync(SPRINTS_DIR, { recursive: true });
+  if (!DRY_RUN) fs.mkdirSync(SPRINTS_DIR, { recursive: true });
 
   const today = new Date();
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
