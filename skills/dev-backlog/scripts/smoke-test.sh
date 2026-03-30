@@ -354,6 +354,209 @@ assert_contains "status: todo count" "$OUT" "1 To Do"
 assert_contains "status: inprog count" "$OUT" "1 In Progress"
 assert_contains "status: completed count" "$OUT" "Completed: 1"
 
+# ============================================================
+# context-hook.sh tests
+# ============================================================
+
+# Restore active sprint for hook tests
+cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+---
+milestone: Test Sprint
+status: active
+started: 2026-03-30
+due: 2026-04-05
+---
+
+# Test Sprint
+
+## Goal
+Test context hook.
+
+## Plan
+- [x] #1 Setup DB (~15min)
+- [x] #2 Seed data (~10min)
+- [~] #3 OAuth2 flow (~2hr) → PR #87 (reviewing)
+- [ ] #4 Rate limiting (~30min)
+- [ ] #5 Input validation (~20min)
+
+## Running Context
+
+## Progress
+EOF
+
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+assert_contains "hook: sprint name" "$OUT" "[Sprint: 2026-03-test]"
+assert_contains "hook: done count" "$OUT" "2/5 done"
+assert_contains "hook: in-flight" "$OUT" "1 in-flight"
+assert_contains "hook: next item" "$OUT" "Next: #4 Rate limiting"
+
+# Hook exits 0
+bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog"
+assert_equals "hook: exit code 0" "$?" "0"
+
+# No active sprint — silent exit 0
+rm "$TEST_DIR/backlog/sprints/2026-03-test.md"
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+assert_equals "hook: no sprint = empty" "$OUT" ""
+bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog"
+assert_equals "hook: no sprint exit 0" "$?" "0"
+
+# No sprints dir — silent exit 0
+rm -rf "$TEST_DIR/backlog/sprints"
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+assert_equals "hook: no dir = empty" "$OUT" ""
+
+# All done — no next item
+mkdir -p "$TEST_DIR/backlog/sprints"
+cat > "$TEST_DIR/backlog/sprints/2026-03-done.md" << 'EOF'
+---
+status: active
+---
+
+## Plan
+- [x] #1 Task A
+- [x] #2 Task B
+EOF
+
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+assert_contains "hook all-done: count" "$OUT" "2/2 done"
+assert_not_contains "hook all-done: no Next" "$OUT" "Next:"
+
+# ============================================================
+# integration contract pattern tests
+# ============================================================
+
+# Checkbox regex matches all three states
+assert_equals "contract: [ ] matches" "$(echo '- [ ] #1 Task' | grep -c '^\- \[.\] #')" "1"
+assert_equals "contract: [~] matches" "$(echo '- [~] #2 Task' | grep -c '^\- \[.\] #')" "1"
+assert_equals "contract: [x] matches" "$(echo '- [x] #3 Task' | grep -c '^\- \[.\] #')" "1"
+
+# Issue number extraction
+assert_equals "contract: issue number" \
+  "$(echo '- [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)' | sed 's/^\- \[.\] #\([0-9]*\).*/\1/')" "42"
+
+# Section heading regex
+assert_equals "contract: Plan heading" \
+  "$(echo '## Plan' | grep -c '^## Plan[ 	]*$')" "1"
+assert_equals "contract: Running Context heading" \
+  "$(echo '## Running Context' | grep -c '^## Running Context[ 	]*$')" "1"
+
+# ============================================================
+# sprint-close.sh tests
+# ============================================================
+
+# Setup fresh environment for sprint-close tests
+rm -rf "$TEST_DIR/backlog"
+mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+
+cat > "$TEST_DIR/backlog/sprints/2026-03-auth.md" << 'EOF'
+---
+milestone: Auth Sprint
+status: active
+started: 2026-03-22
+due: 2026-03-28
+---
+
+# Auth Sprint
+
+## Goal
+Ship auth.
+
+## Plan
+- [x] #1 DB schema
+- [x] #2 OAuth flow
+
+## Running Context
+- argon2 for hashing (decided in #1)
+- test DB: docker-compose.test.yml
+
+## Progress
+- 2026-03-22: Batch 1 done.
+EOF
+
+# Create matching task files
+cat > "$TEST_DIR/backlog/tasks/BACK-1 - db-schema.md" << 'EOF'
+---
+id: BACK-1
+title: DB schema
+status: In Progress
+---
+EOF
+cat > "$TEST_DIR/backlog/tasks/BACK-2 - oauth-flow.md" << 'EOF'
+---
+id: BACK-2
+title: OAuth flow
+status: In Progress
+---
+EOF
+# Task not in sprint — should NOT be moved
+cat > "$TEST_DIR/backlog/tasks/BACK-99 - unrelated.md" << 'EOF'
+---
+id: BACK-99
+title: Unrelated
+status: To Do
+---
+EOF
+
+# --- dry-run test ---
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" --dry-run 2>&1)
+assert_contains "close dry-run: would set completed" "$OUT" "Would set status: completed"
+assert_contains "close dry-run: would move task" "$OUT" "BACK-1"
+assert_contains "close dry-run: shows context entries" "$OUT" "argon2"
+# Verify nothing actually changed
+assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "3"
+
+# --- actual close ---
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+assert_contains "close: set completed" "$OUT" "status: completed"
+assert_contains "close: moved tasks" "$OUT" "BACK-1"
+assert_contains "close: context reminder" "$OUT" "argon2"
+
+# Verify sprint file updated
+assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "completed"
+
+# Verify tasks moved
+assert_equals "close: tasks dir has 1 left" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "1"
+assert_equals "close: unrelated stayed" "$(ls "$TEST_DIR/backlog/tasks/")" "BACK-99 - unrelated.md"
+assert_equals "close: completed has 2" "$(ls "$TEST_DIR/backlog/completed/" | wc -l | tr -d ' ')" "2"
+
+# --- ambiguous issue number test (#1 must not match #11) ---
+rm -rf "$TEST_DIR/backlog"
+mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+
+cat > "$TEST_DIR/backlog/sprints/2026-03-ambig.md" << 'EOF'
+---
+status: active
+---
+
+## Plan
+- [x] #1 Short task
+
+## Running Context
+
+## Progress
+EOF
+
+cat > "$TEST_DIR/backlog/tasks/BACK-1 - short-task.md" << 'EOF'
+---
+id: BACK-1
+---
+EOF
+cat > "$TEST_DIR/backlog/tasks/BACK-11 - longer-task.md" << 'EOF'
+---
+id: BACK-11
+---
+EOF
+
+bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" >/dev/null 2>&1
+assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
+assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
+
+# --- no active sprint ---
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+assert_contains "close: no active sprint" "$OUT" "No active sprint"
+
 # --- Results ---
 echo ""
 TOTAL=$((PASS + FAIL))
