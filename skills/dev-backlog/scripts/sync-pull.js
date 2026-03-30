@@ -35,40 +35,19 @@ function structureBody(body) {
   return "\n## Description\n" + body + "\n";
 }
 
-// --- Main execution ---
+// --- Core logic (testable) ---
 
-function main() {
-  const args = process.argv.slice(2);
-  const UPDATE = args.includes("--update");
-  const DRY_RUN = args.includes("--dry-run");
-  const config = readConfig();
-  const PREFIX = args.find((a) => !a.startsWith("-")) || config.task_prefix;
-  const TASKS_DIR = path.join("backlog", "tasks");
-
-  if (!DRY_RUN) fs.mkdirSync(TASKS_DIR, { recursive: true });
-
-  function getOpenIssues() {
-    try {
-      const out = execFileSync("gh", [
-        "issue", "list", "--state", "open", "--limit", "100",
-        "--json", "number,title,body,labels,milestone,assignees"
-      ], { encoding: "utf-8" });
-      return JSON.parse(out);
-    } catch (e) {
-      console.error(`gh error: ${e.message}`);
-      process.exit(1);
-    }
-  }
+function run({ issues, tasksDir, prefix, update, dryRun }) {
+  if (!dryRun) fs.mkdirSync(tasksDir, { recursive: true });
 
   function findExistingFile(num) {
-    const prefix = `${PREFIX}-${num} - `;
-    const files = fs.readdirSync(TASKS_DIR);
-    return files.find((f) => f.startsWith(prefix) && f.endsWith(".md"));
+    const pfx = `${prefix}-${num} - `;
+    if (!fs.existsSync(tasksDir)) return undefined;
+    const files = fs.readdirSync(tasksDir);
+    return files.find((f) => f.startsWith(pfx) && f.endsWith(".md"));
   }
 
   function buildFrontmatter(issue, labelNames) {
-    const num = issue.number;
-    const title = issue.title;
     const milestone = issue.milestone?.title || "";
     const status = statusFromLabels(labelNames);
     const priority = priorityFromLabels(labelNames);
@@ -81,8 +60,8 @@ function main() {
     const today = new Date().toISOString().slice(0, 10);
 
     return `---
-id: ${PREFIX}-${num}
-title: ${escapeYaml(title)}
+id: ${prefix}-${issue.number}
+title: ${escapeYaml(issue.title)}
 status: ${status}
 labels:${labelsYaml}
 priority: ${priority}
@@ -93,24 +72,23 @@ created_date: '${today}'
 
   function writeTaskFile(issue) {
     const num = issue.number;
-    const title = issue.title;
-    const slug = slugify(title) || String(num);
-    const filename = `${PREFIX}-${num} - ${slug}.md`;
-    const filepath = path.join(TASKS_DIR, filename);
+    const slug = slugify(issue.title) || String(num);
+    const filename = `${prefix}-${num} - ${slug}.md`;
+    const filepath = path.join(tasksDir, filename);
     const labelNames = (issue.labels || []).map((l) => l.name);
     const body = issue.body || "";
 
     const existing = findExistingFile(num);
     if (existing) {
-      if (!UPDATE) {
+      if (!update) {
         console.log(`  skip: ${existing} (exists, use --update to refresh)`);
         return;
       }
-      if (DRY_RUN) {
+      if (dryRun) {
         console.log(`  would update: ${existing}`);
         return;
       }
-      const existingPath = path.join(TASKS_DIR, existing);
+      const existingPath = path.join(tasksDir, existing);
       const content = fs.readFileSync(existingPath, "utf-8");
       const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
       const existingBody = bodyMatch ? bodyMatch[1] : structureBody(body);
@@ -120,7 +98,7 @@ created_date: '${today}'
       return;
     }
 
-    if (DRY_RUN) {
+    if (dryRun) {
       console.log(`  would create: ${filename}`);
       return;
     }
@@ -129,7 +107,30 @@ created_date: '${today}'
     console.log(`  pull: ${filename}`);
   }
 
-  const issues = getOpenIssues();
+  const label = dryRun ? "[dry-run] " : "";
+  console.log(`${label}Found ${issues.length} open issues. Syncing to ${tasksDir}/`);
+  issues.forEach(writeTaskFile);
+  console.log("Done.");
+}
+
+// --- CLI entry point ---
+
+function main() {
+  const args = process.argv.slice(2);
+  const config = readConfig();
+
+  let issues;
+  try {
+    const out = execFileSync("gh", [
+      "issue", "list", "--state", "open", "--limit", "100",
+      "--json", "number,title,body,labels,milestone,assignees"
+    ], { encoding: "utf-8" });
+    issues = JSON.parse(out);
+  } catch (e) {
+    console.error(`gh error: ${e.message}`);
+    process.exit(1);
+  }
+
   if (issues.length >= 100) {
     console.warn("Warning: 100 issues fetched (limit). Some issues may be missing.");
   }
@@ -138,12 +139,15 @@ created_date: '${today}'
     process.exit(0);
   }
 
-  const label = DRY_RUN ? "[dry-run] " : "";
-  console.log(`${label}Found ${issues.length} open issues. Syncing to ${TASKS_DIR}/`);
-  issues.forEach(writeTaskFile);
-  console.log("Done.");
+  run({
+    issues,
+    tasksDir: path.join("backlog", "tasks"),
+    prefix: args.find((a) => !a.startsWith("-")) || config.task_prefix,
+    update: args.includes("--update"),
+    dryRun: args.includes("--dry-run"),
+  });
 }
 
 if (require.main === module) main();
 
-module.exports = { statusFromLabels, priorityFromLabels, structureBody };
+module.exports = { statusFromLabels, priorityFromLabels, structureBody, run };
