@@ -12,17 +12,30 @@ if [ -d "$SPRINTS_DIR" ]; then
   ACTIVE=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: active" {} \; 2>/dev/null | head -1)
   if [ -n "$ACTIVE" ]; then
     SPRINT_NAME=$(basename "$ACTIVE" .md)
-    TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null || echo 0)
-    DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null || echo 0)
-    TODO=$((TOTAL - DONE))
+    TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null) || TOTAL=0
+    DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null) || DONE=0
+    IN_FLIGHT=$(grep -c '^\- \[~\] #' "$ACTIVE" 2>/dev/null) || IN_FLIGHT=0
+    TODO=$((TOTAL - DONE - IN_FLIGHT))
     if [ "$TOTAL" -gt 0 ]; then
       PCT=$((DONE * 100 / TOTAL))
     else
       PCT=0
     fi
-    echo "$SPRINT_NAME: $DONE/$TOTAL tasks ($PCT%)"
+    if [ "$IN_FLIGHT" -gt 0 ]; then
+      echo "$SPRINT_NAME: $DONE/$TOTAL tasks ($PCT%) — $IN_FLIGHT in-flight"
+    else
+      echo "$SPRINT_NAME: $DONE/$TOTAL tasks ($PCT%)"
+    fi
 
-    # Show in-progress (unchecked items in completed batches, or first unchecked batch)
+    # Show in-flight items (dispatched via dev-relay)
+    IN_FLIGHT_ITEMS=$(grep '^\- \[~\] #' "$ACTIVE" | head -3)
+    if [ -n "$IN_FLIGHT_ITEMS" ]; then
+      echo ""
+      echo "In flight:"
+      echo "$IN_FLIGHT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
+    fi
+
+    # Show next unchecked items
     NEXT_ITEMS=$(grep '^\- \[ \] #' "$ACTIVE" | head -3)
     if [ -n "$NEXT_ITEMS" ]; then
       echo ""
@@ -30,7 +43,7 @@ if [ -d "$SPRINTS_DIR" ]; then
       echo "$NEXT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
     fi
 
-    if [ "$TODO" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+    if [ "$TODO" -eq 0 ] && [ "$IN_FLIGHT" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
       echo ""
       echo ">> All items done — ready to close sprint"
     fi

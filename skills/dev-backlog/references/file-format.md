@@ -69,17 +69,22 @@ Task files are thin GitHub mirrors. Notes, decisions, and context go in the **sp
 
 ```markdown
 ## Description
-[Synced from GitHub issue body]
+[Synced from GitHub issue body — includes any checkboxes from the issue]
+```
 
+`sync-pull.js` wraps the raw GitHub issue body in `## Description`. Acceptance criteria checkboxes from the issue body appear here as-is. dev-relay and other tools read AC from whatever structure the issue body provides.
+
+For manual task files or Backlog.md CLI compatibility, you can optionally add structured AC markers:
+
+```markdown
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] Condition 1
 - [x] Condition 2 (checked off during work)
-- [ ] Condition 3
 <!-- AC:END -->
 ```
 
-The `<!-- AC:BEGIN -->` and `<!-- AC:END -->` markers are optional but enable machine parsing by Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
+The `<!-- AC:BEGIN/END -->` markers enable machine parsing by the Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
 
 Only AC checkboxes get updated in task files during work. Everything else (notes, technical decisions, running context) lives in the sprint file.
 

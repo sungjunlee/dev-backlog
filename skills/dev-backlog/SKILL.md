@@ -79,7 +79,7 @@ Ordered batches. Small tasks grouped into one session.
 - [x] #39 Seed data script (~10min)
 
 ### Batch 2 — Core auth
-- [ ] #42 OAuth2 flow (~2hr)
+- [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
 
 ### Batch 3 — Hardening (one session)
 - [ ] #43 Rate limiting (~30min)
@@ -100,6 +100,14 @@ Carries across all tasks in this sprint. Add entries as you learn things.
 - 2026-03-22 PM: #42 started. 3/5 AC done. Token refresh logic remaining.
 - 2026-03-23 AM: #42 complete. Started Batch 3.
 ```
+
+### Plan checkbox states
+
+| Marker | Meaning | Set by |
+|--------|---------|--------|
+| `[ ]` | Not started | sprint-init.js or manual |
+| `[~]` | In-flight — dispatched, PR under review | dev-relay (after dispatch) |
+| `[x]` | Done — merged or completed | Manual or dev-relay (after merge) |
 
 ### What each section does
 

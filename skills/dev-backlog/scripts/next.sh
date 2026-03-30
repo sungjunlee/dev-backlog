@@ -35,16 +35,30 @@ if [ -n "$GOAL" ]; then
 fi
 
 # Count progress
-TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null || echo 0)
-DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null || echo 0)
-TODO=$((TOTAL - DONE))
-echo "Progress: $DONE/$TOTAL done ($TODO remaining)"
+TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null) || TOTAL=0
+DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null) || DONE=0
+IN_FLIGHT=$(grep -c '^\- \[~\] #' "$ACTIVE" 2>/dev/null) || IN_FLIGHT=0
+TODO=$((TOTAL - DONE - IN_FLIGHT))
+if [ "$IN_FLIGHT" -gt 0 ]; then
+  echo "Progress: $DONE/$TOTAL done ($IN_FLIGHT in-flight, $TODO remaining)"
+else
+  echo "Progress: $DONE/$TOTAL done ($TODO remaining)"
+fi
 echo ""
 
 # All done?
-if [ "$TODO" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+if [ "$TODO" -eq 0 ] && [ "$IN_FLIGHT" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
   echo "All items checked! Ready to close sprint."
   exit 0
+fi
+
+# Show in-flight items (dispatched via dev-relay, marked [~])
+if [ "$IN_FLIGHT" -gt 0 ]; then
+  echo "In flight:"
+  grep '^\- \[~\] #' "$ACTIVE" | while IFS= read -r line; do
+    echo "  $line"
+  done
+  echo ""
 fi
 
 # Find current batch (first batch with unchecked items)
