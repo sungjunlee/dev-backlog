@@ -1,65 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { slugify, escapeYaml, statusFromLabels, priorityFromLabels, structureBody } = require("./sync-pull.js");
-
-describe("slugify", () => {
-  it("converts spaces to hyphens", () => {
-    assert.equal(slugify("hello world"), "hello-world");
-  });
-
-  it("removes special characters", () => {
-    assert.equal(slugify("OAuth2 (flow)"), "oauth2-flow");
-    assert.equal(slugify("hello@world!"), "hello-world");
-  });
-
-  it("collapses multiple hyphens", () => {
-    assert.equal(slugify("a---b"), "a-b");
-  });
-
-  it("trims leading and trailing hyphens", () => {
-    assert.equal(slugify("-hello-"), "hello");
-  });
-
-  it("lowercases output", () => {
-    assert.equal(slugify("Hello World"), "hello-world");
-  });
-
-  it("returns empty string for non-ASCII-only input", () => {
-    assert.equal(slugify("인증 시스템"), "");
-  });
-
-  it("handles mixed ASCII and non-ASCII", () => {
-    assert.equal(slugify("OAuth2 인증"), "oauth2");
-  });
-
-  it("returns empty string for empty input", () => {
-    assert.equal(slugify(""), "");
-  });
-});
-
-describe("escapeYaml", () => {
-  it("returns plain text unchanged", () => {
-    assert.equal(escapeYaml("simple text"), "simple text");
-  });
-
-  it("quotes text with colons", () => {
-    assert.equal(escapeYaml("key: value"), "'key: value'");
-  });
-
-  it("quotes text with special chars", () => {
-    assert.equal(escapeYaml("hello #world"), "'hello #world'");
-    assert.equal(escapeYaml("a & b"), "'a & b'");
-    assert.equal(escapeYaml("100%"), "'100%'");
-  });
-
-  it("escapes single quotes by doubling", () => {
-    assert.equal(escapeYaml("it's here"), "'it''s here'");
-  });
-
-  it("quotes text with leading/trailing whitespace", () => {
-    assert.equal(escapeYaml(" padded "), "' padded '");
-  });
-});
+const { statusFromLabels, priorityFromLabels, structureBody } = require("./sync-pull.js");
 
 describe("statusFromLabels", () => {
   it("returns In Progress for status:in-progress", () => {

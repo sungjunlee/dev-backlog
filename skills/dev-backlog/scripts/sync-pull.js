@@ -13,19 +13,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-
-// --- Pure functions (exported for testing) ---
-
-function slugify(text) {
-  return text.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
-}
-
-function escapeYaml(text) {
-  if (/[:"'#{}\[\]|>&*!%@`]/.test(text) || text !== text.trim()) {
-    return "'" + text.replace(/'/g, "''") + "'";
-  }
-  return text;
-}
+const { slugify, escapeYaml, readConfig } = require("./lib");
 
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
@@ -53,7 +41,8 @@ function main() {
   const args = process.argv.slice(2);
   const UPDATE = args.includes("--update");
   const DRY_RUN = args.includes("--dry-run");
-  const PREFIX = args.find((a) => !a.startsWith("-")) || "BACK";
+  const config = readConfig();
+  const PREFIX = args.find((a) => !a.startsWith("-")) || config.task_prefix;
   const TASKS_DIR = path.join("backlog", "tasks");
 
   if (!DRY_RUN) fs.mkdirSync(TASKS_DIR, { recursive: true });
@@ -157,4 +146,4 @@ created_date: '${today}'
 
 if (require.main === module) main();
 
-module.exports = { slugify, escapeYaml, statusFromLabels, priorityFromLabels, structureBody };
+module.exports = { statusFromLabels, priorityFromLabels, structureBody };
