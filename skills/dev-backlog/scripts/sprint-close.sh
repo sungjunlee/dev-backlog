@@ -101,8 +101,8 @@ if $CLOSE_MILESTONE; then
     if $DRY_RUN; then
       echo "[dry-run] Would close milestone: $MILESTONE"
     else
-      gh api repos/{owner}/{repo}/milestones \
-        --jq ".[] | select(.title==\"$MILESTONE\") | .number" 2>/dev/null | \
+      MS="$MILESTONE" gh api repos/{owner}/{repo}/milestones \
+        --jq '.[] | select(.title==env.MS) | .number' 2>/dev/null | \
         while IFS= read -r ms_num; do
           gh api -X PATCH "repos/{owner}/{repo}/milestones/$ms_num" -f state=closed 2>/dev/null && \
             echo "Closed milestone: $MILESTONE" || \
