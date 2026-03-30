@@ -3,28 +3,28 @@ set -uo pipefail
 # Project status from sprint file + GitHub + local files.
 # Usage: bash scripts/status.sh [backlog-dir]
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
 BACKLOG_DIR="${1:-backlog}"
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 # --- Active Sprint ---
 echo "=== Active Sprint ==="
 if [ -d "$SPRINTS_DIR" ]; then
-  ACTIVE=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: active" {} \; 2>/dev/null | head -1)
+  ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
   if [ -n "$ACTIVE" ]; then
     SPRINT_NAME=$(basename "$ACTIVE" .md)
-    TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null) || TOTAL=0
-    DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null) || DONE=0
-    IN_FLIGHT=$(grep -c '^\- \[~\] #' "$ACTIVE" 2>/dev/null) || IN_FLIGHT=0
-    TODO=$((TOTAL - DONE - IN_FLIGHT))
-    if [ "$TOTAL" -gt 0 ]; then
-      PCT=$((DONE * 100 / TOTAL))
+    count_checkboxes "$ACTIVE"
+    if [ "$CB_TOTAL" -gt 0 ]; then
+      PCT=$((CB_DONE * 100 / CB_TOTAL))
     else
       PCT=0
     fi
-    if [ "$IN_FLIGHT" -gt 0 ]; then
-      echo "$SPRINT_NAME: $DONE/$TOTAL tasks ($PCT%) — $IN_FLIGHT in-flight"
+    if [ "$CB_IN_FLIGHT" -gt 0 ]; then
+      echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%) — $CB_IN_FLIGHT in-flight"
     else
-      echo "$SPRINT_NAME: $DONE/$TOTAL tasks ($PCT%)"
+      echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%)"
     fi
 
     # Show in-flight items (dispatched via dev-relay)
@@ -43,7 +43,7 @@ if [ -d "$SPRINTS_DIR" ]; then
       echo "$NEXT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
     fi
 
-    if [ "$TODO" -eq 0 ] && [ "$IN_FLIGHT" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+    if [ "$CB_TODO" -eq 0 ] && [ "$CB_IN_FLIGHT" -eq 0 ] && [ "$CB_TOTAL" -gt 0 ]; then
       echo ""
       echo ">> All items done — ready to close sprint"
     fi

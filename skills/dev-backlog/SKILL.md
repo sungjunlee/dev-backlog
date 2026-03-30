@@ -109,6 +109,27 @@ Carries across all tasks in this sprint. Add entries as you learn things.
 | `[~]` | In-flight — dispatched, PR under review | dev-relay (after dispatch) |
 | `[x]` | Done — merged or completed | Manual or dev-relay (after merge) |
 
+```
+[ ] #42 OAuth2 flow              ← Planning (sprint-init or manual)
+ │
+ ├─ Do yourself ──→ [x] #42       ← commit "Fixes #42"
+ └─ Delegate ─────→ [~] #42 → PR #87 (reviewing)
+                     │
+                     └──────────→ [x] #42 → PR #87 (merged)
+```
+
+### dev-relay data flow
+
+```
+backlog/sprints/{active}.md          backlog/tasks/{PREFIX}-{N}.md
+┌──────────────────────┐             ┌────────────────────┐
+│ ## Plan               │──reads───→ │ AC checkboxes      │──→ relay-plan
+│  [ ] / [~] / [x]     │←─writes──  └────────────────────┘
+│ ## Running Context    │←─writes──  relay-merge (learnings)
+│ ## Progress           │←─writes──  relay-merge (audit log)
+└──────────────────────┘
+```
+
 ### What each section does
 
 | Section | Purpose | When to update |
@@ -195,8 +216,10 @@ Full process details: `references/process.md` (Orient, Create, Plan, Work, Compl
 
 All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, not the target project). Run from the target project root.
 
+- `scripts/lib.sh` — Shared bash functions: `find_active_sprint`, `count_checkboxes`, `extract_section`
+- `scripts/lib.js` — Shared Node functions: `slugify`, `escapeYaml`, `readConfig`, `estimateSize`
 - `scripts/init.sh [project-name]` — Bootstrap `backlog/` directory with config.yml
 - `scripts/next.sh` — Show next actionable batch from active sprint (zero LLM cost)
 - `scripts/status.sh` — Project status from sprint file + GitHub
-- `scripts/sync-pull.js [PREFIX] [--update]` — Pull open GitHub issues to local backlog/tasks/. `--update` refreshes frontmatter of existing files while preserving local AC checkboxes.
+- `scripts/sync-pull.js [PREFIX] [--update]` — Pull open GitHub issues to local backlog/tasks/. PREFIX defaults to config.yml's `task_prefix`. `--update` refreshes frontmatter while preserving local AC checkboxes.
 - `scripts/sprint-init.js "auth-system" [--milestone "Name"]` — Generate sprint file skeleton

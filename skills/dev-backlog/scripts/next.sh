@@ -6,6 +6,9 @@ set -uo pipefail
 # Usage: bash scripts/next.sh [backlog-dir]
 #        backlog-dir defaults to ./backlog
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
 BACKLOG_DIR="${1:-backlog}"
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
@@ -14,8 +17,7 @@ if [ ! -d "$SPRINTS_DIR" ]; then
   exit 1
 fi
 
-# Find active sprint file (status: active in frontmatter)
-ACTIVE=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: active" {} \; 2>/dev/null | head -1)
+ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
 
 if [ -z "$ACTIVE" ]; then
   echo "No active sprint found."
@@ -28,32 +30,29 @@ echo "=== Sprint: $SPRINT_NAME ==="
 echo ""
 
 # Extract Goal
-GOAL=$(sed -n '/^## Goal/,/^## /{/^## Goal/d;/^## /d;p;}' "$ACTIVE" | head -3 | sed 's/^ *//')
+GOAL=$(extract_section "$ACTIVE" "Goal" | head -3 | sed 's/^ *//')
 if [ -n "$GOAL" ]; then
   echo "Goal: $GOAL"
   echo ""
 fi
 
 # Count progress
-TOTAL=$(grep -c '^\- \[.\] #' "$ACTIVE" 2>/dev/null) || TOTAL=0
-DONE=$(grep -c '^\- \[x\] #' "$ACTIVE" 2>/dev/null) || DONE=0
-IN_FLIGHT=$(grep -c '^\- \[~\] #' "$ACTIVE" 2>/dev/null) || IN_FLIGHT=0
-TODO=$((TOTAL - DONE - IN_FLIGHT))
-if [ "$IN_FLIGHT" -gt 0 ]; then
-  echo "Progress: $DONE/$TOTAL done ($IN_FLIGHT in-flight, $TODO remaining)"
+count_checkboxes "$ACTIVE"
+if [ "$CB_IN_FLIGHT" -gt 0 ]; then
+  echo "Progress: $CB_DONE/$CB_TOTAL done ($CB_IN_FLIGHT in-flight, $CB_TODO remaining)"
 else
-  echo "Progress: $DONE/$TOTAL done ($TODO remaining)"
+  echo "Progress: $CB_DONE/$CB_TOTAL done ($CB_TODO remaining)"
 fi
 echo ""
 
 # All done?
-if [ "$TODO" -eq 0 ] && [ "$IN_FLIGHT" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+if [ "$CB_TODO" -eq 0 ] && [ "$CB_IN_FLIGHT" -eq 0 ] && [ "$CB_TOTAL" -gt 0 ]; then
   echo "All items checked! Ready to close sprint."
   exit 0
 fi
 
 # Show in-flight items (dispatched via dev-relay, marked [~])
-if [ "$IN_FLIGHT" -gt 0 ]; then
+if [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "In flight:"
   grep '^\- \[~\] #' "$ACTIVE" | while IFS= read -r line; do
     echo "  $line"
@@ -91,7 +90,7 @@ fi
 
 # Last progress entry
 echo ""
-LAST_PROGRESS=$(sed -n '/^## Progress/,/^## /{/^## /d;p;}' "$ACTIVE" | grep '^\- ' | tail -1)
+LAST_PROGRESS=$(extract_section "$ACTIVE" "Progress" | grep '^\- ' | tail -1)
 if [ -n "$LAST_PROGRESS" ]; then
   echo "Last: $LAST_PROGRESS"
 fi

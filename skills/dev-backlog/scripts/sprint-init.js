@@ -13,20 +13,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-
-// --- Pure functions (exported for testing) ---
-
-function slugify(text) {
-  return text.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
-}
-
-function estimateSize(labels) {
-  for (const l of labels) {
-    if (l === "bug" || l === "type:bug") return "~30min";
-    if (l === "chore" || l === "type:chore") return "~15min";
-  }
-  return "";
-}
+const { slugify, estimateSize } = require("./lib");
 
 // --- Main execution ---
 
@@ -142,4 +129,4 @@ ${issueLines.join("\n")}
 
 if (require.main === module) main();
 
-module.exports = { slugify, estimateSize };
+module.exports = {};
