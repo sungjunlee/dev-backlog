@@ -163,4 +163,14 @@ describe("readConfig", () => {
     const config = readConfig(tmpDir);
     assert.equal(config.task_prefix, "BACK");
   });
+
+  it("preserves array defaults for list values", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config.yml"),
+      'statuses: ["To Do", "In Progress", "Done"]\ntask_prefix: "PROJ"\n'
+    );
+    const config = readConfig(tmpDir);
+    assert.ok(Array.isArray(config.statuses), "statuses should remain an array");
+    assert.equal(config.task_prefix, "PROJ");
+  });
 });

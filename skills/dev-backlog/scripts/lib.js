@@ -40,6 +40,8 @@ function readConfig(backlogDir) {
       const m = line.match(/^(\w+):\s*(.+)$/);
       if (!m) continue;
       let val = m[2].trim();
+      // Skip list values — simple parser handles scalars only; defaults preserved
+      if (val.startsWith("[")) continue;
       // Strip surrounding quotes
       if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
