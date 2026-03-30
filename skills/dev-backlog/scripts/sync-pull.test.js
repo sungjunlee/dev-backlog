@@ -238,6 +238,20 @@ Original description
     assert.equal(files.length, 0);
   });
 
+  it("--dry-run works when tasksDir does not exist", () => {
+    const missingDir = path.join(tasksDir, "nonexistent", "tasks");
+    assert.doesNotThrow(() => {
+      run({
+        issues: [makeIssue()],
+        tasksDir: missingDir,
+        prefix: "TEST",
+        update: false,
+        dryRun: true,
+      });
+    });
+    assert.equal(fs.existsSync(missingDir), false);
+  });
+
   it("--dry-run does not update existing files", () => {
     fs.writeFileSync(
       path.join(tasksDir, "TEST-42 - oauth2-flow.md"),

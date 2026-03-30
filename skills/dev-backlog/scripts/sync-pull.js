@@ -42,6 +42,7 @@ function run({ issues, tasksDir, prefix, update, dryRun }) {
 
   function findExistingFile(num) {
     const pfx = `${prefix}-${num} - `;
+    if (!fs.existsSync(tasksDir)) return undefined;
     const files = fs.readdirSync(tasksDir);
     return files.find((f) => f.startsWith(pfx) && f.endsWith(".md"));
   }
