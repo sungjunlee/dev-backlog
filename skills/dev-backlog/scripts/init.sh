@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 # Bootstrap backlog/ directory for a new project.
 #
 # Usage: bash scripts/init.sh [project-name]
