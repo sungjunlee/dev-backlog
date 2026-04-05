@@ -8,6 +8,7 @@
  * Options:
  *   --update    Update existing files (frontmatter only; preserves local AC checkboxes)
  *   --dry-run   Show what would be created/updated without writing files
+ *   --json      Print machine-readable summary to stdout
  */
 
 const { execFileSync } = require("child_process");
@@ -35,10 +36,65 @@ function structureBody(body) {
   return "\n## Description\n" + body + "\n";
 }
 
+function parseArgs(args, defaultPrefix) {
+  return {
+    prefix: args.find((a) => !a.startsWith("-")) || defaultPrefix,
+    update: args.includes("--update"),
+    dryRun: args.includes("--dry-run"),
+    json: args.includes("--json"),
+  };
+}
+
+function makeResult({ tasksDir, prefix, update, dryRun, issueCount }) {
+  return {
+    action: "sync-pull",
+    dryRun,
+    update,
+    prefix,
+    tasksDir,
+    issueCount,
+    counts: {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+    },
+    createdFiles: [],
+    updatedFiles: [],
+    skippedFiles: [],
+    operations: [],
+  };
+}
+
+function recordOperation(result, type, file) {
+  result.counts[type] += 1;
+  result.operations.push({ type, file });
+  if (type === "created") result.createdFiles.push(file);
+  if (type === "updated") result.updatedFiles.push(file);
+  if (type === "skipped") result.skippedFiles.push(file);
+}
+
+function printResult(result) {
+  const label = result.dryRun ? "[dry-run] " : "";
+  console.log(`${label}Found ${result.issueCount} open issues. Syncing to ${result.tasksDir}/`);
+
+  for (const op of result.operations) {
+    if (op.type === "created") {
+      console.log(result.dryRun ? `  would create: ${op.file}` : `  pull: ${op.file}`);
+    } else if (op.type === "updated") {
+      console.log(result.dryRun ? `  would update: ${op.file}` : `  update: ${op.file}`);
+    } else {
+      console.log(`  skip: ${op.file} (exists, use --update to refresh)`);
+    }
+  }
+
+  console.log("Done.");
+}
+
 // --- Core logic (testable) ---
 
 function run({ issues, tasksDir, prefix, update, dryRun }) {
   if (!dryRun) fs.mkdirSync(tasksDir, { recursive: true });
+  const result = makeResult({ tasksDir, prefix, update, dryRun, issueCount: issues.length });
 
   function findExistingFile(num) {
     const pfx = `${prefix}-${num} - `;
@@ -81,12 +137,12 @@ created_date: '${today}'
     const existing = findExistingFile(num);
     if (existing) {
       if (!update) {
-        console.log(`  skip: ${existing} (exists, use --update to refresh)`);
-        return;
+        recordOperation(result, "skipped", existing);
+        return existing;
       }
       if (dryRun) {
-        console.log(`  would update: ${existing}`);
-        return;
+        recordOperation(result, "updated", existing);
+        return existing;
       }
       const existingPath = path.join(tasksDir, existing);
       const content = fs.readFileSync(existingPath, "utf-8");
@@ -94,23 +150,22 @@ created_date: '${today}'
       const existingBody = bodyMatch ? bodyMatch[1] : structureBody(body);
       const newContent = buildFrontmatter(issue, labelNames) + "\n" + existingBody;
       fs.writeFileSync(existingPath, newContent);
-      console.log(`  update: ${existing}`);
-      return;
+      recordOperation(result, "updated", existing);
+      return existing;
     }
 
     if (dryRun) {
-      console.log(`  would create: ${filename}`);
-      return;
+      recordOperation(result, "created", filename);
+      return filename;
     }
     const content = buildFrontmatter(issue, labelNames) + structureBody(body);
     fs.writeFileSync(filepath, content);
-    console.log(`  pull: ${filename}`);
+    recordOperation(result, "created", filename);
+    return filename;
   }
 
-  const label = dryRun ? "[dry-run] " : "";
-  console.log(`${label}Found ${issues.length} open issues. Syncing to ${tasksDir}/`);
   issues.forEach(writeTaskFile);
-  console.log("Done.");
+  return result;
 }
 
 // --- CLI entry point ---
@@ -118,6 +173,7 @@ created_date: '${today}'
 function main() {
   const args = process.argv.slice(2);
   const config = readConfig();
+  const options = parseArgs(args, config.task_prefix);
 
   let issues;
   try {
@@ -135,19 +191,44 @@ function main() {
     console.warn("Warning: 100 issues fetched (limit). Some issues may be missing.");
   }
   if (!issues.length) {
-    console.log("No open issues found.");
+    if (options.json) {
+      console.log(JSON.stringify(makeResult({
+        tasksDir: path.join("backlog", "tasks"),
+        prefix: options.prefix,
+        update: options.update,
+        dryRun: options.dryRun,
+        issueCount: 0,
+      }), null, 2));
+    } else {
+      console.log("No open issues found.");
+    }
     process.exit(0);
   }
 
-  run({
+  const result = run({
     issues,
     tasksDir: path.join("backlog", "tasks"),
-    prefix: args.find((a) => !a.startsWith("-")) || config.task_prefix,
-    update: args.includes("--update"),
-    dryRun: args.includes("--dry-run"),
+    prefix: options.prefix,
+    update: options.update,
+    dryRun: options.dryRun,
   });
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  printResult(result);
 }
 
 if (require.main === module) main();
 
-module.exports = { statusFromLabels, priorityFromLabels, structureBody, run };
+module.exports = {
+  statusFromLabels,
+  priorityFromLabels,
+  structureBody,
+  parseArgs,
+  makeResult,
+  printResult,
+  run,
+};
