@@ -5,7 +5,7 @@
 
 GitHub Issues stay the source of truth. Sprint files become the execution hub that both you and your AI agent read during a coding session.
 
-Issue trackers answer "what exists." They do not answer what to do next, what context matters, or what your AI agent should read before touching code. dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
+dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
 
 No new server. No hidden state. No need to abandon GitHub Issues.
 
@@ -145,7 +145,7 @@ This is simple on purpose. The issue tracker handles collaboration. The sprint f
 
 dev-backlog works fine on its own.
 
-If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint file becomes the execution hub for delegated implementation.
+If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint file tracks delegated implementation too.
 
 ```text
 [ ] #42 OAuth2 flow
@@ -157,7 +157,7 @@ If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint
                                           +----------------------------> [x] #42 -> PR #87 (merged)
 ```
 
-The sprint file is the coordination surface. One agent plans, another implements, a third reviews. The `[~]` state makes in-flight work visible to everyone, and `Running Context` carries decisions across handoffs without re-explaining.
+The `[~]` state makes in-flight work visible to everyone, and `Running Context` carries decisions across handoffs without re-explaining.
 
 The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
 
@@ -195,8 +195,6 @@ All scripts live under `skills/dev-backlog/scripts/`.
 
 ## Quality Bar
 
-This repo is meant to be used, not admired from a distance.
-
 - GitHub Actions CI runs on push and pull request to `main`
 - 130+ tests cover Node logic and Bash smoke flows
 - `--dry-run` exists for risky file-writing operations
@@ -212,7 +210,7 @@ This repo is meant to be used, not admired from a distance.
 | Task files stay thin | Sync cache only; decisions belong in the sprint file |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
-| Builds on Backlog.md | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) format; `sprints/` adds the execution hub layer and `gh` sync that Backlog.md does not cover |
+| Builds on Backlog.md | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) format; `sprints/` and `gh` sync are the additions |
 
 ## Docs
 
