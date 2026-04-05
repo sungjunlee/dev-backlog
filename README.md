@@ -1,78 +1,102 @@
 # dev-backlog
 
-**Manage development work through GitHub Issues + local sprint files.**
+[![CI](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml/badge.svg)](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-dev-backlog bridges GitHub's issue tracker with local sprint execution files for [Claude Code](https://claude.ai/code) and [Codex](https://chatgpt.com/codex). GitHub Issues define _what_ to do. Sprint files organize _how_ — batching, ordering, shared context, and progress tracking.
+Keep GitHub Issues as source of truth. Add a local sprint file as the execution layer for Claude Code, Codex, and humans.
 
+GitHub is good at shared visibility. It is bad at answering four questions that matter during a work session: what should I do next, what context matters, what is already in flight, and what should my AI agent read before touching code. dev-backlog fills that gap with plain Markdown files that live next to your repo and stay easy to inspect in git.
+
+No new server. No hidden state. No need to abandon GitHub Issues.
+
+```text
+GitHub
+  issues, milestones, labels, PR links
+        |
+        | explicit sync via gh
+        v
+backlog/
+  sprints/     one active working file: plan, context, progress
+  tasks/       thin issue mirror for local and AI reads
+  completed/   archived done tasks
+  config.yml   project config
 ```
-GitHub Issues                 Local Sprint File              Your Session
- │                             │                              │
- ├── #38 DB schema             │                              │
- ├── #39 Seed data       ──►  Batch 1 — DB + seed       ──► Read sprint file
- ├── #42 OAuth2 flow      ──►  Batch 2 — Core auth       ──► Work batch by batch
- ├── #43 Rate limiting    ──►  Batch 3 — Hardening       ──► Update progress
- └── #44 Input validation      │                              │
-                               Running Context:               │
-                               - argon2 for hashing           │
-                               - rate limit middleware path   │
-```
 
-## Why
+## Why This Exists
 
-- **One file per session** — read the sprint file and you know where you are, what's next, and what context matters
-- **Batching** — group small tasks (~15-30min) into one session for flow
-- **Running Context** — decisions and discoveries carry across tasks, not lost between sessions
-- **Explicit sync** — pull at sprint start, push at milestones; no silent background sync
-- **Backlog.md compatible** — `npm i -g backlog.md` adds board/TUI/MCP on top
+Issue trackers answer "what exists."
+
+Sessions need "what is next."
+
+If you work with Claude Code or Codex, this gets sharper. The agent can move fast, but only if it can read the same execution surface you do. A good sprint file gives both of you the same working memory: batches, decisions, gotchas, progress, and open loops.
+
+That is the whole point of this project.
+
+## What You Get
+
+| Capability | What changes |
+|------------|--------------|
+| GitHub stays the source of truth | Collaborators keep using issues, milestones, labels, and PR links |
+| One active sprint file | The human and the agent read the same execution plan |
+| Thin local task mirror | AI can read issue details without another API round trip |
+| Explicit sync | Pull and refresh when you choose, not behind your back |
+| `[ ]`, `[~]`, `[x]` plan states | In-flight delegated work stays visible instead of disappearing into PR tabs |
+| `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
+| `sprint-close.sh` | Close the loop: mark sprint complete, archive tasks, optionally close the milestone |
+| Plain Markdown + Bash + Node built-ins | No database, no daemon, no mystery |
 
 ## Install
 
-```bash
-npx skills add sungjunlee/dev-backlog
-```
-
-Installs as a [Claude Code custom slash command](https://docs.anthropic.com/en/docs/claude-code/skills). Add `-g -y` for global install without prompts:
+### Use as a skill
 
 ```bash
 npx skills add sungjunlee/dev-backlog -g -y
 ```
 
-<details>
-<summary>Install from a local clone</summary>
-
-```bash
-git clone https://github.com/sungjunlee/dev-backlog.git
-cd dev-backlog
-npx skills add . -g -y
-```
-</details>
-
 ### Prerequisites
 
 - [Claude Code](https://claude.ai/code) or [Codex](https://chatgpt.com/codex)
-- [`gh` CLI](https://cli.github.com/) — authenticated (`gh auth login`)
+- [`gh` CLI](https://cli.github.com/) authenticated with `gh auth login`
 - Git
 - Node.js 18+
 
+### Want to inspect or run the helper scripts directly?
+
+```bash
+git clone https://github.com/sungjunlee/dev-backlog.git
+```
+
 ## Quick Start
 
+Run these commands from the project you want to manage, not from the `dev-backlog` repo itself.
+The examples below assume you have this repo available at `/path/to/dev-backlog`. If you installed the skill with `npx skills add`, use the installed skill path instead.
+
+```bash
+# 1. Bootstrap backlog/
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/init.sh
+
+# 2. Pull open GitHub issues into backlog/tasks/
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --dry-run
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js
+
+# 3. Create an active sprint from a milestone
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
+
+# 4. See what to do next
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
 ```
-/dev-backlog orient          # Read sprint file, see where you are
-/dev-backlog next             # Show next actionable batch
-/dev-backlog status           # Project status from sprint + GitHub
+
+Then use the skill during your coding session:
+
+```text
+/dev-backlog orient
+/dev-backlog next
+/dev-backlog work 42
+/dev-backlog sync
 ```
 
-### Sprint lifecycle
-
-1. **Create issues** on GitHub with labels and milestones
-2. **Pull to local**: `sync-pull.js` fetches issues to `backlog/tasks/`
-3. **Plan sprint**: `sprint-init.js` generates a sprint file skeleton
-4. **Work batches**: implement, verify AC, commit with `Fixes #N`
-5. **Close sprint**: set `status: completed`, move tasks, promote context
-
-## Sprint File Example
-
-Filename: `2026-03-auth-system.md`
+## A Sprint File Looks Like This
 
 ```markdown
 ---
@@ -88,74 +112,126 @@ due: 2026-03-28
 Users can log in and access protected API endpoints.
 
 ## Plan
-### Batch 1 — DB + seed (one session)
+### Batch 1 - DB + seed
 - [x] #38 DB schema setup (~15min)
 - [x] #39 Seed data script (~10min)
 
-### Batch 2 — Core auth
-- [ ] #42 OAuth2 flow (~2hr)
+### Batch 2 - Core auth
+- [~] #42 OAuth2 flow (~2hr) -> PR #87 (reviewing)
+
+### Batch 3 - Hardening
+- [ ] #43 Rate limiting (~30min)
+- [ ] #44 Input validation (~20min)
 
 ## Running Context
-- argon2 for hashing (decided in #42)
-- rate limit middleware: middleware/rateLimit.ts
+- argon2 for hashing
+- test DB: docker-compose.test.yml
 
 ## Progress
 - 2026-03-22 AM: Batch 1 done.
-- 2026-03-22 PM: #42 started. 3/5 AC done.
+- 2026-03-22 PM: #42 in review.
 ```
 
-## Scripts
+`[ ]` means not started. `[~]` means in flight, usually a delegated task or open PR. `[x]` means merged or done.
 
-All scripts live in the skill's `scripts/` directory. Run from your project root.
+## Daily Workflow
 
-| Script | Description |
-|--------|-------------|
-| `init.sh [project-name]` | Bootstrap `backlog/` directory with config.yml |
-| `next.sh` | Show next actionable batch from active sprint |
-| `status.sh` | Project status from sprint file + GitHub |
-| `sync-pull.js [PREFIX] [--update] [--dry-run]` | Pull open GitHub issues to local task files |
-| `sprint-init.js "topic" [--milestone "Name"] [--dry-run]` | Generate sprint file skeleton |
+1. Pull GitHub issues into `backlog/tasks/`.
+2. Generate or update the active sprint file.
+3. Read the sprint before you code.
+4. Work batch by batch, not issue by issue across ten tabs.
+5. Update `Running Context` and `Progress` as you learn things.
+6. Close the sprint explicitly when the work is really done.
 
-## Structure
+This is simple on purpose. The issue tracker handles collaboration. The sprint file handles execution.
 
+## Solo Or With dev-relay
+
+dev-backlog works fine on its own.
+
+If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint file becomes the handoff contract between planning and delegated implementation.
+
+```text
+[ ] #42 OAuth2 flow
+   |
+   +-> do it yourself ------------------> [x] #42
+   |
+   +-> dispatch with dev-relay ---------> [~] #42 -> PR #87 (reviewing)
+                                          |
+                                          +----------------------------> [x] #42 -> PR #87 (merged)
 ```
-skills/dev-backlog/
-├── SKILL.md                     ← Core prompt (always loaded, ~194 lines)
-├── references/
-│   ├── file-format.md           ← Backlog.md field spec + config.yml
-│   ├── github-sync.md           ← gh CLI patterns, labels, milestones
-│   ├── process.md               ← Detailed workflow steps
-│   └── workflow-patterns.md     ← Sprint planning, triage, retro
-└── scripts/
-    ├── init.sh                  ← Bootstrap backlog/ directory (bash)
-    ├── next.sh                  ← Next actionable batch (bash)
-    ├── status.sh                ← Project status overview (bash)
-    ├── sync-pull.js             ← Pull GitHub issues to local (node)
-    └── sprint-init.js           ← Generate sprint skeleton (node)
+
+The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
+
+## Deterministic Scripts
+
+All scripts live under `skills/dev-backlog/scripts/`.
+
+| Script | What it does |
+|--------|--------------|
+| `init.sh [project-name]` | Create `backlog/`, `sprints/`, `tasks/`, `completed/`, and `config.yml` |
+| `sync-pull.js [PREFIX] [--update] [--dry-run]` | Pull open issues into `backlog/tasks/`; `--update` refreshes frontmatter while preserving local acceptance-criteria checkboxes |
+| `sprint-init.js "topic" [--milestone "Name"] [--dry-run]` | Create a sprint file from a GitHub milestone |
+| `next.sh [backlog-dir]` | Show the next actionable batch with zero LLM cost |
+| `status.sh [backlog-dir]` | Show sprint progress, GitHub issues, local task counts, and in-flight work |
+| `context-hook.sh [backlog-dir]` | Print a one-line sprint summary for Claude Code `PreToolUse` hooks |
+| `sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` | Mark the sprint complete, move finished tasks, and optionally close the GitHub milestone |
+
+<details>
+<summary>Claude Code hook example</summary>
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "command": "bash /path/to/dev-backlog/skills/dev-backlog/scripts/context-hook.sh /path/to/repo/backlog"
+      }
+    ]
+  }
+}
 ```
 
-## Works With dev-relay
+</details>
 
-dev-backlog works standalone. For delegating implementation to AI agents, pair it with [dev-relay](https://github.com/sungjunlee/dev-relay):
+## Quality Bar
 
-- **dev-backlog** defines the work (issues, sprint plan, context)
-- **dev-relay** executes it (worktree → Codex → PR → review → merge)
-- Sprint files are updated at each relay phase
+This repo is meant to be used, not admired from a distance.
 
-## Design Decisions
+- GitHub Actions CI runs on push and pull request to `main`
+- 130+ tests cover Node logic and Bash smoke flows
+- `--dry-run` exists for risky file-writing operations
+- Shared Bash and Node libraries keep behavior consistent across scripts
+- MIT licensed
 
-| Decision | Rationale |
-|----------|-----------|
-| GitHub Issues = source of truth | Visible to collaborators, persists across tools, standard workflow |
-| Sprint file = execution hub | One file carries plan, context, and progress across sessions |
-| Task files = thin mirror | Sync cache only; context lives in sprint file, not duplicated |
-| Explicit sync | No silent background sync; pull/push at meaningful milestones |
-| Backlog.md compatible | `sprints/` is a custom addition; `tasks/` follows the standard format |
-| Stateless scripts | No database, no daemon — state lives in GitHub and local markdown |
+## Design Choices
+
+| Decision | Why |
+|----------|-----|
+| GitHub Issues are the source of truth | Collaborators already live there |
+| Sprint files are the execution hub | One file carries plan, context, and progress across sessions |
+| Task files stay thin | Sync cache only; decisions belong in the sprint file |
+| `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
+| Sync is always explicit | No background process mutates your local state behind your back |
+| Backlog.md compatibility matters | `tasks/` stays compatible with the standard format; `sprints/` is the only custom layer |
+
+## Docs
+
+- [Core skill prompt](skills/dev-backlog/SKILL.md)
+- [Process guide](skills/dev-backlog/references/process.md)
+- [File format and config](skills/dev-backlog/references/file-format.md)
+- [GitHub sync patterns](skills/dev-backlog/references/github-sync.md)
+- [Workflow patterns](skills/dev-backlog/references/workflow-patterns.md)
+- [dev-relay integration contract](skills/dev-backlog/references/integration-contract.md)
 
 ## Contributing
 
-Issues and PRs welcome. Please open an issue first for non-trivial changes.
+Issues and pull requests are welcome.
+
+If you want to change sprint file structure, checkbox patterns, or task file naming, read the integration contract first. Those details are load-bearing for `dev-relay` interop.
+
+For non-trivial changes, open an issue first so the format and workflow stay coherent.
 
 ## License
 
