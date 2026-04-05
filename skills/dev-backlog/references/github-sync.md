@@ -46,7 +46,11 @@ gh issue list --state open --json number,title,body,labels,milestone,assignees
 gh issue view 42 --json number,title,body,labels,milestone,assignees,comments
 
 # Pull all open issues (script pattern)
-gh issue list --state open --limit 100 --json number,title,body,labels,milestone,assignees | \
+TOTAL=$(gh api graphql -F owner={owner} -F name={repo} \
+  -f query='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }' \
+  --jq '.data.repository.issues.totalCount')
+
+gh issue list --state open --limit "$TOTAL" --json number,title,body,labels,milestone,assignees | \
   jq -c '.[]' | while read -r issue; do
     num=$(echo "$issue" | jq -r '.number')
     title=$(echo "$issue" | jq -r '.title')

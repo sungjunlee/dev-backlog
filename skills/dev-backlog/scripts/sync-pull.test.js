@@ -3,7 +3,14 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { statusFromLabels, priorityFromLabels, structureBody, parseArgs, run } = require("./sync-pull.js");
+const {
+  statusFromLabels,
+  priorityFromLabels,
+  structureBody,
+  parseArgs,
+  loadOpenIssues,
+  run,
+} = require("./sync-pull.js");
 
 describe("statusFromLabels", () => {
   it("returns In Progress for status:in-progress", () => {
@@ -80,6 +87,7 @@ describe("parseArgs", () => {
       update: true,
       dryRun: true,
       json: true,
+      limit: undefined,
     });
   });
 
@@ -87,6 +95,116 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["--json"], "BACK");
     assert.equal(parsed.prefix, "BACK");
     assert.equal(parsed.json, true);
+  });
+
+  it("parses --limit without treating the value as prefix", () => {
+    const parsed = parseArgs(["--limit", "250", "TEST"], "BACK");
+    assert.deepEqual(parsed, {
+      prefix: "TEST",
+      update: false,
+      dryRun: false,
+      json: false,
+      limit: 250,
+    });
+  });
+
+  it("parses --limit=N form", () => {
+    const parsed = parseArgs(["TEST", "--limit=25"], "BACK");
+    assert.equal(parsed.prefix, "TEST");
+    assert.equal(parsed.limit, 25);
+  });
+
+  it("returns an error for invalid --limit values", () => {
+    const missingValue = parseArgs(["--limit"], "BACK");
+    assert.equal(missingValue.error, "Missing value for --limit. Expected a positive integer.");
+
+    const invalidValue = parseArgs(["--limit", "0"], "BACK");
+    assert.equal(invalidValue.error, "Invalid --limit value: 0. Expected a positive integer.");
+  });
+});
+
+describe("loadOpenIssues", () => {
+  it("uses the explicit limit when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 1, title: "One" }]);
+    };
+
+    const issues = loadOpenIssues({ limit: 12, execFile });
+
+    assert.deepEqual(issues, [{ number: 1, title: "One" }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue", "list", "--state", "open", "--limit", "12",
+        "--json", "number,title,body,labels,milestone,assignees",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
+  it("fetches all open issues by first reading totalCount", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+
+      if (args[0] === "api") return "125\n";
+      if (args[0] === "issue") return JSON.stringify([{ number: 1 }, { number: 2 }]);
+
+      throw new Error(`Unexpected gh args: ${args.join(" ")}`);
+    };
+
+    const issues = loadOpenIssues({ execFile });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[0], {
+      command: "gh",
+      args: [
+        "api", "graphql",
+        "-F", "owner={owner}",
+        "-F", "name={repo}",
+        "-f", "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }",
+        "--jq", ".data.repository.issues.totalCount",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    });
+    assert.deepEqual(calls[1], {
+      command: "gh",
+      args: [
+        "issue", "list", "--state", "open", "--limit", "125",
+        "--json", "number,title,body,labels,milestone,assignees",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    });
+  });
+
+  it("skips issue listing when the repo has no open issues", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return "0\n";
+    };
+
+    const issues = loadOpenIssues({ execFile });
+
+    assert.deepEqual(issues, []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args[0], "api");
+    assert.deepEqual(calls[0].options, {
+      encoding: "utf-8",
+      maxBuffer: 50 * 1024 * 1024,
+    });
   });
 });
 

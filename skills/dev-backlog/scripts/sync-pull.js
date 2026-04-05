@@ -9,12 +9,21 @@
  *   --update    Update existing files (frontmatter only; preserves local AC checkboxes)
  *   --dry-run   Show what would be created/updated without writing files
  *   --json      Print machine-readable summary to stdout
+ *   --limit N   Fetch at most N open issues (defaults to all open issues)
  */
 
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { slugify, escapeYaml, readConfig } = require("./lib");
+
+const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
+const COUNT_OPEN_ISSUES_QUERY =
+  "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
+const GH_EXEC_OPTIONS = {
+  encoding: "utf-8",
+  maxBuffer: 50 * 1024 * 1024,
+};
 
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
@@ -36,13 +45,76 @@ function structureBody(body) {
   return "\n## Description\n" + body + "\n";
 }
 
+function parseLimitValue(value) {
+  if (!/^\d+$/.test(value)) {
+    return { error: `Invalid --limit value: ${value}. Expected a positive integer.` };
+  }
+
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    return { error: `Invalid --limit value: ${value}. Expected a positive integer.` };
+  }
+
+  return { limit };
+}
+
 function parseArgs(args, defaultPrefix) {
-  return {
-    prefix: args.find((a) => !a.startsWith("-")) || defaultPrefix,
-    update: args.includes("--update"),
-    dryRun: args.includes("--dry-run"),
-    json: args.includes("--json"),
+  const options = {
+    prefix: defaultPrefix,
+    update: false,
+    dryRun: false,
+    json: false,
+    limit: undefined,
   };
+  let prefixSet = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === "--update") {
+      options.update = true;
+      continue;
+    }
+
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
+
+    if (arg === "--limit") {
+      const nextValue = args[index + 1];
+      if (!nextValue) {
+        return { ...options, error: "Missing value for --limit. Expected a positive integer." };
+      }
+
+      const parsed = parseLimitValue(nextValue);
+      if (parsed.error) return { ...options, error: parsed.error };
+
+      options.limit = parsed.limit;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--limit=")) {
+      const parsed = parseLimitValue(arg.slice("--limit=".length));
+      if (parsed.error) return { ...options, error: parsed.error };
+
+      options.limit = parsed.limit;
+      continue;
+    }
+
+    if (!arg.startsWith("-") && !prefixSet) {
+      options.prefix = arg;
+      prefixSet = true;
+    }
+  }
+
+  return options;
 }
 
 function makeResult({ tasksDir, prefix, update, dryRun, issueCount }) {
@@ -170,26 +242,55 @@ created_date: '${today}'
 
 // --- CLI entry point ---
 
+function getOpenIssueCount(execFile = execFileSync) {
+  const out = execFile("gh", [
+    "api", "graphql",
+    "-F", "owner={owner}",
+    "-F", "name={repo}",
+    "-f", `query=${COUNT_OPEN_ISSUES_QUERY}`,
+    "--jq", ".data.repository.issues.totalCount",
+  ], GH_EXEC_OPTIONS).trim();
+  const count = Number.parseInt(out, 10);
+
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`Invalid issue count from gh: ${out}`);
+  }
+
+  return count;
+}
+
+function fetchOpenIssues(limit, execFile = execFileSync) {
+  const out = execFile("gh", [
+    "issue", "list", "--state", "open", "--limit", String(limit),
+    "--json", ISSUE_JSON_FIELDS,
+  ], GH_EXEC_OPTIONS);
+
+  return JSON.parse(out);
+}
+
+function loadOpenIssues({ limit, execFile = execFileSync } = {}) {
+  const resolvedLimit = limit ?? getOpenIssueCount(execFile);
+  if (resolvedLimit === 0) return [];
+  return fetchOpenIssues(resolvedLimit, execFile);
+}
+
 function main() {
   const args = process.argv.slice(2);
   const config = readConfig();
   const options = parseArgs(args, config.task_prefix);
+  if (options.error) {
+    console.error(options.error);
+    process.exit(1);
+  }
 
   let issues;
   try {
-    const out = execFileSync("gh", [
-      "issue", "list", "--state", "open", "--limit", "100",
-      "--json", "number,title,body,labels,milestone,assignees"
-    ], { encoding: "utf-8" });
-    issues = JSON.parse(out);
+    issues = loadOpenIssues({ limit: options.limit });
   } catch (e) {
     console.error(`gh error: ${e.message}`);
     process.exit(1);
   }
 
-  if (issues.length >= 100) {
-    console.warn("Warning: 100 issues fetched (limit). Some issues may be missing.");
-  }
   if (!issues.length) {
     if (options.json) {
       console.log(JSON.stringify(makeResult({
@@ -230,5 +331,8 @@ module.exports = {
   parseArgs,
   makeResult,
   printResult,
+  getOpenIssueCount,
+  fetchOpenIssues,
+  loadOpenIssues,
   run,
 };
