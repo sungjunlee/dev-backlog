@@ -3,34 +3,27 @@
 [![CI](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml/badge.svg)](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Keep GitHub Issues as source of truth. Add a local sprint file as the execution layer for Claude Code, Codex, and humans.
+GitHub Issues stay the source of truth. Sprint files become the execution hub that both you and your AI agent read during a coding session.
 
-GitHub is good at shared visibility. It is bad at answering four questions that matter during a work session: what should I do next, what context matters, what is already in flight, and what should my AI agent read before touching code. dev-backlog fills that gap with plain Markdown files that live next to your repo and stay easy to inspect in git.
+Issue trackers answer "what exists." They do not answer what to do next, what context matters, or what your AI agent should read before touching code. dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
 
 No new server. No hidden state. No need to abandon GitHub Issues.
 
 ```text
-GitHub
-  issues, milestones, labels, PR links
+GitHub Issues (source of truth)
         |
-        | explicit sync via gh
+        | gh CLI (explicit sync)
         v
 backlog/
-  sprints/     one active working file: plan, context, progress
-  tasks/       thin issue mirror for local and AI reads
+  tasks/       thin issue mirror (AI reads without API)
+  sprints/     execution hub: plan, context, progress
   completed/   archived done tasks
-  config.yml   project config
+        ^
+        |
+  Claude Code / Codex / Human
+  reads sprint -> knows what to do next
+  updates progress -> team sees what happened
 ```
-
-## Why This Exists
-
-Issue trackers answer "what exists."
-
-Sessions need "what is next."
-
-If you work with Claude Code or Codex, this gets sharper. The agent can move fast, but only if it can read the same execution surface you do. A good sprint file gives both of you the same working memory: batches, decisions, gotchas, progress, and open loops.
-
-That is the whole point of this project.
 
 ## What You Get
 
@@ -40,7 +33,7 @@ That is the whole point of this project.
 | One active sprint file | The human and the agent read the same execution plan |
 | Thin local task mirror | AI can read issue details without another API round trip |
 | Explicit sync | Pull and refresh when you choose, not behind your back |
-| `[ ]`, `[~]`, `[x]` plan states | In-flight delegated work stays visible instead of disappearing into PR tabs |
+| `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
 | `sprint-close.sh` | Close the loop: mark sprint complete, archive tasks, optionally close the milestone |
 | Plain Markdown + Bash + Node built-ins | No database, no daemon, no mystery |
@@ -151,7 +144,7 @@ This is simple on purpose. The issue tracker handles collaboration. The sprint f
 
 dev-backlog works fine on its own.
 
-If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint file becomes the handoff contract between planning and delegated implementation.
+If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint file becomes the execution hub for delegated implementation.
 
 ```text
 [ ] #42 OAuth2 flow
@@ -162,6 +155,8 @@ If you also use [dev-relay](https://github.com/sungjunlee/dev-relay), the sprint
                                           |
                                           +----------------------------> [x] #42 -> PR #87 (merged)
 ```
+
+The sprint file is the coordination surface. One agent plans, another implements, a third reviews. The `[~]` state makes in-flight work visible to everyone, and `Running Context` carries decisions across handoffs without re-explaining.
 
 The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
 
@@ -216,7 +211,7 @@ This repo is meant to be used, not admired from a distance.
 | Task files stay thin | Sync cache only; decisions belong in the sprint file |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
-| Backlog.md compatibility matters | `tasks/` stays compatible with the standard format; `sprints/` is the only custom layer |
+| Builds on Backlog.md | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) format; `sprints/` adds the execution hub layer and `gh` sync that Backlog.md does not cover |
 
 ## Docs
 
