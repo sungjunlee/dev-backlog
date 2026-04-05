@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { statusFromLabels, priorityFromLabels, structureBody, run } = require("./sync-pull.js");
+const { statusFromLabels, priorityFromLabels, structureBody, parseArgs, run } = require("./sync-pull.js");
 
 describe("statusFromLabels", () => {
   it("returns In Progress for status:in-progress", () => {
@@ -72,6 +72,24 @@ describe("structureBody", () => {
   });
 });
 
+describe("parseArgs", () => {
+  it("parses prefix and flags", () => {
+    const parsed = parseArgs(["TEST", "--update", "--dry-run", "--json"], "BACK");
+    assert.deepEqual(parsed, {
+      prefix: "TEST",
+      update: true,
+      dryRun: true,
+      json: true,
+    });
+  });
+
+  it("falls back to config prefix", () => {
+    const parsed = parseArgs(["--json"], "BACK");
+    assert.equal(parsed.prefix, "BACK");
+    assert.equal(parsed.json, true);
+  });
+});
+
 // --- Integration tests for run() ---
 
 describe("run (integration)", () => {
@@ -96,7 +114,7 @@ describe("run (integration)", () => {
   });
 
   it("creates task file with correct name and content", () => {
-    run({
+    const result = run({
       issues: [makeIssue()],
       tasksDir,
       prefix: "TEST",
@@ -115,6 +133,12 @@ describe("run (integration)", () => {
     assert.match(content, /status: To Do/);
     assert.match(content, /priority: medium/);
     assert.match(content, /## Description\nImplement OAuth2/);
+
+    assert.deepEqual(result.counts, { created: 1, updated: 0, skipped: 0 });
+    assert.deepEqual(result.createdFiles, ["TEST-42 - oauth2-flow.md"]);
+    assert.deepEqual(result.operations, [
+      { type: "created", file: "TEST-42 - oauth2-flow.md" },
+    ]);
   });
 
   it("applies labels to frontmatter correctly", () => {
@@ -223,6 +247,39 @@ Original description
     assert.match(content, /\[x\] Valid credentials return JWT/);
     assert.match(content, /\[ \] Test coverage > 90%/);
     assert.match(content, /AC:BEGIN/);
+  });
+
+  it("returns structured summary for mixed operations", () => {
+    fs.writeFileSync(
+      path.join(tasksDir, "TEST-2 - existing.md"),
+      "---\nid: TEST-2\n---\nExisting"
+    );
+    fs.writeFileSync(
+      path.join(tasksDir, "TEST-3 - keep.md"),
+      "---\nid: TEST-3\n---\nKeep"
+    );
+
+    const result = run({
+      issues: [
+        makeIssue({ number: 1, title: "Create me" }),
+        makeIssue({ number: 2, title: "Existing", body: "Refresh me" }),
+        makeIssue({ number: 3, title: "Keep", body: "Skip me" }),
+      ],
+      tasksDir,
+      prefix: "TEST",
+      update: true,
+      dryRun: true,
+    });
+
+    assert.deepEqual(result.counts, { created: 1, updated: 2, skipped: 0 });
+    assert.deepEqual(result.createdFiles, ["TEST-1 - create-me.md"]);
+    assert.deepEqual(result.updatedFiles, ["TEST-2 - existing.md", "TEST-3 - keep.md"]);
+    assert.deepEqual(result.skippedFiles, []);
+    assert.deepEqual(result.operations, [
+      { type: "created", file: "TEST-1 - create-me.md" },
+      { type: "updated", file: "TEST-2 - existing.md" },
+      { type: "updated", file: "TEST-3 - keep.md" },
+    ]);
   });
 
   it("--dry-run does not create files", () => {

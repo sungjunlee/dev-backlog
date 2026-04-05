@@ -78,9 +78,11 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/init.sh
 # 2. Pull open GitHub issues into backlog/tasks/
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --dry-run
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --json
 
 # 3. Create an active sprint from a milestone
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system" --milestone "Sprint W13" --dry-run --json
 
 # 4. See what to do next
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
@@ -170,8 +172,8 @@ All scripts live under `skills/dev-backlog/scripts/`.
 | Script | What it does |
 |--------|--------------|
 | `init.sh [project-name]` | Create `backlog/`, `sprints/`, `tasks/`, `completed/`, and `config.yml` |
-| `sync-pull.js [PREFIX] [--update] [--dry-run]` | Pull open issues into `backlog/tasks/`; `--update` refreshes frontmatter while preserving local acceptance-criteria checkboxes |
-| `sprint-init.js "topic" [--milestone "Name"] [--dry-run]` | Create a sprint file from a GitHub milestone |
+| `sync-pull.js [PREFIX] [--update] [--dry-run] [--json]` | Pull open issues into `backlog/tasks/`; `--update` refreshes frontmatter while preserving local acceptance-criteria checkboxes; `--json` emits a machine-readable summary |
+| `sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` | Create a sprint file from a GitHub milestone; `--json` emits the sprint path and metadata |
 | `next.sh [backlog-dir]` | Show the next actionable batch with zero LLM cost |
 | `status.sh [backlog-dir]` | Show sprint progress, GitHub issues, local task counts, and in-flight work |
 | `context-hook.sh [backlog-dir]` | Print a one-line sprint summary for Claude Code `PreToolUse` hooks |

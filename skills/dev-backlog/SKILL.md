@@ -222,7 +222,7 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, n
 - `scripts/init.sh [project-name]` — Bootstrap `backlog/` directory with config.yml
 - `scripts/next.sh` — Show next actionable batch from active sprint (zero LLM cost)
 - `scripts/status.sh` — Project status from sprint file + GitHub
-- `scripts/sync-pull.js [PREFIX] [--update]` — Pull open GitHub issues to local backlog/tasks/. PREFIX defaults to config.yml's `task_prefix`. `--update` refreshes frontmatter while preserving local AC checkboxes.
-- `scripts/sprint-init.js "auth-system" [--milestone "Name"]` — Generate sprint file skeleton
+- `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json]` — Pull open GitHub issues to local backlog/tasks/. PREFIX defaults to config.yml's `task_prefix`. `--update` refreshes frontmatter while preserving local AC checkboxes. `--json` emits a machine-readable summary.
+- `scripts/sprint-init.js "auth-system" [--milestone "Name"] [--dry-run] [--json]` — Generate sprint file skeleton. `--json` emits the target sprint file path plus metadata.
 - `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close active sprint: set completed, move tasks, remind about context promotion
 - `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
