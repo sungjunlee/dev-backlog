@@ -15,15 +15,12 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { slugify, escapeYaml, readConfig } = require("./lib");
+const { slugify, escapeYaml, readConfig, GH_EXEC_DEFAULTS } = require("./lib");
 
 const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
 const COUNT_OPEN_ISSUES_QUERY =
   "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
-const GH_EXEC_OPTIONS = {
-  encoding: "utf-8",
-  maxBuffer: 50 * 1024 * 1024,
-};
+const GH_EXEC_OPTIONS = GH_EXEC_DEFAULTS;
 
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
