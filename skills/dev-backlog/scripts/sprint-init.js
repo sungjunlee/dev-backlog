@@ -149,8 +149,8 @@ function createSprintFile({
     throw new Error(`Sprint file already exists: ${sprintFile}`);
   }
 
-  const due = getDue(milestone);
-  const issues = getIssues(milestone);
+  const due = existingFile ? "TBD" : getDue(milestone);
+  const issues = existingFile ? [] : getIssues(milestone);
   const content = existingFile
     ? null
     : buildSprintContent({ milestone, started, due, topic, issues });

@@ -20,7 +20,7 @@ const { slugify, escapeYaml, readConfig, GH_EXEC_DEFAULTS } = require("./lib");
 const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
 const COUNT_OPEN_ISSUES_QUERY =
   "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
-const GH_EXEC_OPTIONS = GH_EXEC_DEFAULTS;
+
 
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
@@ -246,7 +246,7 @@ function getOpenIssueCount(execFile = execFileSync) {
     "-F", "name={repo}",
     "-f", `query=${COUNT_OPEN_ISSUES_QUERY}`,
     "--jq", ".data.repository.issues.totalCount",
-  ], GH_EXEC_OPTIONS).trim();
+  ], GH_EXEC_DEFAULTS).trim();
   const count = Number.parseInt(out, 10);
 
   if (!Number.isInteger(count) || count < 0) {
@@ -260,7 +260,7 @@ function fetchOpenIssues(limit, execFile = execFileSync) {
   const out = execFile("gh", [
     "issue", "list", "--state", "open", "--limit", String(limit),
     "--json", ISSUE_JSON_FIELDS,
-  ], GH_EXEC_OPTIONS);
+  ], GH_EXEC_DEFAULTS);
 
   return JSON.parse(out);
 }
