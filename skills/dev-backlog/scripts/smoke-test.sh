@@ -449,9 +449,14 @@ assert_equals "contract: progress log" \
 assert_equals "contract: run-id extraction" \
   "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" "issue-42-20260403120000000"
 
-# Run-ID is optional (no annotation = line unchanged)
+# Run-ID is optional (no annotation = line unchanged by sed, grep finds 0)
 assert_equals "contract: no run-id is valid" \
   "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | grep -c '\[run:')" "0"
+
+# Extraction sed on line without run-id returns original line (no false positive)
+assert_equals "contract: run-id extraction on absent annotation" \
+  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" \
+  "- [x] #42 OAuth2 flow → PR #87 (merged)"
 
 # _context.md section headings
 assert_equals "contract: Architecture Decisions heading" \
