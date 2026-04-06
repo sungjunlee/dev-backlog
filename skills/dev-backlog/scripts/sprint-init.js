@@ -26,6 +26,10 @@ function parseArgs(args) {
   }
 
   const topic = filteredArgs[0];
+  if (topic.startsWith("--")) {
+    return { error: 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--dry-run] [--json]' };
+  }
+
   let milestone = topic;
   const msIdx = filteredArgs.indexOf("--milestone");
   if (msIdx !== -1 && filteredArgs[msIdx + 1]) {

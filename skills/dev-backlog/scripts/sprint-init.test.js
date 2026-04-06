@@ -33,6 +33,11 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["--json"]);
     assert.match(parsed.error, /Usage: sprint-init\.js/);
   });
+
+  it("returns usage error when only --milestone is provided without a topic", () => {
+    const parsed = parseArgs(["--milestone", "Sprint W13"]);
+    assert.match(parsed.error, /Usage: sprint-init\.js/);
+  });
 });
 
 describe("buildIssueLines", () => {

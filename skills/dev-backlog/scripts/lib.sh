@@ -33,7 +33,8 @@ count_checkboxes() {
 # Usage: NEXT=$(next_todo_item "$FILE")
 next_todo_item() {
   local file="$1"
-  # Strip display prefix "- [ ] " but keep the "#" issue ref
+  # Strip display prefix "- [ ] " but keep the "#" issue ref.
+  # Sed pattern mirrors RE_CB_TODO minus trailing "#"; keep in sync if format changes.
   grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^- \[ \] //'
 }
 
