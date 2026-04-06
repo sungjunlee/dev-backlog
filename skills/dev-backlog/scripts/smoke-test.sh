@@ -426,14 +426,14 @@ assert_not_contains "hook all-done: no Next" "$OUT" "Next:"
 # integration contract pattern tests
 # ============================================================
 
-# Checkbox regex matches all three states
-assert_equals "contract: [ ] matches" "$(echo '- [ ] #1 Task' | grep -c '^\- \[.\] #')" "1"
-assert_equals "contract: [~] matches" "$(echo '- [~] #2 Task' | grep -c '^\- \[.\] #')" "1"
-assert_equals "contract: [x] matches" "$(echo '- [x] #3 Task' | grep -c '^\- \[.\] #')" "1"
+# Checkbox regex matches all three states (using lib.sh constants)
+assert_equals "contract: [ ] matches" "$(echo '- [ ] #1 Task' | grep -c "$RE_CB_ANY")" "1"
+assert_equals "contract: [~] matches" "$(echo '- [~] #2 Task' | grep -c "$RE_CB_ANY")" "1"
+assert_equals "contract: [x] matches" "$(echo '- [x] #3 Task' | grep -c "$RE_CB_ANY")" "1"
 
 # Issue number extraction
 assert_equals "contract: issue number" \
-  "$(echo '- [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)' | sed 's/^\- \[.\] #\([0-9]*\).*/\1/')" "42"
+  "$(echo '- [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)' | sed "s/${RE_CB_ANY}\([0-9]*\).*/\1/")" "42"
 
 # Section heading regex
 assert_equals "contract: Plan heading" \

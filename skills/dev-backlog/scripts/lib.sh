@@ -23,10 +23,9 @@ find_active_sprint() {
 count_checkboxes() {
   local file="$1"
   local counts
+  # Awk patterns mirror RE_CB_* constants (awk can't reference shell vars directly)
   counts=$(awk '/^- \[.\] #/{t++} /^- \[x\] #/{d++} /^- \[~\] #/{f++} END{print t+0, d+0, f+0}' "$file" 2>/dev/null)
-  CB_TOTAL=${counts%% *}
-  CB_DONE=$(echo "$counts" | awk '{print $2}')
-  CB_IN_FLIGHT=$(echo "$counts" | awk '{print $3}')
+  read -r CB_TOTAL CB_DONE CB_IN_FLIGHT <<< "$counts"
   CB_TODO=$((CB_TOTAL - CB_DONE - CB_IN_FLIGHT))
 }
 
@@ -34,7 +33,8 @@ count_checkboxes() {
 # Usage: NEXT=$(next_todo_item "$FILE")
 next_todo_item() {
   local file="$1"
-  grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^\- \[ \] //'
+  # Strip display prefix "- [ ] " but keep the "#" issue ref
+  grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^- \[ \] //'
 }
 
 # Extract a markdown section by heading (## level).
