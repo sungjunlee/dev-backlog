@@ -78,6 +78,28 @@ if [ -d "$BACKLOG_DIR/completed" ]; then
   echo "Completed: $done_count"
 fi
 
+# --- Relay Runs (optional — only when dev-relay is installed) ---
+RELAY_HOME="${RELAY_HOME:-$HOME/.relay}"
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$REPO_ROOT" ] && [ -d "$RELAY_HOME/runs" ]; then
+  RESOLVED=$(cd "$REPO_ROOT" && pwd -P)
+  SLUG_BASE=$(basename "$RESOLVED" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/^-\|-$//g')
+  SLUG_HASH=$(printf '%s' "$RESOLVED" | shasum -a 256 | cut -c1-8)
+  RELAY_RUNS_DIR="$RELAY_HOME/runs/${SLUG_BASE}-${SLUG_HASH}"
+  if [ -d "$RELAY_RUNS_DIR" ]; then
+    ACTIVE_RUNS=$(grep -l "^state:.*\(dispatched\|review_pending\|changes_requested\|ready_to_merge\)" "$RELAY_RUNS_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$ACTIVE_RUNS" -gt 0 ]; then
+      echo ""
+      echo "=== Relay Runs ==="
+      grep -l "^state:.*\(dispatched\|review_pending\|changes_requested\|ready_to_merge\)" "$RELAY_RUNS_DIR"/*.md 2>/dev/null | while IFS= read -r mf; do
+        RUN_ID=$(basename "$mf" .md)
+        STATE=$(grep "^state:" "$mf" | head -1 | sed "s/^state: *'\\{0,1\\}//; s/'\\{0,1\\}$//")
+        echo "  $RUN_ID ($STATE)"
+      done
+    fi
+  fi
+fi
+
 # --- Past Sprints ---
 if [ -d "$SPRINTS_DIR" ]; then
   PAST=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: completed" {} \; 2>/dev/null | wc -l | tr -d ' ')
