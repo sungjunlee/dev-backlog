@@ -54,7 +54,7 @@ fi
 # Show in-flight items (dispatched via dev-relay, marked [~])
 if [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "In flight:"
-  grep '^\- \[~\] #' "$ACTIVE" | while IFS= read -r line; do
+  grep "$RE_CB_INFLIGHT" "$ACTIVE" | while IFS= read -r line; do
     echo "  $line"
   done
   echo ""
@@ -67,7 +67,7 @@ while IFS= read -r line; do
   if echo "$line" | grep -q '^### Batch'; then
     IN_BATCH="$line"
   fi
-  if [ -n "$IN_BATCH" ] && echo "$line" | grep -q '^\- \[ \] #'; then
+  if [ -n "$IN_BATCH" ] && echo "$line" | grep -q "$RE_CB_TODO"; then
     if [ -z "$CURRENT_BATCH" ]; then
       CURRENT_BATCH="$IN_BATCH"
       echo "Next: $CURRENT_BATCH"
@@ -83,7 +83,7 @@ done < "$ACTIVE"
 # If no batch headers, show all unchecked items
 if [ -z "$CURRENT_BATCH" ]; then
   echo "Next items:"
-  grep '^\- \[ \] #' "$ACTIVE" | while IFS= read -r line; do
+  grep "$RE_CB_TODO" "$ACTIVE" | while IFS= read -r line; do
     echo "  $line"
   done
 fi

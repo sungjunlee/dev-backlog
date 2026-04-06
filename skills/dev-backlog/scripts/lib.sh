@@ -2,6 +2,13 @@
 # Shared library for dev-backlog bash scripts.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
+# Checkbox regex patterns — integration contract with dev-relay.
+# See: references/integration-contract.md
+RE_CB_ANY='^\- \[.\] #'
+RE_CB_DONE='^\- \[x\] #'
+RE_CB_INFLIGHT='^\- \[~\] #'
+RE_CB_TODO='^\- \[ \] #'
+
 # Find the active sprint file (status: active in frontmatter).
 # Usage: ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
 find_active_sprint() {
@@ -15,9 +22,9 @@ find_active_sprint() {
 # Usage: count_checkboxes "$FILE"
 count_checkboxes() {
   local file="$1"
-  CB_TOTAL=$(grep -c '^\- \[.\] #' "$file" 2>/dev/null) || CB_TOTAL=0
-  CB_DONE=$(grep -c '^\- \[x\] #' "$file" 2>/dev/null) || CB_DONE=0
-  CB_IN_FLIGHT=$(grep -c '^\- \[~\] #' "$file" 2>/dev/null) || CB_IN_FLIGHT=0
+  CB_TOTAL=$(grep -c "$RE_CB_ANY" "$file" 2>/dev/null) || CB_TOTAL=0
+  CB_DONE=$(grep -c "$RE_CB_DONE" "$file" 2>/dev/null) || CB_DONE=0
+  CB_IN_FLIGHT=$(grep -c "$RE_CB_INFLIGHT" "$file" 2>/dev/null) || CB_IN_FLIGHT=0
   CB_TODO=$((CB_TOTAL - CB_DONE - CB_IN_FLIGHT))
 }
 
