@@ -28,6 +28,13 @@ count_checkboxes() {
   CB_TODO=$((CB_TOTAL - CB_DONE - CB_IN_FLIGHT))
 }
 
+# Return the first unchecked todo item (stripped of "- [ ] " prefix).
+# Usage: NEXT=$(next_todo_item "$FILE")
+next_todo_item() {
+  local file="$1"
+  grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^\- \[ \] //'
+}
+
 # Extract a markdown section by heading (## level).
 # Handles: last section (no next ##), empty sections, trailing whitespace.
 # Usage: extract_section "$FILE" "Goal"

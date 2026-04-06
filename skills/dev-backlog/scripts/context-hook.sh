@@ -43,7 +43,7 @@ if [ "$CB_IN_FLIGHT" -gt 0 ]; then
 fi
 
 # Find next unchecked item
-NEXT_ITEM=$(grep "$RE_CB_TODO" "$ACTIVE" | head -1 | sed 's/^\- \[ \] //' || true)
+NEXT_ITEM=$(next_todo_item "$ACTIVE" || true)
 if [ -n "$NEXT_ITEM" ]; then
   SUMMARY="$SUMMARY | Next: $NEXT_ITEM"
 fi
