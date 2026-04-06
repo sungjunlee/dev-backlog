@@ -62,7 +62,7 @@ fi
 
 # --- Step 2: Move completed task files ---
 # Collect issue numbers from checked items
-DONE_ISSUES=$(grep '^\- \[x\] #' "$ACTIVE" | sed 's/^\- \[x\] #\([0-9]*\).*/\1/' || true)
+DONE_ISSUES=$(grep "$RE_CB_DONE" "$ACTIVE" | sed "s/${RE_CB_DONE}\([0-9]*\).*/\1/" || true)
 
 if [ -d "$TASKS_DIR" ] && [ -n "$DONE_ISSUES" ]; then
   if ! $DRY_RUN; then

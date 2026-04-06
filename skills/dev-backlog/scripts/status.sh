@@ -28,7 +28,7 @@ if [ -d "$SPRINTS_DIR" ]; then
     fi
 
     # Show in-flight items (dispatched via dev-relay)
-    IN_FLIGHT_ITEMS=$(grep '^\- \[~\] #' "$ACTIVE" | head -3)
+    IN_FLIGHT_ITEMS=$(grep "$RE_CB_INFLIGHT" "$ACTIVE" | head -3)
     if [ -n "$IN_FLIGHT_ITEMS" ]; then
       echo ""
       echo "In flight:"
@@ -36,7 +36,7 @@ if [ -d "$SPRINTS_DIR" ]; then
     fi
 
     # Show next unchecked items
-    NEXT_ITEMS=$(grep '^\- \[ \] #' "$ACTIVE" | head -3)
+    NEXT_ITEMS=$(grep "$RE_CB_TODO" "$ACTIVE" | head -3)
     if [ -n "$NEXT_ITEMS" ]; then
       echo ""
       echo "Next up:"

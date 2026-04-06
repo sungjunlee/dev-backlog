@@ -2,23 +2,40 @@
 # Shared library for dev-backlog bash scripts.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
+# Checkbox regex patterns — integration contract with dev-relay.
+# See: references/integration-contract.md
+RE_CB_ANY='^\- \[.\] #'
+RE_CB_DONE='^\- \[x\] #'
+RE_CB_INFLIGHT='^\- \[~\] #'
+RE_CB_TODO='^\- \[ \] #'
+
 # Find the active sprint file (status: active in frontmatter).
 # Usage: ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
 find_active_sprint() {
   local sprints_dir="$1"
   find "$sprints_dir" -maxdepth 1 -name "*.md" ! -name "_context.md" \
-    -exec grep -l "^status: active" {} \; 2>/dev/null | head -1
+    -exec grep -l "^status: active" {} + 2>/dev/null | head -1
 }
 
-# Count checkbox states in a sprint file.
+# Count checkbox states in a sprint file (single awk pass).
 # Sets: CB_TOTAL, CB_DONE, CB_IN_FLIGHT, CB_TODO
 # Usage: count_checkboxes "$FILE"
 count_checkboxes() {
   local file="$1"
-  CB_TOTAL=$(grep -c '^\- \[.\] #' "$file" 2>/dev/null) || CB_TOTAL=0
-  CB_DONE=$(grep -c '^\- \[x\] #' "$file" 2>/dev/null) || CB_DONE=0
-  CB_IN_FLIGHT=$(grep -c '^\- \[~\] #' "$file" 2>/dev/null) || CB_IN_FLIGHT=0
+  local counts
+  # Awk patterns mirror RE_CB_* constants (awk can't reference shell vars directly)
+  counts=$(awk '/^- \[.\] #/{t++} /^- \[x\] #/{d++} /^- \[~\] #/{f++} END{print t+0, d+0, f+0}' "$file" 2>/dev/null)
+  read -r CB_TOTAL CB_DONE CB_IN_FLIGHT <<< "$counts"
   CB_TODO=$((CB_TOTAL - CB_DONE - CB_IN_FLIGHT))
+}
+
+# Return the first unchecked todo item (stripped of "- [ ] " prefix).
+# Usage: NEXT=$(next_todo_item "$FILE")
+next_todo_item() {
+  local file="$1"
+  # Strip display prefix "- [ ] " but keep the "#" issue ref.
+  # Sed pattern mirrors RE_CB_TODO minus trailing "#"; keep in sync if format changes.
+  grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^- \[ \] //'
 }
 
 # Extract a markdown section by heading (## level).

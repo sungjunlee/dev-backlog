@@ -20,6 +20,12 @@ function escapeYaml(text) {
   return text;
 }
 
+/** Default options for gh CLI execFileSync calls (prevents silent truncation). */
+const GH_EXEC_DEFAULTS = {
+  encoding: "utf-8",
+  maxBuffer: 50 * 1024 * 1024,
+};
+
 const CONFIG_DEFAULTS = {
   task_prefix: "BACK",
   default_status: "To Do",
@@ -76,4 +82,4 @@ function estimateSize(labels) {
   return "";
 }
 
-module.exports = { slugify, escapeYaml, readConfig, estimateSize, CONFIG_DEFAULTS };
+module.exports = { slugify, escapeYaml, readConfig, estimateSize, CONFIG_DEFAULTS, GH_EXEC_DEFAULTS };

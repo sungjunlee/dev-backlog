@@ -14,7 +14,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { slugify, estimateSize } = require("./lib");
+const { slugify, estimateSize, GH_EXEC_DEFAULTS } = require("./lib");
 
 function parseArgs(args) {
   const dryRun = args.includes("--dry-run");
@@ -26,6 +26,10 @@ function parseArgs(args) {
   }
 
   const topic = filteredArgs[0];
+  if (topic.startsWith("--")) {
+    return { error: 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--dry-run] [--json]' };
+  }
+
   let milestone = topic;
   const msIdx = filteredArgs.indexOf("--milestone");
   if (msIdx !== -1 && filteredArgs[msIdx + 1]) {
@@ -106,7 +110,7 @@ function getMilestoneDue(milestone) {
     const out = execFileSync("gh", [
       "api", "repos/{owner}/{repo}/milestones",
       "--jq", '.[] | select(.title==env.MS) | .due_on'
-    ], { encoding: "utf-8", env: { ...process.env, MS: milestone } }).trim();
+    ], { ...GH_EXEC_DEFAULTS, env: { ...process.env, MS: milestone } }).trim();
     return out ? out.slice(0, 10) : "TBD";
   } catch {
     return "TBD";
@@ -118,7 +122,7 @@ function getMilestoneIssues(milestone) {
     const out = execFileSync("gh", [
       "issue", "list", "--milestone", milestone,
       "--state", "open", "--json", "number,title,labels"
-    ], { encoding: "utf-8" });
+    ], GH_EXEC_DEFAULTS);
     return JSON.parse(out);
   } catch {
     return [];
@@ -149,8 +153,8 @@ function createSprintFile({
     throw new Error(`Sprint file already exists: ${sprintFile}`);
   }
 
-  const due = getDue(milestone);
-  const issues = getIssues(milestone);
+  const due = existingFile ? "TBD" : getDue(milestone);
+  const issues = existingFile ? [] : getIssues(milestone);
   const content = existingFile
     ? null
     : buildSprintContent({ milestone, started, due, topic, issues });

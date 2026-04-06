@@ -33,6 +33,11 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["--json"]);
     assert.match(parsed.error, /Usage: sprint-init\.js/);
   });
+
+  it("returns usage error when only --milestone is provided without a topic", () => {
+    const parsed = parseArgs(["--milestone", "Sprint W13"]);
+    assert.match(parsed.error, /Usage: sprint-init\.js/);
+  });
 });
 
 describe("buildIssueLines", () => {
@@ -160,5 +165,89 @@ describe("createSprintFile", () => {
         getIssues: () => [],
       });
     }, /Sprint file already exists/);
+  });
+
+  it("creates sprintsDir when it does not exist", () => {
+    const nested = path.join(tmpDir, "deep", "sprints");
+
+    createSprintFile({
+      topic: "setup",
+      milestone: "Sprint W15",
+      dryRun: false,
+      sprintsDir: nested,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "TBD",
+      getIssues: () => [],
+    });
+
+    assert.ok(fs.existsSync(nested));
+    const files = fs.readdirSync(nested);
+    assert.equal(files.length, 1);
+    assert.match(files[0], /^2026-04-setup\.md$/);
+  });
+
+  it("renders multiple issues with varied labels", () => {
+    const issues = [
+      { number: 10, title: "Auth flow", labels: [{ name: "feature" }] },
+      { number: 11, title: "Rate limit", labels: [{ name: "size:S" }] },
+      { number: 12, title: "Fix typo", labels: [{ name: "bug" }, { name: "size:XS" }] },
+      { number: 13, title: "Add docs", labels: [{ name: "documentation" }] },
+      { number: 14, title: "Bare issue", labels: [] },
+    ];
+
+    const result = createSprintFile({
+      topic: "mixed",
+      milestone: "Sprint W15",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "2026-04-12",
+      getIssues: () => issues,
+    });
+
+    assert.equal(result.issueCount, 5);
+    assert.match(result.content, /#10 Auth flow/);
+    assert.match(result.content, /#14 Bare issue/);
+    // All issues rendered as unchecked checkboxes
+    const checkboxLines = result.content.split("\n").filter((l) => l.startsWith("- [ ] #"));
+    assert.equal(checkboxLines.length, 5);
+  });
+
+  it("handles special characters in topic and issue titles", () => {
+    const result = createSprintFile({
+      topic: "OAuth2 / PKCE (v2)",
+      milestone: "Sprint W15",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "TBD",
+      getIssues: () => [
+        { number: 42, title: "Support café & résumé endpoints", labels: [] },
+      ],
+    });
+
+    assert.ok(fs.existsSync(result.sprintFile));
+    assert.match(result.content, /café & résumé/);
+    // Filename uses slugified topic
+    assert.match(path.basename(result.sprintFile), /^2026-04-.*\.md$/);
+    assert.ok(!path.basename(result.sprintFile).includes("/"));
+  });
+
+  it("produces frontmatter compatible with find_active_sprint", () => {
+    const result = createSprintFile({
+      topic: "compat-check",
+      milestone: "Sprint W15",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "2026-04-12",
+      getIssues: () => [{ number: 1, title: "Task", labels: [] }],
+    });
+
+    const content = fs.readFileSync(result.sprintFile, "utf-8");
+    // Frontmatter must have status: active on its own line (what find_active_sprint greps for)
+    assert.match(content, /^status: active$/m);
+    // Checkbox must match the integration contract regex
+    assert.match(content, /^- \[ \] #\d+/m);
   });
 });
