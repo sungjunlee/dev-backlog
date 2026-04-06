@@ -89,6 +89,52 @@ created_date: 'YYYY-MM-DD'
 
 dev-relay reads AC via LLM context from whatever structure the body provides. The `<!-- AC:BEGIN/END -->` markers are a convention, not machine-parsed by dev-relay.
 
+## Cross-Sprint Context (`_context.md`) Sections
+
+dev-relay reads `_context.md` for project-level knowledge. The following `## ` headings are expected:
+
+| Section | dev-relay reads | Purpose |
+|---------|:-:|---------|
+| `## Architecture Decisions` | Yes | Tech choices with date + sprint ref (e.g., "argon2 for password hashing (2026-03-22, Sprint W13)") |
+| `## Conventions` | Yes | Recurring patterns (e.g., "All new endpoints need rate limiting middleware") |
+| `## Known Gotchas` | Yes | Non-obvious pitfalls (e.g., "Safari doesn't send cookies on first redirect") |
+
+relay-plan uses these sections as context when building scoring rubrics. relay-dispatch may include relevant conventions in the executor prompt. Sections may be empty or absent — treated as empty.
+
+## Relay-Merge Sprint Update Format
+
+When relay-merge completes a task, it updates the active sprint file in these specific formats:
+
+**Plan section** — mark checkbox done with PR annotation:
+```
+- [x] #N Task name → PR #M (merged)
+```
+
+**Progress section** — structured log with review rounds:
+```
+- YYYY-MM-DD HH:MM: #N dispatched → PR #M → reviewed (LGTM, round R) → merged
+```
+
+**Running Context section** — append learnings:
+```
+- Topic: concise discovery. (e.g., "OAuth2: PKCE flow using jose library")
+```
+
+### Run-ID Annotation (optional)
+
+Sprint plan items may include a relay run-id for traceability back to the manifest:
+
+```
+- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]
+```
+
+Regex for extraction:
+```
+/\[run:([^\]]+)\]$/
+```
+
+This is optional — items without `[run:...]` are valid. relay-merge appends it when a manifest exists.
+
 ## Graceful Degradation
 
 - **No sprint file**: dev-relay skips sprint tracking entirely. Tasks still work standalone.

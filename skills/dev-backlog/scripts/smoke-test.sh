@@ -441,6 +441,31 @@ assert_equals "contract: Plan heading" \
 assert_equals "contract: Running Context heading" \
   "$(echo '## Running Context' | grep -c '^## Running Context[ 	]*$')" "1"
 
+# Relay-merge progress log format
+assert_equals "contract: progress log" \
+  "$(echo '- 2026-03-25 10:50: #38 dispatched → PR #87 → reviewed (LGTM, round 1) → merged' | grep -c '#[0-9]* dispatched → PR #[0-9]*')" "1"
+
+# Run-ID annotation extraction
+assert_equals "contract: run-id extraction" \
+  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" "issue-42-20260403120000000"
+
+# Run-ID is optional (no annotation = line unchanged by sed, grep finds 0)
+assert_equals "contract: no run-id is valid" \
+  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | grep -c '\[run:')" "0"
+
+# Extraction sed on line without run-id returns original line (no false positive)
+assert_equals "contract: run-id extraction on absent annotation" \
+  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" \
+  "- [x] #42 OAuth2 flow → PR #87 (merged)"
+
+# _context.md section headings
+assert_equals "contract: Architecture Decisions heading" \
+  "$(echo '## Architecture Decisions' | grep -c '^## Architecture Decisions[ 	]*$')" "1"
+assert_equals "contract: Conventions heading" \
+  "$(echo '## Conventions' | grep -c '^## Conventions[ 	]*$')" "1"
+assert_equals "contract: Known Gotchas heading" \
+  "$(echo '## Known Gotchas' | grep -c '^## Known Gotchas[ 	]*$')" "1"
+
 # ============================================================
 # sprint-close.sh tests
 # ============================================================
