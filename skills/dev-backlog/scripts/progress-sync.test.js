@@ -6,6 +6,14 @@ const os = require("os");
 const {
   makeMarker,
   parseMarkerMonth,
+  makeCommentMarker,
+  parseCommentEntryId,
+  mergeEntryKey,
+  stuckEntryKey,
+  renderMergeComment,
+  renderStuckComment,
+  parseManagedComments,
+  reconcileComments,
   monthKey,
   monthTitle,
   prevMonth,
@@ -568,6 +576,536 @@ describe("sync", () => {
     const r2 = sync({ month: "2026-04", dryRun: true, backlogDir: tmpDir, execFile: makeExec() });
 
     assert.equal(r1.body, r2.body);
+  });
+});
+
+// --- Comment marker ---
+
+describe("makeCommentMarker", () => {
+  it("produces the expected comment marker string", () => {
+    assert.equal(
+      makeCommentMarker("2026-04/merge/pr-10"),
+      "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->"
+    );
+  });
+
+  it("uses a distinct prefix from the body marker", () => {
+    const bodyMarker = makeMarker("2026-04");
+    const commentMarker = makeCommentMarker("2026-04/merge/pr-10");
+    // They should not contain each other's prefix
+    assert.ok(!bodyMarker.includes("progress-comment"));
+    assert.ok(!commentMarker.includes("progress-issue"));
+  });
+});
+
+describe("parseCommentEntryId", () => {
+  it("extracts entry id from comment body", () => {
+    const body = "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->\n**Merged:** #10";
+    assert.equal(parseCommentEntryId(body), "2026-04/merge/pr-10");
+  });
+
+  it("extracts stuck entry id", () => {
+    const body = "<!-- dev-backlog:progress-comment id=2026-04/stuck/BACK-5.md -->\n**Stuck**";
+    assert.equal(parseCommentEntryId(body), "2026-04/stuck/BACK-5.md");
+  });
+
+  it("returns null for missing marker", () => {
+    assert.equal(parseCommentEntryId("no marker here"), null);
+    assert.equal(parseCommentEntryId(null), null);
+    assert.equal(parseCommentEntryId(""), null);
+  });
+
+  it("returns null for empty id", () => {
+    assert.equal(parseCommentEntryId("<!-- dev-backlog:progress-comment id= -->"), null);
+  });
+
+  it("ignores body marker", () => {
+    const body = "<!-- dev-backlog:progress-issue month=2026-04 -->\nbody text";
+    assert.equal(parseCommentEntryId(body), null);
+  });
+
+  it("marker round-trips through make and parse", () => {
+    const entryId = "2026-04/merge/pr-42";
+    const marker = makeCommentMarker(entryId);
+    assert.equal(parseCommentEntryId(marker), entryId);
+  });
+});
+
+// --- Entry key derivation ---
+
+describe("mergeEntryKey", () => {
+  it("derives stable key from month and PR number", () => {
+    assert.equal(mergeEntryKey("2026-04", 10), "2026-04/merge/pr-10");
+    assert.equal(mergeEntryKey("2026-04", 10), mergeEntryKey("2026-04", 10));
+  });
+
+  it("different PRs produce different keys", () => {
+    assert.notEqual(mergeEntryKey("2026-04", 10), mergeEntryKey("2026-04", 11));
+  });
+
+  it("different months produce different keys", () => {
+    assert.notEqual(mergeEntryKey("2026-04", 10), mergeEntryKey("2026-05", 10));
+  });
+});
+
+describe("stuckEntryKey", () => {
+  it("derives stable key from month and task file", () => {
+    assert.equal(stuckEntryKey("2026-04", "BACK-5.md"), "2026-04/stuck/BACK-5.md");
+  });
+
+  it("different tasks produce different keys", () => {
+    assert.notEqual(
+      stuckEntryKey("2026-04", "BACK-5.md"),
+      stuckEntryKey("2026-04", "BACK-6.md")
+    );
+  });
+});
+
+// --- Comment rendering ---
+
+describe("renderMergeComment", () => {
+  it("includes comment marker and PR info", () => {
+    const body = renderMergeComment("2026-04", { number: 10, title: "Add auth" });
+    assert.ok(body.includes("<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->"));
+    assert.ok(body.includes("**Merged:** #10 — Add auth"));
+  });
+
+  it("marker is parseable back to entry id", () => {
+    const body = renderMergeComment("2026-04", { number: 10, title: "Add auth" });
+    assert.equal(parseCommentEntryId(body), "2026-04/merge/pr-10");
+  });
+});
+
+describe("renderStuckComment", () => {
+  it("includes comment marker and task info", () => {
+    const body = renderStuckComment("2026-04", { file: "BACK-5.md", status: "In Progress" });
+    assert.ok(body.includes("<!-- dev-backlog:progress-comment id=2026-04/stuck/BACK-5.md -->"));
+    assert.ok(body.includes("**Stuck candidate:** BACK-5.md"));
+  });
+
+  it("marker is parseable back to entry id", () => {
+    const body = renderStuckComment("2026-04", { file: "BACK-5.md", status: "In Progress" });
+    assert.equal(parseCommentEntryId(body), "2026-04/stuck/BACK-5.md");
+  });
+});
+
+// --- parseManagedComments ---
+
+describe("parseManagedComments", () => {
+  it("filters only comments with managed marker", () => {
+    const comments = [
+      { id: 1, body: "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->\n**Merged**" },
+      { id: 2, body: "This is a human comment" },
+      { id: 3, body: "<!-- dev-backlog:progress-comment id=2026-04/stuck/BACK-5.md -->\n**Stuck**" },
+      { id: 4, body: "Another human comment with <!-- random html -->" },
+    ];
+    const managed = parseManagedComments(comments);
+    assert.equal(managed.length, 2);
+    assert.equal(managed[0].id, 1);
+    assert.equal(managed[0].entryId, "2026-04/merge/pr-10");
+    assert.equal(managed[1].id, 3);
+    assert.equal(managed[1].entryId, "2026-04/stuck/BACK-5.md");
+  });
+
+  it("returns empty array when no managed comments", () => {
+    const comments = [
+      { id: 1, body: "human comment" },
+      { id: 2, body: "another human comment" },
+    ];
+    assert.deepEqual(parseManagedComments(comments), []);
+  });
+
+  it("returns empty array for empty input", () => {
+    assert.deepEqual(parseManagedComments([]), []);
+  });
+
+  it("ignores body markers (progress-issue, not progress-comment)", () => {
+    const comments = [
+      { id: 1, body: "<!-- dev-backlog:progress-issue month=2026-04 -->\nBody" },
+    ];
+    assert.deepEqual(parseManagedComments(comments), []);
+  });
+});
+
+// --- reconcileComments ---
+
+describe("reconcileComments", () => {
+  function makeStubExec() {
+    const calls = [];
+    const execFile = (cmd, args) => {
+      calls.push({ cmd, args });
+      return "{}";
+    };
+    return { execFile, calls };
+  }
+
+  it("creates comments for new merge events", () => {
+    const { execFile, calls } = makeStubExec();
+    const fetchComments = () => []; // no existing comments
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "PR A" }, { number: 11, title: "PR B" }],
+      stuckTasks: [],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.created, 2);
+    assert.equal(actions.updated, 0);
+    assert.equal(actions.skipped, 0);
+    // Verify gh api POST calls were made
+    const postCalls = calls.filter((c) => c.args.includes("POST"));
+    assert.equal(postCalls.length, 2);
+  });
+
+  it("creates comments for stuck tasks", () => {
+    const { execFile } = makeStubExec();
+    const fetchComments = () => [];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [],
+      stuckTasks: [{ file: "BACK-5.md", status: "In Progress" }],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.created, 1);
+  });
+
+  it("skips when existing comment body matches exactly", () => {
+    const { execFile, calls } = makeStubExec();
+    const mergeBody = renderMergeComment("2026-04", { number: 10, title: "PR A" });
+    const fetchComments = () => [
+      { id: 100, body: mergeBody },
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "PR A" }],
+      stuckTasks: [],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.skipped, 1);
+    assert.equal(actions.created, 0);
+    assert.equal(actions.updated, 0);
+    // No write calls should have been made
+    const writeCalls = calls.filter((c) => c.args.includes("POST") || c.args.includes("PATCH"));
+    assert.equal(writeCalls.length, 0);
+  });
+
+  it("updates when existing comment body differs", () => {
+    const { execFile, calls } = makeStubExec();
+    const oldBody = "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->\n**Merged:** #10 — Old Title";
+    const fetchComments = () => [
+      { id: 100, body: oldBody },
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "New Title" }],
+      stuckTasks: [],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.updated, 1);
+    assert.equal(actions.created, 0);
+    assert.equal(actions.skipped, 0);
+    const patchCalls = calls.filter((c) => c.args.includes("PATCH"));
+    assert.equal(patchCalls.length, 1);
+  });
+
+  it("repairs duplicates: keeps first, deletes rest", () => {
+    const { execFile, calls } = makeStubExec();
+    const markerBody = "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-10 -->\n**Merged:** #10 — Dup";
+    const fetchComments = () => [
+      { id: 100, body: markerBody },
+      { id: 101, body: markerBody },
+      { id: 102, body: markerBody },
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "Dup" }],
+      stuckTasks: [],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.repaired, 1);
+    assert.equal(actions.created, 0);
+    // First comment updated, two deleted
+    const patchCalls = calls.filter((c) => c.args.includes("PATCH"));
+    assert.equal(patchCalls.length, 1);
+    const deleteCalls = calls.filter((c) => c.args.includes("DELETE"));
+    assert.equal(deleteCalls.length, 2);
+  });
+
+  it("leaves human comments untouched", () => {
+    const { execFile, calls } = makeStubExec();
+    const fetchComments = () => [
+      { id: 200, body: "Great progress this month!" },
+      { id: 201, body: "I have a question about the stuck items." },
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "PR A" }],
+      stuckTasks: [],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    // Should create 1 new comment, not touch the 2 human ones
+    assert.equal(actions.created, 1);
+    // No PATCH or DELETE calls for human comments
+    const patchCalls = calls.filter((c) => c.args.includes("PATCH"));
+    assert.equal(patchCalls.length, 0);
+    const deleteCalls = calls.filter((c) => c.args.includes("DELETE"));
+    assert.equal(deleteCalls.length, 0);
+  });
+
+  it("dry-run does not create, update, or delete", () => {
+    const { execFile, calls } = makeStubExec();
+    const fetchComments = () => [];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 10, title: "PR A" }],
+      stuckTasks: [{ file: "BACK-5.md", status: "In Progress" }],
+      month: "2026-04",
+      dryRun: true,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.created, 2);
+    // No API calls
+    assert.equal(calls.length, 0);
+  });
+
+  it("handles mixed: create, skip, update, repair in one pass", () => {
+    const { execFile } = makeStubExec();
+    const existingMerge10 = renderMergeComment("2026-04", { number: 10, title: "PR A" });
+    const oldMerge11 = "<!-- dev-backlog:progress-comment id=2026-04/merge/pr-11 -->\n**Merged:** #11 — Old";
+    const dupStuck = "<!-- dev-backlog:progress-comment id=2026-04/stuck/BACK-5.md -->\n**Stuck**";
+
+    const fetchComments = () => [
+      { id: 100, body: existingMerge10 },    // will be skipped (exact match)
+      { id: 101, body: oldMerge11 },          // will be updated (body differs)
+      { id: 102, body: dupStuck },            // duplicate 1
+      { id: 103, body: dupStuck },            // duplicate 2 — triggers repair
+      { id: 200, body: "Human comment" },     // left untouched
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [
+        { number: 10, title: "PR A" },
+        { number: 11, title: "New Title" },
+        { number: 12, title: "Brand New" },   // will be created
+      ],
+      stuckTasks: [{ file: "BACK-5.md", status: "In Progress" }],
+      month: "2026-04",
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.skipped, 1);    // PR #10
+    assert.equal(actions.updated, 1);    // PR #11
+    assert.equal(actions.created, 1);    // PR #12
+    assert.equal(actions.repaired, 1);   // BACK-5.md duplicates
+  });
+
+  it("rerun is idempotent: second pass skips everything", () => {
+    const { execFile: exec1 } = makeStubExec();
+    const mergedPRs = [{ number: 10, title: "PR A" }];
+    const stuckTasks = [{ file: "BACK-5.md", status: "In Progress" }];
+
+    // First run: empty, creates everything
+    const actions1 = reconcileComments({
+      issueNumber: 50,
+      mergedPRs,
+      stuckTasks,
+      month: "2026-04",
+      dryRun: false,
+      execFile: exec1,
+      fetchComments: () => [],
+    });
+    assert.equal(actions1.created, 2);
+
+    // Second run: simulate comments now exist with correct bodies
+    const { execFile: exec2, calls: calls2 } = makeStubExec();
+    const actions2 = reconcileComments({
+      issueNumber: 50,
+      mergedPRs,
+      stuckTasks,
+      month: "2026-04",
+      dryRun: false,
+      execFile: exec2,
+      fetchComments: () => [
+        { id: 100, body: renderMergeComment("2026-04", { number: 10, title: "PR A" }) },
+        { id: 101, body: renderStuckComment("2026-04", { file: "BACK-5.md", status: "In Progress" }) },
+      ],
+    });
+    assert.equal(actions2.skipped, 2);
+    assert.equal(actions2.created, 0);
+    assert.equal(actions2.updated, 0);
+    assert.equal(actions2.repaired, 0);
+    // No write calls
+    assert.equal(calls2.length, 0);
+  });
+});
+
+// --- sync with comments ---
+
+describe("sync (comment integration)", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-sync-cmt-"));
+    fs.mkdirSync(path.join(tmpDir, "tasks"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "completed"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "sprints"), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeExecFile({ issues = [], openPRs = [], mergedPRs = [], createdIssueNumber = 99 }) {
+    const calls = [];
+    const execFile = (cmd, args) => {
+      calls.push({ cmd, args });
+      const joined = args.join(" ");
+      if (joined.includes("issue list")) return JSON.stringify(issues);
+      if (joined.includes("pr list") && joined.includes("open")) return JSON.stringify(openPRs);
+      if (joined.includes("pr list") && joined.includes("merged")) return JSON.stringify(mergedPRs);
+      if (joined.includes("issue create")) return `https://github.com/owner/repo/issues/${createdIssueNumber}\n`;
+      if (joined.includes("issue edit")) return "";
+      return "{}";
+    };
+    return { execFile, calls };
+  }
+
+  it("sync result includes comment actions", () => {
+    const { execFile } = makeExecFile({
+      mergedPRs: [{ number: 10, title: "PR A" }],
+      createdIssueNumber: 99,
+    });
+    fs.writeFileSync(path.join(tmpDir, "tasks", "BACK-5.md"), "---\nstatus: In Progress\n---\n");
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+      fetchComments: () => [],
+    });
+
+    assert.ok(result.comments);
+    assert.equal(result.comments.created, 2); // 1 merge + 1 stuck
+    assert.equal(result.comments.skipped, 0);
+  });
+
+  it("sync dry-run includes comment actions without writing", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+    };
+    const { execFile, calls } = makeExecFile({
+      issues: [existing],
+      mergedPRs: [{ number: 10, title: "PR" }],
+    });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: true,
+      backlogDir: tmpDir,
+      execFile,
+      fetchComments: () => [],
+    });
+
+    assert.ok(result.comments);
+    assert.equal(result.comments.created, 1);
+    // No API write calls for comments
+    const postCalls = calls.filter((c) => c.args && c.args.includes("POST"));
+    assert.equal(postCalls.length, 0);
+  });
+
+  it("sync with no issue number skips comments", () => {
+    const { execFile } = makeExecFile({});
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: true,
+      backlogDir: tmpDir,
+      execFile,
+      fetchComments: () => { throw new Error("should not be called"); },
+    });
+
+    assert.deepEqual(result.comments, { created: 0, updated: 0, skipped: 0, repaired: 0 });
+  });
+
+  it("parses paginated gh api comment arrays and avoids duplicate managed comments", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+    };
+    const calls = [];
+    let issueListCalls = 0;
+    const existingMergeComment = renderMergeComment("2026-04", { number: 10, title: "PR A" });
+    const execFile = (_cmd, args) => {
+      calls.push(args);
+      const joined = args.join(" ");
+      if (joined.includes("issue list") && joined.includes("--search")) {
+        issueListCalls += 1;
+        return issueListCalls === 1 ? JSON.stringify([existing]) : "[]";
+      }
+      if (joined.includes("pr list") && joined.includes("open")) return "[]";
+      if (joined.includes("pr list") && joined.includes("merged")) {
+        return JSON.stringify([{ number: 10, title: "PR A" }]);
+      }
+      if (joined.includes("issues/50/comments")) {
+        return [
+          JSON.stringify([{ id: 100, body: existingMergeComment }]),
+          JSON.stringify([{ id: 101, body: "Human comment" }]),
+        ].join("\n");
+      }
+      if (joined.includes("issue edit")) return "";
+      return "{}";
+    };
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.comments.created, 0);
+    assert.equal(result.comments.skipped, 1);
+    const postCalls = calls.filter((args) => args.includes("POST"));
+    assert.equal(postCalls.length, 0);
   });
 });
 
