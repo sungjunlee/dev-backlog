@@ -6,6 +6,7 @@
  *        node scripts/progress-sync.js --dry-run
  *        node scripts/progress-sync.js --json
  *        node scripts/progress-sync.js --month 2026-03
+ *        node scripts/progress-sync.js --relay-manifest ~/.relay/runs/<repo>/<run>.md
  *
  * Finds or creates the current month's Progress issue, then reconciles
  * the issue body from source data (tasks, PRs, sprint state).
@@ -65,6 +66,14 @@ function stuckEntryKey(month, taskFile) {
   return `${month}/stuck/${taskFile}`;
 }
 
+function relayMergeEntryKey(runId) {
+  return `run/${runId}/merge`;
+}
+
+function relayStuckEntryKey(runId) {
+  return `run/${runId}/stuck`;
+}
+
 // --- Month helpers ---
 
 function monthKey(date) {
@@ -91,7 +100,7 @@ function prevMonth(month) {
 // --- Parse args ---
 
 function parseArgs(args) {
-  const options = { dryRun: false, json: false, month: null };
+  const options = { dryRun: false, json: false, month: null, relayManifest: null };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -114,11 +123,33 @@ function parseArgs(args) {
       options.month = val;
       continue;
     }
+    if (arg === "--relay-manifest") {
+      const val = args[i + 1];
+      if (!val) {
+        return { ...options, error: "Missing --relay-manifest value." };
+      }
+      options.relayManifest = val;
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--relay-manifest=")) {
+      const val = arg.slice("--relay-manifest=".length);
+      if (!val) {
+        return { ...options, error: "Missing --relay-manifest value." };
+      }
+      options.relayManifest = val;
+      continue;
+    }
   }
   return options;
 }
 
 // --- Local data readers ---
+
+function parseTaskIssueNumber(taskFile) {
+  const match = String(taskFile || "").match(/^[A-Za-z]+-(\d+)\b/);
+  return match ? Number(match[1]) : null;
+}
 
 function readTaskFiles(tasksDir) {
   if (!fs.existsSync(tasksDir)) return [];
@@ -127,9 +158,13 @@ function readTaskFiles(tasksDir) {
     .map((f) => {
       const content = fs.readFileSync(path.join(tasksDir, f), "utf-8");
       const fm = content.match(/^---\n([\s\S]*?)\n---/);
-      if (!fm) return { file: f, status: "unknown" };
+      if (!fm) return { file: f, issueNumber: parseTaskIssueNumber(f), status: "unknown" };
       const statusMatch = fm[1].match(/^status:\s*(.+)$/m);
-      return { file: f, status: statusMatch ? statusMatch[1].trim() : "unknown" };
+      return {
+        file: f,
+        issueNumber: parseTaskIssueNumber(f),
+        status: statusMatch ? statusMatch[1].trim() : "unknown",
+      };
     });
 }
 
@@ -207,14 +242,179 @@ function renderBody({ month, summary, prevIssueNumber }) {
 
 // --- Comment rendering ---
 
-function renderMergeComment(month, pr) {
-  const marker = makeCommentMarker(mergeEntryKey(month, pr.number));
-  return `${marker}\n**Merged:** #${pr.number} — ${pr.title}`;
+function normalizeRelayField(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "unknown" || trimmed === "null") return null;
+    return trimmed;
+  }
+  return value;
 }
 
-function renderStuckComment(month, task) {
-  const marker = makeCommentMarker(stuckEntryKey(month, task.file));
-  return `${marker}\n**Stuck candidate:** ${task.file} (status: ${task.status})`;
+function parseFrontmatterScalar(value) {
+  if (value === "null") return null;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replace(/''/g, "'");
+  }
+  if (value.startsWith("\"") && value.endsWith("\"")) {
+    return JSON.parse(value);
+  }
+  return value;
+}
+
+function parseFrontmatter(text) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  if (lines[0] !== "---") {
+    return {};
+  }
+
+  const closingIndex = lines.indexOf("---", 1);
+  if (closingIndex === -1) {
+    throw new Error("Invalid relay manifest: missing closing frontmatter marker");
+  }
+
+  const frontmatterLines = lines.slice(1, closingIndex);
+
+  function parseBlock(startIndex, indent) {
+    const data = {};
+    let index = startIndex;
+
+    while (index < frontmatterLines.length) {
+      const raw = frontmatterLines[index];
+      if (!raw.trim()) {
+        index++;
+        continue;
+      }
+
+      const currentIndent = raw.match(/^ */)[0].length;
+      if (currentIndent < indent) break;
+      if (currentIndent > indent) {
+        throw new Error(`Invalid relay manifest indentation on line ${index + 2}`);
+      }
+
+      const trimmed = raw.trim();
+      const separator = trimmed.indexOf(":");
+      if (separator === -1) {
+        throw new Error(`Invalid relay manifest entry on line ${index + 2}`);
+      }
+
+      const key = trimmed.slice(0, separator).trim();
+      const rest = trimmed.slice(separator + 1).trim();
+
+      if (!rest) {
+        const nested = parseBlock(index + 1, indent + 2);
+        data[key] = nested.data;
+        index = nested.index;
+        continue;
+      }
+
+      data[key] = parseFrontmatterScalar(rest);
+      index++;
+    }
+
+    return { data, index };
+  }
+
+  return parseBlock(0, 0).data;
+}
+
+function relayEventsPath(relayManifestPath, runId) {
+  return path.join(path.dirname(relayManifestPath), runId, "events.jsonl");
+}
+
+function readRelayManifestMetadata(relayManifestPath) {
+  const resolved = path.resolve(relayManifestPath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`Relay manifest not found: ${resolved}`);
+  }
+
+  const text = fs.readFileSync(resolved, "utf-8");
+  const data = parseFrontmatter(text);
+  const runId = normalizeRelayField(data.run_id) || path.basename(resolved, path.extname(resolved));
+
+  return {
+    manifestPath: resolved,
+    runId,
+    state: normalizeRelayField(data.state),
+    nextAction: normalizeRelayField(data.next_action),
+    issueNumber: Number.isFinite(data.issue?.number) ? data.issue.number : null,
+    prNumber: Number.isFinite(data.git?.pr_number) ? data.git.pr_number : null,
+    executor: normalizeRelayField(data.roles?.executor),
+    reviewer: normalizeRelayField(data.roles?.reviewer),
+    actor: normalizeRelayField(data.roles?.actor) || normalizeRelayField(data.roles?.orchestrator),
+    rounds: Number.isFinite(data.review?.rounds) ? data.review.rounds : null,
+  };
+}
+
+function readRelayGrade(eventsPath) {
+  if (!fs.existsSync(eventsPath)) return null;
+
+  let grade = null;
+  const lines = fs.readFileSync(eventsPath, "utf-8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const record = JSON.parse(line);
+    if (record.event === "rubric_quality" && typeof record.grade === "string" && record.grade.trim()) {
+      grade = record.grade.trim();
+    }
+  }
+
+  return grade;
+}
+
+function loadRelayMetadata(relayManifestPath) {
+  if (!relayManifestPath) return null;
+
+  const metadata = readRelayManifestMetadata(relayManifestPath);
+  return {
+    ...metadata,
+    eventsPath: relayEventsPath(metadata.manifestPath, metadata.runId),
+    grade: readRelayGrade(relayEventsPath(metadata.manifestPath, metadata.runId)),
+  };
+}
+
+function relayDetailLine(relay, { includeState = false } = {}) {
+  if (!relay?.runId) return null;
+
+  const parts = [`run \`${relay.runId}\``];
+  if (relay.grade) parts.push(`grade ${relay.grade}`);
+  if (typeof relay.rounds === "number") parts.push(`rounds ${relay.rounds}`);
+  if (relay.executor) parts.push(`executor ${relay.executor}`);
+  if (relay.reviewer) parts.push(`reviewer ${relay.reviewer}`);
+  if (relay.actor) parts.push(`actor ${relay.actor}`);
+  if (includeState && relay.state) parts.push(`state ${relay.state}`);
+  if (includeState && relay.nextAction) parts.push(`next ${relay.nextAction}`);
+
+  return parts.length ? `**Relay:** ${parts.join(" · ")}` : null;
+}
+
+function renderMergeComment(month, pr, relay = null) {
+  const entryId = relay?.runId ? relayMergeEntryKey(relay.runId) : mergeEntryKey(month, pr.number);
+  const marker = makeCommentMarker(entryId);
+  const lines = [marker, `**Merged:** #${pr.number} — ${pr.title}`];
+  const relayLine = relayDetailLine(relay);
+  if (relayLine) {
+    lines.push("", relayLine);
+  }
+  return lines.join("\n");
+}
+
+function renderStuckComment(month, task, relay = null) {
+  const entryId = relay?.runId ? relayStuckEntryKey(relay.runId) : stuckEntryKey(month, task.file);
+  const marker = makeCommentMarker(entryId);
+  const lines = [marker, `**Stuck candidate:** ${task.file} (status: ${task.status})`];
+  const relayLine = relayDetailLine(relay, { includeState: true });
+  if (relayLine) {
+    lines.push("", relayLine);
+  }
+  return lines.join("\n");
 }
 
 // --- GitHub I/O ---
@@ -339,11 +539,55 @@ function parseManagedComments(comments) {
   return managed;
 }
 
+function buildDesiredCommentEntries({ mergedPRs, stuckTasks, month, relayMetadata }) {
+  const desired = [];
+
+  for (const pr of mergedPRs) {
+    const relay = relayMetadata?.runId && relayMetadata.prNumber === pr.number ? relayMetadata : null;
+    desired.push({
+      entryId: relay ? relayMergeEntryKey(relay.runId) : mergeEntryKey(month, pr.number),
+      aliasIds: relay ? [mergeEntryKey(month, pr.number)] : [],
+      body: renderMergeComment(month, pr, relay),
+    });
+  }
+
+  for (const task of stuckTasks) {
+    const taskIssueNumber = task.issueNumber ?? parseTaskIssueNumber(task.file);
+    const relay = relayMetadata?.runId && relayMetadata.issueNumber === taskIssueNumber ? relayMetadata : null;
+    desired.push({
+      entryId: relay ? relayStuckEntryKey(relay.runId) : stuckEntryKey(month, task.file),
+      aliasIds: relay ? [stuckEntryKey(month, task.file)] : [],
+      body: renderStuckComment(month, task, relay),
+    });
+  }
+
+  return desired;
+}
+
+function matchingManagedComments(byEntryId, entry) {
+  const unique = new Map();
+  const entryIds = [entry.entryId, ...(entry.aliasIds || [])];
+
+  for (const entryId of entryIds) {
+    const matches = byEntryId.get(entryId) || [];
+    for (const match of matches) {
+      unique.set(match.id, match);
+    }
+  }
+
+  return Array.from(unique.values());
+}
+
+function selectPrimaryManagedComment(existing, canonicalEntryId) {
+  return existing.find((comment) => comment.entryId === canonicalEntryId) || existing[0];
+}
+
 function reconcileComments({
   issueNumber,
   mergedPRs,
   stuckTasks,
   month,
+  relayMetadata = null,
   dryRun,
   execFile,
   fetchComments = fetchIssueComments,
@@ -358,25 +602,12 @@ function reconcileComments({
     byEntryId.get(mc.entryId).push(mc);
   }
 
-  // Build desired entries: { entryId, body }
-  const desired = [];
-  for (const pr of mergedPRs) {
-    desired.push({
-      entryId: mergeEntryKey(month, pr.number),
-      body: renderMergeComment(month, pr),
-    });
-  }
-  for (const task of stuckTasks) {
-    desired.push({
-      entryId: stuckEntryKey(month, task.file),
-      body: renderStuckComment(month, task),
-    });
-  }
+  const desired = buildDesiredCommentEntries({ mergedPRs, stuckTasks, month, relayMetadata });
 
   const actions = { created: 0, updated: 0, skipped: 0, repaired: 0 };
 
   for (const entry of desired) {
-    const existing = byEntryId.get(entry.entryId) || [];
+    const existing = matchingManagedComments(byEntryId, entry);
 
     if (existing.length === 0) {
       // Create new comment
@@ -384,7 +615,7 @@ function reconcileComments({
       actions.created++;
     } else if (existing.length === 1) {
       // Single existing — update if body differs, skip if identical
-      if (existing[0].body === entry.body) {
+      if (existing[0].body === entry.body && existing[0].entryId === entry.entryId) {
         actions.skipped++;
       } else {
         if (!dryRun) updateIssueComment(existing[0].id, entry.body, execFile);
@@ -392,10 +623,12 @@ function reconcileComments({
       }
     } else {
       // Duplicate repair: keep the first, update it, delete the rest
+      const primary = selectPrimaryManagedComment(existing, entry.entryId);
+      const duplicates = existing.filter((comment) => comment.id !== primary.id);
       if (!dryRun) {
-        updateIssueComment(existing[0].id, entry.body, execFile);
-        for (let i = 1; i < existing.length; i++) {
-          deleteIssueComment(existing[i].id, execFile);
+        updateIssueComment(primary.id, entry.body, execFile);
+        for (const duplicate of duplicates) {
+          deleteIssueComment(duplicate.id, execFile);
         }
       }
       actions.repaired++;
@@ -403,6 +636,9 @@ function reconcileComments({
 
     // Remove processed entry from index so we don't revisit
     byEntryId.delete(entry.entryId);
+    for (const aliasId of entry.aliasIds || []) {
+      byEntryId.delete(aliasId);
+    }
   }
 
   // Remaining managed comments with entry ids not in desired set are left as-is
@@ -417,6 +653,7 @@ function sync({
   month,
   dryRun,
   backlogDir = "backlog",
+  relayManifestPath = null,
   execFile = execFileSync,
   readFs = { readTaskFiles, readCompletedCount, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
@@ -430,6 +667,7 @@ function sync({
   const sprint = readFs.readActiveSprintSummary(sprintsDir);
   const openPRs = fetchOpenPRs(execFile);
   const mergedPRs = fetchMergedPRsThisMonth(month, execFile);
+  const relayMetadata = loadRelayMetadata(relayManifestPath);
 
   const summary = computeSummary({ tasks, sprint, openPRs, mergedPRs });
 
@@ -450,6 +688,13 @@ function sync({
     dryRun,
     summary,
     prevIssueNumber,
+    relay: relayMetadata ? {
+      runId: relayMetadata.runId,
+      issueNumber: relayMetadata.issueNumber,
+      prNumber: relayMetadata.prNumber,
+      grade: relayMetadata.grade,
+      rounds: relayMetadata.rounds,
+    } : null,
   };
 
   if (existing) {
@@ -480,6 +725,7 @@ function sync({
       mergedPRs,
       stuckTasks,
       month,
+      relayMetadata,
       dryRun,
       execFile,
       fetchComments,
@@ -524,6 +770,13 @@ function printResult(result) {
     console.log(`  comments: ${c.created} created, ${c.updated} updated, ${c.skipped} skipped, ${c.repaired} repaired`);
   }
 
+  if (result.relay) {
+    const details = [`run ${result.relay.runId}`];
+    if (result.relay.grade) details.push(`grade ${result.relay.grade}`);
+    if (typeof result.relay.rounds === "number") details.push(`rounds ${result.relay.rounds}`);
+    console.log(`  relay: ${details.join(", ")}`);
+  }
+
   console.log("Done.");
 }
 
@@ -540,7 +793,11 @@ function main() {
   const month = options.month || monthKey(new Date());
 
   try {
-    const result = sync({ month, dryRun: options.dryRun });
+    const result = sync({
+      month,
+      dryRun: options.dryRun,
+      relayManifestPath: options.relayManifest,
+    });
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
@@ -563,9 +820,16 @@ module.exports = {
   parseCommentEntryId,
   mergeEntryKey,
   stuckEntryKey,
+  relayMergeEntryKey,
+  relayStuckEntryKey,
   renderMergeComment,
   renderStuckComment,
   parseManagedComments,
+  parseTaskIssueNumber,
+  readRelayManifestMetadata,
+  readRelayGrade,
+  loadRelayMetadata,
+  buildDesiredCommentEntries,
   reconcileComments,
   monthKey,
   monthTitle,

@@ -10,9 +10,16 @@ const {
   parseCommentEntryId,
   mergeEntryKey,
   stuckEntryKey,
+  relayMergeEntryKey,
+  relayStuckEntryKey,
   renderMergeComment,
   renderStuckComment,
   parseManagedComments,
+  parseTaskIssueNumber,
+  readRelayManifestMetadata,
+  readRelayGrade,
+  loadRelayMetadata,
+  buildDesiredCommentEntries,
   reconcileComments,
   monthKey,
   monthTitle,
@@ -81,12 +88,12 @@ describe("prevMonth", () => {
 describe("parseArgs", () => {
   it("parses all flags", () => {
     const parsed = parseArgs(["--dry-run", "--json", "--month", "2026-03"]);
-    assert.deepEqual(parsed, { dryRun: true, json: true, month: "2026-03" });
+    assert.deepEqual(parsed, { dryRun: true, json: true, month: "2026-03", relayManifest: null });
   });
 
   it("defaults to no flags", () => {
     const parsed = parseArgs([]);
-    assert.deepEqual(parsed, { dryRun: false, json: false, month: null });
+    assert.deepEqual(parsed, { dryRun: false, json: false, month: null, relayManifest: null });
   });
 
   it("parses --month=YYYY-MM form", () => {
@@ -98,6 +105,16 @@ describe("parseArgs", () => {
     assert.ok(parseArgs(["--month", "bad"]).error);
     assert.ok(parseArgs(["--month"]).error);
     assert.ok(parseArgs(["--month=bad"]).error);
+  });
+
+  it("parses --relay-manifest in split and equals form", () => {
+    assert.equal(parseArgs(["--relay-manifest", "/tmp/run.md"]).relayManifest, "/tmp/run.md");
+    assert.equal(parseArgs(["--relay-manifest=/tmp/run.md"]).relayManifest, "/tmp/run.md");
+  });
+
+  it("returns error for missing --relay-manifest value", () => {
+    assert.ok(parseArgs(["--relay-manifest"]).error);
+    assert.ok(parseArgs(["--relay-manifest="]).error);
   });
 });
 
@@ -116,6 +133,8 @@ describe("readTaskFiles", () => {
     assert.equal(tasks.length, 2);
     assert.ok(tasks.some((t) => t.status === "In Progress"));
     assert.ok(tasks.some((t) => t.status === "To Do"));
+    assert.ok(tasks.some((t) => t.issueNumber === 1));
+    assert.ok(tasks.some((t) => t.issueNumber === 2));
   });
 
   it("returns empty array for missing dir", () => {
@@ -127,6 +146,17 @@ describe("readTaskFiles", () => {
     const tasks = readTaskFiles(tmpDir);
     assert.equal(tasks.length, 1);
     assert.equal(tasks[0].status, "unknown");
+  });
+});
+
+describe("parseTaskIssueNumber", () => {
+  it("extracts numeric issue id from backlog task filenames", () => {
+    assert.equal(parseTaskIssueNumber("BACK-35 - progress-sync.md"), 35);
+    assert.equal(parseTaskIssueNumber("TASK-7.md"), 7);
+  });
+
+  it("returns null when filename does not follow task naming", () => {
+    assert.equal(parseTaskIssueNumber("notes.md"), null);
   });
 });
 
@@ -661,6 +691,13 @@ describe("stuckEntryKey", () => {
   });
 });
 
+describe("relay entry keys", () => {
+  it("derives stable relay-backed keys from run id", () => {
+    assert.equal(relayMergeEntryKey("issue-37-20260407134610713"), "run/issue-37-20260407134610713/merge");
+    assert.equal(relayStuckEntryKey("issue-37-20260407134610713"), "run/issue-37-20260407134610713/stuck");
+  });
+});
+
 // --- Comment rendering ---
 
 describe("renderMergeComment", () => {
@@ -674,6 +711,19 @@ describe("renderMergeComment", () => {
     const body = renderMergeComment("2026-04", { number: 10, title: "Add auth" });
     assert.equal(parseCommentEntryId(body), "2026-04/merge/pr-10");
   });
+
+  it("uses relay run id and enrichment details when relay metadata is present", () => {
+    const body = renderMergeComment("2026-04", { number: 39, title: "Structured comments" }, {
+      runId: "issue-36-20260407133044244",
+      grade: "A",
+      rounds: 1,
+      executor: "claude",
+      reviewer: "codex",
+      actor: "orchestrator",
+    });
+    assert.ok(body.includes("<!-- dev-backlog:progress-comment id=run/issue-36-20260407133044244/merge -->"));
+    assert.ok(body.includes("**Relay:** run `issue-36-20260407133044244` · grade A · rounds 1 · executor claude · reviewer codex · actor orchestrator"));
+  });
 });
 
 describe("renderStuckComment", () => {
@@ -686,6 +736,19 @@ describe("renderStuckComment", () => {
   it("marker is parseable back to entry id", () => {
     const body = renderStuckComment("2026-04", { file: "BACK-5.md", status: "In Progress" });
     assert.equal(parseCommentEntryId(body), "2026-04/stuck/BACK-5.md");
+  });
+
+  it("includes relay stuck-state signals when relay metadata is present", () => {
+    const body = renderStuckComment("2026-04", { file: "BACK-37 - sync.md", status: "In Progress" }, {
+      runId: "issue-37-20260407134610713",
+      rounds: 2,
+      state: "changes_requested",
+      nextAction: "redispatch",
+      executor: "claude",
+    });
+    assert.ok(body.includes("<!-- dev-backlog:progress-comment id=run/issue-37-20260407134610713/stuck -->"));
+    assert.ok(body.includes("state changes_requested"));
+    assert.ok(body.includes("next redispatch"));
   });
 });
 
@@ -724,6 +787,91 @@ describe("parseManagedComments", () => {
       { id: 1, body: "<!-- dev-backlog:progress-issue month=2026-04 -->\nBody" },
     ];
     assert.deepEqual(parseManagedComments(comments), []);
+  });
+});
+
+describe("relay manifest metadata", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-relay-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeRelayRun(runId) {
+    const manifestPath = path.join(tmpDir, `${runId}.md`);
+    const eventsDir = path.join(tmpDir, runId);
+    fs.mkdirSync(eventsDir, { recursive: true });
+    fs.writeFileSync(manifestPath, [
+      "---",
+      "run_id: 'issue-37-20260407134610713'",
+      "state: 'changes_requested'",
+      "next_action: 'redispatch'",
+      "issue:",
+      "  number: 37",
+      "git:",
+      "  pr_number: 40",
+      "roles:",
+      "  executor: 'claude'",
+      "  reviewer: 'codex'",
+      "  orchestrator: 'relay'",
+      "review:",
+      "  rounds: 2",
+      "---",
+      "# Notes",
+    ].join("\n"));
+    fs.writeFileSync(path.join(eventsDir, "events.jsonl"), [
+      JSON.stringify({ event: "iteration_score", run_id: runId, round: 1 }),
+      JSON.stringify({ event: "rubric_quality", run_id: runId, grade: "A" }),
+    ].join("\n"));
+    return manifestPath;
+  }
+
+  it("reads nested relay metadata from manifest frontmatter", () => {
+    const manifestPath = writeRelayRun("issue-37-20260407134610713");
+    const metadata = readRelayManifestMetadata(manifestPath);
+    assert.equal(metadata.runId, "issue-37-20260407134610713");
+    assert.equal(metadata.issueNumber, 37);
+    assert.equal(metadata.prNumber, 40);
+    assert.equal(metadata.executor, "claude");
+    assert.equal(metadata.reviewer, "codex");
+    assert.equal(metadata.actor, "relay");
+    assert.equal(metadata.rounds, 2);
+    assert.equal(metadata.state, "changes_requested");
+    assert.equal(metadata.nextAction, "redispatch");
+  });
+
+  it("reads grade from relay events and returns enriched metadata", () => {
+    const manifestPath = writeRelayRun("issue-37-20260407134610713");
+    const eventsPath = path.join(tmpDir, "issue-37-20260407134610713", "events.jsonl");
+    assert.equal(readRelayGrade(eventsPath), "A");
+    const metadata = loadRelayMetadata(manifestPath);
+    assert.equal(metadata.grade, "A");
+    assert.equal(metadata.eventsPath, eventsPath);
+  });
+});
+
+describe("buildDesiredCommentEntries", () => {
+  it("switches to run_id identities and keeps backlog aliases for matched relay entries", () => {
+    const desired = buildDesiredCommentEntries({
+      month: "2026-04",
+      mergedPRs: [{ number: 40, title: "Relay enrichment" }],
+      stuckTasks: [{ file: "BACK-37 - sync.md", issueNumber: 37, status: "In Progress" }],
+      relayMetadata: {
+        runId: "issue-37-20260407134610713",
+        issueNumber: 37,
+        prNumber: 40,
+        grade: "A",
+      },
+    });
+
+    assert.equal(desired[0].entryId, "run/issue-37-20260407134610713/merge");
+    assert.deepEqual(desired[0].aliasIds, ["2026-04/merge/pr-40"]);
+    assert.equal(desired[1].entryId, "run/issue-37-20260407134610713/stuck");
+    assert.deepEqual(desired[1].aliasIds, ["2026-04/stuck/BACK-37 - sync.md"]);
   });
 });
 
@@ -900,6 +1048,35 @@ describe("reconcileComments", () => {
     assert.equal(calls.length, 0);
   });
 
+  it("upgrades a backlog-only merge comment to relay run-id without creating a duplicate", () => {
+    const { execFile, calls } = makeStubExec();
+    const fetchComments = () => [
+      { id: 100, body: renderMergeComment("2026-04", { number: 40, title: "Relay enrichment" }) },
+    ];
+
+    const actions = reconcileComments({
+      issueNumber: 50,
+      mergedPRs: [{ number: 40, title: "Relay enrichment" }],
+      stuckTasks: [],
+      month: "2026-04",
+      relayMetadata: {
+        runId: "issue-37-20260407134610713",
+        prNumber: 40,
+        grade: "A",
+        rounds: 2,
+      },
+      dryRun: false,
+      execFile,
+      fetchComments,
+    });
+
+    assert.equal(actions.updated, 1);
+    assert.equal(actions.created, 0);
+    const patchCalls = calls.filter((c) => c.args.includes("PATCH"));
+    assert.equal(patchCalls.length, 1);
+    assert.ok(patchCalls[0].args.some((arg) => arg.includes("run/issue-37-20260407134610713/merge")));
+  });
+
   it("handles mixed: create, skip, update, repair in one pass", () => {
     const { execFile } = makeStubExec();
     const existingMerge10 = renderMergeComment("2026-04", { number: 10, title: "PR A" });
@@ -1063,6 +1240,59 @@ describe("sync (comment integration)", () => {
     });
 
     assert.deepEqual(result.comments, { created: 0, updated: 0, skipped: 0, repaired: 0 });
+  });
+
+  it("sync enriches matching merge comments when relay manifest is provided", () => {
+    const relayDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-sync-relay-"));
+    const runId = "issue-37-20260407134610713";
+    const manifestPath = path.join(relayDir, `${runId}.md`);
+    fs.mkdirSync(path.join(relayDir, runId), { recursive: true });
+    fs.writeFileSync(manifestPath, [
+      "---",
+      `run_id: '${runId}'`,
+      "issue:",
+      "  number: 37",
+      "git:",
+      "  pr_number: 40",
+      "roles:",
+      "  executor: 'claude'",
+      "review:",
+      "  rounds: 2",
+      "---",
+    ].join("\n"));
+    fs.writeFileSync(path.join(relayDir, runId, "events.jsonl"), JSON.stringify({
+      event: "rubric_quality",
+      run_id: runId,
+      grade: "A",
+    }));
+
+    const { execFile, calls } = makeExecFile({
+      issues: [{
+        number: 50,
+        title: "Progress: April 2026",
+        body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+      }],
+      mergedPRs: [{ number: 40, title: "Relay enrichment" }],
+    });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      relayManifestPath: manifestPath,
+      execFile,
+      fetchComments: () => [],
+    });
+
+    assert.ok(result.relay);
+    assert.equal(result.relay.runId, runId);
+    assert.equal(result.comments.created, 1);
+    const postCall = calls.find((c) => c.args.includes("POST"));
+    assert.ok(postCall);
+    assert.ok(postCall.args.some((arg) => arg.includes(`run/${runId}/merge`)));
+    assert.ok(postCall.args.some((arg) => arg.includes("grade A")));
+
+    fs.rmSync(relayDir, { recursive: true, force: true });
   });
 });
 
