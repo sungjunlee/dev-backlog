@@ -16,6 +16,7 @@ const {
   computeSummary,
   renderBody,
   findMonthIssue,
+  fetchMergedPRsThisMonth,
   sync,
   printResult,
 } = require("./progress-sync.js");
@@ -290,6 +291,42 @@ describe("findMonthIssue", () => {
   it("returns null when no match", () => {
     const execFile = () => JSON.stringify([]);
     assert.equal(findMonthIssue("2026-04", execFile), null);
+  });
+});
+
+// --- fetchMergedPRsThisMonth ---
+
+describe("fetchMergedPRsThisMonth", () => {
+  it("uses exclusive upper bound to exclude day-1 of next month", () => {
+    let capturedSearch;
+    const execFile = (_cmd, args) => {
+      const searchIdx = args.indexOf("--search");
+      if (searchIdx !== -1) capturedSearch = args[searchIdx + 1];
+      return "[]";
+    };
+
+    fetchMergedPRsThisMonth("2025-04", execFile);
+
+    // Must use >= start and < end (exclusive), not inclusive range (..)
+    assert.ok(capturedSearch, "should have captured --search value");
+    assert.ok(capturedSearch.includes("merged:>=2025-04-01"), `expected merged:>=2025-04-01, got: ${capturedSearch}`);
+    assert.ok(capturedSearch.includes("merged:<2025-05-01"), `expected merged:<2025-05-01, got: ${capturedSearch}`);
+    // Must NOT use inclusive range syntax
+    assert.ok(!capturedSearch.includes(".."), `must not use inclusive range (..), got: ${capturedSearch}`);
+  });
+
+  it("handles year boundary (December → January)", () => {
+    let capturedSearch;
+    const execFile = (_cmd, args) => {
+      const searchIdx = args.indexOf("--search");
+      if (searchIdx !== -1) capturedSearch = args[searchIdx + 1];
+      return "[]";
+    };
+
+    fetchMergedPRsThisMonth("2025-12", execFile);
+
+    assert.ok(capturedSearch.includes("merged:>=2025-12-01"));
+    assert.ok(capturedSearch.includes("merged:<2026-01-01"));
   });
 });
 

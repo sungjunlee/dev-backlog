@@ -238,7 +238,7 @@ function fetchMergedPRsThisMonth(month, execFile) {
   try {
     const out = execFile("gh", [
       "pr", "list", "--state", "merged",
-      "--search", `merged:${start}..${end}`,
+      "--search", `merged:>=${start} merged:<${end}`,
       "--json", "number,title",
       "--limit", "200",
     ], GH_EXEC_DEFAULTS);
@@ -383,6 +383,7 @@ module.exports = {
   computeSummary,
   renderBody,
   findMonthIssue,
+  fetchMergedPRsThisMonth,
   sync,
   printResult,
 };
