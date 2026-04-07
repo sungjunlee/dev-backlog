@@ -1284,7 +1284,6 @@ describe("sync (comment integration)", () => {
     const postCalls = calls.filter((args) => args.includes("POST"));
     assert.equal(postCalls.length, 0);
   });
-
   it("sync enriches matching merge comments when relay manifest is provided", () => {
     const relayDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-sync-relay-"));
     const runId = "issue-37-20260407134610713";
