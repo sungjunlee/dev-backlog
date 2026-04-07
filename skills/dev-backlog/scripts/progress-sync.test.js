@@ -179,19 +179,18 @@ describe("readActiveSprintSummary", () => {
 // --- Summary computation ---
 
 describe("computeSummary", () => {
-  it("computes counts from source data", () => {
+  it("derives merged count from month-scoped mergedPRs only", () => {
     const result = computeSummary({
       tasks: [
         { file: "a.md", status: "In Progress" },
         { file: "b.md", status: "In Progress" },
         { file: "c.md", status: "To Do" },
       ],
-      completedCount: 5,
       sprint: { file: "sprint.md", done: 3, inflight: 1, todo: 2, total: 6 },
       openPRs: [{ number: 10, title: "PR A" }],
       mergedPRs: [{ number: 11, title: "PR B" }, { number: 12, title: "PR C" }],
     });
-    assert.equal(result.merged, 7); // 5 completed + 2 merged PRs
+    assert.equal(result.merged, 2); // only month-scoped merged PRs
     assert.equal(result.inFlight, 1);
     assert.equal(result.stuckCandidates, 2);
     assert.deepEqual(result.sprint, { file: "sprint.md", done: 3, inflight: 1, todo: 2, total: 6 });
@@ -200,7 +199,6 @@ describe("computeSummary", () => {
   it("handles empty inputs", () => {
     const result = computeSummary({
       tasks: [],
-      completedCount: 0,
       sprint: null,
       openPRs: [],
       mergedPRs: [],
@@ -311,7 +309,7 @@ describe("sync", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function makeExecFile({ issues = [], openPRs = [], mergedPRs = [], createdIssue = null }) {
+  function makeExecFile({ issues = [], openPRs = [], mergedPRs = [], createdIssueNumber = 99 }) {
     const calls = [];
     const execFile = (cmd, args) => {
       calls.push({ cmd, args });
@@ -319,7 +317,7 @@ describe("sync", () => {
       if (joined.includes("issue list")) return JSON.stringify(issues);
       if (joined.includes("pr list") && joined.includes("open")) return JSON.stringify(openPRs);
       if (joined.includes("pr list") && joined.includes("merged")) return JSON.stringify(mergedPRs);
-      if (joined.includes("issue create")) return JSON.stringify(createdIssue || { number: 99, title: "created", body: "" });
+      if (joined.includes("issue create")) return `https://github.com/owner/repo/issues/${createdIssueNumber}\n`;
       if (joined.includes("issue edit")) return "";
       return "[]";
     };
@@ -328,7 +326,7 @@ describe("sync", () => {
 
   it("creates a new issue when none exists", () => {
     const { execFile, calls } = makeExecFile({
-      createdIssue: { number: 99, title: "Progress: April 2026", body: "" },
+      createdIssueNumber: 99,
     });
 
     const result = sync({
@@ -344,6 +342,22 @@ describe("sync", () => {
     assert.ok(result.body.includes("<!-- dev-backlog:progress-issue month=2026-04 -->"));
     // Should have called issue create
     assert.ok(calls.some((c) => c.args.includes("issue") && c.args.includes("create")));
+    // Verify create call does NOT include --json flag (gh issue create doesn't support it)
+    const createCall = calls.find((c) => c.args.includes("create"));
+    assert.ok(!createCall.args.includes("--json"), "gh issue create must not use --json flag");
+  });
+
+  it("parses issue number from gh issue create URL output", () => {
+    const { execFile } = makeExecFile({ createdIssueNumber: 42 });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.issueNumber, 42);
   });
 
   it("updates existing issue instead of creating duplicate", () => {
@@ -406,7 +420,7 @@ describe("sync", () => {
       }
       if (joined.includes("pr list") && joined.includes("open")) return "[]";
       if (joined.includes("pr list") && joined.includes("merged")) return "[]";
-      if (joined.includes("issue create")) return JSON.stringify({ number: 99, title: "", body: "" });
+      if (joined.includes("issue create")) return "https://github.com/owner/repo/issues/99\n";
       return "[]";
     };
 
@@ -439,7 +453,7 @@ describe("sync", () => {
     const { execFile } = makeExecFile({
       openPRs: [{ number: 10, title: "PR" }],
       mergedPRs: [{ number: 11, title: "PR" }],
-      createdIssue: { number: 99, title: "", body: "" },
+      createdIssueNumber: 99,
     });
 
     const result = sync({
@@ -449,7 +463,7 @@ describe("sync", () => {
       execFile,
     });
 
-    assert.equal(result.summary.merged, 2); // 1 completed + 1 merged PR
+    assert.equal(result.summary.merged, 1); // only month-scoped merged PRs
     assert.equal(result.summary.inFlight, 1);
     assert.equal(result.summary.stuckCandidates, 1);
     assert.ok(result.summary.sprint);
@@ -460,7 +474,7 @@ describe("sync", () => {
     // Empty backlog dir — no tasks, no completed, no sprints
     const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-empty-"));
     const { execFile } = makeExecFile({
-      createdIssue: { number: 99, title: "", body: "" },
+      createdIssueNumber: 99,
     });
 
     const result = sync({
@@ -499,8 +513,8 @@ describe("sync", () => {
 
     // Body must not contain stale text
     assert.ok(!result.body.includes("old stale content"));
-    // Body is freshly rendered
-    assert.ok(result.body.includes("| Merged / completed | 3 |"));
+    // Body is freshly rendered — merged count is from month-scoped PRs only (0 here)
+    assert.ok(result.body.includes("| Merged / completed | 0 |"));
   });
 
   it("idempotent: same output for same inputs", () => {

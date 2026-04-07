@@ -129,8 +129,8 @@ function readActiveSprintSummary(sprintsDir) {
 
 // --- Summary computation ---
 
-function computeSummary({ tasks, completedCount, sprint, openPRs, mergedPRs }) {
-  const merged = completedCount + mergedPRs.length;
+function computeSummary({ tasks, sprint, openPRs, mergedPRs }) {
+  const merged = mergedPRs.length;
   const inFlight = openPRs.length;
 
   // Stuck candidates: tasks still marked "In Progress" locally
@@ -201,9 +201,13 @@ function findMonthIssue(month, execFile) {
 function createIssue(title, body, execFile) {
   const out = execFile("gh", [
     "issue", "create", "--title", title, "--body", body,
-    "--json", "number,title,body",
   ], GH_EXEC_DEFAULTS);
-  return JSON.parse(out);
+  // gh issue create prints the issue URL, e.g. https://github.com/owner/repo/issues/123
+  const match = out.trim().match(/\/issues\/(\d+)\s*$/);
+  if (!match) {
+    throw new Error(`Failed to parse issue number from gh output: ${out.trim()}`);
+  }
+  return { number: Number(match[1]) };
 }
 
 function updateIssueBody(number, body, execFile) {
@@ -259,12 +263,11 @@ function sync({
 
   // Gather source data
   const tasks = readFs.readTaskFiles(tasksDir);
-  const completedCount = readFs.readCompletedCount(completedDir);
   const sprint = readFs.readActiveSprintSummary(sprintsDir);
   const openPRs = fetchOpenPRs(execFile);
   const mergedPRs = fetchMergedPRsThisMonth(month, execFile);
 
-  const summary = computeSummary({ tasks, completedCount, sprint, openPRs, mergedPRs });
+  const summary = computeSummary({ tasks, sprint, openPRs, mergedPRs });
 
   // Find or create current month issue
   const existing = findMonthIssue(month, execFile);
