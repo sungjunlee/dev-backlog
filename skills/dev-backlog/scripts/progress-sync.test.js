@@ -1242,6 +1242,49 @@ describe("sync (comment integration)", () => {
     assert.deepEqual(result.comments, { created: 0, updated: 0, skipped: 0, repaired: 0 });
   });
 
+  it("parses paginated gh api comment arrays and avoids duplicate managed comments", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+    };
+    const calls = [];
+    let issueListCalls = 0;
+    const existingMergeComment = renderMergeComment("2026-04", { number: 10, title: "PR A" });
+    const execFile = (_cmd, args) => {
+      calls.push(args);
+      const joined = args.join(" ");
+      if (joined.includes("issue list") && joined.includes("--search")) {
+        issueListCalls += 1;
+        return issueListCalls === 1 ? JSON.stringify([existing]) : "[]";
+      }
+      if (joined.includes("pr list") && joined.includes("open")) return "[]";
+      if (joined.includes("pr list") && joined.includes("merged")) {
+        return JSON.stringify([{ number: 10, title: "PR A" }]);
+      }
+      if (joined.includes("issues/50/comments")) {
+        return [
+          JSON.stringify([{ id: 100, body: existingMergeComment }]),
+          JSON.stringify([{ id: 101, body: "Human comment" }]),
+        ].join("\n");
+      }
+      if (joined.includes("issue edit")) return "";
+      return "{}";
+    };
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.comments.created, 0);
+    assert.equal(result.comments.skipped, 1);
+    const postCalls = calls.filter((args) => args.includes("POST"));
+    assert.equal(postCalls.length, 0);
+  });
+
   it("sync enriches matching merge comments when relay manifest is provided", () => {
     const relayDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-sync-relay-"));
     const runId = "issue-37-20260407134610713";
