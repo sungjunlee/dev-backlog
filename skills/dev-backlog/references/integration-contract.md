@@ -135,12 +135,46 @@ Regex for extraction:
 
 This is optional — items without `[run:...]` are valid. relay-merge appends it when a manifest exists.
 
+## Progress Reporting Boundary
+
+Monthly progress reporting is owned by `dev-backlog`, not `dev-relay`.
+
+- Canonical engine: `skills/dev-backlog/scripts/progress-sync.js`
+- Backlog-only mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM`
+- Relay-enriched mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM --relay-manifest /abs/path/to/<run-id>.md`
+
+Boundary rules:
+
+- `dev-backlog` creates or updates the monthly progress issue body.
+- `dev-backlog` reconciles only its own machine-managed progress comments on that issue.
+- `dev-relay` may pass a relay manifest path to enrich matching merge or stuck entries with `run_id`, grade, rounds, actor/executor/reviewer, and richer stuck-state signals.
+- `dev-relay` must not bypass `progress-sync.js` with a separate direct-to-GitHub reporting implementation.
+
+### Progress comment identity
+
+Backlog-only comments use month-scoped keys:
+
+```
+YYYY-MM/merge/pr-<N>
+YYYY-MM/stuck/<task-file>
+```
+
+When relay metadata is present, `dev-backlog` upgrades matching entries to relay-scoped keys while preserving the backlog-only key as an alias for reconciliation:
+
+```
+run/<run-id>/merge
+run/<run-id>/stuck
+```
+
+This allows comment upserts to stay idempotent and prevents duplicate machine comments when a backlog-only entry is later enriched by relay data.
+
 ## Graceful Degradation
 
 - **No sprint file**: dev-relay skips sprint tracking entirely. Tasks still work standalone.
 - **No `_context.md`**: ignored silently.
 - **Missing section in sprint**: treated as empty.
 - **No task file for an issue**: dev-relay reads directly from GitHub via `gh`.
+- **No relay manifest path**: progress reporting stays backlog-only.
 
 ## Cross-Project Smoke Test
 
