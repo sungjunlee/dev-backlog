@@ -17,7 +17,7 @@ const fs = require("fs");
 const path = require("path");
 const { GH_EXEC_DEFAULTS } = require("./lib");
 
-// --- Machine marker ---
+// --- Machine marker (body) ---
 
 const MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
 const MARKER_SUFFIX = " -->";
@@ -34,6 +34,35 @@ function parseMarkerMonth(body) {
   const end = body.indexOf(MARKER_SUFFIX, start);
   if (end === -1) return null;
   return body.slice(start, end).trim();
+}
+
+// --- Machine marker (comment) ---
+
+const COMMENT_MARKER_PREFIX = "<!-- dev-backlog:progress-comment id=";
+const COMMENT_MARKER_SUFFIX = " -->";
+
+function makeCommentMarker(entryId) {
+  return `${COMMENT_MARKER_PREFIX}${entryId}${COMMENT_MARKER_SUFFIX}`;
+}
+
+function parseCommentEntryId(body) {
+  if (!body) return null;
+  const idx = body.indexOf(COMMENT_MARKER_PREFIX);
+  if (idx === -1) return null;
+  const start = idx + COMMENT_MARKER_PREFIX.length;
+  const end = body.indexOf(COMMENT_MARKER_SUFFIX, start);
+  if (end === -1) return null;
+  return body.slice(start, end).trim() || null;
+}
+
+// --- Entry key derivation ---
+
+function mergeEntryKey(month, prNumber) {
+  return `${month}/merge/pr-${prNumber}`;
+}
+
+function stuckEntryKey(month, taskFile) {
+  return `${month}/stuck/${taskFile}`;
 }
 
 // --- Month helpers ---
@@ -176,6 +205,18 @@ function renderBody({ month, summary, prevIssueNumber }) {
   return lines.join("\n");
 }
 
+// --- Comment rendering ---
+
+function renderMergeComment(month, pr) {
+  const marker = makeCommentMarker(mergeEntryKey(month, pr.number));
+  return `${marker}\n**Merged:** #${pr.number} — ${pr.title}`;
+}
+
+function renderStuckComment(month, task) {
+  const marker = makeCommentMarker(stuckEntryKey(month, task.file));
+  return `${marker}\n**Stuck candidate:** ${task.file} (status: ${task.status})`;
+}
+
 // --- GitHub I/O ---
 
 function searchProgressIssues(month, execFile) {
@@ -248,6 +289,128 @@ function fetchMergedPRsThisMonth(month, execFile) {
   }
 }
 
+// --- Comment I/O ---
+
+function fetchIssueComments(issueNumber, execFile) {
+  try {
+    const out = execFile("gh", [
+      "api", `repos/{owner}/{repo}/issues/${issueNumber}/comments`,
+      "--paginate",
+    ], GH_EXEC_DEFAULTS);
+    // gh api --paginate concatenates JSON arrays; flatten if needed
+    const parsed = JSON.parse(out);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function createIssueComment(issueNumber, body, execFile) {
+  execFile("gh", [
+    "api", `repos/{owner}/{repo}/issues/${issueNumber}/comments`,
+    "--method", "POST", "--field", `body=${body}`,
+  ], GH_EXEC_DEFAULTS);
+}
+
+function updateIssueComment(commentId, body, execFile) {
+  execFile("gh", [
+    "api", `repos/{owner}/{repo}/issues/comments/${commentId}`,
+    "--method", "PATCH", "--field", `body=${body}`,
+  ], GH_EXEC_DEFAULTS);
+}
+
+function deleteIssueComment(commentId, execFile) {
+  execFile("gh", [
+    "api", `repos/{owner}/{repo}/issues/comments/${commentId}`,
+    "--method", "DELETE",
+  ], GH_EXEC_DEFAULTS);
+}
+
+// --- Comment reconciliation ---
+
+function parseManagedComments(comments) {
+  const managed = [];
+  for (const c of comments) {
+    const entryId = parseCommentEntryId(c.body);
+    if (entryId) {
+      managed.push({ id: c.id, entryId, body: c.body });
+    }
+  }
+  return managed;
+}
+
+function reconcileComments({
+  issueNumber,
+  mergedPRs,
+  stuckTasks,
+  month,
+  dryRun,
+  execFile,
+  fetchComments = fetchIssueComments,
+}) {
+  const allComments = fetchComments(issueNumber, execFile);
+  const managed = parseManagedComments(allComments);
+
+  // Build index: entryId → [managed comments]
+  const byEntryId = new Map();
+  for (const mc of managed) {
+    if (!byEntryId.has(mc.entryId)) byEntryId.set(mc.entryId, []);
+    byEntryId.get(mc.entryId).push(mc);
+  }
+
+  // Build desired entries: { entryId, body }
+  const desired = [];
+  for (const pr of mergedPRs) {
+    desired.push({
+      entryId: mergeEntryKey(month, pr.number),
+      body: renderMergeComment(month, pr),
+    });
+  }
+  for (const task of stuckTasks) {
+    desired.push({
+      entryId: stuckEntryKey(month, task.file),
+      body: renderStuckComment(month, task),
+    });
+  }
+
+  const actions = { created: 0, updated: 0, skipped: 0, repaired: 0 };
+
+  for (const entry of desired) {
+    const existing = byEntryId.get(entry.entryId) || [];
+
+    if (existing.length === 0) {
+      // Create new comment
+      if (!dryRun) createIssueComment(issueNumber, entry.body, execFile);
+      actions.created++;
+    } else if (existing.length === 1) {
+      // Single existing — update if body differs, skip if identical
+      if (existing[0].body === entry.body) {
+        actions.skipped++;
+      } else {
+        if (!dryRun) updateIssueComment(existing[0].id, entry.body, execFile);
+        actions.updated++;
+      }
+    } else {
+      // Duplicate repair: keep the first, update it, delete the rest
+      if (!dryRun) {
+        updateIssueComment(existing[0].id, entry.body, execFile);
+        for (let i = 1; i < existing.length; i++) {
+          deleteIssueComment(existing[i].id, execFile);
+        }
+      }
+      actions.repaired++;
+    }
+
+    // Remove processed entry from index so we don't revisit
+    byEntryId.delete(entry.entryId);
+  }
+
+  // Remaining managed comments with entry ids not in desired set are left as-is
+  // (they may be from a previous month or an entry type we no longer emit)
+
+  return actions;
+}
+
 // --- Core sync logic ---
 
 function sync({
@@ -256,6 +419,7 @@ function sync({
   backlogDir = "backlog",
   execFile = execFileSync,
   readFs = { readTaskFiles, readCompletedCount, readActiveSprintSummary },
+  fetchComments = fetchIssueComments,
 }) {
   const tasksDir = path.join(backlogDir, "tasks");
   const completedDir = path.join(backlogDir, "completed");
@@ -307,6 +471,23 @@ function sync({
   }
 
   result.body = body;
+
+  // Reconcile managed comments on the progress issue
+  if (result.issueNumber) {
+    const stuckTasks = tasks.filter((t) => t.status === "In Progress");
+    result.comments = reconcileComments({
+      issueNumber: result.issueNumber,
+      mergedPRs,
+      stuckTasks,
+      month,
+      dryRun,
+      execFile,
+      fetchComments,
+    });
+  } else {
+    result.comments = { created: 0, updated: 0, skipped: 0, repaired: 0 };
+  }
+
   return result;
 }
 
@@ -336,6 +517,11 @@ function printResult(result) {
 
   if (result.prevIssueNumber) {
     console.log(`  previous: #${result.prevIssueNumber}`);
+  }
+
+  if (result.comments) {
+    const c = result.comments;
+    console.log(`  comments: ${c.created} created, ${c.updated} updated, ${c.skipped} skipped, ${c.repaired} repaired`);
   }
 
   console.log("Done.");
@@ -373,6 +559,14 @@ if (require.main === module) main();
 module.exports = {
   makeMarker,
   parseMarkerMonth,
+  makeCommentMarker,
+  parseCommentEntryId,
+  mergeEntryKey,
+  stuckEntryKey,
+  renderMergeComment,
+  renderStuckComment,
+  parseManagedComments,
+  reconcileComments,
   monthKey,
   monthTitle,
   prevMonth,
