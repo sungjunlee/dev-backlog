@@ -291,15 +291,31 @@ function fetchMergedPRsThisMonth(month, execFile) {
 
 // --- Comment I/O ---
 
+function parsePaginatedApiArray(output) {
+  const text = String(output || "").trim();
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {}
+
+  try {
+    const combined = `[${text.replace(/\]\s*\[/g, "],[")}]`;
+    const parsed = JSON.parse(combined);
+    return parsed.flatMap((page) => Array.isArray(page) ? page : [page]);
+  } catch {
+    return [];
+  }
+}
+
 function fetchIssueComments(issueNumber, execFile) {
   try {
     const out = execFile("gh", [
       "api", `repos/{owner}/{repo}/issues/${issueNumber}/comments`,
       "--paginate",
     ], GH_EXEC_DEFAULTS);
-    // gh api --paginate concatenates JSON arrays; flatten if needed
-    const parsed = JSON.parse(out);
-    return Array.isArray(parsed) ? parsed : [];
+    return parsePaginatedApiArray(out);
   } catch {
     return [];
   }
