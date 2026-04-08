@@ -92,6 +92,14 @@ Then use the skill during your coding session:
 /dev-backlog sync
 ```
 
+Important if you use `dev-relay`: sprint files are not fully freeform markdown.
+These details are load-bearing for automation:
+
+- section headings such as `## Plan`, `## Running Context`, `## Progress`
+- checkbox states `- [ ]`, `- [~]`, `- [x]`
+
+If you change those shapes casually, relay automation can stop reading or updating the sprint correctly. Full contract: [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
+
 ## A Sprint File Looks Like This
 
 ```markdown
@@ -190,6 +198,36 @@ All scripts live under `skills/dev-backlog/scripts/`.
   }
 }
 ```
+
+</details>
+
+<details>
+<summary>Codex workflow example</summary>
+
+`dev-backlog` works well with Codex when the sprint file stays the shared execution state instead of extra chat context.
+
+Start with the cheap deterministic commands:
+
+```bash
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
+```
+
+Then hand Codex the active sprint as the source of truth:
+
+```text
+Read backlog/sprints/_context.md and the active sprint file first.
+Tell me the next batch, implement #42, and keep the sprint file updated.
+Update Running Context and Progress before you stop.
+```
+
+When GitHub issue metadata changed during the session, refresh the local mirror:
+
+```bash
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --update
+```
+
+This keeps Codex focused on one execution file, not ten browser tabs and stale issue context.
 
 </details>
 
