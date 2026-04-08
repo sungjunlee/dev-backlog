@@ -142,13 +142,16 @@ Monthly progress reporting is owned by `dev-backlog`, not `dev-relay`.
 - Canonical engine: `skills/dev-backlog/scripts/progress-sync.js`
 - Backlog-only mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM`
 - Relay-enriched mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM --relay-manifest /abs/path/to/<run-id>.md`
+- Month finalization mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM --finalize`
 
 Boundary rules:
 
 - `dev-backlog` creates or updates the monthly progress issue body.
+- `dev-backlog` may finalize a month's issue by rendering the month-end block from source data and closing the issue idempotently.
 - `dev-backlog` reconciles only its own machine-managed progress comments on that issue.
 - `dev-relay` may pass a relay manifest path to enrich matching merge or stuck entries with `run_id`, grade, rounds, actor/executor/reviewer, and richer stuck-state signals.
 - `dev-relay` must not bypass `progress-sync.js` with a separate direct-to-GitHub reporting implementation.
+- Neighbor links are rendered from the month being synced only. If `Previous` or `Next` month issues already exist, the synced month's body may include both links; syncing one month does not mutate neighboring month issues.
 
 ### Progress comment identity
 

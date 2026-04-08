@@ -24,6 +24,9 @@ const {
   monthKey,
   monthTitle,
   prevMonth,
+  nextMonth,
+  formatDate,
+  parseFinalizedDate,
   parseArgs,
   readTaskFiles,
   readCompletedCount,
@@ -83,17 +86,37 @@ describe("prevMonth", () => {
   });
 });
 
+describe("nextMonth", () => {
+  it("returns next month", () => {
+    assert.equal(nextMonth("2026-04"), "2026-05");
+    assert.equal(nextMonth("2026-11"), "2026-12");
+    assert.equal(nextMonth("2026-12"), "2027-01");
+  });
+});
+
 // --- parseArgs ---
 
 describe("parseArgs", () => {
   it("parses all flags", () => {
-    const parsed = parseArgs(["--dry-run", "--json", "--month", "2026-03"]);
-    assert.deepEqual(parsed, { dryRun: true, json: true, month: "2026-03", relayManifest: null });
+    const parsed = parseArgs(["--dry-run", "--json", "--month", "2026-03", "--finalize"]);
+    assert.deepEqual(parsed, {
+      dryRun: true,
+      json: true,
+      month: "2026-03",
+      relayManifest: null,
+      finalize: true,
+    });
   });
 
   it("defaults to no flags", () => {
     const parsed = parseArgs([]);
-    assert.deepEqual(parsed, { dryRun: false, json: false, month: null, relayManifest: null });
+    assert.deepEqual(parsed, {
+      dryRun: false,
+      json: false,
+      month: null,
+      relayManifest: null,
+      finalize: false,
+    });
   });
 
   it("parses --month=YYYY-MM form", () => {
@@ -115,6 +138,30 @@ describe("parseArgs", () => {
   it("returns error for missing --relay-manifest value", () => {
     assert.ok(parseArgs(["--relay-manifest"]).error);
     assert.ok(parseArgs(["--relay-manifest="]).error);
+  });
+});
+
+describe("formatDate", () => {
+  it("formats a date as YYYY-MM-DD", () => {
+    assert.equal(formatDate(new Date("2026-05-01T12:00:00Z")), "2026-05-01");
+  });
+});
+
+describe("parseFinalizedDate", () => {
+  it("extracts a finalized date from the month-end block", () => {
+    const body = [
+      "# Progress: April 2026",
+      "",
+      "## Month End",
+      "",
+      "- Finalized on: 2026-05-01",
+      "- State: closed",
+    ].join("\n");
+    assert.equal(parseFinalizedDate(body), "2026-05-01");
+  });
+
+  it("returns null when the body is not finalized", () => {
+    assert.equal(parseFinalizedDate("# Progress: April 2026"), null);
   });
 });
 
@@ -262,6 +309,7 @@ describe("renderBody", () => {
         sprint: { file: "2026-04-auth.md", done: 3, inflight: 1, todo: 2, total: 6 },
       },
       prevIssueNumber: 42,
+      nextIssueNumber: 44,
     });
 
     assert.ok(body.includes("<!-- dev-backlog:progress-issue month=2026-04 -->"));
@@ -272,6 +320,8 @@ describe("renderBody", () => {
     assert.ok(body.includes("2026-04-auth.md"));
     assert.ok(body.includes("3/6 done"));
     assert.ok(body.includes("#42"));
+    assert.ok(body.includes("## Next"));
+    assert.ok(body.includes("#44"));
   });
 
   it("renders no-sprint and no-prev gracefully", () => {
@@ -279,10 +329,30 @@ describe("renderBody", () => {
       month: "2026-04",
       summary: { merged: 0, inFlight: 0, stuckCandidates: 0, sprint: null },
       prevIssueNumber: null,
+      nextIssueNumber: null,
     });
 
     assert.ok(body.includes("_No active sprint._"));
     assert.ok(!body.includes("## Previous"));
+  });
+
+  it("renders a stable month-end block when finalized", () => {
+    const body = renderBody({
+      month: "2026-04",
+      summary: {
+        merged: 2,
+        inFlight: 0,
+        stuckCandidates: 0,
+        sprint: null,
+        finalizedAt: "2026-05-01",
+      },
+      prevIssueNumber: null,
+      nextIssueNumber: null,
+    });
+
+    assert.ok(body.includes("## Month End"));
+    assert.ok(body.includes("- Finalized on: 2026-05-01"));
+    assert.ok(body.includes("- State: closed"));
   });
 
   it("marker is stable across renders", () => {
@@ -290,6 +360,7 @@ describe("renderBody", () => {
       month: "2026-04",
       summary: { merged: 1, inFlight: 0, stuckCandidates: 0, sprint: null },
       prevIssueNumber: null,
+      nextIssueNumber: null,
     };
     const body1 = renderBody(args);
     const body2 = renderBody(args);
@@ -301,6 +372,7 @@ describe("renderBody", () => {
       month: "2026-04",
       summary: { merged: 0, inFlight: 0, stuckCandidates: 0, sprint: null },
       prevIssueNumber: null,
+      nextIssueNumber: null,
     });
     assert.equal(parseMarkerMonth(body), "2026-04");
   });
@@ -510,6 +582,44 @@ describe("sync", () => {
     assert.ok(result.body.includes("#30"));
   });
 
+  it("links next month issue when present", () => {
+    let searchCount = 0;
+    const execFile = (_cmd, args) => {
+      const joined = args.join(" ");
+      if (joined.includes("issue list") && joined.includes("--search")) {
+        searchCount++;
+        if (searchCount === 1) {
+          return JSON.stringify([{
+            number: 50,
+            title: "Progress: April 2026",
+            body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+          }]);
+        }
+        if (searchCount === 2) return "[]"; // previous month not found
+        return JSON.stringify([{
+          number: 60,
+          title: "Progress: May 2026",
+          body: "<!-- dev-backlog:progress-issue month=2026-05 -->",
+        }]);
+      }
+      if (joined.includes("pr list") && joined.includes("open")) return "[]";
+      if (joined.includes("pr list") && joined.includes("merged")) return "[]";
+      if (joined.includes("issue edit")) return "";
+      return "[]";
+    };
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.nextIssueNumber, 60);
+    assert.ok(result.body.includes("## Next"));
+    assert.ok(result.body.includes("#60"));
+  });
+
   it("reads local backlog data into summary", () => {
     // Write task files
     fs.writeFileSync(path.join(tmpDir, "tasks", "BACK-1 - foo.md"), "---\nstatus: In Progress\n---\n");
@@ -606,6 +716,89 @@ describe("sync", () => {
     const r2 = sync({ month: "2026-04", dryRun: true, backlogDir: tmpDir, execFile: makeExec() });
 
     assert.equal(r1.body, r2.body);
+  });
+
+  it("finalize renders a month-end block and closes the issue", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+    };
+    const { execFile, calls } = makeExecFile({ issues: [existing] });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      finalize: true,
+      now: new Date("2026-05-01T12:00:00Z"),
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.finalize, true);
+    assert.equal(result.finalizedAt, "2026-05-01");
+    assert.equal(result.closed, true);
+    assert.ok(result.body.includes("## Month End"));
+    assert.ok(result.body.includes("- Finalized on: 2026-05-01"));
+    const closeCall = calls.find((c) =>
+      c.args.includes("PATCH") &&
+      c.args.includes(`repos/{owner}/{repo}/issues/${existing.number}`) &&
+      c.args.includes("state=closed")
+    );
+    assert.ok(closeCall);
+  });
+
+  it("finalize reuses the existing finalized date on rerun", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: [
+        "<!-- dev-backlog:progress-issue month=2026-04 -->",
+        "",
+        "# Progress: April 2026",
+        "",
+        "## Month End",
+        "",
+        "- Finalized on: 2026-05-01",
+        "- State: closed",
+      ].join("\n"),
+    };
+    const { execFile } = makeExecFile({ issues: [existing] });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      finalize: true,
+      now: new Date("2026-05-03T12:00:00Z"),
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.finalizedAt, "2026-05-01");
+    assert.ok(result.body.includes("- Finalized on: 2026-05-01"));
+    assert.ok(!result.body.includes("- Finalized on: 2026-05-03"));
+  });
+
+  it("finalize dry-run does not close the issue", () => {
+    const existing = {
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+    };
+    const { execFile, calls } = makeExecFile({ issues: [existing] });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: true,
+      finalize: true,
+      now: new Date("2026-05-01T12:00:00Z"),
+      backlogDir: tmpDir,
+      execFile,
+    });
+
+    assert.equal(result.closed, false);
+    const closeCalls = calls.filter((c) => c.args.includes("state=closed"));
+    assert.equal(closeCalls.length, 0);
   });
 });
 

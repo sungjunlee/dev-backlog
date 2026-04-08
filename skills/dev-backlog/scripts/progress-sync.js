@@ -6,6 +6,7 @@
  *        node scripts/progress-sync.js --dry-run
  *        node scripts/progress-sync.js --json
  *        node scripts/progress-sync.js --month 2026-03
+ *        node scripts/progress-sync.js --month 2026-03 --finalize
  *        node scripts/progress-sync.js --relay-manifest ~/.relay/runs/<repo>/<run>.md
  *
  * Finds or creates the current month's Progress issue, then reconciles
@@ -97,15 +98,35 @@ function prevMonth(month) {
   return `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
+function nextMonth(month) {
+  const [y, m] = month.split("-").map(Number);
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseFinalizedDate(body) {
+  if (!body) return null;
+  const match = body.match(/^- Finalized on: (\d{4}-\d{2}-\d{2})$/m);
+  return match ? match[1] : null;
+}
+
 // --- Parse args ---
 
 function parseArgs(args) {
-  const options = { dryRun: false, json: false, month: null, relayManifest: null };
+  const options = { dryRun: false, json: false, month: null, relayManifest: null, finalize: false };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--dry-run") { options.dryRun = true; continue; }
     if (arg === "--json") { options.json = true; continue; }
+    if (arg === "--finalize") { options.finalize = true; continue; }
     if (arg === "--month") {
       const val = args[i + 1];
       if (!val || !/^\d{4}-\d{2}$/.test(val)) {
@@ -205,7 +226,7 @@ function computeSummary({ tasks, sprint, openPRs, mergedPRs }) {
 
 // --- Body rendering ---
 
-function renderBody({ month, summary, prevIssueNumber }) {
+function renderBody({ month, summary, prevIssueNumber, nextIssueNumber }) {
   const marker = makeMarker(month);
   const lines = [marker, "", `# ${monthTitle(month)}`, ""];
 
@@ -217,6 +238,13 @@ function renderBody({ month, summary, prevIssueNumber }) {
   lines.push(`| In-flight (open PRs) | ${summary.inFlight} |`);
   lines.push(`| Stuck candidates | ${summary.stuckCandidates} |`);
   lines.push("");
+
+  if (summary.finalizedAt) {
+    lines.push("## Month End", "");
+    lines.push(`- Finalized on: ${summary.finalizedAt}`);
+    lines.push("- State: closed");
+    lines.push("");
+  }
 
   // Sprint snapshot
   if (summary.sprint) {
@@ -234,6 +262,12 @@ function renderBody({ month, summary, prevIssueNumber }) {
   if (prevIssueNumber) {
     lines.push("## Previous", "");
     lines.push(`- #${prevIssueNumber}`);
+    lines.push("");
+  }
+
+  if (nextIssueNumber) {
+    lines.push("## Next", "");
+    lines.push(`- #${nextIssueNumber}`);
     lines.push("");
   }
 
@@ -457,6 +491,14 @@ function updateIssueBody(number, body, execFile) {
   ], GH_EXEC_DEFAULTS);
 }
 
+function closeIssue(number, execFile) {
+  execFile("gh", [
+    "api", `repos/{owner}/{repo}/issues/${number}`,
+    "--method", "PATCH",
+    "--field", "state=closed",
+  ], GH_EXEC_DEFAULTS);
+}
+
 function fetchOpenPRs(execFile) {
   try {
     const out = execFile("gh", [
@@ -668,8 +710,10 @@ function reconcileComments({
 function sync({
   month,
   dryRun,
+  finalize = false,
   backlogDir = "backlog",
   relayManifestPath = null,
+  now = new Date(),
   execFile = execFileSync,
   readFs = { readTaskFiles, readCompletedCount, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
@@ -694,16 +738,30 @@ function sync({
   const prev = prevMonth(month);
   const prevIssue = findMonthIssue(prev, execFile);
   const prevIssueNumber = prevIssue ? prevIssue.number : null;
+  const next = nextMonth(month);
+  const nextIssue = findMonthIssue(next, execFile);
+  const nextIssueNumber = nextIssue ? nextIssue.number : null;
 
-  const body = renderBody({ month, summary, prevIssueNumber });
+  const finalizedAt = finalize
+    ? parseFinalizedDate(existing?.body) || formatDate(now)
+    : null;
+  const body = renderBody({
+    month,
+    summary: { ...summary, finalizedAt },
+    prevIssueNumber,
+    nextIssueNumber,
+  });
   const title = monthTitle(month);
 
   const result = {
     action: "progress-sync",
     month,
     dryRun,
+    finalize,
     summary,
     prevIssueNumber,
+    nextIssueNumber,
+    finalizedAt,
     relay: relayMetadata ? {
       runId: relayMetadata.runId,
       issueNumber: relayMetadata.issueNumber,
@@ -750,6 +808,15 @@ function sync({
     result.comments = { created: 0, updated: 0, skipped: 0, repaired: 0 };
   }
 
+  if (finalize && result.issueNumber) {
+    if (!dryRun) {
+      closeIssue(result.issueNumber, execFile);
+    }
+    result.closed = !dryRun;
+  } else {
+    result.closed = false;
+  }
+
   return result;
 }
 
@@ -758,7 +825,17 @@ function sync({
 function printResult(result) {
   const label = result.dryRun ? "[dry-run] " : "";
 
-  if (result.created) {
+  if (result.finalize) {
+    if (result.dryRun) {
+      if (result.issueNumber) {
+        console.log(`${label}Would finalize and close #${result.issueNumber}: ${monthTitle(result.month)}`);
+      } else {
+        console.log(`${label}Would create, finalize, and close: ${monthTitle(result.month)}`);
+      }
+    } else {
+      console.log(`Finalized and closed progress issue #${result.issueNumber}: ${monthTitle(result.month)}`);
+    }
+  } else if (result.created) {
     console.log(`${label}Created progress issue #${result.issueNumber}: ${monthTitle(result.month)}`);
   } else if (result.updated) {
     console.log(`${label}Updated progress issue #${result.issueNumber}: ${monthTitle(result.month)}`);
@@ -779,6 +856,14 @@ function printResult(result) {
 
   if (result.prevIssueNumber) {
     console.log(`  previous: #${result.prevIssueNumber}`);
+  }
+
+  if (result.nextIssueNumber) {
+    console.log(`  next: #${result.nextIssueNumber}`);
+  }
+
+  if (result.finalizedAt) {
+    console.log(`  finalized: ${result.finalizedAt}`);
   }
 
   if (result.comments) {
@@ -812,6 +897,7 @@ function main() {
     const result = sync({
       month,
       dryRun: options.dryRun,
+      finalize: options.finalize,
       relayManifestPath: options.relayManifest,
     });
 
@@ -850,6 +936,9 @@ module.exports = {
   monthKey,
   monthTitle,
   prevMonth,
+  nextMonth,
+  formatDate,
+  parseFinalizedDate,
   parseArgs,
   readTaskFiles,
   readCompletedCount,
@@ -858,6 +947,7 @@ module.exports = {
   renderBody,
   findMonthIssue,
   fetchMergedPRsThisMonth,
+  closeIssue,
   sync,
   printResult,
 };
