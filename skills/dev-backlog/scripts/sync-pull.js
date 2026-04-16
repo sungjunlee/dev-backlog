@@ -21,7 +21,6 @@ const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
 const COUNT_OPEN_ISSUES_QUERY =
   "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
 
-
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
   if (labels.includes("status:blocked")) return "Blocked";
@@ -142,6 +141,81 @@ function recordOperation(result, type, file) {
   if (type === "skipped") result.skippedFiles.push(file);
 }
 
+function findExistingTaskFile({ tasksDir, prefix, issueNumber }) {
+  const prefixMatch = `${prefix}-${issueNumber} - `;
+  if (!fs.existsSync(tasksDir)) return undefined;
+  return fs.readdirSync(tasksDir).find((file) => file.startsWith(prefixMatch) && file.endsWith(".md"));
+}
+
+function buildTaskFilename({ issue, prefix }) {
+  const slug = slugify(issue.title) || String(issue.number);
+  return `${prefix}-${issue.number} - ${slug}.md`;
+}
+
+function buildTaskFrontmatter({ issue, prefix, today = new Date().toISOString().slice(0, 10) }) {
+  const labelNames = (issue.labels || []).map((label) => label.name);
+  const milestone = issue.milestone?.title || "";
+  const status = statusFromLabels(labelNames);
+  const priority = priorityFromLabels(labelNames);
+  const displayLabels = labelNames.filter(
+    (label) => !label.startsWith("status:") && !label.startsWith("priority:")
+  );
+  const labelsYaml = displayLabels.length
+    ? "\n" + displayLabels.map((label) => `  - ${label}`).join("\n")
+    : " []";
+
+  return `---
+id: ${prefix}-${issue.number}
+title: ${escapeYaml(issue.title)}
+status: ${status}
+labels:${labelsYaml}
+priority: ${priority}
+milestone: ${escapeYaml(milestone)}
+created_date: '${today}'
+---`;
+}
+
+function extractBodyAfterFrontmatter(content) {
+  const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  return bodyMatch ? bodyMatch[1] : null;
+}
+
+function syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result }) {
+  const filename = buildTaskFilename({ issue, prefix });
+  const filepath = path.join(tasksDir, filename);
+  const existing = findExistingTaskFile({ tasksDir, prefix, issueNumber: issue.number });
+  const frontmatter = buildTaskFrontmatter({ issue, prefix });
+  const structuredBody = structureBody(issue.body || "");
+
+  if (existing) {
+    if (!update) {
+      recordOperation(result, "skipped", existing);
+      return existing;
+    }
+
+    if (dryRun) {
+      recordOperation(result, "updated", existing);
+      return existing;
+    }
+
+    const existingPath = path.join(tasksDir, existing);
+    const existingContent = fs.readFileSync(existingPath, "utf-8");
+    const preservedBody = extractBodyAfterFrontmatter(existingContent) || structuredBody;
+    fs.writeFileSync(existingPath, `${frontmatter}\n${preservedBody}`);
+    recordOperation(result, "updated", existing);
+    return existing;
+  }
+
+  if (dryRun) {
+    recordOperation(result, "created", filename);
+    return filename;
+  }
+
+  fs.writeFileSync(filepath, frontmatter + structuredBody);
+  recordOperation(result, "created", filename);
+  return filename;
+}
+
 function printResult(result) {
   const label = result.dryRun ? "[dry-run] " : "";
   console.log(`${label}Found ${result.issueCount} open issues. Syncing to ${result.tasksDir}/`);
@@ -164,76 +238,9 @@ function printResult(result) {
 function run({ issues, tasksDir, prefix, update, dryRun }) {
   if (!dryRun) fs.mkdirSync(tasksDir, { recursive: true });
   const result = makeResult({ tasksDir, prefix, update, dryRun, issueCount: issues.length });
-
-  function findExistingFile(num) {
-    const pfx = `${prefix}-${num} - `;
-    if (!fs.existsSync(tasksDir)) return undefined;
-    const files = fs.readdirSync(tasksDir);
-    return files.find((f) => f.startsWith(pfx) && f.endsWith(".md"));
-  }
-
-  function buildFrontmatter(issue, labelNames) {
-    const milestone = issue.milestone?.title || "";
-    const status = statusFromLabels(labelNames);
-    const priority = priorityFromLabels(labelNames);
-    const displayLabels = labelNames.filter(
-      (l) => !l.startsWith("status:") && !l.startsWith("priority:")
-    );
-    const labelsYaml = displayLabels.length
-      ? "\n" + displayLabels.map((l) => `  - ${l}`).join("\n")
-      : " []";
-    const today = new Date().toISOString().slice(0, 10);
-
-    return `---
-id: ${prefix}-${issue.number}
-title: ${escapeYaml(issue.title)}
-status: ${status}
-labels:${labelsYaml}
-priority: ${priority}
-milestone: ${escapeYaml(milestone)}
-created_date: '${today}'
----`;
-  }
-
-  function writeTaskFile(issue) {
-    const num = issue.number;
-    const slug = slugify(issue.title) || String(num);
-    const filename = `${prefix}-${num} - ${slug}.md`;
-    const filepath = path.join(tasksDir, filename);
-    const labelNames = (issue.labels || []).map((l) => l.name);
-    const body = issue.body || "";
-
-    const existing = findExistingFile(num);
-    if (existing) {
-      if (!update) {
-        recordOperation(result, "skipped", existing);
-        return existing;
-      }
-      if (dryRun) {
-        recordOperation(result, "updated", existing);
-        return existing;
-      }
-      const existingPath = path.join(tasksDir, existing);
-      const content = fs.readFileSync(existingPath, "utf-8");
-      const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-      const existingBody = bodyMatch ? bodyMatch[1] : structureBody(body);
-      const newContent = buildFrontmatter(issue, labelNames) + "\n" + existingBody;
-      fs.writeFileSync(existingPath, newContent);
-      recordOperation(result, "updated", existing);
-      return existing;
-    }
-
-    if (dryRun) {
-      recordOperation(result, "created", filename);
-      return filename;
-    }
-    const content = buildFrontmatter(issue, labelNames) + structureBody(body);
-    fs.writeFileSync(filepath, content);
-    recordOperation(result, "created", filename);
-    return filename;
-  }
-
-  issues.forEach(writeTaskFile);
+  issues.forEach((issue) => {
+    syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result });
+  });
   return result;
 }
 

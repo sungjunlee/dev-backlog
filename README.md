@@ -9,6 +9,8 @@ dev-backlog adds a local sprint file that carries the plan, decisions, and progr
 
 No new server. No hidden state. No need to abandon GitHub Issues.
 
+README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+
 ```text
 GitHub Issues (source of truth)
         |
@@ -92,6 +94,8 @@ Then use the skill during your coding session:
 /dev-backlog sync
 ```
 
+For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+
 Important if you use `dev-relay`: sprint files are not fully freeform markdown.
 These details are load-bearing for automation:
 
@@ -169,19 +173,10 @@ The `[~]` state makes in-flight work visible to everyone, and `Running Context` 
 
 The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
 
-## Deterministic Scripts
+## Script Entry Points
 
-All scripts live under `skills/dev-backlog/scripts/`.
-
-| Script | What it does |
-|--------|--------------|
-| `init.sh [project-name]` | Create `backlog/`, `sprints/`, `tasks/`, `completed/`, and `config.yml` |
-| `sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` | Pull open issues into `backlog/tasks/`; defaults to all open issues, `--limit N` caps the fetch size, `--update` refreshes frontmatter while preserving local acceptance-criteria checkboxes, and `--json` emits a machine-readable summary |
-| `sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` | Create a sprint file from a GitHub milestone; `--json` emits the sprint path and metadata |
-| `next.sh [backlog-dir]` | Show the next actionable batch with zero LLM cost |
-| `status.sh [backlog-dir]` | Show sprint progress, GitHub issues, local task counts, and in-flight work |
-| `context-hook.sh [backlog-dir]` | Print a one-line sprint summary for Claude Code `PreToolUse` hooks |
-| `sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` | Mark the sprint complete, move finished tasks, and optionally close the GitHub milestone |
+All deterministic helpers live under `skills/dev-backlog/scripts/`.
+Use the commands in Quick Start for the common path, and use [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md) as the canonical script/flag reference when you need the full execution contract.
 
 <details>
 <summary>Claude Code hook example</summary>
@@ -252,7 +247,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 
 ## Docs
 
-- [Core skill prompt](skills/dev-backlog/SKILL.md)
+- [Agent execution contract](skills/dev-backlog/SKILL.md)
 - [Process guide](skills/dev-backlog/references/process.md)
 - [File format and config](skills/dev-backlog/references/file-format.md)
 - [GitHub sync patterns](skills/dev-backlog/references/github-sync.md)

@@ -29,7 +29,6 @@ const {
   parseFinalizedDate,
   parseArgs,
   readTaskFiles,
-  readCompletedCount,
   readActiveSprintSummary,
   computeSummary,
   renderBody,
@@ -207,23 +206,6 @@ describe("parseTaskIssueNumber", () => {
   });
 });
 
-describe("readCompletedCount", () => {
-  let tmpDir;
-
-  beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-comp-")); });
-  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
-
-  it("counts .md files", () => {
-    fs.writeFileSync(path.join(tmpDir, "BACK-1.md"), "done");
-    fs.writeFileSync(path.join(tmpDir, "BACK-2.md"), "done");
-    assert.equal(readCompletedCount(tmpDir), 2);
-  });
-
-  it("returns 0 for missing dir", () => {
-    assert.equal(readCompletedCount("/nonexistent/path"), 0);
-  });
-});
-
 describe("readActiveSprintSummary", () => {
   let tmpDir;
 
@@ -314,7 +296,7 @@ describe("renderBody", () => {
 
     assert.ok(body.includes("<!-- dev-backlog:progress-issue month=2026-04 -->"));
     assert.ok(body.includes("# Progress: April 2026"));
-    assert.ok(body.includes("| Merged / completed | 5 |"));
+    assert.ok(body.includes("| Merged PRs (month) | 5 |"));
     assert.ok(body.includes("| In-flight (open PRs) | 2 |"));
     assert.ok(body.includes("| Stuck candidates | 1 |"));
     assert.ok(body.includes("2026-04-auth.md"));
@@ -624,8 +606,6 @@ describe("sync", () => {
     // Write task files
     fs.writeFileSync(path.join(tmpDir, "tasks", "BACK-1 - foo.md"), "---\nstatus: In Progress\n---\n");
     fs.writeFileSync(path.join(tmpDir, "tasks", "BACK-2 - bar.md"), "---\nstatus: To Do\n---\n");
-    // Write completed
-    fs.writeFileSync(path.join(tmpDir, "completed", "BACK-0.md"), "done");
     // Write active sprint
     fs.writeFileSync(path.join(tmpDir, "sprints", "2026-04-auth.md"), [
       "---", "status: active", "---",
@@ -656,7 +636,7 @@ describe("sync", () => {
   });
 
   it("handles sparse data gracefully", () => {
-    // Empty backlog dir — no tasks, no completed, no sprints
+    // Empty backlog dir — no tasks or sprints
     const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "ps-empty-"));
     const { execFile } = makeExecFile({
       createdIssueNumber: 99,
@@ -682,7 +662,7 @@ describe("sync", () => {
     const staleBody = "<!-- dev-backlog:progress-issue month=2026-04 -->\nold stale content";
     const existing = { number: 50, title: "Progress: April 2026", body: staleBody };
 
-    // Write fresh local data
+    // Completed backlog files are ignored for the merged summary.
     fs.writeFileSync(path.join(tmpDir, "completed", "BACK-1.md"), "done");
     fs.writeFileSync(path.join(tmpDir, "completed", "BACK-2.md"), "done");
     fs.writeFileSync(path.join(tmpDir, "completed", "BACK-3.md"), "done");
@@ -699,12 +679,10 @@ describe("sync", () => {
     // Body must not contain stale text
     assert.ok(!result.body.includes("old stale content"));
     // Body is freshly rendered — merged count is from month-scoped PRs only (0 here)
-    assert.ok(result.body.includes("| Merged / completed | 0 |"));
+    assert.ok(result.body.includes("| Merged PRs (month) | 0 |"));
   });
 
   it("idempotent: same output for same inputs", () => {
-    fs.writeFileSync(path.join(tmpDir, "completed", "BACK-1.md"), "done");
-
     const existing = {
       number: 50,
       title: "Progress: April 2026",
@@ -716,6 +694,34 @@ describe("sync", () => {
     const r2 = sync({ month: "2026-04", dryRun: true, backlogDir: tmpDir, execFile: makeExec() });
 
     assert.equal(r1.body, r2.body);
+  });
+
+  it("ignores completed backlog readers when computing merged summary", () => {
+    fs.writeFileSync(path.join(tmpDir, "completed", "BACK-1.md"), "done");
+    fs.writeFileSync(path.join(tmpDir, "completed", "BACK-2.md"), "done");
+
+    const { execFile } = makeExecFile({
+      mergedPRs: [{ number: 11, title: "PR" }],
+      createdIssueNumber: 99,
+    });
+
+    const result = sync({
+      month: "2026-04",
+      dryRun: false,
+      backlogDir: tmpDir,
+      execFile,
+      readFs: {
+        readTaskFiles,
+        readCompletedCount: () => {
+          throw new Error("completed backlog should not be read");
+        },
+        readActiveSprintSummary,
+      },
+      fetchComments: () => [],
+    });
+
+    assert.equal(result.summary.merged, 1);
+    assert.ok(result.body.includes("| Merged PRs (month) | 1 |"));
   });
 
   it("finalize renders a month-end block and closes the issue", () => {
@@ -1534,6 +1540,29 @@ describe("sync (comment integration)", () => {
 // --- printResult ---
 
 describe("printResult", () => {
+  it("prints the merged metric with month-scoped wording", () => {
+    const log = console.log;
+    const lines = [];
+    console.log = (...args) => { lines.push(args.join(" ")); };
+
+    try {
+      printResult({
+        action: "progress-sync",
+        month: "2026-04",
+        dryRun: false,
+        created: true,
+        updated: false,
+        issueNumber: 99,
+        summary: { merged: 1, inFlight: 0, stuckCandidates: 0, sprint: null },
+        prevIssueNumber: null,
+      });
+    } finally {
+      console.log = log;
+    }
+
+    assert.ok(lines.some((line) => line.includes("merged PRs (month): 1, in-flight: 0, stuck candidates: 0")));
+  });
+
   it("does not throw for created result", () => {
     assert.doesNotThrow(() => {
       // Suppress console output during test

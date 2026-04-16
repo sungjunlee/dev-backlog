@@ -17,79 +17,43 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { GH_EXEC_DEFAULTS } = require("./lib");
-
-// --- Machine marker (body) ---
-
-const MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
-const MARKER_SUFFIX = " -->";
-
-function makeMarker(month) {
-  return `${MARKER_PREFIX}${month}${MARKER_SUFFIX}`;
-}
-
-function parseMarkerMonth(body) {
-  if (!body) return null;
-  const idx = body.indexOf(MARKER_PREFIX);
-  if (idx === -1) return null;
-  const start = idx + MARKER_PREFIX.length;
-  const end = body.indexOf(MARKER_SUFFIX, start);
-  if (end === -1) return null;
-  return body.slice(start, end).trim();
-}
-
-// --- Machine marker (comment) ---
-
-const COMMENT_MARKER_PREFIX = "<!-- dev-backlog:progress-comment id=";
-const COMMENT_MARKER_SUFFIX = " -->";
-
-function makeCommentMarker(entryId) {
-  return `${COMMENT_MARKER_PREFIX}${entryId}${COMMENT_MARKER_SUFFIX}`;
-}
-
-function parseCommentEntryId(body) {
-  if (!body) return null;
-  const idx = body.indexOf(COMMENT_MARKER_PREFIX);
-  if (idx === -1) return null;
-  const start = idx + COMMENT_MARKER_PREFIX.length;
-  const end = body.indexOf(COMMENT_MARKER_SUFFIX, start);
-  if (end === -1) return null;
-  return body.slice(start, end).trim() || null;
-}
-
-// --- Entry key derivation ---
-
-function mergeEntryKey(month, prNumber) {
-  return `${month}/merge/pr-${prNumber}`;
-}
-
-function stuckEntryKey(month, taskFile) {
-  return `${month}/stuck/${taskFile}`;
-}
-
-function relayMergeEntryKey(runId) {
-  return `run/${runId}/merge`;
-}
-
-function relayStuckEntryKey(runId) {
-  return `run/${runId}/stuck`;
-}
-
-// --- Month helpers ---
+const {
+  makeMarker,
+  parseMarkerMonth,
+  makeCommentMarker,
+  parseCommentEntryId,
+  mergeEntryKey,
+  stuckEntryKey,
+  relayMergeEntryKey,
+  relayStuckEntryKey,
+  parseTaskIssueNumber,
+  monthTitle,
+  renderBody,
+  renderMergeComment,
+  renderStuckComment,
+  parseManagedComments,
+  buildDesiredCommentEntries,
+} = require("./progress-sync-render");
+const {
+  readRelayManifestMetadata,
+  readRelayGrade,
+  loadRelayMetadata,
+} = require("./progress-sync-relay");
+const {
+  findMonthIssue,
+  createIssue,
+  updateIssueBody,
+  closeIssue,
+  fetchOpenPRs,
+  fetchMergedPRsThisMonth,
+  fetchIssueComments,
+  reconcileComments,
+} = require("./progress-sync-github");
 
 function monthKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
-}
-
-function monthTitle(month) {
-  const [y, m] = month.split("-");
-  const names = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-  return `Progress: ${names[Number(m) - 1]} ${y}`;
 }
 
 function prevMonth(month) {
@@ -167,11 +131,6 @@ function parseArgs(args) {
 
 // --- Local data readers ---
 
-function parseTaskIssueNumber(taskFile) {
-  const match = String(taskFile || "").match(/^[A-Za-z]+-(\d+)\b/);
-  return match ? Number(match[1]) : null;
-}
-
 function readTaskFiles(tasksDir) {
   if (!fs.existsSync(tasksDir)) return [];
   return fs.readdirSync(tasksDir)
@@ -187,11 +146,6 @@ function readTaskFiles(tasksDir) {
         status: statusMatch ? statusMatch[1].trim() : "unknown",
       };
     });
-}
-
-function readCompletedCount(completedDir) {
-  if (!fs.existsSync(completedDir)) return 0;
-  return fs.readdirSync(completedDir).filter((f) => f.endsWith(".md")).length;
 }
 
 function readActiveSprintSummary(sprintsDir) {
@@ -226,485 +180,6 @@ function computeSummary({ tasks, sprint, openPRs, mergedPRs }) {
 
 // --- Body rendering ---
 
-function renderBody({ month, summary, prevIssueNumber, nextIssueNumber }) {
-  const marker = makeMarker(month);
-  const lines = [marker, "", `# ${monthTitle(month)}`, ""];
-
-  // Counts
-  lines.push("## Summary", "");
-  lines.push(`| Metric | Count |`);
-  lines.push(`| --- | --- |`);
-  lines.push(`| Merged / completed | ${summary.merged} |`);
-  lines.push(`| In-flight (open PRs) | ${summary.inFlight} |`);
-  lines.push(`| Stuck candidates | ${summary.stuckCandidates} |`);
-  lines.push("");
-
-  if (summary.finalizedAt) {
-    lines.push("## Month End", "");
-    lines.push(`- Finalized on: ${summary.finalizedAt}`);
-    lines.push("- State: closed");
-    lines.push("");
-  }
-
-  // Sprint snapshot
-  if (summary.sprint) {
-    const s = summary.sprint;
-    lines.push("## Active Sprint", "");
-    lines.push(`**${s.file}** — ${s.done}/${s.total} done, ${s.inflight} in-flight, ${s.todo} remaining`);
-    lines.push("");
-  } else {
-    lines.push("## Active Sprint", "");
-    lines.push("_No active sprint._");
-    lines.push("");
-  }
-
-  // Previous month link
-  if (prevIssueNumber) {
-    lines.push("## Previous", "");
-    lines.push(`- #${prevIssueNumber}`);
-    lines.push("");
-  }
-
-  if (nextIssueNumber) {
-    lines.push("## Next", "");
-    lines.push(`- #${nextIssueNumber}`);
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-// --- Comment rendering ---
-
-function normalizeRelayField(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === "unknown" || trimmed === "null") return null;
-    return trimmed;
-  }
-  return value;
-}
-
-function parseFrontmatterScalar(value) {
-  if (value === "null") return null;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
-  if (value.startsWith("'") && value.endsWith("'")) {
-    return value.slice(1, -1).replace(/''/g, "'");
-  }
-  if (value.startsWith("\"") && value.endsWith("\"")) {
-    return JSON.parse(value);
-  }
-  return value;
-}
-
-function parseFrontmatter(text) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  if (lines[0] !== "---") {
-    return {};
-  }
-
-  const closingIndex = lines.indexOf("---", 1);
-  if (closingIndex === -1) {
-    throw new Error("Invalid relay manifest: missing closing frontmatter marker");
-  }
-
-  const frontmatterLines = lines.slice(1, closingIndex);
-
-  function parseBlock(startIndex, indent) {
-    const data = {};
-    let index = startIndex;
-
-    while (index < frontmatterLines.length) {
-      const raw = frontmatterLines[index];
-      if (!raw.trim()) {
-        index++;
-        continue;
-      }
-
-      const currentIndent = raw.match(/^ */)[0].length;
-      if (currentIndent < indent) break;
-      if (currentIndent > indent) {
-        throw new Error(`Invalid relay manifest indentation on line ${index + 2}`);
-      }
-
-      const trimmed = raw.trim();
-      const separator = trimmed.indexOf(":");
-      if (separator === -1) {
-        throw new Error(`Invalid relay manifest entry on line ${index + 2}`);
-      }
-
-      const key = trimmed.slice(0, separator).trim();
-      const rest = trimmed.slice(separator + 1).trim();
-
-      if (!rest) {
-        const nested = parseBlock(index + 1, indent + 2);
-        data[key] = nested.data;
-        index = nested.index;
-        continue;
-      }
-
-      data[key] = parseFrontmatterScalar(rest);
-      index++;
-    }
-
-    return { data, index };
-  }
-
-  return parseBlock(0, 0).data;
-}
-
-function relayEventsPath(relayManifestPath, runId) {
-  return path.join(path.dirname(relayManifestPath), runId, "events.jsonl");
-}
-
-function readRelayManifestMetadata(relayManifestPath) {
-  const resolved = path.resolve(relayManifestPath);
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`Relay manifest not found: ${resolved}`);
-  }
-
-  const text = fs.readFileSync(resolved, "utf-8");
-  const data = parseFrontmatter(text);
-  const runId = normalizeRelayField(data.run_id) || path.basename(resolved, path.extname(resolved));
-
-  return {
-    manifestPath: resolved,
-    runId,
-    state: normalizeRelayField(data.state),
-    nextAction: normalizeRelayField(data.next_action),
-    issueNumber: Number.isFinite(data.issue?.number) ? data.issue.number : null,
-    prNumber: Number.isFinite(data.git?.pr_number) ? data.git.pr_number : null,
-    executor: normalizeRelayField(data.roles?.executor),
-    reviewer: normalizeRelayField(data.roles?.reviewer),
-    actor: normalizeRelayField(data.roles?.actor) || normalizeRelayField(data.roles?.orchestrator),
-    rounds: Number.isFinite(data.review?.rounds) ? data.review.rounds : null,
-  };
-}
-
-function readRelayGrade(eventsPath) {
-  if (!fs.existsSync(eventsPath)) return null;
-
-  let grade = null;
-  const lines = fs.readFileSync(eventsPath, "utf-8")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (const line of lines) {
-    const record = JSON.parse(line);
-    if (record.event === "rubric_quality" && typeof record.grade === "string" && record.grade.trim()) {
-      grade = record.grade.trim();
-    }
-  }
-
-  return grade;
-}
-
-function loadRelayMetadata(relayManifestPath) {
-  if (!relayManifestPath) return null;
-
-  const metadata = readRelayManifestMetadata(relayManifestPath);
-  return {
-    ...metadata,
-    eventsPath: relayEventsPath(metadata.manifestPath, metadata.runId),
-    grade: readRelayGrade(relayEventsPath(metadata.manifestPath, metadata.runId)),
-  };
-}
-
-function relayDetailLine(relay, { includeState = false } = {}) {
-  if (!relay?.runId) return null;
-
-  const parts = [`run \`${relay.runId}\``];
-  if (relay.grade) parts.push(`grade ${relay.grade}`);
-  if (typeof relay.rounds === "number") parts.push(`rounds ${relay.rounds}`);
-  if (relay.executor) parts.push(`executor ${relay.executor}`);
-  if (relay.reviewer) parts.push(`reviewer ${relay.reviewer}`);
-  if (relay.actor) parts.push(`actor ${relay.actor}`);
-  if (includeState && relay.state) parts.push(`state ${relay.state}`);
-  if (includeState && relay.nextAction) parts.push(`next ${relay.nextAction}`);
-
-  return parts.length ? `**Relay:** ${parts.join(" · ")}` : null;
-}
-
-function renderMergeComment(month, pr, relay = null) {
-  const entryId = relay?.runId ? relayMergeEntryKey(relay.runId) : mergeEntryKey(month, pr.number);
-  const marker = makeCommentMarker(entryId);
-  const lines = [marker, `**Merged:** #${pr.number} — ${pr.title}`];
-  const relayLine = relayDetailLine(relay);
-  if (relayLine) {
-    lines.push("", relayLine);
-  }
-  return lines.join("\n");
-}
-
-function renderStuckComment(month, task, relay = null) {
-  const entryId = relay?.runId ? relayStuckEntryKey(relay.runId) : stuckEntryKey(month, task.file);
-  const marker = makeCommentMarker(entryId);
-  const lines = [marker, `**Stuck candidate:** ${task.file} (status: ${task.status})`];
-  const relayLine = relayDetailLine(relay, { includeState: true });
-  if (relayLine) {
-    lines.push("", relayLine);
-  }
-  return lines.join("\n");
-}
-
-// --- GitHub I/O ---
-
-function searchProgressIssues(month, execFile) {
-  const title = monthTitle(month);
-  const out = execFile("gh", [
-    "issue", "list", "--state", "all", "--search", `"${title}" in:title`,
-    "--json", "number,title,body", "--limit", "50",
-  ], GH_EXEC_DEFAULTS);
-  return JSON.parse(out);
-}
-
-function findMonthIssue(month, execFile) {
-  const issues = searchProgressIssues(month, execFile);
-  const marker = makeMarker(month);
-  // Trust marker first
-  const markerMatch = issues.find((i) => i.body && i.body.includes(marker));
-  if (markerMatch) return markerMatch;
-  // Fallback: exact title match
-  const title = monthTitle(month);
-  return issues.find((i) => i.title === title) || null;
-}
-
-function createIssue(title, body, execFile) {
-  const out = execFile("gh", [
-    "issue", "create", "--title", title, "--body", body,
-  ], GH_EXEC_DEFAULTS);
-  // gh issue create prints the issue URL, e.g. https://github.com/owner/repo/issues/123
-  const match = out.trim().match(/\/issues\/(\d+)\s*$/);
-  if (!match) {
-    throw new Error(`Failed to parse issue number from gh output: ${out.trim()}`);
-  }
-  return { number: Number(match[1]) };
-}
-
-function updateIssueBody(number, body, execFile) {
-  execFile("gh", [
-    "issue", "edit", String(number), "--body", body,
-  ], GH_EXEC_DEFAULTS);
-}
-
-function closeIssue(number, execFile) {
-  execFile("gh", [
-    "api", `repos/{owner}/{repo}/issues/${number}`,
-    "--method", "PATCH",
-    "--field", "state=closed",
-  ], GH_EXEC_DEFAULTS);
-}
-
-function fetchOpenPRs(execFile) {
-  try {
-    const out = execFile("gh", [
-      "pr", "list", "--state", "open", "--json", "number,title",
-      "--limit", "100",
-    ], GH_EXEC_DEFAULTS);
-    return JSON.parse(out);
-  } catch {
-    return [];
-  }
-}
-
-function fetchMergedPRsThisMonth(month, execFile) {
-  const [y, m] = month.split("-");
-  const start = `${y}-${m}-01`;
-  // Approximate end of month
-  const nextM = Number(m) === 12 ? 1 : Number(m) + 1;
-  const nextY = Number(m) === 12 ? Number(y) + 1 : Number(y);
-  const end = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
-  try {
-    const out = execFile("gh", [
-      "pr", "list", "--state", "merged",
-      "--search", `merged:>=${start} merged:<${end}`,
-      "--json", "number,title",
-      "--limit", "200",
-    ], GH_EXEC_DEFAULTS);
-    return JSON.parse(out);
-  } catch {
-    return [];
-  }
-}
-
-// --- Comment I/O ---
-
-function parsePaginatedApiArray(output) {
-  const text = String(output || "").trim();
-  if (!text) return [];
-
-  try {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {}
-
-  try {
-    const combined = `[${text.replace(/\]\s*\[/g, "],[")}]`;
-    const parsed = JSON.parse(combined);
-    return parsed.flatMap((page) => Array.isArray(page) ? page : [page]);
-  } catch {
-    return [];
-  }
-}
-
-function fetchIssueComments(issueNumber, execFile) {
-  try {
-    const out = execFile("gh", [
-      "api", `repos/{owner}/{repo}/issues/${issueNumber}/comments`,
-      "--paginate",
-    ], GH_EXEC_DEFAULTS);
-    return parsePaginatedApiArray(out);
-  } catch {
-    return [];
-  }
-}
-
-function createIssueComment(issueNumber, body, execFile) {
-  execFile("gh", [
-    "api", `repos/{owner}/{repo}/issues/${issueNumber}/comments`,
-    "--method", "POST", "--field", `body=${body}`,
-  ], GH_EXEC_DEFAULTS);
-}
-
-function updateIssueComment(commentId, body, execFile) {
-  execFile("gh", [
-    "api", `repos/{owner}/{repo}/issues/comments/${commentId}`,
-    "--method", "PATCH", "--field", `body=${body}`,
-  ], GH_EXEC_DEFAULTS);
-}
-
-function deleteIssueComment(commentId, execFile) {
-  execFile("gh", [
-    "api", `repos/{owner}/{repo}/issues/comments/${commentId}`,
-    "--method", "DELETE",
-  ], GH_EXEC_DEFAULTS);
-}
-
-// --- Comment reconciliation ---
-
-function parseManagedComments(comments) {
-  const managed = [];
-  for (const c of comments) {
-    const entryId = parseCommentEntryId(c.body);
-    if (entryId) {
-      managed.push({ id: c.id, entryId, body: c.body });
-    }
-  }
-  return managed;
-}
-
-function buildDesiredCommentEntries({ mergedPRs, stuckTasks, month, relayMetadata }) {
-  const desired = [];
-
-  for (const pr of mergedPRs) {
-    const relay = relayMetadata?.runId && relayMetadata.prNumber === pr.number ? relayMetadata : null;
-    desired.push({
-      entryId: relay ? relayMergeEntryKey(relay.runId) : mergeEntryKey(month, pr.number),
-      aliasIds: relay ? [mergeEntryKey(month, pr.number)] : [],
-      body: renderMergeComment(month, pr, relay),
-    });
-  }
-
-  for (const task of stuckTasks) {
-    const taskIssueNumber = task.issueNumber ?? parseTaskIssueNumber(task.file);
-    const relay = relayMetadata?.runId && relayMetadata.issueNumber === taskIssueNumber ? relayMetadata : null;
-    desired.push({
-      entryId: relay ? relayStuckEntryKey(relay.runId) : stuckEntryKey(month, task.file),
-      aliasIds: relay ? [stuckEntryKey(month, task.file)] : [],
-      body: renderStuckComment(month, task, relay),
-    });
-  }
-
-  return desired;
-}
-
-function matchingManagedComments(byEntryId, entry) {
-  const unique = new Map();
-  const entryIds = [entry.entryId, ...(entry.aliasIds || [])];
-
-  for (const entryId of entryIds) {
-    const matches = byEntryId.get(entryId) || [];
-    for (const match of matches) {
-      unique.set(match.id, match);
-    }
-  }
-
-  return Array.from(unique.values());
-}
-
-function selectPrimaryManagedComment(existing, canonicalEntryId) {
-  return existing.find((comment) => comment.entryId === canonicalEntryId) || existing[0];
-}
-
-function reconcileComments({
-  issueNumber,
-  mergedPRs,
-  stuckTasks,
-  month,
-  relayMetadata = null,
-  dryRun,
-  execFile,
-  fetchComments = fetchIssueComments,
-}) {
-  const allComments = fetchComments(issueNumber, execFile);
-  const managed = parseManagedComments(allComments);
-
-  // Build index: entryId → [managed comments]
-  const byEntryId = new Map();
-  for (const mc of managed) {
-    if (!byEntryId.has(mc.entryId)) byEntryId.set(mc.entryId, []);
-    byEntryId.get(mc.entryId).push(mc);
-  }
-
-  const desired = buildDesiredCommentEntries({ mergedPRs, stuckTasks, month, relayMetadata });
-
-  const actions = { created: 0, updated: 0, skipped: 0, repaired: 0 };
-
-  for (const entry of desired) {
-    const existing = matchingManagedComments(byEntryId, entry);
-
-    if (existing.length === 0) {
-      // Create new comment
-      if (!dryRun) createIssueComment(issueNumber, entry.body, execFile);
-      actions.created++;
-    } else if (existing.length === 1) {
-      // Single existing — update if body differs, skip if identical
-      if (existing[0].body === entry.body && existing[0].entryId === entry.entryId) {
-        actions.skipped++;
-      } else {
-        if (!dryRun) updateIssueComment(existing[0].id, entry.body, execFile);
-        actions.updated++;
-      }
-    } else {
-      // Duplicate repair: keep the first, update it, delete the rest
-      const primary = selectPrimaryManagedComment(existing, entry.entryId);
-      const duplicates = existing.filter((comment) => comment.id !== primary.id);
-      if (!dryRun) {
-        updateIssueComment(primary.id, entry.body, execFile);
-        for (const duplicate of duplicates) {
-          deleteIssueComment(duplicate.id, execFile);
-        }
-      }
-      actions.repaired++;
-    }
-
-    // Remove processed entry from index so we don't revisit
-    byEntryId.delete(entry.entryId);
-    for (const aliasId of entry.aliasIds || []) {
-      byEntryId.delete(aliasId);
-    }
-  }
-
-  // Remaining managed comments with entry ids not in desired set are left as-is
-  // (they may be from a previous month or an entry type we no longer emit)
-
-  return actions;
-}
-
 // --- Core sync logic ---
 
 function sync({
@@ -715,11 +190,10 @@ function sync({
   relayManifestPath = null,
   now = new Date(),
   execFile = execFileSync,
-  readFs = { readTaskFiles, readCompletedCount, readActiveSprintSummary },
+  readFs = { readTaskFiles, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
 }) {
   const tasksDir = path.join(backlogDir, "tasks");
-  const completedDir = path.join(backlogDir, "completed");
   const sprintsDir = path.join(backlogDir, "sprints");
 
   // Gather source data
@@ -846,7 +320,7 @@ function printResult(result) {
   }
 
   const s = result.summary;
-  console.log(`  merged/completed: ${s.merged}, in-flight: ${s.inFlight}, stuck candidates: ${s.stuckCandidates}`);
+  console.log(`  merged PRs (month): ${s.merged}, in-flight: ${s.inFlight}, stuck candidates: ${s.stuckCandidates}`);
 
   if (s.sprint) {
     console.log(`  sprint: ${s.sprint.file} (${s.sprint.done}/${s.sprint.total} done)`);
@@ -941,7 +415,6 @@ module.exports = {
   parseFinalizedDate,
   parseArgs,
   readTaskFiles,
-  readCompletedCount,
   readActiveSprintSummary,
   computeSummary,
   renderBody,
