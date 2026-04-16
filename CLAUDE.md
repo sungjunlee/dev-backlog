@@ -2,12 +2,14 @@
 
 GitHub Issues + local sprint execution files for Claude Code / Codex.
 
+`README.md` is the human quick start. `skills/dev-backlog/SKILL.md` is the agent execution contract.
+
 ## Project Structure
 
-```
+```text
 skills/
   dev-backlog/
-    SKILL.md               ← Core process (~290 lines)
+    SKILL.md               ← Agent execution contract (keep under 250 lines)
     references/            ← Detailed specs (on-demand)
     scripts/               ← Deterministic helpers (node + bash)
 ```
@@ -31,6 +33,6 @@ GitHub (what)  ↔  gh CLI  ↔  backlog/sprints/ (how + context)
 ## Working on This Project
 
 - All content in English (Korean in trigger keywords only)
-- Keep SKILL.md under 250 lines
+- Keep README focused on the human quick start; keep `SKILL.md` under 250 lines as the agent execution contract
 - Test changes by simulating real task management scenarios against GitHub repos
 - Match prompt-builder quality: practical, not ceremonial
