@@ -6,7 +6,7 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 
 ## Project Structure
 
-```
+```text
 skills/
   dev-backlog/
     SKILL.md               ← Agent execution contract (keep under 250 lines)
