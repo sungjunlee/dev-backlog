@@ -9,6 +9,8 @@ metadata:
 
 # Dev Backlog
 
+README covers install and human quick start. This skill file is the execution contract for agents: file roles, sprint structure, process, and script behavior.
+
 Two layers, each with a clear job:
 
 ```
