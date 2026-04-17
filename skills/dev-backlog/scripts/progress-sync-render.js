@@ -121,14 +121,73 @@ function relayDetailLine(relay, { includeState = false } = {}) {
   return parts.length ? `**Relay:** ${parts.join(" · ")}` : null;
 }
 
+function relayDetailText(relay, { includeState = false } = {}) {
+  const line = relayDetailLine(relay, { includeState });
+  return line ? line.replace(/^\*\*Relay:\*\* /, "") : null;
+}
+
+function formatMergedAt(mergedAt) {
+  if (!mergedAt) return null;
+  const date = new Date(mergedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  const iso = date.toISOString();
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+}
+
+function formatIssueRef(issue) {
+  if (!issue || !Number.isFinite(issue.number)) return null;
+  return issue.url ? `[#${issue.number}](${issue.url})` : `#${issue.number}`;
+}
+
+function mergeIssueRefKey(issue) {
+  return Number.isFinite(issue?.number) ? `issue:${issue.number}` : null;
+}
+
+function collectMergeIssueRefs(pr, relay) {
+  const refs = [];
+  const seen = new Set();
+
+  for (const issue of pr?.closingIssuesReferences || []) {
+    const key = mergeIssueRefKey(issue);
+    const ref = formatIssueRef(issue);
+    if (!key || !ref || seen.has(key)) continue;
+    refs.push(ref);
+    seen.add(key);
+  }
+
+  if (Number.isFinite(relay?.issueNumber)) {
+    const fallbackIssue = { number: relay.issueNumber };
+    const fallbackKey = mergeIssueRefKey(fallbackIssue);
+    const fallback = formatIssueRef(fallbackIssue);
+    if (fallbackKey && fallback && !seen.has(fallbackKey)) refs.push(fallback);
+  }
+
+  return refs;
+}
+
 function renderMergeComment(month, pr, relay = null) {
   const entryId = relay?.runId ? relayMergeEntryKey(relay.runId) : mergeEntryKey(month, pr.number);
   const marker = makeCommentMarker(entryId);
-  const lines = [marker, `**Merged:** #${pr.number} — ${pr.title}`];
-  const relayLine = relayDetailLine(relay);
-  if (relayLine) {
-    lines.push("", relayLine);
+  const prRef = pr.url ? `[#${pr.number}](${pr.url})` : `#${pr.number}`;
+  const lines = [marker, `**Merged:** ${prRef} — ${pr.title}`];
+  const issueRefs = collectMergeIssueRefs(pr, relay);
+  const landedAt = formatMergedAt(pr.mergedAt);
+  const relayText = relayDetailText(relay);
+
+  if (issueRefs.length === 1) {
+    lines.push(`- Task: ${issueRefs[0]}`);
+  } else if (issueRefs.length > 1) {
+    lines.push(`- Tasks: ${issueRefs.join(", ")}`);
   }
+
+  if (landedAt) {
+    lines.push(`- Landed: ${landedAt}`);
+  }
+
+  if (relayText) {
+    lines.push(`- AI: ${relayText}`);
+  }
+
   return lines.join("\n");
 }
 

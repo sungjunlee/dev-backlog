@@ -71,7 +71,7 @@ function fetchMergedPRsThisMonth(month, execFile) {
     const out = execFile("gh", [
       "pr", "list", "--state", "merged",
       "--search", `merged:>=${start} merged:<${end}`,
-      "--json", "number,title",
+      "--json", "number,title,url,mergedAt,closingIssuesReferences",
       "--limit", "200",
     ], GH_EXEC_DEFAULTS);
     return JSON.parse(out);

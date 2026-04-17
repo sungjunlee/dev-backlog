@@ -906,14 +906,34 @@ describe("renderMergeComment", () => {
     assert.ok(body.includes("**Merged:** #10 — Add auth"));
   });
 
+  it("includes task refs and landed time from GitHub metadata", () => {
+    const body = renderMergeComment("2026-04", {
+      number: 54,
+      title: "Refresh root contract docs",
+      url: "https://github.com/sungjunlee/dev-backlog/pull/54",
+      mergedAt: "2026-04-16T22:54:20Z",
+      closingIssuesReferences: [
+        { number: 53, url: "https://github.com/sungjunlee/dev-backlog/issues/53" },
+      ],
+    });
+    assert.ok(body.includes("**Merged:** [#54](https://github.com/sungjunlee/dev-backlog/pull/54) — Refresh root contract docs"));
+    assert.ok(body.includes("- Task: [#53](https://github.com/sungjunlee/dev-backlog/issues/53)"));
+    assert.ok(body.includes("- Landed: 2026-04-16 22:54 UTC"));
+  });
+
   it("marker is parseable back to entry id", () => {
     const body = renderMergeComment("2026-04", { number: 10, title: "Add auth" });
     assert.equal(parseCommentEntryId(body), "2026-04/merge/pr-10");
   });
 
-  it("uses relay run id and enrichment details when relay metadata is present", () => {
-    const body = renderMergeComment("2026-04", { number: 39, title: "Structured comments" }, {
+  it("uses relay fallback task ids and AI details when relay metadata is present", () => {
+    const body = renderMergeComment("2026-04", {
+      number: 39,
+      title: "Structured comments",
+      mergedAt: "2026-04-07T13:30:44Z",
+    }, {
       runId: "issue-36-20260407133044244",
+      issueNumber: 36,
       grade: "A",
       rounds: 1,
       executor: "claude",
@@ -921,7 +941,25 @@ describe("renderMergeComment", () => {
       actor: "orchestrator",
     });
     assert.ok(body.includes("<!-- dev-backlog:progress-comment id=run/issue-36-20260407133044244/merge -->"));
-    assert.ok(body.includes("**Relay:** run `issue-36-20260407133044244` · grade A · rounds 1 · executor claude · reviewer codex · actor orchestrator"));
+    assert.ok(body.includes("- Task: #36"));
+    assert.ok(body.includes("- Landed: 2026-04-07 13:30 UTC"));
+    assert.ok(body.includes("- AI: run `issue-36-20260407133044244` · grade A · rounds 1 · executor claude · reviewer codex · actor orchestrator"));
+  });
+
+  it("prefers the GitHub task ref when relay fallback points to the same issue", () => {
+    const body = renderMergeComment("2026-04", {
+      number: 56,
+      title: "Compact journal enrichment",
+      closingIssuesReferences: [
+        { number: 55, url: "https://github.com/sungjunlee/dev-backlog/issues/55" },
+      ],
+    }, {
+      runId: "issue-55-20260417122000000",
+      issueNumber: 55,
+    });
+    assert.ok(body.includes("- Task: [#55](https://github.com/sungjunlee/dev-backlog/issues/55)"));
+    assert.equal((body.match(/#55/g) || []).length, 1);
+    assert.ok(!body.includes("Tasks:"));
   });
 });
 
