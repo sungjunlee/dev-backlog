@@ -139,20 +139,27 @@ function formatIssueRef(issue) {
   return issue.url ? `[#${issue.number}](${issue.url})` : `#${issue.number}`;
 }
 
+function mergeIssueRefKey(issue) {
+  return Number.isFinite(issue?.number) ? `issue:${issue.number}` : null;
+}
+
 function collectMergeIssueRefs(pr, relay) {
   const refs = [];
   const seen = new Set();
 
   for (const issue of pr?.closingIssuesReferences || []) {
+    const key = mergeIssueRefKey(issue);
     const ref = formatIssueRef(issue);
-    if (!ref || seen.has(ref)) continue;
+    if (!key || !ref || seen.has(key)) continue;
     refs.push(ref);
-    seen.add(ref);
+    seen.add(key);
   }
 
   if (Number.isFinite(relay?.issueNumber)) {
-    const fallback = formatIssueRef({ number: relay.issueNumber });
-    if (fallback && !seen.has(fallback)) refs.push(fallback);
+    const fallbackIssue = { number: relay.issueNumber };
+    const fallbackKey = mergeIssueRefKey(fallbackIssue);
+    const fallback = formatIssueRef(fallbackIssue);
+    if (fallbackKey && fallback && !seen.has(fallbackKey)) refs.push(fallback);
   }
 
   return refs;

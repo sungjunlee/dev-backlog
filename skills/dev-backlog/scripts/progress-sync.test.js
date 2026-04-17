@@ -945,6 +945,22 @@ describe("renderMergeComment", () => {
     assert.ok(body.includes("- Landed: 2026-04-07 13:30 UTC"));
     assert.ok(body.includes("- AI: run `issue-36-20260407133044244` · grade A · rounds 1 · executor claude · reviewer codex · actor orchestrator"));
   });
+
+  it("prefers the GitHub task ref when relay fallback points to the same issue", () => {
+    const body = renderMergeComment("2026-04", {
+      number: 56,
+      title: "Compact journal enrichment",
+      closingIssuesReferences: [
+        { number: 55, url: "https://github.com/sungjunlee/dev-backlog/issues/55" },
+      ],
+    }, {
+      runId: "issue-55-20260417122000000",
+      issueNumber: 55,
+    });
+    assert.ok(body.includes("- Task: [#55](https://github.com/sungjunlee/dev-backlog/issues/55)"));
+    assert.equal((body.match(/#55/g) || []).length, 1);
+    assert.ok(!body.includes("Tasks:"));
+  });
 });
 
 describe("renderStuckComment", () => {
