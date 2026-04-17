@@ -9,6 +9,7 @@ const {
   structureBody,
   parseArgs,
   loadOpenIssues,
+  isMachineManagedIssueBody,
   run,
 } = require("./sync-pull.js");
 
@@ -120,6 +121,25 @@ describe("parseArgs", () => {
 
     const invalidValue = parseArgs(["--limit", "0"], "BACK");
     assert.equal(invalidValue.error, "Invalid --limit value: 0. Expected a positive integer.");
+  });
+});
+
+describe("isMachineManagedIssueBody", () => {
+  it("returns true for the monthly progress marker", () => {
+    assert.equal(
+      isMachineManagedIssueBody("<!-- dev-backlog:progress-issue month=2026-04 -->\n\n# Progress"),
+      true
+    );
+  });
+
+  it("returns false for normal issue bodies", () => {
+    assert.equal(isMachineManagedIssueBody("Plain body"), false);
+    assert.equal(isMachineManagedIssueBody(""), false);
+    assert.equal(isMachineManagedIssueBody(null), false);
+    assert.equal(
+      isMachineManagedIssueBody("<!-- dev-backlog:progress-comment id=abc -->"),
+      false
+    );
   });
 });
 
@@ -326,6 +346,98 @@ describe("run (integration)", () => {
     // File should be unchanged
     const content = fs.readFileSync(path.join(tasksDir, "TEST-42 - oauth2-flow.md"), "utf-8");
     assert.equal(content, "---\nid: TEST-42\n---\nOld body");
+  });
+
+  it("--update refreshes the body when the GitHub issue body carries the progress marker", () => {
+    // Pre-create a stale local mirror for a machine-managed progress issue.
+    const staleBody = `
+## Description
+<!-- dev-backlog:progress-issue month=2026-04 -->
+
+# Progress: April 2026
+
+## Summary
+
+| Metric | Count |
+| --- | --- |
+| Merged PRs (month) | 9 |
+`;
+    fs.writeFileSync(
+      path.join(tasksDir, "TEST-46 - progress-april-2026.md"),
+      `---\nid: TEST-46\ntitle: 'Progress: April 2026'\nstatus: To Do\nlabels: []\npriority: medium\nmilestone: ''\ncreated_date: '2026-04-01'\n---\n${staleBody}`
+    );
+
+    const freshIssueBody = `<!-- dev-backlog:progress-issue month=2026-04 -->
+
+# Progress: April 2026
+
+## Summary
+
+| Metric | Count |
+| --- | --- |
+| Merged PRs (month) | 14 |
+`;
+
+    run({
+      issues: [makeIssue({
+        number: 46,
+        title: "Progress: April 2026",
+        body: freshIssueBody,
+      })],
+      tasksDir,
+      prefix: "TEST",
+      update: true,
+      dryRun: false,
+    });
+
+    const content = fs.readFileSync(
+      path.join(tasksDir, "TEST-46 - progress-april-2026.md"),
+      "utf-8"
+    );
+    // Frontmatter still refreshed.
+    assert.match(content, /title: 'Progress: April 2026'/);
+    // Body refreshed to the fresh GitHub value.
+    assert.match(content, /Merged PRs \(month\) \| 14/);
+    // Stale count gone.
+    assert.doesNotMatch(content, /Merged PRs \(month\) \| 9/);
+    // Marker preserved so future pulls still recognise the mirror.
+    assert.match(content, /<!-- dev-backlog:progress-issue month=2026-04 -->/);
+  });
+
+  it("--update leaves the body alone when only the local mirror carries the progress marker", () => {
+    // Local file has the marker, but the incoming GitHub body does not — we must not
+    // treat that as machine-managed and must keep respecting the local body.
+    const localBody = `
+## Description
+<!-- dev-backlog:progress-issue month=2026-04 -->
+
+Local notes the user edited by hand.
+`;
+    fs.writeFileSync(
+      path.join(tasksDir, "TEST-46 - progress-april-2026.md"),
+      `---\nid: TEST-46\ntitle: 'Progress: April 2026'\nstatus: To Do\nlabels: []\npriority: medium\nmilestone: ''\ncreated_date: '2026-04-01'\n---\n${localBody}`
+    );
+
+    run({
+      issues: [makeIssue({
+        number: 46,
+        title: "Progress: April 2026",
+        body: "Plain unstructured body without the marker",
+      })],
+      tasksDir,
+      prefix: "TEST",
+      update: true,
+      dryRun: false,
+    });
+
+    const content = fs.readFileSync(
+      path.join(tasksDir, "TEST-46 - progress-april-2026.md"),
+      "utf-8"
+    );
+    // Local body retained verbatim.
+    assert.match(content, /Local notes the user edited by hand\./);
+    // New GitHub body did NOT replace it.
+    assert.doesNotMatch(content, /Plain unstructured body without the marker/);
   });
 
   it("--update refreshes frontmatter but preserves existing body", () => {

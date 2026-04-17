@@ -16,6 +16,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { slugify, escapeYaml, readConfig, GH_EXEC_DEFAULTS } = require("./lib");
+const { parseMarkerMonth } = require("./progress-sync-render");
 
 const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
 const COUNT_OPEN_ISSUES_QUERY =
@@ -180,6 +181,10 @@ function extractBodyAfterFrontmatter(content) {
   return bodyMatch ? bodyMatch[1] : null;
 }
 
+function isMachineManagedIssueBody(body) {
+  return parseMarkerMonth(body) !== null;
+}
+
 function syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result }) {
   const filename = buildTaskFilename({ issue, prefix });
   const filepath = path.join(tasksDir, filename);
@@ -200,8 +205,10 @@ function syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result }
 
     const existingPath = path.join(tasksDir, existing);
     const existingContent = fs.readFileSync(existingPath, "utf-8");
-    const preservedBody = extractBodyAfterFrontmatter(existingContent) || structuredBody;
-    fs.writeFileSync(existingPath, `${frontmatter}\n${preservedBody}`);
+    const nextBody = isMachineManagedIssueBody(issue.body)
+      ? structuredBody
+      : extractBodyAfterFrontmatter(existingContent) || structuredBody;
+    fs.writeFileSync(existingPath, `${frontmatter}\n${nextBody}`);
     recordOperation(result, "updated", existing);
     return existing;
   }
@@ -338,5 +345,6 @@ module.exports = {
   getOpenIssueCount,
   fetchOpenIssues,
   loadOpenIssues,
+  isMachineManagedIssueBody,
   run,
 };
