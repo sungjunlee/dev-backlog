@@ -2,6 +2,7 @@
  * Shared library for dev-backlog Node scripts.
  */
 
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -32,32 +33,190 @@ const CONFIG_DEFAULTS = {
   statuses: ["To Do", "In Progress", "Done"],
 };
 
+const TRIAGE_CONFIG_DEFAULTS = {
+  theme_keywords: {},
+  activity_days: {
+    warm: 14,
+    cold: 60,
+  },
+  stale_days: 60,
+  duplicate_threshold: 0.75,
+};
+
+const OPEN_ISSUE_COUNT_QUERY =
+  "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
+const OPEN_ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees,createdAt,updatedAt";
+
+function stripQuotes(text) {
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1).replace(/''/g, "'");
+  }
+  return text;
+}
+
+function parseInlineArray(raw) {
+  const inner = raw.slice(1, -1).trim();
+  if (!inner) return [];
+  return inner.split(",").map((part) => stripQuotes(part.trim()));
+}
+
+function parseYamlScalar(raw) {
+  const value = raw.trim();
+  if (!value) return "";
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return stripQuotes(value);
+  }
+  if (value.startsWith("[") && value.endsWith("]")) {
+    return parseInlineArray(value);
+  }
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) {
+    return Number(value);
+  }
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
+function parseSimpleYaml(raw) {
+  const root = {};
+  const stack = [{ indent: -1, value: root }];
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+
+    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+    if (!match) continue;
+
+    const indent = match[1].length;
+    const key = match[2];
+    const rawValue = match[3] || "";
+
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+
+    const parent = stack[stack.length - 1].value;
+    if (!rawValue.trim()) {
+      parent[key] = {};
+      stack.push({ indent, value: parent[key] });
+      continue;
+    }
+
+    parent[key] = parseYamlScalar(rawValue);
+  }
+
+  return root;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeConfig(defaults, parsed) {
+  const merged = { ...defaults };
+  for (const [key, value] of Object.entries(parsed || {})) {
+    if (isPlainObject(value) && isPlainObject(defaults[key])) {
+      merged[key] = mergeConfig(defaults[key], value);
+      continue;
+    }
+    merged[key] = value;
+  }
+  return merged;
+}
+
+function readYamlConfig(configPath, defaults) {
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    return mergeConfig(defaults, parseSimpleYaml(raw));
+  } catch {
+    return mergeConfig(defaults, {});
+  }
+}
+
 /**
  * Read backlog/config.yml with simple YAML key: value parsing.
  * Returns merged config (file values override defaults).
  * Gracefully falls back to defaults on missing/malformed file.
  */
 function readConfig(backlogDir) {
-  const configPath = path.join(backlogDir || "backlog", "config.yml");
-  try {
-    const raw = fs.readFileSync(configPath, "utf-8");
-    const parsed = {};
-    for (const line of raw.split("\n")) {
-      const m = line.match(/^(\w+):\s*(.+)$/);
-      if (!m) continue;
-      let val = m[2].trim();
-      // Skip list values — simple parser handles scalars only; defaults preserved
-      if (val.startsWith("[")) continue;
-      // Strip surrounding quotes
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      parsed[m[1]] = val;
-    }
-    return { ...CONFIG_DEFAULTS, ...parsed };
-  } catch {
-    return { ...CONFIG_DEFAULTS };
+  return readYamlConfig(path.join(backlogDir || "backlog", "config.yml"), CONFIG_DEFAULTS);
+}
+
+function readTriageConfig(backlogDir) {
+  return readYamlConfig(
+    path.join(backlogDir || "backlog", "triage-config.yml"),
+    TRIAGE_CONFIG_DEFAULTS
+  );
+}
+
+function buildIssueCountArgs(repo) {
+  if (!repo) {
+    return [
+      "api",
+      "graphql",
+      "-F",
+      "owner={owner}",
+      "-F",
+      "name={repo}",
+      "-f",
+      `query=${OPEN_ISSUE_COUNT_QUERY}`,
+      "--jq",
+      ".data.repository.issues.totalCount",
+    ];
   }
+
+  const [owner, name] = repo.split("/");
+  if (!owner || !name) {
+    throw new Error(`Invalid repo value: ${repo}. Expected OWNER/REPO.`);
+  }
+
+  return [
+    "api",
+    "graphql",
+    "-F",
+    `owner=${owner}`,
+    "-F",
+    `name=${name}`,
+    "-f",
+    `query=${OPEN_ISSUE_COUNT_QUERY}`,
+    "--jq",
+    ".data.repository.issues.totalCount",
+  ];
+}
+
+function getOpenIssueCount({ repo, execFile = execFileSync } = {}) {
+  const out = execFile("gh", buildIssueCountArgs(repo), GH_EXEC_DEFAULTS).trim();
+  const count = Number.parseInt(out, 10);
+
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`Invalid issue count from gh: ${out}`);
+  }
+
+  return count;
+}
+
+/**
+ * Fetch open GitHub issues via `gh issue list`.
+ *
+ * When `limit` is `undefined`, the helper first resolves the repository's
+ * open-issue count via GraphQL and then uses that count as the list limit.
+ * `execFile` is injectable so tests can stub `gh` without spawning a process.
+ */
+function fetchOpenIssues({ repo, limit, execFile = execFileSync } = {}) {
+  const resolvedLimit = limit ?? getOpenIssueCount({ repo, execFile });
+  if (resolvedLimit === 0) return [];
+
+  const args = ["issue", "list", "--state", "open", "--limit", String(resolvedLimit)];
+  if (repo) args.push("--repo", repo);
+  args.push("--json", OPEN_ISSUE_JSON_FIELDS);
+
+  return JSON.parse(execFile("gh", args, GH_EXEC_DEFAULTS));
 }
 
 /**
@@ -82,4 +241,17 @@ function estimateSize(labels) {
   return "";
 }
 
-module.exports = { slugify, escapeYaml, readConfig, estimateSize, CONFIG_DEFAULTS, GH_EXEC_DEFAULTS };
+module.exports = {
+  slugify,
+  escapeYaml,
+  readConfig,
+  readTriageConfig,
+  estimateSize,
+  CONFIG_DEFAULTS,
+  TRIAGE_CONFIG_DEFAULTS,
+  GH_EXEC_DEFAULTS,
+  OPEN_ISSUE_COUNT_QUERY,
+  OPEN_ISSUE_JSON_FIELDS,
+  getOpenIssueCount,
+  fetchOpenIssues,
+};

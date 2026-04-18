@@ -15,12 +15,16 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { slugify, escapeYaml, readConfig, GH_EXEC_DEFAULTS } = require("./lib");
+const {
+  slugify,
+  escapeYaml,
+  readConfig,
+  GH_EXEC_DEFAULTS,
+  getOpenIssueCount: getSharedOpenIssueCount,
+} = require("./lib");
 const { parseMarkerMonth } = require("./progress-sync-render");
 
 const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
-const COUNT_OPEN_ISSUES_QUERY =
-  "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
 
 function statusFromLabels(labels) {
   if (labels.includes("status:in-progress")) return "In Progress";
@@ -254,20 +258,7 @@ function run({ issues, tasksDir, prefix, update, dryRun }) {
 // --- CLI entry point ---
 
 function getOpenIssueCount(execFile = execFileSync) {
-  const out = execFile("gh", [
-    "api", "graphql",
-    "-F", "owner={owner}",
-    "-F", "name={repo}",
-    "-f", `query=${COUNT_OPEN_ISSUES_QUERY}`,
-    "--jq", ".data.repository.issues.totalCount",
-  ], GH_EXEC_DEFAULTS).trim();
-  const count = Number.parseInt(out, 10);
-
-  if (!Number.isInteger(count) || count < 0) {
-    throw new Error(`Invalid issue count from gh: ${out}`);
-  }
-
-  return count;
+  return getSharedOpenIssueCount({ execFile });
 }
 
 function fetchOpenIssues(limit, execFile = execFileSync) {
