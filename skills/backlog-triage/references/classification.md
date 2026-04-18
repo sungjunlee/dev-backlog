@@ -11,6 +11,9 @@ theme_keywords:
 activity_days:
   warm: 14
   cold: 60
+comment_fetch_concurrency: 5
+closed_issue_days: 180
+closed_issue_limit: 200
 stale_days: 60
 duplicate_threshold: 0.75
 ```
@@ -18,6 +21,9 @@ duplicate_threshold: 0.75
 - `theme_keywords` maps a theme name to title-keyword substrings. The first matching theme wins.
 - `activity_days.warm` is the exclusive upper bound for the `recent` bucket.
 - `activity_days.cold` is the exclusive upper bound for the `warm` bucket.
+- `comment_fetch_concurrency` bounds `--with-comments` fan-out when comment hydration is enabled.
+- `closed_issue_days` bounds the lookback window for `--with-closed-issues`.
+- `closed_issue_limit` caps how many recent closed issues are collected for snapshot v2 enrichment.
 - `stale_days` and `duplicate_threshold` are collected as config-as-data for downstream scripts (`triage-stale`, `triage-relate`); `triage-collect` does not apply them yet.
 
 ## Per-issue snapshot shape
@@ -33,11 +39,29 @@ Each entry in `snapshot.issues` has:
   "createdAt": "...",
   "updatedAt": "...",
   "milestone": "Backlog Triage MVP" | null,
+  "closing_prs": [{ "number": 87, "state": "MERGED", "mergedAt": "...", "url": "..." }],
+  "comments": [{ "author": "octocat", "body": "...", "createdAt": "..." }],
   "buckets": { "label": {...}, "theme": "...", "age": "...", "activity": "...", "milestone": "assigned" | "unassigned" }
 }
 ```
 
 `body` is always a string — empty (`""`) when `gh` returns null or the field is missing, never `undefined`. Downstream scripts (`triage-relate` today, and future `triage-stale` follow-ups if code-reference signals are added later) rely on body being present so they never need to re-fetch from `gh`.
+
+`closing_prs` is always present and defaults to `[]`. It comes from GraphQL `closedByPullRequestsReferences`, so downstream analysis can distinguish issues already covered by merged PRs without a second fetch.
+
+`comments` is optional and appears only when `triage-collect.js` runs with `--with-comments`. The default path stays at one GraphQL collection pass; comment hydration is an explicit cost/performance tradeoff.
+
+Snapshot v2 may also add a top-level `closed_issues` array when `--with-closed-issues` is enabled:
+
+```json
+{
+  "closed_issues": [
+    { "number": 55, "title": "...", "body": "...", "closedAt": "..." }
+  ]
+}
+```
+
+This enrichment is opt-in and bounded by `closed_issue_days` and `closed_issue_limit` so the default advisory loop remains cheap.
 
 ## Bucketing rules
 
