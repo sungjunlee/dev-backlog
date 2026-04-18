@@ -260,6 +260,41 @@ describe("fetchOpenIssues", () => {
     }]);
   });
 
+  it("uses defaultLimit without a GraphQL preflight when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 1 }, { number: 2 }]);
+    };
+
+    const issues = fetchOpenIssues({
+      repo: "sungjunlee/dev-backlog",
+      defaultLimit: 2147483647,
+      execFile,
+    });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        "2147483647",
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
   it("resolves the limit from GraphQL when limit is omitted", () => {
     const calls = [];
     const execFile = (command, args, options) => {

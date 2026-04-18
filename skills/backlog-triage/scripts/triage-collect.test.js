@@ -9,6 +9,7 @@ const {
   classifyIssue,
   collectSnapshot,
   formatSnapshotFilename,
+  TRIAGE_DEFAULT_FETCH_LIMIT,
 } = require("./triage-collect.js");
 
 const GENERATED = "2026-04-18T01:30:00.000Z";
@@ -273,5 +274,40 @@ describe("collectSnapshot", () => {
         "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
       ],
     });
+  });
+
+  it("uses a single gh issue list fetch when --limit is omitted", () => {
+    const calls = [];
+    const execFile = (command, args) => {
+      calls.push({ command, args });
+      if (command === "gh") return JSON.stringify([makeIssue()]);
+      throw new Error(`Unexpected command: ${command}`);
+    };
+
+    const result = collectSnapshot({
+      repo: "sungjunlee/dev-backlog",
+      dryRun: true,
+      execFile,
+      config: CONFIG,
+      generated: GENERATED,
+      snapshotDir,
+    });
+
+    assert.equal(result.snapshot.issues.length, 1);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        String(TRIAGE_DEFAULT_FETCH_LIMIT),
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+    }]);
   });
 });

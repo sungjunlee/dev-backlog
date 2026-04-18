@@ -204,12 +204,14 @@ function getOpenIssueCount({ repo, execFile = execFileSync } = {}) {
 /**
  * Fetch open GitHub issues via `gh issue list`.
  *
- * When `limit` is `undefined`, the helper first resolves the repository's
- * open-issue count via GraphQL and then uses that count as the list limit.
- * `execFile` is injectable so tests can stub `gh` without spawning a process.
+ * When `defaultLimit` is provided, the helper uses that limit directly to avoid
+ * a separate count fetch. Otherwise, omitted `limit` falls back to a GraphQL
+ * count lookup so callers can still fetch "all open issues" without choosing a
+ * cap themselves. `execFile` is injectable so tests can stub `gh` without
+ * spawning a process.
  */
-function fetchOpenIssues({ repo, limit, execFile = execFileSync } = {}) {
-  const resolvedLimit = limit ?? getOpenIssueCount({ repo, execFile });
+function fetchOpenIssues({ repo, limit, defaultLimit, execFile = execFileSync } = {}) {
+  const resolvedLimit = limit ?? defaultLimit ?? getOpenIssueCount({ repo, execFile });
   if (resolvedLimit === 0) return [];
 
   const args = ["issue", "list", "--state", "open", "--limit", String(resolvedLimit)];

@@ -10,6 +10,7 @@ const {
 
 const CONFIG_PATH = path.join("backlog", "triage-config.yml");
 const SNAPSHOT_DIR = path.join("backlog", "triage", ".cache");
+const TRIAGE_DEFAULT_FETCH_LIMIT = 2147483647;
 
 function parseLimitValue(value) {
   if (!/^\d+$/.test(value)) {
@@ -232,7 +233,12 @@ function collectSnapshot({
 } = {}) {
   const resolvedRepo = repo || detectRepo(execFile);
   const triageConfig = config || readTriageConfig("backlog");
-  const issues = fetchOpenIssues({ repo: resolvedRepo, limit, execFile });
+  const issues = fetchOpenIssues({
+    repo: resolvedRepo,
+    limit,
+    defaultLimit: TRIAGE_DEFAULT_FETCH_LIMIT,
+    execFile,
+  });
   const snapshot = buildSnapshot({
     issues,
     repo: resolvedRepo,
@@ -296,4 +302,5 @@ module.exports = {
   collectSnapshot,
   CONFIG_PATH,
   SNAPSHOT_DIR,
+  TRIAGE_DEFAULT_FETCH_LIMIT,
 };
