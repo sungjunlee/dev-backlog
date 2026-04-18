@@ -93,9 +93,17 @@ It classifies the open issue set, surfaces relationships, flags stale or obsolet
 Use it when the backlog needs cleanup before sprint planning, not when you are already executing an active sprint.
 
 ```bash
-node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-collect.js
-node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-report.js --snapshot backlog/triage/.cache/<ts>.json
-node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-apply.js backlog/triage/<date>-report.md --apply
+SKILL=/path/to/dev-backlog/skills/backlog-triage/scripts
+SNAP=backlog/triage/.cache/<ts>.json
+
+# Review phase (read-only): collect → analyze → render
+node $SKILL/triage-collect.js
+node $SKILL/triage-relate.js --snapshot $SNAP --json > /tmp/relate.json
+node $SKILL/triage-stale.js  --snapshot $SNAP --json > /tmp/stale.json
+node $SKILL/triage-report.js --snapshot $SNAP --relate /tmp/relate.json --stale /tmp/stale.json
+
+# Apply phase (opt-in): check proposals in the report, then
+node $SKILL/triage-apply.js backlog/triage/<date>-report.md --apply
 ```
 
 ### Manual fallback

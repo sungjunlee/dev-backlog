@@ -110,7 +110,9 @@ anchor + checkbox + rationale per item.
 Unplanned issues grouped into candidate next sprints.
 
 ## Apply Checklist
-Summary of every anchored action. This is the surface the apply step reads.
+Consolidated list of every anchored action for scan-and-check review. The apply step parses
+the whole report and dedupes by `(verb, issueNumber, normalizedArgs)` — this section and the
+source sections above both count as acceptance surfaces (see `references/apply.md`).
 ```
 
 ---
