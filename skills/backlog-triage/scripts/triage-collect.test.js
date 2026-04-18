@@ -36,22 +36,86 @@ function makeIssue(overrides = {}) {
   return {
     number: 61,
     title: "feat(backlog-triage): collect + classify open issues",
+    body: "Issue body",
     labels: [],
     createdAt: "2026-04-17T01:30:00.000Z",
     updatedAt: "2026-04-17T01:30:00.000Z",
     milestone: null,
+    closing_prs: [],
     ...overrides,
   };
 }
 
+function toGraphqlOpenIssue(issue) {
+  return {
+    number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt,
+    milestone: issue.milestone,
+    labels: {
+      nodes: (issue.labels || []).map((label) => (
+        typeof label === "string" ? { name: label } : { name: label.name }
+      )),
+    },
+    closedByPullRequestsReferences: {
+      nodes: (issue.closing_prs || []).map((pr) => ({
+        number: pr.number,
+        state: pr.state,
+        mergedAt: pr.mergedAt || null,
+        url: pr.url || null,
+      })),
+    },
+  };
+}
+
+function openIssuesPage(issues, pageInfo = { hasNextPage: false, endCursor: null }) {
+  return JSON.stringify({
+    data: {
+      repository: {
+        issues: {
+          nodes: issues.map(toGraphqlOpenIssue),
+          pageInfo,
+        },
+      },
+    },
+  });
+}
+
+function closedIssuesPage(issues, pageInfo = { hasNextPage: false, endCursor: null }) {
+  return JSON.stringify({
+    data: {
+      search: {
+        nodes: issues,
+        pageInfo,
+      },
+    },
+  });
+}
+
 describe("parseArgs", () => {
-  it("parses repo, limit, json, and dry-run flags", () => {
-    assert.deepEqual(parseArgs(["--repo", "owner/repo", "--limit", "3", "--json", "--dry-run"]), {
-      repo: "owner/repo",
-      limit: 3,
-      json: true,
-      dryRun: true,
-    });
+  it("parses repo, limit, comment/closed flags, json, and dry-run flags", () => {
+    assert.deepEqual(
+      parseArgs([
+        "--repo",
+        "owner/repo",
+        "--limit",
+        "3",
+        "--with-comments",
+        "--with-closed-issues",
+        "--json",
+        "--dry-run",
+      ]),
+      {
+        repo: "owner/repo",
+        limit: 3,
+        withComments: true,
+        withClosedIssues: true,
+        json: true,
+        dryRun: true,
+      }
+    );
   });
 
   it("rejects invalid repo and limit values", () => {
@@ -207,6 +271,18 @@ describe("classifyIssue", () => {
     assert.equal(withoutBody.body, "");
     assert.equal(nullBody.body, "");
   });
+
+  it("preserves closing_prs and comments for downstream snapshot v2 consumers", () => {
+    const comments = [{ author: "octocat", body: "Tracked in #73", createdAt: GENERATED }];
+    const closingPrs = [{ number: 120, state: "MERGED", mergedAt: GENERATED, url: "https://example.com/pr/120" }];
+    const issue = classifyIssue(makeIssue({ closing_prs: closingPrs, comments }), {
+      generated: GENERATED,
+      config: CONFIG,
+    });
+
+    assert.deepEqual(issue.closing_prs, closingPrs);
+    assert.deepEqual(issue.comments, comments);
+  });
 });
 
 describe("collectSnapshot", () => {
@@ -220,17 +296,20 @@ describe("collectSnapshot", () => {
     fs.rmSync(snapshotDir, { recursive: true, force: true });
   });
 
-  it("writes a canonical snapshot with an FS-safe filename", () => {
-    const execFile = () =>
-      JSON.stringify([
+  it("writes a canonical snapshot with an FS-safe filename", async () => {
+    const calls = [];
+    const execFile = (command, args) => {
+      calls.push({ command, args });
+      return openIssuesPage([
         makeIssue({
           number: 61,
           title: "OAuth token refresh flow",
           labels: [{ name: "type:feature" }],
         }),
       ]);
+    };
 
-    const result = collectSnapshot({
+    const result = await collectSnapshot({
       repo: "sungjunlee/dev-backlog",
       limit: 1,
       execFile,
@@ -248,12 +327,28 @@ describe("collectSnapshot", () => {
     assert.equal(written.repo, "sungjunlee/dev-backlog");
     assert.equal(written.config_path, "backlog/triage-config.yml");
     assert.equal(written.issues.length, 1);
+    assert.deepEqual(written.issues[0].closing_prs, []);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, "gh");
+    assert.deepEqual(calls[0].args.slice(0, 8), [
+      "api",
+      "graphql",
+      "-F",
+      "owner=sungjunlee",
+      "-F",
+      "name=dev-backlog",
+      "-F",
+      "pageSize=1",
+    ]);
+    assert.equal(calls[0].args[8], "-f");
+    assert.match(calls[0].args[9], /^query=\s*query\(/);
   });
 
-  it("honors dry-run by skipping all snapshot writes", () => {
-    const execFile = () => JSON.stringify([makeIssue()]);
+  it("honors dry-run by skipping all snapshot writes", async () => {
+    const execFile = () => openIssuesPage([makeIssue()]);
 
-    const result = collectSnapshot({
+    const result = await collectSnapshot({
       repo: "sungjunlee/dev-backlog",
       limit: 1,
       dryRun: true,
@@ -267,10 +362,10 @@ describe("collectSnapshot", () => {
     assert.deepEqual(fs.readdirSync(snapshotDir), []);
   });
 
-  it("excludes dev-backlog progress issues from the snapshot", () => {
-    const execFile = () => JSON.stringify(loadFixtureIssues());
+  it("excludes dev-backlog progress issues from the snapshot", async () => {
+    const execFile = () => openIssuesPage(loadFixtureIssues());
 
-    const result = collectSnapshot({
+    const result = await collectSnapshot({
       repo: "sungjunlee/dev-backlog",
       dryRun: true,
       execFile,
@@ -286,16 +381,16 @@ describe("collectSnapshot", () => {
     assert.equal(result.snapshot.issues[0].title, "fix(backlog-triage): preserve conventional commit prefixes in report titles");
   });
 
-  it("detects the default repo from git remote get-url origin when --repo is omitted", () => {
+  it("detects the default repo from git remote get-url origin when --repo is omitted", async () => {
     const calls = [];
     const execFile = (command, args) => {
       calls.push({ command, args });
       if (command === "git") return "git@github.com:sungjunlee/dev-backlog.git\n";
-      if (command === "gh") return JSON.stringify([makeIssue()]);
+      if (command === "gh") return openIssuesPage([makeIssue()]);
       throw new Error(`Unexpected command: ${command}`);
     };
 
-    const result = collectSnapshot({
+    const result = await collectSnapshot({
       limit: 1,
       dryRun: true,
       execFile,
@@ -306,32 +401,25 @@ describe("collectSnapshot", () => {
 
     assert.equal(result.snapshot.repo, "sungjunlee/dev-backlog");
     assert.equal(calls[0].command, "git");
-    assert.deepEqual(calls[1], {
-      command: "gh",
-      args: [
-        "issue",
-        "list",
-        "--state",
-        "open",
-        "--limit",
-        "1",
-        "--repo",
-        "sungjunlee/dev-backlog",
-        "--json",
-        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
-      ],
-    });
+    assert.deepEqual(calls[0].args, ["remote", "get-url", "origin"]);
+    assert.equal(calls[1].command, "gh");
+    assert.equal(calls[1].args[0], "api");
+    assert.equal(calls[1].args[1], "graphql");
+    assert.ok(calls[1].args.includes("owner=sungjunlee"));
+    assert.ok(calls[1].args.includes("name=dev-backlog"));
+    assert.ok(calls[1].args.includes("pageSize=1"));
+    assert.equal(calls[1].args.includes("--paginate"), false);
   });
 
-  it("uses a single gh issue list fetch when --limit is omitted", () => {
+  it("uses a single paginated gh graphql fetch when --limit is omitted", async () => {
     const calls = [];
     const execFile = (command, args) => {
       calls.push({ command, args });
-      if (command === "gh") return JSON.stringify([makeIssue()]);
+      if (command === "gh") return openIssuesPage([makeIssue()]);
       throw new Error(`Unexpected command: ${command}`);
     };
 
-    const result = collectSnapshot({
+    const result = await collectSnapshot({
       repo: "sungjunlee/dev-backlog",
       dryRun: true,
       execFile,
@@ -341,20 +429,150 @@ describe("collectSnapshot", () => {
     });
 
     assert.equal(result.snapshot.issues.length, 1);
-    assert.deepEqual(calls, [{
-      command: "gh",
-      args: [
-        "issue",
-        "list",
-        "--state",
-        "open",
-        "--limit",
-        String(TRIAGE_DEFAULT_FETCH_LIMIT),
-        "--repo",
-        "sungjunlee/dev-backlog",
-        "--json",
-        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
-      ],
-    }]);
+    assert.equal(TRIAGE_DEFAULT_FETCH_LIMIT, 2147483647);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, "gh");
+    assert.deepEqual(calls[0].args.slice(0, 8), [
+      "api",
+      "graphql",
+      "-F",
+      "owner=sungjunlee",
+      "-F",
+      "name=dev-backlog",
+      "-F",
+      "pageSize=100",
+    ]);
+    assert.equal(calls[0].args[8], "-f");
+    assert.match(calls[0].args[9], /^query=\s*query\(/);
+    assert.equal(calls[0].args[10], "--paginate");
+  });
+
+  it("adds normalized comments only when --with-comments is enabled", async () => {
+    const calls = [];
+    const execFile = (command, args) => {
+      calls.push({ command, args });
+      if (command !== "gh") throw new Error(`Unexpected command: ${command}`);
+
+      if (args[0] === "api" && args[1] === "graphql") {
+        return openIssuesPage([
+          makeIssue({ number: 61 }),
+          makeIssue({
+            number: 78,
+            title: "Progress: April 2026",
+            body: "<!-- dev-backlog:progress-issue month=2026-04 -->",
+          }),
+        ]);
+      }
+
+      if (args[0] === "api" && args[1] === "repos/sungjunlee/dev-backlog/issues/61/comments") {
+        return JSON.stringify([
+          {
+            user: { login: "octocat" },
+            body: "Looks good",
+            created_at: GENERATED,
+          },
+        ]);
+      }
+
+      throw new Error(`Unexpected gh args: ${args.join(" ")}`);
+    };
+
+    const result = await collectSnapshot({
+      repo: "sungjunlee/dev-backlog",
+      dryRun: true,
+      withComments: true,
+      execFile,
+      config: { ...CONFIG, comment_fetch_concurrency: 3 },
+      generated: GENERATED,
+      snapshotDir,
+    });
+
+    assert.deepEqual(result.snapshot.issues, [
+      {
+        number: 61,
+        title: "feat(backlog-triage): collect + classify open issues",
+        body: "Issue body",
+        labels: [],
+        createdAt: "2026-04-17T01:30:00.000Z",
+        updatedAt: "2026-04-17T01:30:00.000Z",
+        milestone: null,
+        closing_prs: [],
+        comments: [{ author: "octocat", body: "Looks good", createdAt: GENERATED }],
+        buckets: {
+          label: { type: "uncategorized", priority: "medium", status: "todo" },
+          theme: "uncategorized",
+          age: "<7d",
+          activity: "recent",
+          milestone: "unassigned",
+        },
+      },
+    ]);
+    assert.deepEqual(result.warnings, [
+      "--with-comments enabled: fetching issue comments adds 1 gh API calls (concurrency 3).",
+    ]);
+    assert.equal(
+      calls.filter((call) => call.args[1] === "repos/sungjunlee/dev-backlog/issues/61/comments").length,
+      1
+    );
+    assert.equal(
+      calls.some((call) => call.args[1] === "repos/sungjunlee/dev-backlog/issues/78/comments"),
+      false
+    );
+  });
+
+  it("adds top-level closed_issues only when --with-closed-issues is enabled", async () => {
+    const calls = [];
+    const execFile = (command, args) => {
+      calls.push({ command, args });
+      if (command !== "gh") throw new Error(`Unexpected command: ${command}`);
+
+      if (args[0] === "api" && args[1] === "graphql" && args.includes("owner=sungjunlee")) {
+        return openIssuesPage([makeIssue()]);
+      }
+
+      if (args[0] === "api" && args[1] === "graphql" && args.some((arg) => arg.startsWith("searchQuery="))) {
+        return closedIssuesPage([
+          {
+            number: 55,
+            title: "Old triage follow-up",
+            body: "Closed via follow-up PR",
+            closedAt: "2026-04-10T00:00:00Z",
+          },
+        ]);
+      }
+
+      throw new Error(`Unexpected gh args: ${args.join(" ")}`);
+    };
+
+    const result = await collectSnapshot({
+      repo: "sungjunlee/dev-backlog",
+      dryRun: true,
+      withClosedIssues: true,
+      execFile,
+      config: {
+        ...CONFIG,
+        closed_issue_days: 30,
+        closed_issue_limit: 2,
+      },
+      generated: GENERATED,
+      snapshotDir,
+    });
+
+    assert.deepEqual(result.snapshot.closed_issues, [
+      {
+        number: 55,
+        title: "Old triage follow-up",
+        body: "Closed via follow-up PR",
+        closedAt: "2026-04-10T00:00:00Z",
+      },
+    ]);
+
+    const searchCall = calls.find((call) => call.args.some((arg) => arg.startsWith("searchQuery=")));
+    assert.ok(searchCall);
+    assert.ok(
+      searchCall.args.includes("searchQuery=repo:sungjunlee/dev-backlog is:issue is:closed closed:>=2026-03-19")
+    );
+    assert.ok(searchCall.args.includes("pageSize=2"));
+    assert.equal(searchCall.args.includes("--paginate"), false);
   });
 });
