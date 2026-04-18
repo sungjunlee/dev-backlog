@@ -580,7 +580,7 @@ function renderMilestoneSuggestions(actions) {
 function renderApplyChecklist(actions) {
   const lines = [
     "## Apply Checklist",
-    "Anchored surface the apply step (#65) reads. Each entry is the anchor+checkbox pair; flip `[ ]` → `[x]` to accept.",
+    "Consolidated list of every anchored action for scan-and-check review. Flip `[ ]` → `[x]` to accept. The apply step parses the whole report and dedupes — a checkbox in *any* location carrying the anchor accepts the action.",
   ];
 
   if (actions.length === 0) {
