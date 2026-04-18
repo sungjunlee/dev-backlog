@@ -37,9 +37,10 @@ Every script in this phase is read-only. Running any number of times is safe. Th
 Humans review the report and mark accepted proposals (flip `[ ]` → `[x]`). Then:
 
 ```bash
-node scripts/triage-apply.js backlog/triage/YYYY-MM-DD-report.md               # dry-run
-node scripts/triage-apply.js backlog/triage/YYYY-MM-DD-report.md --apply       # with confirmation
-node scripts/triage-apply.js backlog/triage/YYYY-MM-DD-report.md --apply --yes # CI-safe
+# Run from the target project root; scripts live under ${CLAUDE_SKILL_DIR}/scripts/.
+node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md               # dry-run
+node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply       # with confirmation
+node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply --yes # CI-safe
 ```
 
 Default is **dry-run**. `--apply` requires confirmation unless `--yes`. Idempotent: re-running after a partial apply emits `already-applied` log entries for actions already executed.
