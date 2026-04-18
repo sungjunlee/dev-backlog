@@ -7,6 +7,7 @@ const {
   fetchOpenIssues,
   readTriageConfig,
 } = require("../../dev-backlog/scripts/lib");
+const { parseMarkerMonth } = require("../../dev-backlog/scripts/progress-sync-render");
 
 const CONFIG_PATH = path.join("backlog", "triage-config.yml");
 const SNAPSHOT_DIR = path.join("backlog", "triage", ".cache");
@@ -201,12 +202,18 @@ function classifyIssue(issue, { generated, config }) {
   };
 }
 
+function isProgressIssue(issue) {
+  return parseMarkerMonth(issue?.body) !== null;
+}
+
 function buildSnapshot({ issues, repo, generated, configPath = CONFIG_PATH, config }) {
   return {
     generated,
     repo,
     config_path: configPath,
-    issues: issues.map((issue) => classifyIssue(issue, { generated, config })),
+    issues: issues
+      .filter((issue) => !isProgressIssue(issue))
+      .map((issue) => classifyIssue(issue, { generated, config })),
   };
 }
 
@@ -297,6 +304,7 @@ module.exports = {
   classifyAge,
   classifyActivity,
   classifyIssue,
+  isProgressIssue,
   buildSnapshot,
   formatSnapshotFilename,
   writeSnapshot,

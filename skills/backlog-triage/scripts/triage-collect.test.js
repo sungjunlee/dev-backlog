@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+
 const {
   parseArgs,
   parseRepoFromRemoteUrl,
@@ -13,6 +14,7 @@ const {
 } = require("./triage-collect.js");
 
 const GENERATED = "2026-04-18T01:30:00.000Z";
+const FIXTURE_PATH = path.join(__dirname, "__fixtures__", "triage-collect", "open-issues.json");
 const CONFIG = {
   theme_keywords: {
     auth: ["auth", "oauth", "token"],
@@ -25,6 +27,10 @@ const CONFIG = {
   stale_days: 60,
   duplicate_threshold: 0.75,
 };
+
+function loadFixtureIssues() {
+  return JSON.parse(fs.readFileSync(FIXTURE_PATH, "utf-8"));
+}
 
 function makeIssue(overrides = {}) {
   return {
@@ -259,6 +265,25 @@ describe("collectSnapshot", () => {
 
     assert.equal(result.snapshotPath, null);
     assert.deepEqual(fs.readdirSync(snapshotDir), []);
+  });
+
+  it("excludes dev-backlog progress issues from the snapshot", () => {
+    const execFile = () => JSON.stringify(loadFixtureIssues());
+
+    const result = collectSnapshot({
+      repo: "sungjunlee/dev-backlog",
+      dryRun: true,
+      execFile,
+      config: CONFIG,
+      generated: GENERATED,
+      snapshotDir,
+    });
+
+    assert.deepEqual(
+      result.snapshot.issues.map((issue) => issue.number),
+      [79]
+    );
+    assert.equal(result.snapshot.issues[0].title, "fix(backlog-triage): preserve conventional commit prefixes in report titles");
   });
 
   it("detects the default repo from git remote get-url origin when --repo is omitted", () => {

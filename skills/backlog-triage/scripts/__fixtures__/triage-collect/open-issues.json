@@ -1,0 +1,25 @@
+[
+  {
+    "number": 78,
+    "title": "fix(backlog-triage): exclude progress issues from open-issue snapshot",
+    "body": "<!-- dev-backlog:progress-issue month=2026-04 -->\n\n# Progress: April 2026",
+    "labels": [
+      { "name": "type:chore" }
+    ],
+    "createdAt": "2026-04-01T00:00:00.000Z",
+    "updatedAt": "2026-04-18T00:00:00.000Z",
+    "milestone": null
+  },
+  {
+    "number": 79,
+    "title": "fix(backlog-triage): preserve conventional commit prefixes in report titles",
+    "body": "Normal issue body",
+    "labels": [
+      { "name": "type:bug" },
+      { "name": "priority:high" }
+    ],
+    "createdAt": "2026-04-10T00:00:00.000Z",
+    "updatedAt": "2026-04-18T00:00:00.000Z",
+    "milestone": null
+  }
+]
