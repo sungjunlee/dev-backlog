@@ -121,10 +121,15 @@ The apply step in #65 is responsible for:
 
 ## Report Boundaries
 
-The triage report must contain triage anchors only in actionable proposal sections. The current renderer emits actionable anchors in:
+The renderer emits anchor+checkbox pairs in four sections:
 
-- `## Obsolete Candidates`
-- `## Priority Proposals`
-- `## Milestone Suggestions`
+- `## Obsolete Candidates` — source section with evidence sub-bullet
+- `## Priority Proposals` — source section with rationale
+- `## Milestone Suggestions` — source section grouped by sprint/cluster
+- `## Apply Checklist` — flattened summary; this is the surface the apply step (#65) reads
 
-The flattened `## Apply Checklist` is a human summary of all emitted proposals. It should stay in sync with the actionable sections, but the authoritative machine contract is still the anchor line plus its paired checkbox.
+Every proposal emitted in a source section is re-emitted in `## Apply Checklist` as an anchor+checkbox pair so #65 has a single, stable surface to parse without needing to know the source-section layout. This is intentional duplication — the same action anchor appears twice in the report.
+
+### Deduplication rule for the apply step
+
+Because the same action anchor appears in both its source section and the Apply Checklist, #65 must deduplicate by the tuple `(verb, issueNumber, normalizedArgs)` before executing. A user may check the box in either location to accept the action; #65 accepts the action when the box is checked in *any* location carrying that anchor.

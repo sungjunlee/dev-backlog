@@ -357,6 +357,19 @@ describe("triage-report integration chain", () => {
       assert.match(obsoleteBlock, anchorRegex, `expected evidence line for obsolete #${issueNumber}`);
     }
 
+    // Apply Checklist is the surface #65 reads — every entry must be an anchor+checkbox pair,
+    // not a plain bullet. Plain bullets downgrade the cross-step contract.
+    const applyBlock = markdown.split(/^##\s+Apply Checklist/m)[1] || "";
+    const applyAnchors = [...applyBlock.matchAll(/<!--\s*triage:[\w-]+\s+#\d+[^>]*-->/g)];
+    assert.ok(
+      applyAnchors.length >= 3,
+      `Apply Checklist must carry anchored checkbox pairs for #65 — found ${applyAnchors.length} anchors`
+    );
+    for (const anchor of applyAnchors) {
+      const tail = applyBlock.slice(anchor.index + anchor[0].length);
+      assert.match(tail, /^\s*\n?\s*-\s+\[[ x]\]\s+/, `expected checkbox after Apply Checklist anchor: ${anchor[0]}`);
+    }
+
     const lines = markdown.split(/\r?\n/);
     const anchorLines = lines
       .map((line, index) => ({ line, index }))

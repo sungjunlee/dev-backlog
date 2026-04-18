@@ -578,20 +578,27 @@ function renderMilestoneSuggestions(actions) {
 }
 
 function renderApplyChecklist(actions) {
-  const lines = ["## Apply Checklist"];
+  const lines = [
+    "## Apply Checklist",
+    "Anchored surface the apply step (#65) reads. Each entry is the anchor+checkbox pair; flip `[ ]` → `[x]` to accept.",
+  ];
 
   if (actions.length === 0) {
-    lines.push("_(none)_");
+    lines.push("", "_(none)_");
     return lines.join("\n");
   }
 
+  lines.push("");
   for (const action of actions) {
     const sectionName =
       action.section === "obsolete" ? "Obsolete Candidates" :
       action.section === "priority" ? "Priority Proposals" :
       "Milestone Suggestions";
-    lines.push(`- ${action.summary} (${sectionName})`);
+    lines.push(formatAnchor(action));
+    lines.push(`- [ ] ${action.summary} _(from ${sectionName})_`);
+    lines.push("");
   }
+  if (lines[lines.length - 1] === "") lines.pop();
 
   return lines.join("\n");
 }
