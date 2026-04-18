@@ -187,6 +187,23 @@ describe("findDuplicateCandidates", () => {
       },
     ]);
   });
+
+  it("duplicate-candidate: does not crash on titles that tokenize to the empty set", () => {
+    // Single-character / stopword-only titles produce zero tokens via tokenizeTitle's length>1 filter.
+    // Regression test — previously jaccardSimilarity returned scalar 0 on empty union and the caller crashed on similarity.overlap.length.
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, title: "A" }),
+        makeIssue({ number: 200, title: "B" }),
+      ],
+    });
+
+    assert.doesNotThrow(() =>
+      findDuplicateCandidates(snapshot, { duplicate_threshold: 0.0 })
+    );
+    // Zero tokens → zero overlap → no duplicate-candidate edge emitted.
+    assert.deepEqual(findDuplicateCandidates(snapshot, { duplicate_threshold: 0.0 }), []);
+  });
 });
 
 describe("analyzeSnapshot", () => {

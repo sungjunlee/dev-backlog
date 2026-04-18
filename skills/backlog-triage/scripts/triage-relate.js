@@ -253,7 +253,7 @@ function jaccardSimilarity(left, right) {
   const leftTokens = [...left];
   const rightTokens = [...right];
   const union = new Set([...leftTokens, ...rightTokens]);
-  if (union.size === 0) return 0;
+  if (union.size === 0) return { score: 0, overlap: [] };
 
   const overlap = leftTokens.filter((token) => right.has(token));
   return {
