@@ -163,8 +163,10 @@ function issueRef(issue) {
 
 function shortText(text, maxLength = 140) {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1)}…`;
+  const stripped = normalized.replace(/^[a-z]+(\([^)]*\))?!?:\s*/i, "");
+  const displayText = stripped || normalized;
+  if (displayText.length <= maxLength) return displayText;
+  return `${displayText.slice(0, maxLength - 1)}…`;
 }
 
 function buildIssueIndex(snapshot) {

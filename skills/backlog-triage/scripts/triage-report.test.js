@@ -233,6 +233,37 @@ describe("renderer helpers", () => {
     assert.match(markdown, /## Relationships[\s\S]*_\(no input provided\)_/);
     assert.match(markdown, /## Obsolete Candidates[\s\S]*_\(no input provided\)_/);
   });
+
+  it("strips conventional-commit prefixes before truncating issue titles in classification tables", () => {
+    const snapshot = makeSnapshot();
+    snapshot.issues.push({
+      number: 107,
+      title: "feat(foo): the important part is here because the keyword should stay visible in the table",
+      body: "Long title regression case.",
+      labels: ["type:feature"],
+      createdAt: "2026-04-12T01:30:00.000Z",
+      updatedAt: "2026-04-17T01:30:00.000Z",
+      milestone: null,
+      buckets: {
+        label: { type: "feature", priority: "medium", status: "todo" },
+        theme: "auth",
+        age: "7-30d",
+        activity: "recent",
+        milestone: "unassigned",
+      },
+    });
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+    });
+
+    const markdown = renderReport(model);
+    assert.match(markdown, /#107 the important part is here because the keyword /);
+    assert.doesNotMatch(markdown, /#107 feat\(foo\):/);
+  });
 });
 
 describe("triage-report integration chain", () => {
