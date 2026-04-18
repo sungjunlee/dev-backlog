@@ -167,12 +167,18 @@ function dedupeEdges(edges) {
   });
 }
 
+function snapshotIssueNumbers(snapshot) {
+  return new Set(snapshot.issues.map((issue) => issue.number));
+}
+
 function scanMentions(snapshot) {
   const edges = [];
+  const openNumbers = snapshotIssueNumbers(snapshot);
 
   for (const issue of snapshot.issues) {
     for (const ref of extractIssueRefs(issue.body)) {
       if (issue.number === ref.number) continue;
+      if (!openNumbers.has(ref.number)) continue;
       edges.push(
         makeEdge({
           from: issue.number,
@@ -193,6 +199,7 @@ function scanMentions(snapshot) {
 
 function scanPhraseEdges(snapshot, patterns, kind, confidence) {
   const edges = [];
+  const openNumbers = snapshotIssueNumbers(snapshot);
 
   for (const issue of snapshot.issues) {
     const source = typeof issue.body === "string" ? issue.body : "";
@@ -207,6 +214,7 @@ function scanPhraseEdges(snapshot, patterns, kind, confidence) {
 
         const target = Number(match[1]);
         if (issue.number === target) continue;
+        if (!openNumbers.has(target)) continue;
 
         edges.push(
           makeEdge({

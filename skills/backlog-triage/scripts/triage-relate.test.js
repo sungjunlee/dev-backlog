@@ -92,6 +92,7 @@ describe("scanMentions", () => {
             "Reminder #100 should stay local.",
           ].join("\n"),
         }),
+        makeIssue({ number: 101, body: "" }),
       ],
     });
 
@@ -108,6 +109,20 @@ describe("scanMentions", () => {
       },
     ]);
   });
+
+  it("mentions: drops refs to issues not present in the snapshot (closed / unrelated)", () => {
+    // Regression: edges must never point at issue numbers outside snapshot.issues.
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, body: "See #999 for history and #101 for follow-up." }),
+        makeIssue({ number: 101, body: "" }),
+      ],
+    });
+
+    const edges = scanMentions(snapshot);
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].to, 101);
+  });
 });
 
 describe("scanBlocks", () => {
@@ -118,6 +133,8 @@ describe("scanBlocks", () => {
           number: 100,
           body: "Blocks #101 until the token flow lands. Later it closes #102 cleanly.",
         }),
+        makeIssue({ number: 101, body: "" }),
+        makeIssue({ number: 102, body: "" }),
       ],
     });
 
@@ -132,6 +149,19 @@ describe("scanBlocks", () => {
     assert.match(edges[0].evidence.snippet, /Blocks #101/);
     assert.match(edges[1].evidence.snippet, /closes #102/);
   });
+
+  it("blocks: drops phrases targeting issues absent from the snapshot", () => {
+    // Regression: `Blocks #999` must not emit an edge if #999 is not in snapshot.issues.
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, body: "Blocks #999. Also blocks #101." }),
+        makeIssue({ number: 101, body: "" }),
+      ],
+    });
+    const edges = scanBlocks(snapshot);
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].to, 101);
+  });
 });
 
 describe("scanDependsOn", () => {
@@ -142,6 +172,9 @@ describe("scanDependsOn", () => {
           number: 101,
           body: "Blocked by #100 today. Then depends on #102 and depends-on #103 later.",
         }),
+        makeIssue({ number: 100, body: "" }),
+        makeIssue({ number: 102, body: "" }),
+        makeIssue({ number: 103, body: "" }),
       ],
     });
 
