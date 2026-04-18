@@ -4,12 +4,14 @@ argument-hint: "[orient|plan|work|next|sync] [issue-number]"
 description: Manage development work through GitHub Issues + local sprint files. Issues/Milestones are the source of truth; local sprint files handle execution — batching, ordering, context, and progress. Use for creating issues, planning sprints, checking what to work on, reviewing progress, syncing with GitHub, managing milestones, backlog, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
-  related-skills: "relay, relay-plan, relay-dispatch, relay-review, relay-merge"
+  related-skills: "backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
 
 # Dev Backlog
 
 README covers install and human quick start. This skill file is the execution contract for agents: file roles, sprint structure, process, and script behavior.
+
+Related skill: [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
 
 Two layers, each with a clear job:
 
@@ -214,6 +216,7 @@ Full process details: `references/process.md` (Orient, Create, Plan, Work, Compl
 - `references/github-sync.md` — `gh` CLI patterns: label setup, milestone management, sync commands
 - `references/workflow-patterns.md` — Sprint planning, bug triage, feature breakdown, retrospective
 - `references/integration-contract.md` — dev-relay ↔ dev-backlog interop surface: file paths, sections, regex patterns
+- [`../backlog-triage/SKILL.md`](../backlog-triage/SKILL.md) — sibling skill for weekly backlog review before sprint planning
 
 ## Scripts (deterministic, no LLM needed)
 

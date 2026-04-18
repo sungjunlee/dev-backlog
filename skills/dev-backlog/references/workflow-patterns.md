@@ -87,13 +87,34 @@ Quick workflow for incoming bugs:
 
 ## Backlog Review
 
-Weekly or bi-weekly cleanup:
+For weekly or bi-weekly grooming, use the [`backlog-triage`](../../backlog-triage/SKILL.md) skill.
+
+It classifies the open issue set, surfaces relationships, flags stale or obsolete candidates, and proposes priority or milestone updates in one reviewable report.
+Use it when the backlog needs cleanup before sprint planning, not when you are already executing an active sprint.
+
+```bash
+SKILL=/path/to/dev-backlog/skills/backlog-triage/scripts
+SNAP=backlog/triage/.cache/<ts>.json
+
+# Review phase (read-only): collect → analyze → render
+node $SKILL/triage-collect.js
+node $SKILL/triage-relate.js --snapshot $SNAP --json > /tmp/relate.json
+node $SKILL/triage-stale.js  --snapshot $SNAP --json > /tmp/stale.json
+node $SKILL/triage-report.js --snapshot $SNAP --relate /tmp/relate.json --stale /tmp/stale.json
+
+# Apply phase (opt-in): check proposals in the report, then
+node $SKILL/triage-apply.js backlog/triage/<date>-report.md --apply
+```
+
+### Manual fallback
+
+Use this when the sibling skill is not installed and you need a plain `gh`-only review:
 
 1. `gh issue list --state open` — scan all open issues
 2. Close stale: `gh issue close <N> -c "No longer relevant"`
 3. Re-prioritize: adjust priority labels
 4. Check `status:blocked` — blocker resolved?
-5. Assign unplanned issues to upcoming milestone
+5. Assign unplanned issues to an upcoming milestone
 
 ```bash
 # Issues without milestone (unplanned)
