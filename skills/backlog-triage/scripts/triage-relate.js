@@ -301,11 +301,6 @@ function findDuplicateCandidates(snapshot, config = readTriageConfig("backlog"))
   return dedupeEdges(edges);
 }
 
-function findMergedPullRequestLinks() {
-  // TODO(#62): wire PR linkage once closing-PR metadata exists in the snapshot.
-  return [];
-}
-
 function compareEdges(left, right) {
   return left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind);
 }
@@ -369,7 +364,6 @@ function analyzeSnapshot(snapshot, { config = readTriageConfig(resolveBacklogDir
     ...scanBlocks(snapshot),
     ...scanDependsOn(snapshot),
     ...findDuplicateCandidates(snapshot, config),
-    ...findMergedPullRequestLinks(snapshot, config),
   ]);
 }
 

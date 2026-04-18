@@ -65,7 +65,7 @@ describe("extractIssueRefs", () => {
       "```md",
       "Blocked by #102",
       "```",
-      "Reference: https://github.com/owner/name/pull/123#issuecomment-456",
+      "Reference: https://github.com/owner/name/pull/123/files#diff-1",
       "Self note #100",
     ].join("\n"));
 
@@ -88,7 +88,7 @@ describe("scanMentions", () => {
             "```js",
             "const hidden = '#102';",
             "```",
-            "https://github.com/owner/name/pull/123#issuecomment-456",
+            "https://github.com/owner/name/pull/123/files#diff-1",
             "Reminder #100 should stay local.",
           ].join("\n"),
         }),
@@ -271,7 +271,7 @@ describe("analyzeSnapshot", () => {
     );
   });
 
-  it("reads fixture snapshots from disk and errors on malformed JSON", () => {
+  it("reads fixture snapshots from disk and errors on missing or malformed JSON", () => {
     process.chdir(tempDir);
 
     const snapshotPath = path.join(tempDir, "snapshot.json");
@@ -279,6 +279,11 @@ describe("analyzeSnapshot", () => {
 
     const snapshot = readSnapshotFile(snapshotPath);
     assert.equal(snapshot.issues[0].number, 100);
+
+    assert.throws(
+      () => readSnapshotFile(path.join(tempDir, "missing.json")),
+      /Snapshot file is missing or unreadable/
+    );
 
     const badPath = path.join(tempDir, "bad.json");
     fs.writeFileSync(badPath, "not json\n");
