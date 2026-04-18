@@ -173,6 +173,21 @@ The `[~]` state makes in-flight work visible to everyone, and `Running Context` 
 
 The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
 
+## Backlog Triage (sibling skill)
+
+`dev-backlog` runs the sprint. [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the open-issue pile that feeds into it — classification, relationships, stale / obsolete flags, priority proposals. It produces one markdown report under `backlog/triage/YYYY-MM-DD-report.md` that you review, check accepted proposals on, and apply behind an explicit `--apply`.
+
+```bash
+# Review phase (read-only, default)
+node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-collect.js
+node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-report.js --snapshot backlog/triage/.cache/<ts>.json
+
+# Apply phase (opt-in)
+node /path/to/dev-backlog/skills/backlog-triage/scripts/triage-apply.js backlog/triage/<date>-report.md --apply
+```
+
+Use `dev-backlog` when you know what to work on; use `backlog-triage` when the open-issue list has grown faster than your attention.
+
 ## Script Entry Points
 
 All deterministic helpers live under `skills/dev-backlog/scripts/`.
@@ -253,6 +268,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 - [GitHub sync patterns](skills/dev-backlog/references/github-sync.md)
 - [Workflow patterns](skills/dev-backlog/references/workflow-patterns.md)
 - [dev-relay integration contract](skills/dev-backlog/references/integration-contract.md)
+- [Backlog triage (sibling skill)](skills/backlog-triage/SKILL.md)
 
 ## Contributing
 
