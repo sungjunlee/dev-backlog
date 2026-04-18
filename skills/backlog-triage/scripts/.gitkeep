@@ -1,0 +1,8 @@
+Scripts land here — tracked under:
+  triage-collect.js  → #61
+  triage-relate.js   → #62
+  triage-stale.js    → #63
+  triage-report.js   → #64
+  triage-apply.js    → #65
+
+See ../SKILL.md for the full contract each script must honor.
