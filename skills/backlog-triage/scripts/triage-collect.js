@@ -186,6 +186,7 @@ function classifyIssue(issue, { generated, config }) {
   return {
     number: issue.number,
     title: issue.title,
+    body: typeof issue.body === "string" ? issue.body : "",
     labels,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
