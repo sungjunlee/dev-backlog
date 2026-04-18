@@ -37,7 +37,7 @@ Each entry in `snapshot.issues` has:
 }
 ```
 
-`body` is always a string — empty (`""`) when `gh` returns null or the field is missing, never `undefined`. Downstream scripts (`triage-relate` for mention / blocks / depends-on scans, `triage-stale` for referenced-code-removed signal) rely on body being present so they never need to re-fetch from `gh`.
+`body` is always a string — empty (`""`) when `gh` returns null or the field is missing, never `undefined`. Downstream scripts (`triage-relate` today, and future `triage-stale` follow-ups if code-reference signals are added later) rely on body being present so they never need to re-fetch from `gh`.
 
 ## Bucketing rules
 
