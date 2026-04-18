@@ -20,6 +20,25 @@ duplicate_threshold: 0.75
 - `activity_days.cold` is the exclusive upper bound for the `warm` bucket.
 - `stale_days` and `duplicate_threshold` are collected as config-as-data for downstream scripts (`triage-stale`, `triage-relate`); `triage-collect` does not apply them yet.
 
+## Per-issue snapshot shape
+
+Each entry in `snapshot.issues` has:
+
+```json
+{
+  "number": 61,
+  "title": "...",
+  "body": "...",
+  "labels": ["..."],
+  "createdAt": "...",
+  "updatedAt": "...",
+  "milestone": "Backlog Triage MVP" | null,
+  "buckets": { "label": {...}, "theme": "...", "age": "...", "activity": "...", "milestone": "assigned" | "unassigned" }
+}
+```
+
+`body` is always a string — empty (`""`) when `gh` returns null or the field is missing, never `undefined`. Downstream scripts (`triage-relate` for mention / blocks / depends-on scans, `triage-stale` for referenced-code-removed signal) rely on body being present so they never need to re-fetch from `gh`.
+
 ## Bucketing rules
 
 ### Label bucket

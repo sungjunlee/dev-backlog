@@ -179,6 +179,28 @@ describe("classifyIssue", () => {
       status: "in-progress",
     });
   });
+
+  it("passes through a populated body for downstream consumers (#62/#63 body-scan signals)", () => {
+    const body = "Blocks #42\n\nSee https://example.com for context.";
+    const issue = classifyIssue(makeIssue({ body }), {
+      generated: GENERATED,
+      config: CONFIG,
+    });
+    assert.equal(issue.body, body);
+  });
+
+  it("emits empty-string body when gh returns undefined or null (never undefined in snapshot)", () => {
+    const withoutBody = classifyIssue(makeIssue({ body: undefined }), {
+      generated: GENERATED,
+      config: CONFIG,
+    });
+    const nullBody = classifyIssue(makeIssue({ body: null }), {
+      generated: GENERATED,
+      config: CONFIG,
+    });
+    assert.equal(withoutBody.body, "");
+    assert.equal(nullBody.body, "");
+  });
 });
 
 describe("collectSnapshot", () => {
