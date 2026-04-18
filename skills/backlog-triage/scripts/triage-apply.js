@@ -278,7 +278,7 @@ function toGhCommands(action, context = {}) {
     case "close-duplicate":
       return [
         ["issue", "comment", issue, "-b", formatDuplicateComment(args.target, args.reason)],
-        ["issue", "close", issue, "-r", "not_planned"],
+        ["issue", "close", issue, "-r", "not planned"],
       ];
     case "set-priority":
       if (Array.isArray(context.currentPriorityLabels)) {

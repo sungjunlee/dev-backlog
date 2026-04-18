@@ -166,7 +166,7 @@ describe("toGhCommands", () => {
       }),
       [
         ["issue", "comment", "103", "-b", "Duplicate of #101. duplicate candidate converged"],
-        ["issue", "close", "103", "-r", "not_planned"],
+        ["issue", "close", "103", "-r", "not planned"],
       ]
     );
 
@@ -230,7 +230,7 @@ describe("execute", () => {
 
     assert.match(stdout, /DRY-RUN: gh issue comment 104/);
     assert.match(stdout, /DRY-RUN: gh issue view 101 --json labels/);
-    assert.match(stdout, /DRY-RUN: gh issue close 103 -r not_planned/);
+    assert.match(stdout, /DRY-RUN: gh issue close 103 -r 'not planned'/);
     assert.match(stdout, /SKIP: triage:future-action #999 \(unknown verb\)/);
     assert.match(stdout, /Summary: dry-run=4, applied=0, already-applied=0, skipped-pending=0, skipped-unknown-verb=1/);
   });
@@ -325,7 +325,7 @@ describe("execute", () => {
       ["issue", "view", "101", "--json", "labels"],
       ["issue", "edit", "101", "--add-label", "priority:high", "--remove-label", "priority:medium"],
       ["issue", "edit", "102", "--milestone", "Sprint W17"],
-      ["issue", "close", "103", "-r", "not_planned"],
+      ["issue", "close", "103", "-r", "not planned"],
     ]);
 
     const entries = fs
