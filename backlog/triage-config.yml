@@ -1,0 +1,8 @@
+theme_keywords:
+  auth: [auth, oauth, token, session]
+  docs: [docs, readme, guide]
+activity_days:
+  warm: 14
+  cold: 60
+stale_days: 60
+duplicate_threshold: 0.75

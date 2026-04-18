@@ -2,7 +2,16 @@ const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const { slugify, escapeYaml, readConfig, estimateSize, CONFIG_DEFAULTS } = require("./lib.js");
+const {
+  slugify,
+  escapeYaml,
+  readConfig,
+  readTriageConfig,
+  estimateSize,
+  fetchOpenIssues,
+  CONFIG_DEFAULTS,
+  TRIAGE_CONFIG_DEFAULTS,
+} = require("./lib.js");
 
 // --- slugify ---
 
@@ -172,5 +181,159 @@ describe("readConfig", () => {
     const config = readConfig(tmpDir);
     assert.ok(Array.isArray(config.statuses), "statuses should remain an array");
     assert.equal(config.task_prefix, "PROJ");
+  });
+});
+
+describe("readTriageConfig", () => {
+  const tmpDir = path.join(__dirname, "__tmp_triage_config_test__");
+
+  beforeEach(() => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns nested defaults when the config file is missing", () => {
+    const config = readTriageConfig(path.join(tmpDir, "missing"));
+    assert.deepEqual(config, TRIAGE_CONFIG_DEFAULTS);
+  });
+
+  it("reads nested theme keywords and activity thresholds", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "triage-config.yml"),
+      [
+        "theme_keywords:",
+        "  auth: [auth, oauth, token]",
+        "  docs: [docs, readme]",
+        "activity_days:",
+        "  warm: 10",
+        "  cold: 45",
+        "stale_days: 75",
+        "duplicate_threshold: 0.9",
+        "",
+      ].join("\n")
+    );
+
+    const config = readTriageConfig(tmpDir);
+
+    assert.deepEqual(config.theme_keywords, {
+      auth: ["auth", "oauth", "token"],
+      docs: ["docs", "readme"],
+    });
+    assert.deepEqual(config.activity_days, { warm: 10, cold: 45 });
+    assert.equal(config.stale_days, 75);
+    assert.equal(config.duplicate_threshold, 0.9);
+  });
+});
+
+describe("fetchOpenIssues", () => {
+  it("uses the explicit repo and limit when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 61, title: "Collect" }]);
+    };
+
+    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", limit: 3, execFile });
+
+    assert.deepEqual(issues, [{ number: 61, title: "Collect" }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        "3",
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
+  it("uses defaultLimit without a GraphQL preflight when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 1 }, { number: 2 }]);
+    };
+
+    const issues = fetchOpenIssues({
+      repo: "sungjunlee/dev-backlog",
+      defaultLimit: 2147483647,
+      execFile,
+    });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        "2147483647",
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
+  it("resolves the limit from GraphQL when limit is omitted", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+
+      if (args[0] === "api") return "2\n";
+      if (args[0] === "issue") return JSON.stringify([{ number: 1 }, { number: 2 }]);
+      throw new Error(`Unexpected args: ${args.join(" ")}`);
+    };
+
+    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", execFile });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[0].args, [
+      "api",
+      "graphql",
+      "-F",
+      "owner=sungjunlee",
+      "-F",
+      "name=dev-backlog",
+      "-f",
+      "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }",
+      "--jq",
+      ".data.repository.issues.totalCount",
+    ]);
+  });
+
+  it("returns an empty array without listing issues when the repo has no open issues", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return "0\n";
+    };
+
+    const issues = fetchOpenIssues({ execFile });
+
+    assert.deepEqual(issues, []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args[0], "api");
   });
 });
