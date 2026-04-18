@@ -126,10 +126,14 @@ The renderer emits anchor+checkbox pairs in four sections:
 - `## Obsolete Candidates` — source section with evidence sub-bullet
 - `## Priority Proposals` — source section with rationale
 - `## Milestone Suggestions` — source section grouped by sprint/cluster
-- `## Apply Checklist` — flattened summary; this is the surface the apply step (#65) reads
+- `## Apply Checklist` — flattened summary for humans reviewing all proposed mutations in one place
 
-Every proposal emitted in a source section is re-emitted in `## Apply Checklist` as an anchor+checkbox pair so #65 has a single, stable surface to parse without needing to know the source-section layout. This is intentional duplication — the same action anchor appears twice in the report.
+Every proposal emitted in a source section is re-emitted in `## Apply Checklist` as an anchor+checkbox pair. This is intentional duplication — the same action anchor appears twice in the report.
+
+`triage-apply.js` does **not** restrict parsing to `## Apply Checklist`. Its `parseReport()` walk accepts any valid anchor+checkbox pair anywhere in the report, then `dedupActions()` collapses repeated proposals into one action before execution. `## Apply Checklist` is still the canonical review summary, but not the only parse surface.
 
 ### Deduplication rule for the apply step
 
-Because the same action anchor appears in both its source section and the Apply Checklist, #65 must deduplicate by the tuple `(verb, issueNumber, normalizedArgs)` before executing. A user may check the box in either location to accept the action; #65 accepts the action when the box is checked in *any* location carrying that anchor.
+Because the same action anchor appears in both its source section and the Apply Checklist, `triage-apply.js` deduplicates by `(verb, issueNumber, normalizedArgs)`, where `normalizedArgs` means sorted keys with trimmed string values before stable serialization.
+
+A user may check the box in either location to accept the action; the deduped action is treated as accepted when *any* occurrence of that anchor is checked. Unknown verbs still parse, but `triage-apply.js` logs and skips them during execution.
