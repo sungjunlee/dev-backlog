@@ -1,0 +1,134 @@
+{
+  "generated": "2026-08-01T00:00:00.000Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 500,
+      "title": "Cold no-milestone issue",
+      "body": "Not touched in ages.",
+      "labels": [],
+      "createdAt": "2025-12-01T00:00:00.000Z",
+      "updatedAt": "2025-12-01T00:00:00.000Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": ">90d",
+        "activity": "cold",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 501,
+      "title": "Cold but milestoned",
+      "body": "Planned work.",
+      "labels": [],
+      "createdAt": "2025-12-01T00:00:00.000Z",
+      "updatedAt": "2025-12-01T00:00:00.000Z",
+      "milestone": "Sprint Later",
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": ">90d",
+        "activity": "cold",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 502,
+      "title": "Recently updated issue",
+      "body": "Still active.",
+      "labels": [],
+      "createdAt": "2026-07-20T00:00:00.000Z",
+      "updatedAt": "2026-07-30T00:00:00.000Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "<7d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 503,
+      "title": "Marked wontfix",
+      "body": "Abandoned.",
+      "labels": [
+        "wontfix"
+      ],
+      "createdAt": "2026-06-01T00:00:00.000Z",
+      "updatedAt": "2026-06-01T00:00:00.000Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": ">90d",
+        "activity": "cold",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 504,
+      "title": "Marked invalid",
+      "body": "Bad ticket.",
+      "labels": [
+        "invalid"
+      ],
+      "createdAt": "2026-06-01T00:00:00.000Z",
+      "updatedAt": "2026-06-01T00:00:00.000Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": ">90d",
+        "activity": "cold",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 505,
+      "title": "Explicit invalid and wontfix labels",
+      "body": "Both labels should surface independently.",
+      "labels": [
+        "invalid",
+        "wontfix"
+      ],
+      "createdAt": "2026-05-01T00:00:00.000Z",
+      "updatedAt": "2026-05-01T00:00:00.000Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": ">90d",
+        "activity": "cold",
+        "milestone": "unassigned"
+      }
+    }
+  ]
+}
