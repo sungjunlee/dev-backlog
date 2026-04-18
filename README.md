@@ -189,9 +189,14 @@ node $SKILL/triage-report.js --snapshot $SNAP --relate /tmp/relate.json --stale 
 
 # Apply phase (opt-in): review the report, check accepted proposals, then
 node $SKILL/triage-apply.js backlog/triage/<date>-report.md --apply
+
+# Live apply integration coverage (opt-in only; mutates the disposable sandbox repo)
+GH_TOKEN="$(gh auth token)" TRIAGE_APPLY_INTEGRATION=1 \
+  node --test $SKILL/triage-apply.integration.test.js
 ```
 
 Use `dev-backlog` when you know what to work on; use `backlog-triage` when the open-issue list has grown faster than your attention.
+The integration test is excluded from the default `node --test` path unless you explicitly set `TRIAGE_APPLY_INTEGRATION=1`. It targets the dedicated sandbox repo `sungjunlee/triage-apply-sandbox` and requires a `GH_TOKEN` that can mutate that repo.
 
 ## Script Entry Points
 

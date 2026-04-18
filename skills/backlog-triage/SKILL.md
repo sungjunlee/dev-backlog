@@ -41,9 +41,14 @@ Humans review the report and mark accepted proposals (flip `[ ]` → `[x]`). The
 node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md               # dry-run
 node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply       # with confirmation
 node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply --yes # CI-safe
+
+# Live integration coverage (opt-in only; disposable sandbox repo + write token required)
+GH_TOKEN="$(gh auth token)" TRIAGE_APPLY_INTEGRATION=1 \
+  node --test "${CLAUDE_SKILL_DIR}/scripts/triage-apply.integration.test.js"
 ```
 
 Default is **dry-run**. `--apply` requires confirmation unless `--yes`. Idempotent: re-running after a partial apply emits `already-applied` log entries for actions already executed.
+The integration test is intentionally separate from the default `node --test` path. It mutates the dedicated sandbox repo `sungjunlee/triage-apply-sandbox`, so it only runs when `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN` are both present.
 
 ---
 
@@ -182,5 +187,6 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` and run from the target proje
 - `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale / obsolete candidates with evidence.
 - `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--out PATH] [--json]` — render the markdown report with anchor comments. Re-runnable; creates `.bak` on overwrite.
 - `scripts/triage-apply.js <report.md> [--apply] [--yes] [--json]` — parse anchor+checkbox pairs, execute accepted actions via `gh`. Default dry-run. Idempotent. Appends to `backlog/triage/<date>-apply.log` (JSONL).
+- `scripts/triage-apply.integration.test.js` — opt-in live integration coverage for `triage-apply.js` against the disposable sandbox repo `sungjunlee/triage-apply-sandbox`. Requires `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN` with write access.
 
 Scripts land in #61–#65; this file is the contract they must honor.
