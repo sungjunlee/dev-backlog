@@ -185,12 +185,22 @@ function sortIssues(issues) {
   return [...issues].sort((left, right) => left.number - right.number);
 }
 
-function sortGroupEntries(groups) {
-  return [...groups.entries()].sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+function sortGroupEntries(groups, orderHint) {
+  const entries = [...groups.entries()];
+  if (Array.isArray(orderHint) && orderHint.length > 0) {
+    const rank = new Map(orderHint.map((key, index) => [key, index]));
+    return entries.sort(([leftKey], [rightKey]) => {
+      const leftRank = rank.has(leftKey) ? rank.get(leftKey) : orderHint.length;
+      const rightRank = rank.has(rightKey) ? rank.get(rightKey) : orderHint.length;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return leftKey.localeCompare(rightKey);
+    });
+  }
+  return entries.sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
 }
 
-function renderIssueTable(title, groups) {
-  const entries = sortGroupEntries(groups);
+function renderIssueTable(title, groups, { orderHint } = {}) {
+  const entries = sortGroupEntries(groups, orderHint);
   const lines = [`### ${title}`];
   if (entries.length === 0) {
     lines.push("", "_(none)_");
@@ -207,19 +217,25 @@ function renderIssueTable(title, groups) {
   return lines.join("\n");
 }
 
+const AGE_ORDER = ["<7d", "7-30d", "30-90d", ">90d"];
+
 function renderClassification(snapshot) {
   return [
     "## Classification",
-    "By theme, priority label, and activity bucket from the collected snapshot.",
+    "Grouped by theme / label / age from the collected snapshot.",
     "",
     renderIssueTable("By Theme", groupBy(snapshot.issues, (issue) => issue.buckets.theme || "uncategorized")),
     "",
     renderIssueTable(
-      "By Priority Label",
-      groupBy(snapshot.issues, (issue) => issue.buckets.label?.priority || "medium")
+      "By Label",
+      groupBy(snapshot.issues, (issue) => issue.buckets.label?.type || "uncategorized")
     ),
     "",
-    renderIssueTable("By Activity", groupBy(snapshot.issues, (issue) => issue.buckets.activity || "unknown")),
+    renderIssueTable(
+      "By Age",
+      groupBy(snapshot.issues, (issue) => issue.buckets.age || "unknown"),
+      { orderHint: AGE_ORDER }
+    ),
   ].join("\n");
 }
 
@@ -287,7 +303,31 @@ function dedupeActions(actions) {
   );
 }
 
+function formatStaleEvidence(candidate) {
+  const ev = candidate.evidence;
+  if (!ev || typeof ev !== "object") return "";
+
+  const parts = [];
+  if (ev.matchedLabel) parts.push(`label=${ev.matchedLabel}`);
+  if (typeof ev.daysSinceUpdate === "number") {
+    const threshold = typeof ev.thresholdDays === "number" ? ` (threshold ${ev.thresholdDays}d)` : "";
+    parts.push(`${ev.daysSinceUpdate}d since update${threshold}`);
+  } else if (ev.updatedAt) {
+    parts.push(`updated ${String(ev.updatedAt).slice(0, 10)}`);
+  }
+  if ("milestone" in ev) {
+    parts.push(ev.milestone ? `milestone=${ev.milestone}` : "no milestone");
+  }
+  if (Array.isArray(ev.labels) && ev.labels.length > 0 && !ev.matchedLabel) {
+    parts.push(`labels=${ev.labels.join(",")}`);
+  }
+
+  return shortText(parts.join("; "), 160);
+}
+
 function staleCandidateToAction(candidate) {
+  const evidence = formatStaleEvidence(candidate);
+
   if (candidate.suggested_action === "close") {
     return {
       section: "obsolete",
@@ -295,7 +335,7 @@ function staleCandidateToAction(candidate) {
       issueNumber: candidate.number,
       args: { reason: candidate.reason },
       summary: `Close #${candidate.number} — ${candidate.reason}`,
-      evidence: shortText(candidate.reason, 160),
+      evidence,
     };
   }
 
@@ -306,7 +346,7 @@ function staleCandidateToAction(candidate) {
       issueNumber: candidate.number,
       args: { reason: candidate.reason },
       summary: `Revisit #${candidate.number} — ${candidate.reason}`,
-      evidence: shortText(candidate.reason, 160),
+      evidence,
     };
   }
 
@@ -318,7 +358,7 @@ function staleCandidateToAction(candidate) {
       issueNumber: candidate.number,
       args: { target: mergeMatch[1], reason: candidate.reason },
       summary: `Close duplicate #${candidate.number} into ${mergeMatch[1]} — ${candidate.reason}`,
-      evidence: shortText(candidate.reason, 160),
+      evidence,
     };
   }
 
@@ -334,11 +374,14 @@ function buildObsoleteActions(stale) {
   );
 }
 
-function renderActionBlocks(actions) {
+function renderActionBlocks(actions, { withEvidence = false } = {}) {
   const lines = [];
   for (const action of actions) {
     lines.push(formatAnchor(action));
     lines.push(`- [ ] ${action.summary}`);
+    if (withEvidence && action.evidence) {
+      lines.push(`  - _evidence: ${action.evidence}_`);
+    }
     lines.push("");
   }
   return lines;
@@ -357,7 +400,7 @@ function renderObsoleteCandidates(stale, actions) {
     return lines.join("\n");
   }
 
-  lines.push(...renderActionBlocks(actions));
+  lines.push(...renderActionBlocks(actions, { withEvidence: true }));
   if (lines[lines.length - 1] === "") lines.pop();
   lines.push("", DEFERRED_OBSOLETE_MARKER);
   return lines.join("\n");
@@ -692,6 +735,8 @@ module.exports = {
   buildObsoleteActions,
   buildPriorityActions,
   buildMilestoneActions,
+  formatStaleEvidence,
+  staleCandidateToAction,
   buildReportModel,
   renderReport,
   resolveOutputPath,

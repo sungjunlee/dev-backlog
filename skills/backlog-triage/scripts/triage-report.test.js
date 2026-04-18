@@ -12,6 +12,8 @@ const {
   buildReportModel,
   renderReport,
   writeReportFile,
+  formatStaleEvidence,
+  staleCandidateToAction,
 } = require("./triage-report.js");
 
 function makeSnapshot() {
@@ -177,6 +179,48 @@ describe("renderer helpers", () => {
     assert.equal(fs.readFileSync(`${reportPath}.bak`, "utf-8"), "old report\n");
   });
 
+  it("formats stale evidence as a compact one-liner per signal kind", () => {
+    const inactive = formatStaleEvidence({
+      evidence: {
+        updatedAt: "2025-10-20T00:00:00.000Z",
+        generated: "2026-04-18T00:00:00.000Z",
+        daysSinceUpdate: 180,
+        thresholdDays: 60,
+        milestone: null,
+        labels: [],
+      },
+    });
+    assert.match(inactive, /180d since update \(threshold 60d\)/);
+    assert.match(inactive, /no milestone/);
+
+    const wontfix = formatStaleEvidence({
+      evidence: {
+        matchedLabel: "wontfix",
+        labels: ["wontfix"],
+        updatedAt: "2026-01-08T00:00:00.000Z",
+        milestone: null,
+      },
+    });
+    assert.match(wontfix, /label=wontfix/);
+    assert.match(wontfix, /updated 2026-01-08/);
+    assert.match(wontfix, /no milestone/);
+
+    const action = staleCandidateToAction({
+      number: 104,
+      title: "Legacy sprint cleanup chore",
+      reason: "labeled wontfix; explicit wontfix signal",
+      suggested_action: "close",
+      evidence: {
+        matchedLabel: "wontfix",
+        labels: ["wontfix"],
+        updatedAt: "2026-01-08T00:00:00.000Z",
+        milestone: null,
+      },
+    });
+    assert.equal(action.verb, "close");
+    assert.match(action.evidence, /label=wontfix/);
+  });
+
   it("renders no-input placeholders for omitted relate/stale inputs", () => {
     const model = buildReportModel({
       snapshot: makeSnapshot(),
@@ -283,6 +327,35 @@ describe("triage-report integration chain", () => {
     assert.match(markdown, /<!-- triage:close #106 reason="labeled invalid; explicit invalid signal" -->/);
     assert.match(markdown, /PR-merged edges deferred/);
     assert.match(markdown, /closing-PR-already-merged and duplicate-of-closed signals deferred/);
+
+    // Classification groups must match Done Criteria: theme / label / age.
+    const classificationBlock = markdown.split(/^##\s+Classification/m)[1].split(/^##\s/m)[0];
+    assert.match(classificationBlock, /### By Theme/);
+    assert.match(classificationBlock, /### By Label/);
+    assert.match(classificationBlock, /### By Age/);
+    // Age buckets render in semantic order, not alphabetic.
+    const ageBlock = classificationBlock.split("### By Age")[1];
+    const ageBucketsInOrder = ["<7d", "7-30d", "30-90d", ">90d"].filter((bucket) =>
+      ageBlock.includes(`| ${bucket} |`)
+    );
+    const ageBucketsAsFound = [];
+    for (const bucket of ["<7d", "7-30d", "30-90d", ">90d"]) {
+      const idx = ageBlock.indexOf(`| ${bucket} |`);
+      if (idx >= 0) ageBucketsAsFound.push({ bucket, idx });
+    }
+    ageBucketsAsFound.sort((left, right) => left.idx - right.idx);
+    assert.deepEqual(
+      ageBucketsAsFound.map((entry) => entry.bucket),
+      ageBucketsInOrder,
+      "age buckets must render in semantic order"
+    );
+
+    // Obsolete Candidates must carry a compact evidence line per item.
+    const obsoleteBlock = markdown.split(/^##\s+Obsolete Candidates/m)[1].split(/^##\s/m)[0];
+    for (const issueNumber of [104, 105, 106]) {
+      const anchorRegex = new RegExp(`<!-- triage:close #${issueNumber} [^>]*-->[\\s\\S]*?- \\[ \\] [^\\n]+\\n\\s+- _evidence: [^\\n]+_`);
+      assert.match(obsoleteBlock, anchorRegex, `expected evidence line for obsolete #${issueNumber}`);
+    }
 
     const lines = markdown.split(/\r?\n/);
     const anchorLines = lines
