@@ -12,9 +12,6 @@ const SIGNALS = Object.freeze({
   INACTIVE: "inactive",
   WONTFIX: "wontfix",
   INVALID: "invalid",
-  MERGED_PR: "merged-pr",
-  REFERENCED_CODE_REMOVED: "referenced-code-removed",
-  DUPLICATE_OF_CLOSED: "duplicate-of-closed",
 });
 
 function usage() {
@@ -177,14 +174,9 @@ function pickAction(signal, context = {}) {
     case SIGNALS.INACTIVE:
     case SIGNALS.WONTFIX:
     case SIGNALS.INVALID:
-    case SIGNALS.MERGED_PR:
       return "close";
-    case SIGNALS.DUPLICATE_OF_CLOSED:
-      return context.targetIssueNumber ? `merge-into:#${context.targetIssueNumber}` : "revisit";
-    case SIGNALS.REFERENCED_CODE_REMOVED:
-      return "revisit";
     default:
-      return "revisit";
+      return context.targetIssueNumber ? `merge-into:#${context.targetIssueNumber}` : "revisit";
   }
 }
 
@@ -250,21 +242,6 @@ function scanWontfixInvalid(issue) {
   return candidates;
 }
 
-function scanMergedPR() {
-  // TODO(#63 follow-up): implement when triage snapshots include merged/closing PR linkage.
-  return [];
-}
-
-function scanReferencedCodeRemoved() {
-  // TODO(#63 follow-up): implement only after a safe, build-free code-reference scanner is defined.
-  return [];
-}
-
-function scanDuplicateOfClosed() {
-  // TODO(#63 follow-up): implement when the snapshot includes closed-issue state for duplicate targets.
-  return [];
-}
-
 function resolveThresholdDays({ since, backlogDir = DEFAULT_BACKLOG_DIR, config } = {}) {
   if (since !== undefined) return since;
   const resolvedConfig = config || readTriageConfig(backlogDir);
@@ -282,9 +259,6 @@ function analyzeSnapshot(snapshot, { since, backlogDir = DEFAULT_BACKLOG_DIR, co
     if (inactiveCandidate) candidates.push(inactiveCandidate);
 
     candidates.push(...scanWontfixInvalid(issue));
-    candidates.push(...scanMergedPR(issue));
-    candidates.push(...scanReferencedCodeRemoved(issue));
-    candidates.push(...scanDuplicateOfClosed(issue));
   }
 
   return {
@@ -357,9 +331,6 @@ module.exports = {
   pickAction,
   scanInactive,
   scanWontfixInvalid,
-  scanMergedPR,
-  scanReferencedCodeRemoved,
-  scanDuplicateOfClosed,
   resolveThresholdDays,
   analyzeSnapshot,
   formatCandidate,

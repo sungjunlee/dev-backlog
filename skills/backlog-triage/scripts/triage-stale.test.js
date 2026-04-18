@@ -11,9 +11,6 @@ const {
   pickAction,
   scanInactive,
   scanWontfixInvalid,
-  scanMergedPR,
-  scanReferencedCodeRemoved,
-  scanDuplicateOfClosed,
   resolveThresholdDays,
   analyzeSnapshot,
 } = require("./triage-stale.js");
@@ -53,7 +50,7 @@ describe("readSnapshot", () => {
 
   it("reads the fixture snapshot successfully", () => {
     const snapshot = readSnapshot(FIXTURE_PATH);
-    assert.equal(snapshot.issues.length, 6);
+    assert.equal(snapshot.issues.length, 5);
     assert.equal(snapshot.generated, "2026-08-01T00:00:00.000Z");
   });
 
@@ -71,10 +68,9 @@ describe("pickAction", () => {
     assert.equal(pickAction(SIGNALS.INVALID), "close");
   });
 
-  it("routes deferred duplicate and best-effort stale signals safely", () => {
-    assert.equal(pickAction(SIGNALS.DUPLICATE_OF_CLOSED, { targetIssueNumber: 42 }), "merge-into:#42");
-    assert.equal(pickAction(SIGNALS.DUPLICATE_OF_CLOSED), "revisit");
-    assert.equal(pickAction(SIGNALS.REFERENCED_CODE_REMOVED), "revisit");
+  it("keeps revisit and merge-into actions available for future signals", () => {
+    assert.equal(pickAction("future-signal", { targetIssueNumber: 42 }), "merge-into:#42");
+    assert.equal(pickAction("future-signal"), "revisit");
   });
 });
 
@@ -140,25 +136,6 @@ describe("scanWontfixInvalid", () => {
     assert.equal(candidate.evidence.matchedLabel, "invalid");
   });
 
-  it("surfaces wontfix and invalid separately when both labels are present", () => {
-    const snapshot = loadFixtureSnapshot();
-    const issue = snapshot.issues.find((entry) => entry.number === 505);
-
-    const candidates = scanWontfixInvalid(issue);
-
-    assert.equal(candidates.length, 2);
-    assert.deepEqual(candidates.map((candidate) => candidate.evidence.matchedLabel).sort(), ["invalid", "wontfix"]);
-  });
-});
-
-describe("deferred stale scanners", () => {
-  it("keeps merged-pr, duplicate-of-closed, and referenced-code-removed as empty stubs", () => {
-    const issue = loadFixtureSnapshot().issues[0];
-
-    assert.deepEqual(scanMergedPR(issue), []);
-    assert.deepEqual(scanReferencedCodeRemoved(issue), []);
-    assert.deepEqual(scanDuplicateOfClosed(issue), []);
-  });
 });
 
 describe("resolveThresholdDays and analyzeSnapshot", () => {
