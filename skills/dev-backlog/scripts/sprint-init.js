@@ -58,6 +58,7 @@ milestone: ${milestone}
 status: active
 started: ${started}
 due: ${due}
+objectives: []
 ---
 
 # ${topic}
