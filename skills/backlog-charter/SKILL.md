@@ -50,6 +50,8 @@ Objective conventions:
 - Never reuse a removed objective ID; new objectives take the next free number.
 - Record provenance with `src:` (`user`, `inferred`, or `execution`).
 
+See `references/objectives.md` for 5 good and 5 bad worked examples, common rewrite patterns, and a 30-second predicate test.
+
 ## Amend Mode
 
 Use amend mode when `CHARTER.md` exists at the repo root, or when invoked as `backlog-charter amend`.
@@ -72,3 +74,4 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 - `references/amendment.md` — challenge checklist, proof-gate rules, no-rubber-stamp discipline, and bloat checks.
 - `references/alignment.md` — shared work↔objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
+- `references/objectives.md` — verifiable-predicate examples (5 good, 5 bad), common rewrite patterns, 30-second test.
