@@ -4,7 +4,7 @@ argument-hint: "[collect|relate|stale|report|apply] [options]"
 description: Interactive backlog grooming for open GitHub Issues. Classifies, relates, flags stale/obsolete, and proposes priorities — produces a markdown triage report you review before applying. Advisory by default; mutations require explicit --apply. Use for backlog review, issue grooming, stale cleanup, priority re-ranking, 백로그 정리, 이슈 검토, 트리아지, 정리.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
-  related-skills: "dev-backlog, relay, relay-plan"
+  related-skills: "backlog-charter, dev-backlog, relay, relay-plan"
 ---
 
 # Backlog Triage
@@ -27,10 +27,12 @@ Sibling skill to dev-backlog, not a replacement. dev-backlog is the execution hu
 ### Phase 1 — Report (default, no mutations)
 
 1. **Collect** open issues → snapshot JSON (one `gh` fetch per run)
-2. **Analyze** — classification, relationships, stale/obsolete signals
+2. **Analyze** — classification, relationships, stale/obsolete signals, and Alignment Check when repo-root `CHARTER.md` exists
 3. **Render** — one markdown report with anchored proposals
 
 Every script in this phase is read-only. Running any number of times is safe. The snapshot is the canonical artifact; all downstream analysis consumes it via `--snapshot PATH` (no re-fetch).
+
+Alignment Check is prompt-driven, not a `triage-*.js` script: when `CHARTER.md` exists, map open issues to Objectives using `../backlog-charter/references/alignment.md` and emit an `## Alignment` report section. When `CHARTER.md` is absent, skip this step entirely and keep the existing report shape.
 
 ### Phase 2 — Apply (opt-in, explicit)
 
@@ -114,6 +116,21 @@ anchor + checkbox + rationale per item.
 ## Milestone Suggestions
 Unplanned issues grouped into candidate next sprints.
 
+## Alignment
+Coverage: 7/9 open issues → objectives ✓ · O3 has no work ⚠
+
+### Orphan Work
+Issues that map to no Objective (medium severity).
+
+### Neglected Objectives
+Active Objectives with no open issue advancing them (medium severity).
+
+### Contradictions
+Issues that violate a Non-Goal (high severity).
+
+### Proposed CHARTER changes
+Seed proposals for `backlog-charter` amend; triage does not mutate `CHARTER.md`.
+
 ## Apply Checklist
 Consolidated list of every anchored action for scan-and-check review. The apply step parses
 the whole report and dedupes by `(verb, issueNumber, normalizedArgs)` — this section and the
@@ -130,6 +147,7 @@ source sections above both count as acceptance surfaces (see `references/apply.m
 | Milestone lifecycle, monthly progress issue | dev-backlog |
 | AC checkboxes inside issue bodies (`AC:BEGIN`/`END`) | dev-backlog |
 | Open-issue classification, relationships, stale flags | backlog-triage |
+| CHARTER alignment of open issues | backlog-triage (report; `CHARTER.md` mutations stay with `backlog-charter`) |
 | Priority / milestone **proposals** | backlog-triage (report) |
 | Priority / milestone **mutations** | backlog-triage (`--apply`) |
 | Post-triage sprint planning | dev-backlog (reads report, edits sprint file) |
@@ -140,7 +158,7 @@ Recommended cadence: run backlog-triage weekly or bi-weekly. Feed the report's M
 
 ## Process
 
-**Collect → Analyze → Report.** One `gh` fetch, one snapshot, downstream scripts consume it via `--snapshot`. Re-fetching in each script is a bug — it creates drift across signals.
+**Collect → Analyze → Report.** One `gh` fetch, one snapshot, downstream scripts consume it via `--snapshot`. Re-fetching in each script is a bug — it creates drift across signals. During Analyze, run the prompt-driven Alignment Check when `CHARTER.md` is present; its Proposed CHARTER changes feed `backlog-charter` amend and are not applied by `triage-apply.js`, which only mutates GitHub issues.
 
 **Review the report.** Read each proposal. Check the ones you accept (flip `[ ]` → `[x]`). Leave rejected ones unchecked. Do not delete anchor comments; unchecked anchors are ignored by apply.
 
@@ -175,6 +193,7 @@ Flags on individual scripts override config.
 - `references/relationships.md` — mention / blocks / depends-on / duplicate heuristics, evidence format
 - `references/stale.md` — obsolescence signals, thresholds, suggested-action grammar
 - `references/apply.md` — anchor grammar, parse rules, idempotency contract, apply-log schema
+- `../backlog-charter/references/alignment.md` — prompt-driven CHARTER work↔objective mapping and drift severity rules
 
 ---
 

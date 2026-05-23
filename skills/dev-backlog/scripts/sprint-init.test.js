@@ -72,6 +72,7 @@ describe("buildSprintContent", () => {
     assert.match(content, /milestone: Sprint W13/);
     assert.match(content, /started: 2026-04-05/);
     assert.match(content, /due: 2026-04-12/);
+    assert.match(content, /due: 2026-04-12\nobjectives: \[\]\n---/);
     assert.match(content, /# auth-system/);
     assert.match(content, /- \[ \] #42 OAuth2 flow \(~1hr\)/);
   });
@@ -110,6 +111,7 @@ describe("createSprintFile", () => {
 
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
+    assert.match(written, /due: 2026-04-12\nobjectives: \[\]\n---/);
   });
 
   it("returns placeholder metadata on dry-run when milestone has no issues", () => {
@@ -247,6 +249,7 @@ describe("createSprintFile", () => {
     const content = fs.readFileSync(result.sprintFile, "utf-8");
     // Frontmatter must have status: active on its own line (what find_active_sprint greps for)
     assert.match(content, /^status: active$/m);
+    assert.match(content, /^objectives: \[\]$/m);
     // Checkbox must match the integration contract regex
     assert.match(content, /^- \[ \] #\d+/m);
   });

@@ -4,14 +4,14 @@ argument-hint: "[orient|plan|work|next|sync] [issue-number]"
 description: Manage development work through GitHub Issues + local sprint files. Issues/Milestones are the source of truth; local sprint files handle execution — batching, ordering, context, and progress. Use for creating issues, planning sprints, checking what to work on, reviewing progress, syncing with GitHub, managing milestones, backlog, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
-  related-skills: "backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
+  related-skills: "backlog-charter, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
 
 # Dev Backlog
 
 README covers install and human quick start. This skill file is the execution contract for agents: file roles, sprint structure, process, and script behavior.
 
-Related skill: [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
+Related skills: [`backlog-charter`](../backlog-charter/SKILL.md) for the optional `CHARTER.md` reference axis, and [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
 
 Two layers, each with a clear job:
 
@@ -61,6 +61,7 @@ backlog/
 ## Sprint File Format
 
 The sprint file in `backlog/sprints/` is the execution hub. One file per sprint.
+The `objectives` frontmatter field lists the `CHARTER.md` Objective IDs this sprint advances; it is `[]` when the project has no `CHARTER.md`.
 
 ```markdown
 ---
@@ -68,6 +69,7 @@ milestone: Sprint W13
 status: active
 started: 2026-03-22
 due: 2026-03-28
+objectives: [O1, O3]
 ---
 
 # Auth + API Foundation
@@ -201,6 +203,8 @@ Task files get AC checkboxes updated during work. Everything else (notes, decisi
 ## Process
 
 **Orient** → Read `_context.md` + active sprint file. No sprint? → Plan. All done? → Complete.
+
+**Plan** → If repo-root `CHARTER.md` exists, read its `active` Objectives first, project them onto not-yet-done work, and record advanced IDs in `objectives:`. If absent, plan as before and leave `objectives: []`.
 
 **Work** → Option A (do it yourself): read batch → implement → verify AC → commit `Fixes #N`. Option B (delegate): follow the relay skill's dispatch process.
 

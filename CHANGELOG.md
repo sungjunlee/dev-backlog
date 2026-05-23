@@ -8,6 +8,23 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 Nothing yet.
 
+## [0.5.0] — 2026-05-22
+
+Headline: new sibling skill **`backlog-charter`** for creating and amending an opt-in `CHARTER.md` project reference axis. Closes [#84](https://github.com/sungjunlee/dev-backlog/issues/84), [#85](https://github.com/sungjunlee/dev-backlog/issues/85), [#86](https://github.com/sungjunlee/dev-backlog/issues/86), [#87](https://github.com/sungjunlee/dev-backlog/issues/87), [#88](https://github.com/sungjunlee/dev-backlog/issues/88), [#89](https://github.com/sungjunlee/dev-backlog/issues/89), and [#90](https://github.com/sungjunlee/dev-backlog/issues/90).
+
+### Added
+
+- New skill `skills/backlog-charter/` with a `CHARTER.md` template, create/amend contract, amendment guidance, and shared alignment mapping reference.
+- `skills/backlog-charter/templates/charter.md` defines the 3-tier charter format: Direction, Predicates, and History.
+- `skills/backlog-charter/references/alignment.md` defines semantic issue→Objective mapping, drift severities, and coverage-line format for triage and sprint planning.
+- `skills/backlog-charter/references/amendment.md` defines Tier 1 challenge checks, Tier 2 proof-gate rules, the no-rubber-stamp rule, and bloat checks.
+
+### Changed
+
+- `skills/dev-backlog/scripts/sprint-init.js` now emits `objectives: []` in sprint frontmatter, with tests updated to lock the field.
+- `skills/dev-backlog/SKILL.md` documents CHARTER-aware sprint planning and graceful degradation when no repo-root `CHARTER.md` exists.
+- `skills/backlog-triage/SKILL.md` now includes a prompt-driven CHARTER-aware Alignment Check and `## Alignment` report section.
+
 ## [0.4.0] — 2026-04-18
 
 Headline: new sibling skill **`backlog-triage`** for interactive open-issue grooming. Closes epic [#59](https://github.com/sungjunlee/dev-backlog/issues/59).
@@ -42,6 +59,7 @@ Tracked for post-0.4.0 work — not blocking the release.
 
 Initial public release — `dev-backlog` skill with sprint files, task files, progress-sync, sync-pull, and Claude Code + Codex compatibility. See the initial commit (`0df6a1f`) for the baseline scope.
 
-[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sungjunlee/dev-backlog/releases/tag/v0.3.0

@@ -2,12 +2,20 @@
 
 GitHub Issues + local sprint execution files for Claude Code / Codex.
 
-`README.md` is the human quick start. `skills/dev-backlog/SKILL.md` is the agent execution contract.
+`README.md` is the human quick start. `skills/*/SKILL.md` files are the agent execution contracts.
 
 ## Project Structure
 
 ```text
 skills/
+  backlog-charter/
+    SKILL.md               ← CHARTER.md create/amend contract
+    references/            ← Amendment + alignment specs
+    templates/             ← Runtime CHARTER.md template
+  backlog-triage/
+    SKILL.md               ← Open-issue grooming contract
+    references/            ← Detailed specs (on-demand)
+    scripts/               ← Deterministic helpers (node)
   dev-backlog/
     SKILL.md               ← Agent execution contract (keep under 250 lines)
     references/            ← Detailed specs (on-demand)
