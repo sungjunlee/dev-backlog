@@ -74,6 +74,8 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-name>` (rerun: polish one capability without touching others).
 
+**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `node skills/backlog-charter/scripts/extract-signals.js --json` first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and proposes capability candidates with signals + draft Goal + draft Scope. Use the draft as the interview seed; grill mode still pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
+
 `spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional for projects with under ~20 capabilities; `split-capabilities.js` migrates to per-capability files once that threshold is crossed.
 
 ### Per-Capability Interview Flow
