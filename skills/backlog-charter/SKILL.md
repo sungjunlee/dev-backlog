@@ -38,9 +38,9 @@ A stable core makes the moving parts meaningful. This tiering prevents the axis 
 
 Use create mode when `CHARTER.md` is absent at the repo root, or when invoked as `backlog-charter create` and no charter exists.
 
-1. Draft from repo signals: `README.md`, `CLAUDE.md`, open epics/issues, and recent commits.
-2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives.
-3. Write repo-root `CHARTER.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`.
+1. Draft from repo signals: `README.md` ≻ `CLAUDE.md` ≻ open epics/issues ≻ recent commits ≻ `CHANGELOG.md`. When signals conflict, surface the conflict in the interview rather than picking silently.
+2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives. Follow the checklist in `references/create.md` — Problem framing options, the wedge test for Approach, Non-Goals elicitation, and Objective framing that cites `references/objectives.md`.
+3. Write repo-root `CHARTER.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`. The Decisions table may be left empty — seed 3–5 rows only when prior design docs, ADRs, or notable merged PRs already record direction; remember that whatever lands becomes immutable from revision 2.
 
 Objective conventions:
 
@@ -72,6 +72,7 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 ## References
 
+- `references/create.md` — create-mode signals priority, conflict handling, interview checklist, seed-Decisions guidance.
 - `references/amendment.md` — challenge checklist, proof-gate rules, no-rubber-stamp discipline, and bloat checks.
 - `references/alignment.md` — shared work↔objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
 - `references/objectives.md` — verifiable-predicate examples (5 good, 5 bad), common rewrite patterns, 30-second test.
