@@ -62,6 +62,7 @@ backlog/
 
 The sprint file in `backlog/sprints/` is the execution hub. One file per sprint.
 The `objectives` frontmatter field lists the `CHARTER.md` Objective IDs this sprint advances; it is `[]` when the project has no `CHARTER.md`.
+The `component` field names a single capability from `spec/capabilities.md` whose `## Learnings` block receives an entry when a relay run merges. Empty string means no live-update target.
 
 ```markdown
 ---
@@ -70,6 +71,7 @@ status: active
 started: 2026-03-22
 due: 2026-03-28
 objectives: [O1, O3]
+component: "auth"
 ---
 
 # Auth + API Foundation
@@ -237,3 +239,4 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, n
 - `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close active sprint: set completed, move tasks, remind about context promotion
 - `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `CHARTER.md` with an actionable (non-deferred) status. Graceful no-op when `CHARTER.md` is absent.
+- `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — Verify every `component:` value in sprint files resolves to a declared capability in `spec/capabilities.md`. Multi-component values (comma-separated) follow design doc D4: first declared wins + warn on secondary entries. Graceful no-op when `spec/capabilities.md` is absent.
