@@ -59,6 +59,7 @@ status: active
 started: ${started}
 due: ${due}
 objectives: []
+component: ""
 ---
 
 # ${topic}
