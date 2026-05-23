@@ -236,3 +236,4 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, n
 - `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — Sync the monthly GitHub Progress issue. `--finalize` adds the month-end block and closes the target month's issue idempotently.
 - `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close active sprint: set completed, move tasks, remind about context promotion
 - `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
+- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `CHARTER.md` with an actionable (non-deferred) status. Graceful no-op when `CHARTER.md` is absent.

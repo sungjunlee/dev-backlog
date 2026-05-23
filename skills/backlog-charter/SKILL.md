@@ -64,7 +64,7 @@ Apply the 3-tier discipline:
 - Tier 2 status advance: require proof for `active` → `validated` or `deferred`; cite a merged PR, passing check, or relay run whose Done Criteria match the predicate. Without proof, refuse the advance and flag it.
 - Tier 3 Decisions: append only. Never edit or delete an existing row; a reversal is a new row with `supersedes`.
 
-After applying an accepted amendment, bump `last_amended` to today and increment `revision`.
+After applying an accepted amendment, bump `last_amended` to today and increment `revision`. Then run `node skills/backlog-charter/scripts/check-size.js` to confirm the 5-minute-read property still holds; collapse long `deferred` lists or oversized Decisions rationale if the script warns.
 
 Amend mode can take a `backlog-triage` Alignment Check report as a seed of proposed changes. The report proposes; this skill applies through the gates.
 
