@@ -32,6 +32,23 @@ dev-relay reads and writes specific `## ` sections in the active sprint file.
 
 Extraction: read lines between the matched `## ` heading and the next `## ` heading (or EOF). See `lib.sh:extract_section()` for the canonical implementation.
 
+## Sprint Frontmatter: Component Routing
+
+The optional `component:` field is one primary routing handle into `spec/capabilities.md`.
+
+```yaml
+component: "charter-management"
+```
+
+Rules:
+
+- Empty string means there is no capability Learnings target.
+- Non-empty values must match exactly one `## Capability: <slug>` heading in `spec/capabilities.md`.
+- Comma-separated values are invalid. If a sprint touches secondary areas, write that in `## Running Context` or sprint prose.
+- `component-lint.js` owns validation on the dev-backlog side.
+
+This is intentionally stricter than normal markdown prose. The field is an address for downstream writers, not a place to explain scope.
+
 ## Checkbox States
 
 Sprint plan items use this format:
@@ -119,6 +136,42 @@ When relay-merge completes a task, it updates the active sprint file in these sp
 ```
 - Topic: concise discovery. (e.g., "OAuth2: PKCE flow using jose library")
 ```
+
+## Capability Learnings Append Contract
+
+When `spec/capabilities.md` exists and the active sprint has a primary `component:` value, relay-merge may append one capability-level Learning after a successful run. This is a narrow writer contract, not permission for working agents to edit the capability spec.
+
+Inputs:
+
+| Field | Meaning |
+|---|---|
+| `component` | Primary capability slug from sprint frontmatter |
+| `date` | `YYYY-MM-DD` append date |
+| `run_id` | Relay run identifier, when available |
+| `summary` | One-line observation from the completed run |
+| `pr` | Merged PR number, when available |
+
+Target:
+
+```
+spec/capabilities.md
+  ## Capability: <component>
+    ### Learnings
+    <!-- LEARN:BEGIN -->
+    - YYYY-MM-DD (run <run_id>): <summary> [PR #N]
+    <!-- LEARN:END -->
+```
+
+Required behavior:
+
+- Reject missing `spec/capabilities.md`; do not silently create it.
+- Reject unknown `component` values.
+- Reject duplicate, missing, or nested `LEARN` markers in the target capability block.
+- Reject writes that would modify text outside the marker pair.
+- Prefer idempotency for the same `run_id`; if exact idempotency is impossible, document the rerun behavior in the relay result.
+- If the append succeeds but commit/push does not happen, surface that explicitly. A local-only Learning is not durable project state.
+
+Until the append writer is installed in the target repo, docs should describe this as a contract to implement, not as an already-enforced property.
 
 ### Run-ID Annotation (optional)
 

@@ -2,20 +2,22 @@
 
 This file is the middle layer between `CHARTER.md` (north star) and the active sprint (this week's tasks). Each capability describes one subsystem buckets-worth of work with a frozen-ish contract and a structurally-bounded live-feedback channel.
 
+Use loose prose and strict handles. Goal, scope, behaviors, sprint Plan, and Running Context are where agents can explain nuance. Capability IDs and sprint `component:` values are routing handles: use one lowercase slug such as `sprint-execution`, not a sentence or comma-separated list.
+
 Mutation discipline (matches the design doc):
 
 | Section | Who writes | When | Gate |
 |---|---|---|---|
 | `Goal`, `In-scope`, `Out-of-scope` | human via `backlog-charter grill` | when the contract changes | challenge + confirm + apply |
 | `Expected Behaviors`, `Hard Constraints` | human via grill | when a behavior or bright-line changes | grill + 3-axis predicate test |
-| `## Learnings` (between magic markers) | `append-learnings.js` only | end of every successful relay run tagged for this capability | structurally bounded append; rejects writes outside markers |
+| `## Learnings` (between magic markers) | `append-learnings.js` only | end of every successful relay run tagged with this primary capability slug | structurally bounded append; rejects writes outside markers |
 | `## Decisions` | human, append-only | when a capability-level decision is made | append-only by convention; promote to CHARTER if cross-cutting |
 
 When this file exceeds ~500 lines, run `split-capabilities.js` to migrate to `spec/components/<name>.md`. Do not pre-split.
 
 ---
 
-## Capability: <name>
+## Capability: <slug>
 
 **Goal:** <one sentence: what the user can observe when this works>
 
@@ -36,7 +38,7 @@ When this file exceeds ~500 lines, run `split-capabilities.js` to migrate to `sp
 
 ### Learnings
 <!-- LEARN:BEGIN -->
-<!-- entries appended by dev-relay/scripts/append-learnings.js after each successful relay run -->
+<!-- entries appended by the bounded append-learnings writer after successful relay runs -->
 <!-- format: - YYYY-MM-DD (run #N): <one-line> [PR #X] -->
 <!-- LEARN:END -->
 

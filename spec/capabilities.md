@@ -2,7 +2,9 @@
 
 The middle layer between [`CHARTER.md`](../CHARTER.md) and the active sprint. Each block describes one subsystem-worth of work with a frozen-ish contract and a structurally bounded live-feedback channel.
 
-Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `backlog-charter grill`; `## Learnings` is appended only by `dev-relay/scripts/append-learnings.js` between magic markers; `## Decisions` is append-only by convention.
+Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `backlog-charter grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `## Decisions` is append-only by convention.
+
+Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs. Put secondary touches in sprint prose, not in frontmatter.
 
 ---
 

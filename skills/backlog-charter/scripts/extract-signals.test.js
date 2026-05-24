@@ -211,6 +211,8 @@ describe("buildCapability", () => {
     });
     assert.match(cap.candidate_goal, /O1/);
     assert.match(cap.candidate_scope, /src\/auth\//);
+    assert.equal(cap.provenance.directory, "src/auth/");
+    assert.deepEqual(cap.provenance.commit_scopes, ["commit-scope:auth (4)"]);
   });
 
   it("falls back to placeholder goal when no readme summary", () => {
@@ -222,6 +224,20 @@ describe("buildCapability", () => {
       charterObjectives: [],
     });
     assert.match(cap.candidate_goal, /Fill in via grill/);
+  });
+
+  it("does not invent a path for commit-scope-only candidates", () => {
+    const cap = buildCapability({
+      name: "progress-sync",
+      sourceRootName: "skills",
+      signals: ["commit-scope:progress-sync (3)"],
+      readmeSummary: null,
+      charterObjectives: [],
+    });
+    assert.equal(cap.provenance.directory, null);
+    assert.deepEqual(cap.provenance.commit_scopes, ["commit-scope:progress-sync (3)"]);
+    assert.doesNotMatch(cap.candidate_scope, /skills\/progress-sync/);
+    assert.match(cap.candidate_scope, /Inferred from commit scope/);
   });
 });
 
@@ -307,8 +323,24 @@ revision: 1
     const ingest = result.capabilities.find((c) => c.name === "ingest");
     assert.ok(ingest.signals.some((s) => s.includes("src/ingest/")));
     assert.ok(ingest.signals.some((s) => s.includes("commit-scope:ingest")));
+    assert.equal(ingest.provenance.directory, "src/ingest/");
     assert.match(ingest.candidate_goal, /logging pipeline/);
     assert.match(ingest.candidate_goal, /O1/);
+  });
+
+  it("brownfield commit-scope-only: keeps provenance explicit without fake ownership", () => {
+    mkdir(repo, "src/worker");
+    const commits = ["feat(progress-sync): one", "fix(progress-sync): two"];
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => commits.join("\n"),
+    });
+
+    const progressSync = result.capabilities.find((c) => c.name === "progress-sync");
+    assert.ok(progressSync);
+    assert.equal(progressSync.provenance.directory, null);
+    assert.match(progressSync.candidate_scope, /Confirm the owning source surface/);
+    assert.doesNotMatch(progressSync.candidate_scope, /src\/progress-sync/);
   });
 
   it("brownfield-thin: only src/ + commits, no README/CLAUDE", () => {
@@ -367,6 +399,7 @@ describe("formatHumanReport", () => {
     };
     const report = formatHumanReport(result);
     assert.match(report, /Capability candidates \(2/);
+    assert.match(report, /functional contracts/);
     assert.match(report, /auth/);
     assert.match(report, /billing/);
   });

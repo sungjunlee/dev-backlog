@@ -72,7 +72,7 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 ## Grill Mode
 
-Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-name>` (rerun: polish one capability without touching others).
+Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-slug>` (rerun: polish one capability without touching others). Capability slugs are strict routing handles used by sprint `component:` frontmatter; keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
 **On a brownfield repo** (existing code, no `spec/capabilities.md`), run `node skills/backlog-charter/scripts/extract-signals.js --json` first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and proposes capability candidates with signals + draft Goal + draft Scope. Use the draft as the interview seed; grill mode still pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup draft candidates rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
 
@@ -105,11 +105,11 @@ Grill mode applies the same challenge + confirm + apply discipline used by amend
 
 - Goal / In-scope / Out-of-scope are Tier-1-equivalent: challenge before applying. Default to no change.
 - Behaviors / Hard Constraints are Tier-2-equivalent: each must pass the 3-axis test. The test is the proof gate.
-- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by `dev-relay/scripts/append-learnings.js` between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either.
+- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by the bounded `append-learnings` writer between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either.
 
 ### Writing the File
 
-On first run, copy `templates/capabilities.md` to `spec/capabilities.md` at the repo root, then walk the interview for one capability. On rerun (`grill <capability-name>`), edit only the named capability block; leave the rest of the file untouched. If `spec/capabilities.md` does not exist on a rerun invocation, fall back to greenfield mode and surface the absence.
+On first run, copy `templates/capabilities.md` to `spec/capabilities.md` at the repo root, then walk the interview for one capability. On rerun (`grill <capability-slug>`), edit only the named capability block; leave the rest of the file untouched. If `spec/capabilities.md` does not exist on a rerun invocation, fall back to greenfield mode and surface the absence.
 
 After applying an accepted change, do **not** bump a revision number on `spec/capabilities.md` — `git blame` is the source of truth (per design doc §"NOT in scope"). Note in the conversation which capability was edited.
 

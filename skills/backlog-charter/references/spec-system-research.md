@@ -87,7 +87,7 @@ A multi-day autonomous run with no in-loop ground-truth check is **open-loop con
 
 ### What this means for spec-system v0.1
 
-- The structural defense against adversarial Goodhart (`append-learnings.js` is the only writer between magic markers) is **not** a stylistic choice; it is the only defense the 4-mode taxonomy considers reliable.
+- The structural defense against adversarial Goodhart (`append-learnings.js` is the only writer between magic markers once installed) is **not** a stylistic choice; it is the only defense the 4-mode taxonomy considers reliable.
 - The 3-axis predicate test maps cleanly: authority → IRD, distributional → goal misgeneralization, manipulability → adversarial Goodhart. Each axis defends against one *category* of failure; missing an axis means a category is unprotected.
 - O5 (auto-reassess) is critical-path under control-theory framing, but deferred until enough `## Learnings` data exists to inform what reassessment should do. Premature O5 closes the loop with noise.
 

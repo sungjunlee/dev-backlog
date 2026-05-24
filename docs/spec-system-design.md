@@ -23,6 +23,7 @@ For autonomous runs that span days, this means: setpoint exists, sensor doesn't,
 - Detail level calibrated to *help* AI agents, not constrain them into Goodhart's law
 - Lower layers can update live without human edit, via structurally bounded channels
 - Interactive "grill-me" mode that pressure-tests specs into verifiable predicates
+- Loose documents, strict handles: prose stays flexible; machine-routing fields stay small and stable
 - Bias to simplicity: one new file family, zero new skill names
 
 ## Non-Goals
@@ -48,7 +49,7 @@ repo/
 │     #   In-scope / Out-of-scope       (frozen — amend-gated)
 │     #   Expected Behaviors            (human-gated, list)
 │     #   Hard Constraints              (anti-adversarial bright-lines)
-│     #   ## Learnings                  (LIVE — relay-merge auto-appends)
+│     #   ## Learnings                  (LIVE once append writer is installed)
 │     #     <!-- LEARN:BEGIN -->
 │     #     - <date> (run #N): <one-line> [PR #X]
 │     #     <!-- LEARN:END -->
@@ -58,6 +59,26 @@ repo/
 └─ src/
 ```
 
+### Loose documents, strict handles
+
+Agents need room to reason in prose. They also need stable coordinates when another agent resumes later. The split:
+
+```
+Free-form reasoning
+  CHARTER prose
+  capability Goal / Scope / Behaviors
+  sprint Plan / Running Context
+
+Strict handles
+  objective IDs: O1, O2
+  capability IDs: sprint-execution
+  sprint component: one primary capability slug
+  LEARN markers
+  append-only Decisions / Learnings
+```
+
+The rule: constrain the address, not the thought. `component:` is a routing handle, so it is one primary capability slug. Multi-capability work belongs in sprint prose or Running Context, where agents can explain the secondary touches without making downstream writers guess.
+
 ### Mutation discipline per layer
 
 | Layer | Who writes | When | Gate |
@@ -66,7 +87,7 @@ repo/
 | `CHARTER.md` Objectives | human via amend; status advance proof-gated | when an objective is added/removed/proven | Tier 2 gate (existing) |
 | `CHARTER.md` Decisions | append-only | when a non-trivial cross-cutting decision is made | Tier 3 (existing) |
 | `spec/capabilities.md` Goal/Scope/Behaviors/HardConstraints per capability | human via `backlog-charter grill` (new mode) | when a capability's contract changes | challenge + confirm + apply |
-| `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a `component:` tag | structurally bounded append between magic markers; rejects anything else |
+| `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a primary `component:` tag | structurally bounded append between magic markers; rejects anything else |
 | `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to CHARTER Tier 3 if cross-cutting |
 
 ### Why single-file, not per-capability
@@ -85,7 +106,7 @@ From Langosco et al. 2022 (goal misgeneralization) + Manheim & Garrabrant 2018 (
 
 - **Misspecification:** the spec is wrong, agent exploits as written. Defense: explicit verifiable predicates.
 - **Goal misgeneralization:** spec is right, but agent's *internalized goal* diverges off-distribution. Defense: distributional robustness check in grill mode.
-- **Adversarial Goodhart:** agent edits the measurement apparatus to satisfy the spec. Defense: structural — agent has zero write access to spec content except the structurally-bounded Learnings append.
+- **Adversarial Goodhart:** agent edits the measurement apparatus to satisfy the spec. Defense: structural — working agents have no write path to spec content except the bounded Learnings append. Until the append writer exists in the target repo, docs must describe this as a contract, not an already-enforced property.
 
 ### 2. Control-theory framing
 
@@ -128,7 +149,7 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
   ├─ skills/dev-backlog/SKILL.md                   (sprint task frontmatter: +component)
   ├─ (dev-relay repo) scripts/append-learnings.js  (NEW, ~50 LOC)
   ├─ (dev-relay repo) relay-merge hook integration
-  └─ Component-tag conflict resolution rule (single-component default; multi → first + warn)
+  └─ Component-tag conflict resolution rule: one primary capability slug; multi-component values fail lint
 ```
 
 ### Build-order rationale
@@ -158,8 +179,8 @@ These are flagged for the implementation PRs, not blockers for committing to M:
 
 - **D2** Naming: `spec/` (root) vs `docs/spec/` vs `.spec/`? Lean root — peer of `backlog/`. Confirm during PR-1.
 - **D3** `spec/capabilities.md` size warning threshold — 500 lines or 700? Tunable in the lint script.
-- **D4** Multi-component sprint task: append to first declared, warn (proposed) vs append to all (rejected: duplication) vs reject the run (rejected: too strict). Confirm in PR-3.
-- **D5** `component:` tag freeform string vs declared-only enum? Lean declared-only with a `--strict` flag default-off, with `component-lint.js` catching typos before they reach Learnings.
+- **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
+- **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
 
 ---
 
