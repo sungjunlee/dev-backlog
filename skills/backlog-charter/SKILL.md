@@ -1,7 +1,7 @@
 ---
 name: backlog-charter
 argument-hint: "[create|amend|grill|reassess]"
-description: Create, amend, grill, and reassess the project spec axis: CHARTER.md plus spec/capabilities.md. Use to establish or evolve project direction, author capability contracts, review stale specs, recommend Learnings compaction, or decide whether Behaviors/Constraints still match execution evidence. 프로젝트 축, 기준, 헌장, 능력 명세, stale spec, spec reassess.
+description: Create, amend, grill, and reassess the project spec axis: CHARTER.md plus spec/capabilities.md. Use to establish or evolve project direction, author capability contracts, review stale specs, recommend Learning Actions, or decide whether Behaviors/Constraints still match execution evidence. 프로젝트 축, 기준, 헌장, 능력 명세, stale spec, spec reassess.
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
   related-skills: "dev-backlog, backlog-triage"
@@ -120,7 +120,7 @@ Grill mode applies the same challenge + confirm + apply discipline used by amend
 
 - Goal / In-scope / Out-of-scope are Tier-1-equivalent: challenge before applying. Default to no change.
 - Behaviors / Hard Constraints are Tier-2-equivalent: each must pass the 3-axis test. The test is the proof gate.
-- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by the bounded `append-learnings` writer between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either, but it may recommend human-gated compaction when a capability has more than 5-7 inline Learnings.
+- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by the bounded `append-learnings` writer between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either, but it may recommend a user-approved Learning Action when a capability has more than 5-7 inline Learnings.
 
 ### Writing the File
 
@@ -132,25 +132,16 @@ See `references/capabilities.md` for additional grill heuristics (placeholder on
 
 ## Reassess Mode
 
-Use reassess mode when the user asks whether `CHARTER.md` or `spec/capabilities.md` is stale, asks to review Learnings, or wants a periodic spec health check. Reassess never edits files: it diagnoses drift and recommends next actions, but accepted fixes must be applied by a separate amend, grill, or explicit human-gated compaction pass.
+Use reassess mode when the user asks whether `CHARTER.md` or `spec/capabilities.md` is stale, asks to review Learnings, or wants a periodic spec health check.
 
-Start with bounded deterministic evidence:
+Reassess never edits files. It diagnoses drift and recommends next actions; accepted fixes must run through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
 
-1. Resolve helper scripts from the installed dev-backlog skill directory. In this repo that is `skills/dev-backlog/scripts/`; in another target repo use the installed skill path. If unavailable, report Missing Evidence.
-2. If `spec/capabilities.md` exists, run `node <dev-backlog-skill-dir>/scripts/capabilities-doctor.js --json` when available.
-3. If backlog sprints exist, run `node <dev-backlog-skill-dir>/scripts/component-lint.js --json` when available.
-4. Read `CHARTER.md`, `spec/capabilities.md`, the active sprint, and at most the latest five completed sprint files only as needed to explain the evidence. Do not recursively scan the repo unless the user asks for a deeper audit.
+Dispatch contract:
 
-Emit a structured report with separate evidence and recommendations:
-
-- **No Change** — areas that still look aligned.
-- **Grill Candidates** — capability contracts that may need `backlog-charter grill <capability>`.
-- **Amend Candidates** — CHARTER objectives or direction that may need `backlog-charter amend`.
-- **Learning Actions** — Learnings to keep inline, promote to Decisions, or archive through a human-gated compaction pass.
-- **Missing Evidence** — absent files, skipped scripts, or weak signals that prevent a confident recommendation.
-- **Recommended Next Step** — one action: no change, `backlog-charter grill <capability>`, `backlog-charter amend`, or a separate human-gated Learnings compaction edit.
-
-Accepted changes flow through existing gates: rerun grill for capability contract changes, amend for CHARTER changes, and keep `## Learnings` compaction as a separate user-approved manual edit. See `references/reassess.md` for report heuristics and stale-spec failure modes.
+1. Resolve helper scripts from the installed dev-backlog skill directory; if unavailable, report **Missing Evidence**.
+2. Start with bounded evidence: `capabilities-doctor.js --json`, `component-lint.js --json`, named CHARTER/capability sections, the active sprint, and at most the latest five completed sprint files.
+3. Emit these report sections: **Evidence**, **No Change**, **Grill Candidates**, **Amend Candidates**, **Learning Actions**, **Missing Evidence**, **Recommended Next Step**.
+4. Use `references/reassess.md` as the source of truth for evidence order, report shape, recommendation rules, Learning Actions, and stale-spec failure modes.
 
 ## References
 
@@ -159,5 +150,5 @@ Accepted changes flow through existing gates: rerun grill for capability contrac
 - `references/alignment.md` — shared work↔objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
 - `references/objectives.md` — verifiable-predicate examples (5 good, 5 bad), common rewrite patterns, 30-second test.
 - `references/capabilities.md` — grill-mode heuristics for `spec/capabilities.md` authoring (placeholder; expand as findings accrue).
-- `references/reassess.md` — report-only stale-spec reassessment: evidence sources, output shape, promotion/compaction rules, and failure modes.
+- `references/reassess.md` — report-only stale-spec reassessment: evidence sources, output shape, Learning Actions, and failure modes.
 - `references/spec-system-research.md` — research grounding for the layered spec system (autonomous-agent failure taxonomy, control-theory framing, spec-language stability discipline).
