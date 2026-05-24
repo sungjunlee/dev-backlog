@@ -1,7 +1,7 @@
 ---
 name: backlog-charter
-argument-hint: "[create|amend|grill]"
-description: Create and amend CHARTER.md — a durable per-project reference axis (problem, approach, non-goals, verifiable objectives, decisions) that sprints and backlog triage are measured against. Also runs grill mode to author the middle-layer spec/capabilities.md (goal, scope, behaviors, hard constraints). Use to establish or evolve project direction, 프로젝트 축, 기준, 헌장, 능력 명세.
+argument-hint: "[create|amend|grill|reassess]"
+description: Create, amend, grill, and reassess the project spec axis: CHARTER.md plus spec/capabilities.md. Use to establish or evolve project direction, author capability contracts, review stale specs, recommend Learnings compaction, or decide whether Behaviors/Constraints still match execution evidence. 프로젝트 축, 기준, 헌장, 능력 명세, stale spec, spec reassess.
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
   related-skills: "dev-backlog, backlog-triage"
@@ -9,7 +9,7 @@ metadata:
 
 # Backlog Charter
 
-Create and amend `CHARTER.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable and routes on file state: no repo-root `CHARTER.md` means create mode; an existing repo-root `CHARTER.md` means amend mode.
+Create and amend `CHARTER.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable. Explicit modes win first (`create`, `amend`, `grill`, `reassess`); file-state routing applies only when no mode is specified: no repo-root `CHARTER.md` means create mode, and an existing repo-root `CHARTER.md` means amend mode.
 
 ## What CHARTER.md Is
 
@@ -130,6 +130,28 @@ After applying an accepted change, do **not** bump a revision number on `spec/ca
 
 See `references/capabilities.md` for additional grill heuristics (placeholder on day 1 — expand as findings accrue).
 
+## Reassess Mode
+
+Use reassess mode when the user asks whether `CHARTER.md` or `spec/capabilities.md` is stale, asks to review Learnings, or wants a periodic spec health check. Reassess never edits files: it diagnoses drift and recommends next actions, but accepted fixes must be applied by a separate amend, grill, or explicit human-gated compaction pass.
+
+Start with bounded deterministic evidence:
+
+1. Resolve helper scripts from the installed dev-backlog skill directory. In this repo that is `skills/dev-backlog/scripts/`; in another target repo use the installed skill path. If unavailable, report Missing Evidence.
+2. If `spec/capabilities.md` exists, run `node <dev-backlog-skill-dir>/scripts/capabilities-doctor.js --json` when available.
+3. If backlog sprints exist, run `node <dev-backlog-skill-dir>/scripts/component-lint.js --json` when available.
+4. Read `CHARTER.md`, `spec/capabilities.md`, the active sprint, and at most the latest five completed sprint files only as needed to explain the evidence. Do not recursively scan the repo unless the user asks for a deeper audit.
+
+Emit a structured report with separate evidence and recommendations:
+
+- **No Change** — areas that still look aligned.
+- **Grill Candidates** — capability contracts that may need `backlog-charter grill <capability>`.
+- **Amend Candidates** — CHARTER objectives or direction that may need `backlog-charter amend`.
+- **Learning Actions** — Learnings to keep inline, promote to Decisions, or archive through a human-gated compaction pass.
+- **Missing Evidence** — absent files, skipped scripts, or weak signals that prevent a confident recommendation.
+- **Recommended Next Step** — one action: no change, `backlog-charter grill <capability>`, `backlog-charter amend`, or a separate human-gated Learnings compaction edit.
+
+Accepted changes flow through existing gates: rerun grill for capability contract changes, amend for CHARTER changes, and keep `## Learnings` compaction as a separate user-approved manual edit. See `references/reassess.md` for report heuristics and stale-spec failure modes.
+
 ## References
 
 - `references/create.md` — create-mode signals priority, conflict handling, interview checklist, seed-Decisions guidance.
@@ -137,4 +159,5 @@ See `references/capabilities.md` for additional grill heuristics (placeholder on
 - `references/alignment.md` — shared work↔objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
 - `references/objectives.md` — verifiable-predicate examples (5 good, 5 bad), common rewrite patterns, 30-second test.
 - `references/capabilities.md` — grill-mode heuristics for `spec/capabilities.md` authoring (placeholder; expand as findings accrue).
+- `references/reassess.md` — report-only stale-spec reassessment: evidence sources, output shape, promotion/compaction rules, and failure modes.
 - `references/spec-system-research.md` — research grounding for the layered spec system (autonomous-agent failure taxonomy, control-theory framing, spec-language stability discipline).
