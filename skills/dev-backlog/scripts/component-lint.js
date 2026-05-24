@@ -6,17 +6,16 @@
  * Usage: ./scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]
  *
  * Behavior:
- *   - Reads spec/capabilities.md and collects "## Capability: <name>" headers.
+ *   - Reads spec/capabilities.md and collects "## Capability: <slug>" headers.
  *   - For each backlog/sprints/*.md, extracts `component:` from frontmatter.
- *   - Reports sprints whose component value (single or comma-separated multi)
- *     does not match any declared capability.
- *   - Per design doc D4: multi-component values use first-declared + warn.
- *     The first value must resolve; subsequent values are flagged as warnings,
- *     not errors.
+ *   - Reports sprints whose component value does not match any declared
+ *     capability.
+ *   - `component:` is one primary routing handle. Comma-separated values fail
+ *     with guidance to keep secondary touches in sprint prose.
  *   - Graceful no-op when spec/capabilities.md is absent (skill is opt-in).
  *
  * Exit codes:
- *   0  no errors (warnings OK), or spec/capabilities.md absent
+ *   0  no errors, or spec/capabilities.md absent
  *   1  one or more component values do not resolve
  */
 
@@ -92,7 +91,7 @@ function parseCapabilityNames(content) {
   const names = new Set();
   const lines = content.split("\n");
   for (const line of lines) {
-    const match = line.match(/^## Capability:\s+(\S+)/);
+    const match = line.match(/^## Capability:\s+([a-z][a-z0-9-]*)\s*$/);
     if (match) names.add(match[1]);
   }
   return names;
@@ -108,19 +107,19 @@ function listSprintFiles(sprintsDir, { readdir = fs.readdirSync, fileExists = fs
 
 function classifyComponents(components, declared) {
   const errors = [];
-  const warnings = [];
-  if (components.length === 0) return { errors, warnings };
+  const invalid = [];
+  if (components.length === 0) return { errors, invalid };
 
-  const [primary, ...rest] = components;
-  if (!declared.has(primary)) errors.push(primary);
-  for (const extra of rest) {
-    if (!declared.has(extra)) {
-      errors.push(extra);
-    } else {
-      warnings.push(extra);
-    }
+  if (components.length > 1) {
+    invalid.push(
+      `multiple component values (${components.join(", ")}); choose one primary capability slug and mention secondary touches in the sprint body`,
+    );
+    return { errors, invalid };
   }
-  return { errors, warnings };
+
+  const [primary] = components;
+  if (!declared.has(primary)) errors.push(primary);
+  return { errors, invalid };
 }
 
 function findIssues(sprintFiles, declared, { readFile = fs.readFileSync } = {}) {
@@ -129,9 +128,9 @@ function findIssues(sprintFiles, declared, { readFile = fs.readFileSync } = {}) 
     const content = readFile(file, "utf-8");
     const components = parseSprintComponents(content);
     if (components.length === 0) continue;
-    const { errors, warnings } = classifyComponents(components, declared);
-    if (errors.length === 0 && warnings.length === 0) continue;
-    issues.push({ sprintFile: file, components, unknown: errors, secondary: warnings });
+    const { errors, invalid } = classifyComponents(components, declared);
+    if (errors.length === 0 && invalid.length === 0) continue;
+    issues.push({ sprintFile: file, components, unknown: errors, invalid });
   }
   return issues;
 }
@@ -162,7 +161,7 @@ function lintComponents({
 }
 
 function hasErrors(result) {
-  return result.issues.some((issue) => issue.unknown.length > 0);
+  return result.issues.some((issue) => issue.unknown.length > 0 || (issue.invalid || []).length > 0);
 }
 
 function formatReport(result) {
@@ -181,8 +180,8 @@ function formatReport(result) {
     if (issue.unknown.length > 0) {
       lines.push(`    - unknown component(s): ${issue.unknown.join(", ")}`);
     }
-    if (issue.secondary.length > 0) {
-      lines.push(`    - warning: secondary component(s) ignored per D4 (first-wins): ${issue.secondary.join(", ")}`);
+    if (issue.invalid.length > 0) {
+      for (const invalid of issue.invalid) lines.push(`    - invalid component: ${invalid}`);
     }
   }
   return lines.join("\n");

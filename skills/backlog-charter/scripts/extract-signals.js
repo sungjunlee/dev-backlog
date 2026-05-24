@@ -164,13 +164,18 @@ function summarizeReadme(readme) {
 }
 
 function buildCapability({ name, sourceRootName, signals, readmeSummary, charterObjectives }) {
+  const directorySignal = sourceRootName
+    ? signals.find((signal) => signal === `${sourceRootName}/${name}/`) || null
+    : null;
+  const commitSignals = signals.filter((signal) => signal.startsWith("commit-scope:"));
+
   const candidateGoal = readmeSummary
     ? `Draft (from README): ${readmeSummary} — refine via grill so the Goal names what the user observes when '${name}' works.`
     : `Draft: what the user observes when the '${name}' capability works. Fill in via grill.`;
 
-  const candidateScope = sourceRootName
-    ? `Owns the ${sourceRootName}/${name}/ surface. Out-of-scope deferred to grill.`
-    : `Owns the '${name}' surface. Out-of-scope deferred to grill.`;
+  const candidateScope = directorySignal
+    ? `Owns the ${directorySignal} surface. Out-of-scope deferred to grill.`
+    : `Inferred from commit scope '${name}'. Confirm the owning source surface and out-of-scope boundary in grill.`;
 
   const objectiveHint = charterObjectives.length > 0
     ? ` Candidate CHARTER objective served: ${charterObjectives[0].id} (${charterObjectives[0].predicate.slice(0, 80)}${charterObjectives[0].predicate.length > 80 ? "..." : ""}). Confirm in grill.`
@@ -179,6 +184,10 @@ function buildCapability({ name, sourceRootName, signals, readmeSummary, charter
   return {
     name,
     signals,
+    provenance: {
+      directory: directorySignal,
+      commit_scopes: commitSignals,
+    },
     candidate_goal: candidateGoal + objectiveHint,
     candidate_scope: candidateScope,
   };
@@ -271,6 +280,7 @@ function formatHumanReport(result) {
   }
 
   lines.push(`Capability candidates (${capabilities.length}, top ${Math.min(capabilities.length, SUMMARY_DIR_LIMIT)} shown):`);
+  lines.push("  Note: candidates cluster by repo signals; grill mode turns them into functional contracts.");
   for (const cap of capabilities.slice(0, SUMMARY_DIR_LIMIT)) {
     lines.push(`  - ${cap.name}`);
     lines.push(`      signals: ${cap.signals.join(", ")}`);

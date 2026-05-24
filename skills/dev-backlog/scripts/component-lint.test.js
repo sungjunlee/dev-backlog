@@ -125,6 +125,11 @@ describe("parseCapabilityNames", () => {
   it("returns empty set when no Capability headers", () => {
     assert.equal(parseCapabilityNames("# Just a heading").size, 0);
   });
+
+  it("does not treat prose headings as capability slugs", () => {
+    const names = parseCapabilityNames("## Capability: pulling open issues\n");
+    assert.equal(names.size, 0);
+  });
 });
 
 describe("listSprintFiles", () => {
@@ -151,32 +156,33 @@ describe("listSprintFiles", () => {
 describe("classifyComponents", () => {
   const declared = new Set(["sprint-execution", "backlog-sync", "charter-management"]);
 
-  it("returns empty errors/warnings for empty input", () => {
-    assert.deepEqual(classifyComponents([], declared), { errors: [], warnings: [] });
+  it("returns empty errors for empty input", () => {
+    assert.deepEqual(classifyComponents([], declared), { errors: [], invalid: [] });
   });
 
   it("primary unknown is an error", () => {
     const r = classifyComponents(["unknown-cap"], declared);
     assert.deepEqual(r.errors, ["unknown-cap"]);
-    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(r.invalid, []);
   });
 
   it("primary known is silent", () => {
     const r = classifyComponents(["sprint-execution"], declared);
     assert.deepEqual(r.errors, []);
-    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(r.invalid, []);
   });
 
-  it("secondary known is a warning per D4 (first-wins)", () => {
+  it("secondary known is invalid because component is one primary routing handle", () => {
     const r = classifyComponents(["sprint-execution", "backlog-sync"], declared);
     assert.deepEqual(r.errors, []);
-    assert.deepEqual(r.warnings, ["backlog-sync"]);
+    assert.equal(r.invalid.length, 1);
+    assert.match(r.invalid[0], /choose one primary capability slug/);
   });
 
-  it("secondary unknown is an error AND signals a typo", () => {
+  it("secondary unknown is invalid before typo classification", () => {
     const r = classifyComponents(["sprint-execution", "typo-cap"], declared);
-    assert.deepEqual(r.errors, ["typo-cap"]);
-    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.invalid.length, 1);
   });
 });
 
@@ -195,7 +201,7 @@ describe("findIssues", () => {
 
       const byName = (name) => issues.find((i) => i.sprintFile.endsWith(name));
       assert.deepEqual(byName("bad.md").unknown, ["typo-cap"]);
-      assert.deepEqual(byName("multi.md").secondary, ["backlog-sync"]);
+      assert.match(byName("multi.md").invalid[0], /multiple component values/);
       assert.deepEqual(byName("multi.md").unknown, []);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -234,15 +240,32 @@ describe("lintComponents", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("accepts a real sprint file with a valid single component", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "comp-lint-valid-"));
+    try {
+      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const capPath = path.join(dir, "spec", "capabilities.md");
+      fs.mkdirSync(sprintsDir, { recursive: true });
+      fs.mkdirSync(path.dirname(capPath), { recursive: true });
+      fs.writeFileSync(capPath, SAMPLE_CAPABILITIES);
+      fs.writeFileSync(
+        path.join(sprintsDir, "2026-05-routing.md"),
+        "---\ncomponent: sprint-execution\n---\nbody",
+      );
+      const result = lintComponents({ sprintsDir, capabilitiesPath: capPath });
+      assert.equal(result.capabilitiesFound, true);
+      assert.equal(result.sprintCount, 1);
+      assert.deepEqual(result.issues, []);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("hasErrors", () => {
   it("true when any issue has unknown components", () => {
-    assert.equal(hasErrors({ issues: [{ unknown: ["x"], secondary: [] }] }), true);
-  });
-
-  it("false when only warnings", () => {
-    assert.equal(hasErrors({ issues: [{ unknown: [], secondary: ["y"] }] }), false);
+    assert.equal(hasErrors({ issues: [{ unknown: ["x"], invalid: [] }] }), true);
   });
 
   it("false when no issues", () => {
@@ -267,15 +290,33 @@ describe("formatReport", () => {
     assert.match(formatReport(result), /All component values resolve/);
   });
 
-  it("renders issue listing with errors and warnings", () => {
+  it("renders issue listing with errors", () => {
     const result = {
       capabilitiesFound: true,
       capabilitiesPath: "spec/capabilities.md",
       declaredCapabilities: ["a", "b"],
       sprintCount: 2,
-      issues: [{ sprintFile: "x.md", components: ["typo", "b"], unknown: ["typo"], secondary: [] }],
+      issues: [{ sprintFile: "x.md", components: ["typo", "b"], unknown: ["typo"], invalid: [] }],
     };
     const report = formatReport(result);
     assert.match(report, /unknown component\(s\): typo/);
+  });
+
+  it("renders invalid multi-component guidance", () => {
+    const result = {
+      capabilitiesFound: true,
+      capabilitiesPath: "spec/capabilities.md",
+      declaredCapabilities: ["a", "b"],
+      sprintCount: 1,
+      issues: [{
+        sprintFile: "x.md",
+        components: ["a", "b"],
+        unknown: [],
+        invalid: ["multiple component values (a, b); choose one primary capability slug"],
+      }],
+    };
+    const report = formatReport(result);
+    assert.match(report, /invalid component/);
+    assert.match(report, /choose one primary capability slug/);
   });
 });
