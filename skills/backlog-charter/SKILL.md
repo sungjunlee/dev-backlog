@@ -28,7 +28,7 @@ When no mode is specified, route by intent first, then use file state only for g
 
 ### Helper Scripts
 
-Resolve helper scripts from the installed `backlog-charter` skill directory, not from the target repo. In a source checkout, that means the local `scripts/` directory beside this `SKILL.md`; in an installed skill, first locate the skill directory and run the same script from there. If a helper is unavailable, report **Missing Evidence** and continue with bounded file reads.
+Resolve helper scripts from the installed `backlog-charter` skill directory, not from the target repo. In a source checkout, that means the local `scripts/` directory beside this `SKILL.md`; in an installed skill, first locate the skill directory and run the same script from there. Always pass the target repo explicitly (`--path <target-repo>/CHARTER.md` or `--repo-root <target-repo>`) so helpers do not inspect the skill directory by accident. If a helper is unavailable, report **Missing Evidence** and continue with bounded file reads.
 
 ### Completion Contract
 
@@ -92,7 +92,7 @@ Apply the 3-tier discipline:
 - Tier 2 status advance: require proof for `active` → `validated` or `deferred`; cite a merged PR, passing check, or relay run whose Done Criteria match the predicate. Without proof, refuse the advance and flag it.
 - Tier 3 Decisions: append only. Never edit or delete an existing row; a reversal is a new row with `supersedes`.
 
-After applying an accepted amendment, bump `last_amended` to today and increment `revision`. Then run `check-size.js` from the installed skill's `scripts/` directory to confirm the 5-minute-read property still holds; collapse long `deferred` lists or oversized Decisions rationale if the script warns.
+After applying an accepted amendment, bump `last_amended` to today and increment `revision`. Then run `check-size.js --path <target-repo>/CHARTER.md` from the installed skill's `scripts/` directory to confirm the 5-minute-read property still holds; collapse long `deferred` lists or oversized Decisions rationale if the script warns.
 
 Amend mode can take a `backlog-triage` Alignment Check report as a seed of proposed changes. The report proposes; this skill applies through the gates.
 
@@ -102,7 +102,7 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-slug>` (rerun: polish one capability without touching others). Capability slugs are strict routing handles used by sprint `component:` frontmatter; keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
-**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `extract-signals.js --json` from the installed skill's `scripts/` directory first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
+**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `extract-signals.js --repo-root <target-repo> --json` from the installed skill's `scripts/` directory first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
 
 `spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional while the spec remains compact: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
 
