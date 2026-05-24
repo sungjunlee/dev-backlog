@@ -92,7 +92,11 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 
 ### Why single-file, not per-capability
 
-For projects with <20 capabilities (the realistic majority), one `spec/capabilities.md` keeps everything legible and grep-able. Once a project exceeds ~500 lines or ownership boundaries demand it, a `split-capabilities.js` tool migrates to `spec/components/<name>.md` — but we don't pre-pave that road. Make-the-change-easy, then make the easy change (Beck).
+One `spec/capabilities.md` is the default because it is easy to read, grep, and hand to an agent in one shot. The budget is about scanability, not feature count: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only when the file exceeds 500 lines, has more than 15 capabilities, or ownership boundaries demand separate review paths.
+
+Dogfood calibrated this rule. dev-backlog has only five capabilities and already produces a 177-line spec. tamgu_note, a larger Flutter/Firebase app, has 15+ feature surfaces plus workflow scopes like `e2e`, `test`, `sprint`, and `backlog`; treating every folder or commit scope as a capability would exceed the split trigger immediately. Capabilities are durable contract boundaries, not directory names.
+
+When the hard trigger fires, `split-capabilities.js` migrates to `spec/components/<name>.md`. Until then, keep the compact single-file shape. Make-the-change-easy, then make the easy change (Beck).
 
 ---
 
@@ -164,7 +168,7 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
 
 | Deferred | Rationale | Promotion trigger |
 |---|---|---|
-| Per-capability files (`spec/components/*.md`) | YAGNI; single file works for <20 capabilities | `spec/capabilities.md` > 500 lines OR ownership demands |
+| Per-capability files (`spec/components/*.md`) | YAGNI; a compact single file is easier to read and route through while under budget | `spec/capabilities.md` > 500 lines, >15 capabilities, or ownership demands |
 | ADR directory (`spec/decisions/*.md`) | CHARTER Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
 | Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
 | Cross-capability dependency graph | Over-engineering; readable from prose | Multiple capability authors complain about silent coupling |
@@ -178,7 +182,7 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
 These are flagged for the implementation PRs, not blockers for committing to M:
 
 - **D2** Naming: `spec/` (root) vs `docs/spec/` vs `.spec/`? Lean root — peer of `backlog/`. Confirm during PR-1.
-- **D3** `spec/capabilities.md` size warning threshold — 500 lines or 700? Tunable in the lint script.
+- **D3** `spec/capabilities.md` size warning threshold — resolved: warn above 12 capabilities or 400 lines; recommend split above 500 lines, 15 capabilities, or ownership-boundary pressure.
 - **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
 - **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
 
@@ -195,6 +199,16 @@ Strangler-fig. None of these requires re-architecture, just expansion:
 
 Every L-tier feature is a YAGNI-violating addition until it's not. Defer until signal.
 
+### Learnings compaction
+
+`## Learnings` is a live sensor, not an audit log. Keep the most recent 5-7 entries inline per capability so the file stays useful during agent startup. Older entries should be:
+
+- promoted to `## Decisions` when they describe a durable capability-level rule
+- promoted to CHARTER Decisions when they change the project-wide axis
+- archived outside the hot `spec/capabilities.md` path when they are useful history but no longer startup context
+
+Compaction is human-gated or doctor-suggested. Relay's bounded writer may append between markers, but it must not silently delete, rewrite, or archive Learnings.
+
 ---
 
 ## Dogfood plan
@@ -203,7 +217,8 @@ The most authentic test of this spec system is applying it to projects we alread
 
 1. **dev-backlog itself** (greenfield-ish — `CHARTER.md` exists, no capabilities file yet). Authors: us. Validates greenfield grill + the layered shape on a project we know cold.
 2. **dev-relay** (brownfield — established code, no CHARTER yet). Validates the full brownfield path: `extract-signals.js` → grill → `spec/capabilities.md` written end-to-end. Also exercises live-update since dev-relay *is* the relay-merge surface.
-3. **(optional, after both)** A real product repo from outside this workspace. Highest signal but lowest control. Worth doing once internal dogfood looks healthy.
+3. **Large-repo fixture** — a deterministic tamgu_note-shaped fixture with many feature folders and workflow commit scopes. Protects against treating feature count as capability count without depending on a private checkout.
+4. **(optional, after both)** A real product repo from outside this workspace. Highest signal but lowest control. Worth doing once internal dogfood looks healthy.
 
 Each dogfood produces:
 - A `spec/capabilities.md` in the target repo

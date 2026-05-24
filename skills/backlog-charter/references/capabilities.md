@@ -114,7 +114,55 @@ If a rerun discovers a cross-cutting decision, append it to the relevant Decisio
 
 ## Capability Count Guidance
 
-Keep the single-file `spec/capabilities.md` until it becomes hard to scan.
+Capability count is a readability budget, not a feature count. Keep the single-file `spec/capabilities.md` while it stays compact enough for an agent to read at session start.
+
+Use this budget:
+
+- Target: 5-10 capabilities
+- Soft warning: more than 12 capabilities or more than 400 lines
+- Hard split trigger: more than 500 lines, more than 15 capabilities, or ownership boundaries that need separate review paths
+- Learnings budget: keep the most recent 5-7 entries inline per capability
+
+One capability should map to a testable contract surface: a surface where a Behavior or Hard Constraint can fail loudly when violated. It should not map mechanically to a source directory, feature folder, or commit scope.
+
+### Admission Test
+
+Before creating a capability, ask:
+
+- Is this a repeated decision boundary?
+- Does it own the primary destination for relay Learnings?
+- Can its Goal be stated as an observable user or operator outcome?
+- Do its Behaviors and Hard Constraints differ from neighboring candidates?
+
+If two candidates share every meaningful Behavior and Hard Constraint, merge them. If one candidate needs more than five Behaviors to feel complete, split it along the actual contract boundary.
+
+### dev-backlog example
+
+dev-backlog has three skill directories, but five capabilities:
+
+- `sprint-execution` owns the active sprint as the execution hub.
+- `backlog-sync` owns the GitHub Issues to task-file mirror.
+- `charter-management` owns CHARTER and capability-spec tier gates.
+- `triage-grooming` owns backlog classification and relationship reports.
+- `task-progress-reporting` owns monthly progress issue synchronization.
+
+This is not one capability per directory. It is one capability per contract surface that can receive distinct Behaviors, Hard Constraints, and Learnings.
+
+### Large-repo counterexample
+
+A feature-first app may have folders like `activity`, `ai`, `insight`, `child`, `family`, `auth`, `onboarding`, `search`, `settings`, `sync`, and `storage`, plus commit scopes like `e2e`, `test`, `sprint`, and `backlog`. Those are raw signals, not a final capability list.
+
+For a repo with that shape, grill should group by durable outcomes, for example:
+
+- `activity-capture`
+- `ai-analysis`
+- `family-access`
+- `data-boundary`
+- `release-safety`
+- `onboarding-conversion`
+- `documentation-ops`
+
+The exact names are project-specific. The rule is stable: merge folders and scopes until each capability names a real decision boundary.
 
 Split later when either trigger is true:
 
@@ -122,3 +170,28 @@ Split later when either trigger is true:
 - capability ownership boundaries require separate review/merge paths
 
 Until then, single-file is easier for agents: one read, one grep surface, fewer paths to rediscover.
+
+## Learnings Compaction
+
+`## Learnings` is recent operational memory, not an endless audit log.
+
+Keep inline:
+
+- the most recent 5-7 Learnings that future runs should see at startup
+- measured facts, reusable patterns, or constraints that are still active
+
+Promote to `## Decisions`:
+
+- a repeated Learning that has become a durable capability rule
+- a constraint that should stop being rediscovered by future runs
+
+Promote to CHARTER Decisions:
+
+- cross-cutting direction changes
+- rules that affect multiple capabilities or project-wide objectives
+
+Archive:
+
+- useful historical entries that no longer need to be in the startup path
+
+Do not let relay delete or rewrite Learnings. Compaction is a human-gated maintenance action or a doctor warning, not an automatic side effect of a merge.
