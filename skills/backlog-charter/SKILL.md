@@ -24,7 +24,7 @@ Explicit modes win first:
 | Create or refine `spec/capabilities.md`, capability contracts, Behaviors, or Hard Constraints | `grill` | Edits only the requested capability on rerun. |
 | Check whether charter/capabilities/Learnings are stale or should change | `reassess` | Report-only; routes accepted fixes to amend, grill, or a Learning Action. |
 
-When no mode is specified, route by file state: no repo-root `CHARTER.md` means create mode, and an existing repo-root `CHARTER.md` means amend mode. If the request mixes diagnosis and edits, run `reassess` first unless the user explicitly asks to apply a known change. If the request could affect both `CHARTER.md` and `spec/capabilities.md`, ask one bounded routing question before editing.
+When no mode is specified, route by intent first, then use file state only for generic charter requests: no repo-root `CHARTER.md` means create mode, and an existing repo-root `CHARTER.md` means amend mode. If the request mixes diagnosis and edits, run `reassess` first unless the user explicitly asks to apply a known change. If the request could affect both `CHARTER.md` and `spec/capabilities.md`, ask one bounded routing question before editing.
 
 ### Helper Scripts
 
