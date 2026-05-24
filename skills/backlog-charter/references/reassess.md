@@ -1,6 +1,12 @@
 # Reassess-Mode Heuristics
 
-Use this reference in `backlog-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learnings compaction edit.
+Use this reference in `backlog-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
+
+## Policy Ownership
+
+- `SKILL.md` owns the dispatch contract: when to invoke reassess, the no-edit boundary, and the required report sections.
+- This reference owns the operational procedure: evidence order, report shape, recommendation rules, Learning Actions, and stale-spec failure modes.
+- `docs/spec-system-design.md` owns durable design policy: lifecycle, naming policy, source-of-truth map, and historical rationale.
 
 ## Operating Principle
 
@@ -8,12 +14,12 @@ Reassess is the controller review, not the writer.
 
 - Sensors: `## Learnings`, sprint `component:` handles, doctor/lint output, recent sprint context.
 - Diagnosis: the reassess report.
-- Controller action: user-approved `amend`, `grill`, or compaction.
+- Controller action: user-approved `amend`, `grill`, or Learning Action.
 - Forbidden shortcut: silently editing accepted CHARTER direction or capability contracts during reassess.
 
 The default answer can be "no change." Do not manufacture churn just because the user asked for a reassessment.
 
-If the user accepts a Learning Action, end reassess and perform a separate user-approved manual edit. Do not treat that edit as part of reassess diagnosis.
+Learning Actions are the user-gated family for keeping recent Learnings inline, promoting durable facts to Decisions, promoting cross-cutting facts to CHARTER Decisions, or archiving old history outside the hot startup path. If the user accepts one, end reassess and perform a separate user-approved manual edit. Do not treat that edit as part of reassess diagnosis.
 
 ## Evidence Order
 
@@ -48,8 +54,8 @@ Use this structure unless the user asks for a shorter answer:
 
 ### Learning Actions
 - Keep inline: <recent high-signal Learnings>
-- Promote: <Learning> — evidence: <repetition or durable rule>; next: separate user-approved compaction edit
-- Archive: <history no longer needed in startup context> — evidence: <age/no longer active>; next: separate user-approved compaction edit
+- Promote: <Learning> — evidence: <repetition or durable rule>; next: separate user-approved Learning Action
+- Archive: <history no longer needed in startup context> — evidence: <age/no longer active>; next: separate user-approved Learning Action
 
 ### Missing Evidence
 - <what was absent or skipped>
@@ -91,11 +97,13 @@ Do not weaken an Objective so the available proof appears sufficient.
 
 ### Learning Action
 
+Learning Action is the canonical umbrella for accepted Learnings cleanup after reassess. It includes keep-inline, promotion, and archive actions.
+
 Keep recent Learnings inline when they are still useful startup context.
 
 Promote a Learning to `## Decisions` when it has become a durable capability rule. Promote to CHARTER Decisions only when it affects more than one capability or changes the project-wide axis.
 
-Archive older Learnings when they are useful history but no longer startup context. Reassess may recommend archive/compaction, but the actual edit is human-gated.
+Archive older Learnings when they are useful history but no longer startup context. Reassess may recommend a Learning Action, but the actual edit is human-gated.
 
 ## Failure Modes
 
@@ -107,4 +115,4 @@ Archive older Learnings when they are useful history but no longer startup conte
 
 ## Reserved Names
 
-Today the callable skill is `backlog-charter`. The names `spec-grill`, `spec-reassess`, and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.
+Naming policy lives in `docs/spec-system-design.md`. Summary: today the callable skill is `backlog-charter`. The names `spec-grill`, `spec-reassess`, and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.

@@ -3,7 +3,7 @@
 **Status:** Approved (M tier) · **Date:** 2026-05-23 · **Author:** session capture
 **Supersedes:** — · **Related:** [`CHARTER.md`](../CHARTER.md), [`skills/backlog-charter/`](../skills/backlog-charter/)
 
-A layered, brownfield-friendly project spec system that survives multi-day autonomous agent execution without rubber-stamping itself into uselessness. This doc captures the chosen architecture, the research that grounds it, the build order, and the open questions deferred to follow-up specs.
+A layered, brownfield-friendly project spec system that survives multi-day autonomous agent execution without rubber-stamping itself into uselessness. This doc captures the current architecture, durable policy, research grounding, and historical implementation evidence.
 
 ---
 
@@ -90,6 +90,14 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 | `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a primary `component:` tag | structurally bounded append between magic markers; rejects anything else |
 | `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to CHARTER Tier 3 if cross-cutting |
 
+### Reassess source-of-truth map
+
+| Artifact | Owns | Does not own |
+|---|---|---|
+| `skills/backlog-charter/SKILL.md` | short dispatch contract: when to invoke modes, no-edit boundary, required reassess report sections | detailed reassess heuristics |
+| `skills/backlog-charter/references/reassess.md` | operational reassess procedure: evidence order, report shape, recommendation rules, Learning Actions, stale-spec failure modes | durable naming policy or historical build notes |
+| `docs/spec-system-design.md` | durable design policy: lifecycle, naming policy, mutation discipline, split/defer triggers, historical rationale | step-by-step skill execution details |
+
 ### Stale-spec lifecycle
 
 Accepted specs are useful only while they still match product reality. The system therefore needs a small reassessment loop, but not autonomous self-editing:
@@ -97,10 +105,23 @@ Accepted specs are useful only while they still match product reality. The syste
 1. **Setpoint:** `CHARTER.md` and `spec/capabilities.md` describe the accepted project/capability contracts.
 2. **Sensor:** relay and sprint execution append bounded observations as `## Learnings` or sprint context.
 3. **Diagnosis:** deterministic scripts report structural signals first (`capabilities-doctor.js`, `component-lint.js`); `backlog-charter reassess` turns those signals into a report.
-4. **Human gate:** accepted changes route through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learnings compaction edit.
+4. **Human gate:** accepted changes route through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
 5. **No silent controller:** reassess may recommend edits, promotion, or archival, but it must not edit CHARTER direction, capability Goal/Scope/Behaviors/Hard Constraints, Decisions, or Learnings while diagnosing.
 
 This keeps freedom where agents need it (reasoning over evidence) and control where the spec could otherwise rationalize itself into noise.
+
+### Learning Actions
+
+`## Learnings` is a live sensor, not an audit log. Keep the most recent 5-7 entries inline per capability so the file stays useful during agent startup.
+
+Learning Action is the canonical umbrella term for accepted cleanup after reassess:
+
+- **Keep inline** when a recent Learning is still useful startup context.
+- **Promote to capability Decisions** when it describes a durable capability-level rule.
+- **Promote to CHARTER Decisions** when it changes the project-wide axis.
+- **Archive outside the hot `spec/capabilities.md` path** when it is useful history but no longer startup context.
+
+Reassess may recommend a Learning Action, but diagnosis itself does not rewrite Learnings. The edit is a separate user-approved manual change.
 
 ### Command surface and reserved names
 
@@ -151,9 +172,53 @@ Before any capability Behavior or Hard Constraint is committed:
 2. **Distributional axis:** does this predicate hold in unseen code areas / unseen workloads? If no → restate as environment-independent.
 3. **Manipulability axis:** can an agent satisfy this by editing the measurement channel rather than the system? If yes → add a structural restriction outside the spec.
 
+## NOT in scope (deferred with rationale)
+
+| Deferred | Rationale | Promotion trigger |
+|---|---|---|
+| Per-capability files (`spec/components/*.md`) | YAGNI; a compact single file is easier to read and route through while under budget | `spec/capabilities.md` > 500 lines, >15 capabilities, or ownership demands |
+| ADR directory (`spec/decisions/*.md`) | CHARTER Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
+| Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
+| Cross-capability dependency graph | Over-engineering; readable from prose | Multiple capability authors complain about silent coupling |
+| Per-capability `revision:` / `last_amended:` | `git blame` is the source of truth | Auditing demand from outside the team |
+| Automated reassess hooks in sprint-close / relay-merge | Manual report-only reassess must prove useful before hooks add noise to execution paths | Repeated manual reassess reports produce the same actionable recommendation |
+| Auto-promotion of Learnings into Decisions or CHARTER | Promotion changes accepted authority and must stay human-gated | Explicit user asks for a promotion pass and reviews the proposed diff |
+
 ---
 
-## Implementation plan (3 PRs, ordered)
+## Design decisions and watchpoints
+
+These are current policy anchors carried forward from implementation. They are not active implementation tasks unless new evidence reopens them.
+
+- **D2** `spec/` location — resolved: root `spec/`, peer of `backlog/`, not `docs/spec/` or `.spec/`.
+- **D3** `spec/capabilities.md` size warning threshold — resolved: warn above 12 capabilities or 400 lines; recommend split above 500 lines, 15 capabilities, or ownership-boundary pressure.
+- **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
+- **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
+
+---
+
+## Migration path to "L tier" (full Approach A) — if needed
+
+Strangler-fig. None of these requires re-architecture, just expansion:
+
+1. `spec/capabilities.md` outgrows comfort → `split-capabilities.js` migrates to `spec/components/<name>.md`. SKILL.md routes the same gates over the new file shape.
+2. Decision volume justifies ADRs → `spec/decisions/<NNNN>-<slug>.md` with a tiny ADR template. Per-capability `## Decisions` sections become a "lite" entry point.
+3. Working agent shows rationalization tells in grill mode → adversarial grill runs as a subagent with separate context. `backlog-charter` SKILL.md gains a `--adversarial-subagent` flag.
+4. Reserved/non-callable names (`spec-grill`, `spec-reassess`, `spec-learn`) become real skills only if the triggers in [Command surface and reserved names](#command-surface-and-reserved-names) fire.
+
+Every L-tier feature is a YAGNI-violating addition until it's not. Defer until signal.
+
+### Learning Actions pointer
+
+Learning Actions are defined in [Learning Actions](#learning-actions). Any future L-tier extension must preserve the rule that reassess recommends and a separate user-approved action edits.
+
+---
+
+## Historical Implementation Notes
+
+This section records how the v0.1 spec system and reassess MVP were built. It is historical context, not current operating policy; current policy lives above.
+
+### v0.1 implementation plan (historical)
 
 ```
 PR-1: template + SKILL.md extension (no executable code)
@@ -179,9 +244,9 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
   └─ Component-tag conflict resolution rule: one primary capability slug; multi-component values fail lint
 ```
 
-### Reassess MVP follow-up
+### Reassess MVP implementation note (completed by PR #142)
 
-After v0.1, the next increment is deliberately smaller than full automation:
+PR #142 implemented the deliberately small follow-up after v0.1:
 
 ```
 PR-4: stale-spec reassess MVP
@@ -197,7 +262,7 @@ Future only if dogfood proves need:
   └─ relay-merge reassess hints
 ```
 
-### Build-order rationale
+### Build-order rationale (historical)
 
 1. **Template first** because the layered structure is the only innovation token; everything else (scripts, hooks) is plumbing. Validate the structure with a real dogfood (writing dev-backlog's own `spec/capabilities.md`) before building scaffolding around it.
 2. **Bootstrap second** because brownfield extraction is the proof that this works on "any real repo, not just greenfield toys." Test against `dev-relay` (rich enough, real enough).
@@ -205,57 +270,9 @@ Future only if dogfood proves need:
 
 ---
 
-## NOT in scope (deferred with rationale)
+## Historical Dogfood Evidence
 
-| Deferred | Rationale | Promotion trigger |
-|---|---|---|
-| Per-capability files (`spec/components/*.md`) | YAGNI; a compact single file is easier to read and route through while under budget | `spec/capabilities.md` > 500 lines, >15 capabilities, or ownership demands |
-| ADR directory (`spec/decisions/*.md`) | CHARTER Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
-| Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
-| Cross-capability dependency graph | Over-engineering; readable from prose | Multiple capability authors complain about silent coupling |
-| Per-capability `revision:` / `last_amended:` | `git blame` is the source of truth | Auditing demand from outside the team |
-| Automated reassess hooks in sprint-close / relay-merge | Manual report-only reassess must prove useful before hooks add noise to execution paths | Repeated manual reassess reports produce the same actionable recommendation |
-| Auto-promotion of Learnings into Decisions or CHARTER | Promotion changes accepted authority and must stay human-gated | Explicit user asks for a promotion pass and reviews the proposed diff |
-
----
-
-## Open questions
-
-These are flagged for the implementation PRs, not blockers for committing to M:
-
-- **D2** Naming: `spec/` (root) vs `docs/spec/` vs `.spec/`? Lean root — peer of `backlog/`. Confirm during PR-1.
-- **D3** `spec/capabilities.md` size warning threshold — resolved: warn above 12 capabilities or 400 lines; recommend split above 500 lines, 15 capabilities, or ownership-boundary pressure.
-- **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
-- **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
-
----
-
-## Migration path to "L tier" (full Approach A) — if needed
-
-Strangler-fig. None of these requires re-architecture, just expansion:
-
-1. `spec/capabilities.md` outgrows comfort → `split-capabilities.js` migrates to `spec/components/<name>.md`. SKILL.md routes the same gates over the new file shape.
-2. Decision volume justifies ADRs → `spec/decisions/<NNNN>-<slug>.md` with a tiny ADR template. Per-capability `## Decisions` sections become a "lite" entry point.
-3. Working agent shows rationalization tells in grill mode → adversarial grill runs as a subagent with separate context. `backlog-charter` SKILL.md gains a `--adversarial-subagent` flag.
-4. Reserved/non-callable names (`spec-grill`, `spec-reassess`, `spec-learn`) become real skills only if the triggers in [Command surface and reserved names](#command-surface-and-reserved-names) fire.
-
-Every L-tier feature is a YAGNI-violating addition until it's not. Defer until signal.
-
-### Learnings compaction
-
-`## Learnings` is a live sensor, not an audit log. Keep the most recent 5-7 entries inline per capability so the file stays useful during agent startup. Older entries should be:
-
-- promoted to `## Decisions` when they describe a durable capability-level rule
-- promoted to CHARTER Decisions when they change the project-wide axis
-- archived outside the hot `spec/capabilities.md` path when they are useful history but no longer startup context
-
-Compaction is human-gated or doctor-suggested. Relay's bounded writer may append between markers, but it must not silently delete, rewrite, or archive Learnings.
-
-`backlog-charter reassess` may recommend compaction, promotion, or archival. If the user accepts a Learning Action, reassess ends and the edit happens as a separate user-approved manual change; diagnosis itself does not rewrite Learnings.
-
----
-
-## Dogfood plan
+This section records calibration evidence. It should inform future changes, but it is not the current operating procedure for every reassess run.
 
 The most authentic test of this spec system is applying it to projects we already understand:
 

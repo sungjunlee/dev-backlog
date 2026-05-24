@@ -171,27 +171,15 @@ Split later when either trigger is true:
 
 Until then, single-file is easier for agents: one read, one grep surface, fewer paths to rediscover.
 
-## Learnings Compaction
+## Learning Actions
 
-`## Learnings` is recent operational memory, not an endless audit log.
+`## Learnings` is recent operational memory, not an endless audit log. Grill mode may notice that a capability is over its 5-7 Learning budget, but it should recommend a user-approved Learning Action rather than define a separate cleanup workflow here.
 
-Keep inline:
+Use the canonical policy in `docs/spec-system-design.md` and the operational report rules in `references/reassess.md`:
 
-- the most recent 5-7 Learnings that future runs should see at startup
-- measured facts, reusable patterns, or constraints that are still active
+- keep recent Learnings inline when they still help startup context
+- promote durable capability facts to `## Decisions`
+- promote cross-cutting facts to CHARTER Decisions
+- archive older history outside the hot `spec/capabilities.md` path
 
-Promote to `## Decisions`:
-
-- a repeated Learning that has become a durable capability rule
-- a constraint that should stop being rediscovered by future runs
-
-Promote to CHARTER Decisions:
-
-- cross-cutting direction changes
-- rules that affect multiple capabilities or project-wide objectives
-
-Archive:
-
-- useful historical entries that no longer need to be in the startup path
-
-Do not let relay delete or rewrite Learnings. Compaction is a human-gated maintenance action or a doctor warning, not an automatic side effect of a merge.
+Do not let relay delete or rewrite Learnings. A Learning Action is human-gated or doctor-suggested, not an automatic side effect of a merge.
