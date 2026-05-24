@@ -74,9 +74,24 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-slug>` (rerun: polish one capability without touching others). Capability slugs are strict routing handles used by sprint `component:` frontmatter; keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
-**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `node skills/backlog-charter/scripts/extract-signals.js --json` first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and proposes capability candidates with signals + draft Goal + draft Scope. Use the draft as the interview seed; grill mode still pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup draft candidates rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
+**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `node skills/backlog-charter/scripts/extract-signals.js --json` first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
 
-`spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional for projects with under ~20 capabilities; `split-capabilities.js` migrates to per-capability files once that threshold is crossed.
+`spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional while the spec remains compact: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
+
+### Capability Admission Test
+
+Before interviewing a candidate capability, decide whether it deserves to exist. Raw extraction signals are not accepted specs.
+
+Admit a capability only when most of these are true:
+
+- It is a repeated decision boundary, not just a directory name or commit scope.
+- It owns a primary relay-learning destination.
+- Its Goal can be stated as an observable user or operator outcome.
+- Its Behaviors and Hard Constraints differ meaningfully from neighboring candidates.
+- If two candidates share nearly all predicates, merge them.
+- If one candidate needs more than five Behaviors to feel complete, split it along the contract boundary the extra Behaviors describe.
+
+Use this as a bloat check before the per-capability flow. dev-backlog's five capabilities are contract surfaces; a large feature-first app may have many feature folders but only 5-10 durable capability contracts.
 
 ### Per-Capability Interview Flow
 
@@ -105,7 +120,7 @@ Grill mode applies the same challenge + confirm + apply discipline used by amend
 
 - Goal / In-scope / Out-of-scope are Tier-1-equivalent: challenge before applying. Default to no change.
 - Behaviors / Hard Constraints are Tier-2-equivalent: each must pass the 3-axis test. The test is the proof gate.
-- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by the bounded `append-learnings` writer between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either.
+- `## Learnings` and `## Decisions` are **not** interview targets. Learnings are appended by the bounded `append-learnings` writer between magic markers (`<!-- LEARN:BEGIN -->` / `<!-- LEARN:END -->`); Decisions are append-only by convention. Grill mode never edits either, but it may recommend human-gated compaction when a capability has more than 5-7 inline Learnings.
 
 ### Writing the File
 

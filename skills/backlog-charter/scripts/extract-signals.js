@@ -4,9 +4,9 @@
  *
  * Usage: ./scripts/extract-signals.js [--repo-root PATH] [--commit-limit N] [--dry-run] [--json]
  *
- * Reads repo signals in priority order and proposes a capability draft that
+ * Reads repo signals in priority order and reports raw capability seeds that
  * grill mode can interview against. Does not write spec/capabilities.md —
- * grill mode owns that decision.
+ * grill mode owns admission, merging, splitting, and naming.
  *
  * Signals (priority):
  *   1. README.md                — top-level product framing
@@ -158,6 +158,10 @@ function summarizeReadme(readme) {
     if (trimmed.startsWith("#")) continue;
     if (trimmed.startsWith("[!")) continue;
     if (trimmed.startsWith("<!--")) continue;
+    if (/^<\/?div\b/i.test(trimmed)) continue;
+    if (/^<p\b/i.test(trimmed) || /^<\/p>/i.test(trimmed)) continue;
+    if (/^<br\s*\/?>$/i.test(trimmed)) continue;
+    if (/^\[.+\]\(.+\)(\s*[•|·]\s*\[.+\]\(.+\))*$/.test(trimmed)) continue;
     return trimmed.length > 240 ? `${trimmed.slice(0, 237)}...` : trimmed;
   }
   return null;
@@ -274,13 +278,13 @@ function formatHumanReport(result) {
   lines.push("");
 
   if (capabilities.length === 0) {
-    lines.push("No capability candidates detected.");
+    lines.push("No raw capability signals detected.");
     lines.push("Grill mode will run in greenfield mode (interview from scratch).");
     return lines.join("\n");
   }
 
-  lines.push(`Capability candidates (${capabilities.length}, top ${Math.min(capabilities.length, SUMMARY_DIR_LIMIT)} shown):`);
-  lines.push("  Note: candidates cluster by repo signals; grill mode turns them into functional contracts.");
+  lines.push(`Raw capability signals (${capabilities.length}, top ${Math.min(capabilities.length, SUMMARY_DIR_LIMIT)} shown):`);
+  lines.push("  Note: these are interview seeds, not accepted capabilities. Grill mode admits, merges, splits, and names functional contracts.");
   for (const cap of capabilities.slice(0, SUMMARY_DIR_LIMIT)) {
     lines.push(`  - ${cap.name}`);
     lines.push(`      signals: ${cap.signals.join(", ")}`);
@@ -289,7 +293,7 @@ function formatHumanReport(result) {
     lines.push(`  ... and ${capabilities.length - SUMMARY_DIR_LIMIT} more (use --json for full draft)`);
   }
   lines.push("");
-  lines.push("Next: invoke `backlog-charter grill` to interview each capability into spec/capabilities.md.");
+  lines.push("Next: invoke `backlog-charter grill` to admit raw signals and interview compact capabilities into spec/capabilities.md.");
   return lines.join("\n");
 }
 

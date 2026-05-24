@@ -194,6 +194,25 @@ describe("summarizeReadme", () => {
     assert.equal(summarizeReadme("# Only headings\n\n## Subhead\n"), null);
   });
 
+  it("skips centered badge and navigation markup before prose", () => {
+    const readme = `# 탐구노트
+
+<div align="center">
+
+**AI-Powered Educational Portfolio for Parents**
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.41.4-blue)](https://flutter.dev)
+
+[Features](#features) • [Quick Start](#quick-start) • [Docs](#docs)
+
+</div>
+
+## What is this?
+
+Tamgu Note helps parents discover children's hidden talents through AI-powered activity analysis.`;
+    assert.equal(summarizeReadme(readme), "**AI-Powered Educational Portfolio for Parents**");
+  });
+
   it("returns null for an empty readme", () => {
     assert.equal(summarizeReadme(null), null);
     assert.equal(summarizeReadme(""), null);
@@ -359,6 +378,48 @@ revision: 1
     assert.match(result.capabilities[0].candidate_goal, /Fill in via grill/);
   });
 
+  it("large feature-first repo: reports raw signals without treating feature count as final spec", () => {
+    write(repo, "README.md", `# Tamgu Note
+
+<div align="center">
+
+[![Flutter](badge)](url)
+
+[Features](#features) • [Quick Start](#quick-start)
+
+</div>
+
+Tamgu Note helps parents discover children's hidden talents through AI-powered activity analysis.
+`);
+    for (const feature of [
+      "activity", "ai", "insight", "child", "family", "auth", "onboarding", "search",
+      "settings", "sync", "storage",
+    ]) {
+      mkdir(repo, `lib/features/${feature}`);
+    }
+    const commits = [
+      "feat(e2e): add patrol lane",
+      "fix(e2e): stabilize image upload",
+      "chore(sprint): close batch",
+      "chore(sprint): dispatch next leaf",
+      "test(activity): cover image-first cards",
+      "fix(activity): edge cases",
+      "chore(backlog): update sprint",
+      "chore(backlog): mark issue done",
+    ];
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => commits.join("\n"),
+    });
+
+    assert.equal(result.inventory.sourceRoot, "lib");
+    assert.ok(result.capabilities.find((c) => c.name === "features"));
+    assert.ok(result.capabilities.find((c) => c.name === "activity"));
+    assert.ok(result.capabilities.find((c) => c.name === "e2e"));
+    assert.match(result.capabilities[0].candidate_goal, /Tamgu Note helps parents/);
+  });
+
   it("is deterministic: same inputs → same output", () => {
     write(repo, "README.md", "# Project\n\nLine.\n");
     mkdir(repo, "src/a");
@@ -385,7 +446,7 @@ describe("formatHumanReport", () => {
     assert.match(formatHumanReport(result), /greenfield/);
   });
 
-  it("renders capability candidates under the summary limit", () => {
+  it("renders raw capability signals under the summary limit", () => {
     const result = {
       inventory: {
         repoRoot: "/x", readmeFound: true, claudeMdFound: false,
@@ -398,8 +459,8 @@ describe("formatHumanReport", () => {
       ],
     };
     const report = formatHumanReport(result);
-    assert.match(report, /Capability candidates \(2/);
-    assert.match(report, /functional contracts/);
+    assert.match(report, /Raw capability signals \(2/);
+    assert.match(report, /interview seeds/);
     assert.match(report, /auth/);
     assert.match(report, /billing/);
   });

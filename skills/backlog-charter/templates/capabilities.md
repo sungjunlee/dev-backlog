@@ -13,7 +13,14 @@ Mutation discipline (matches the design doc):
 | `## Learnings` (between magic markers) | `append-learnings.js` only | end of every successful relay run tagged with this primary capability slug | structurally bounded append; rejects writes outside markers |
 | `## Decisions` | human, append-only | when a capability-level decision is made | append-only by convention; promote to CHARTER if cross-cutting |
 
-When this file exceeds ~500 lines, run `split-capabilities.js` to migrate to `spec/components/<name>.md`. Do not pre-split.
+Compactness budget:
+
+- Target 5-10 capabilities.
+- Warn above 12 capabilities or 400 lines.
+- Split above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
+- Keep the most recent 5-7 Learnings inline per capability; promote durable rules to Decisions and archive older history outside this hot file.
+
+Do not create one capability per feature folder. A capability is a durable contract boundary with distinct Behaviors and Hard Constraints.
 
 ---
 
