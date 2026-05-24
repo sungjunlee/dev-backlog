@@ -9,7 +9,35 @@ metadata:
 
 # Backlog Charter
 
-Create and amend `CHARTER.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable. Explicit modes win first (`create`, `amend`, `grill`, `reassess`); file-state routing applies only when no mode is specified: no repo-root `CHARTER.md` means create mode, and an existing repo-root `CHARTER.md` means amend mode.
+Create and amend `CHARTER.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable.
+
+## Execution Contract
+
+### Mode Router
+
+Explicit modes win first:
+
+| User intent | Mode | Boundary |
+|-------------|------|----------|
+| Create the project axis, baseline, charter, or first spec foundation | `create` | Only when repo-root `CHARTER.md` is absent, unless the user explicitly asks to replace it. |
+| Update direction, objectives, decisions, or accepted charter wording | `amend` | Applies tier gates and may edit `CHARTER.md` after confirmation. |
+| Create or refine `spec/capabilities.md`, capability contracts, Behaviors, or Hard Constraints | `grill` | Edits only the requested capability on rerun. |
+| Check whether charter/capabilities/Learnings are stale or should change | `reassess` | Report-only; routes accepted fixes to amend, grill, or a Learning Action. |
+
+When no mode is specified, route by file state: no repo-root `CHARTER.md` means create mode, and an existing repo-root `CHARTER.md` means amend mode. If the request mixes diagnosis and edits, run `reassess` first unless the user explicitly asks to apply a known change. If the request could affect both `CHARTER.md` and `spec/capabilities.md`, ask one bounded routing question before editing.
+
+### Helper Scripts
+
+Resolve helper scripts from the installed `backlog-charter` skill directory, not from the target repo. In a source checkout, that means the local `scripts/` directory beside this `SKILL.md`; in an installed skill, first locate the skill directory and run the same script from there. If a helper is unavailable, report **Missing Evidence** and continue with bounded file reads.
+
+### Completion Contract
+
+End every mode with a short summary:
+
+- `create`: created files, unresolved assumptions, and the first suggested `grill` or `amend` follow-up.
+- `amend`: accepted changes, refused/parked changes, proof cited for status advances, and size-check result.
+- `grill`: capability blocks created or edited, predicates rejected or rewritten, constraints added, and follow-up Learning Actions if any.
+- `reassess`: required report sections from the Reassess Mode dispatch contract, with one recommended next step.
 
 ## What CHARTER.md Is
 
@@ -64,7 +92,7 @@ Apply the 3-tier discipline:
 - Tier 2 status advance: require proof for `active` → `validated` or `deferred`; cite a merged PR, passing check, or relay run whose Done Criteria match the predicate. Without proof, refuse the advance and flag it.
 - Tier 3 Decisions: append only. Never edit or delete an existing row; a reversal is a new row with `supersedes`.
 
-After applying an accepted amendment, bump `last_amended` to today and increment `revision`. Then run `node skills/backlog-charter/scripts/check-size.js` to confirm the 5-minute-read property still holds; collapse long `deferred` lists or oversized Decisions rationale if the script warns.
+After applying an accepted amendment, bump `last_amended` to today and increment `revision`. Then run `check-size.js` from the installed skill's `scripts/` directory to confirm the 5-minute-read property still holds; collapse long `deferred` lists or oversized Decisions rationale if the script warns.
 
 Amend mode can take a `backlog-triage` Alignment Check report as a seed of proposed changes. The report proposes; this skill applies through the gates.
 
@@ -74,7 +102,7 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-slug>` (rerun: polish one capability without touching others). Capability slugs are strict routing handles used by sprint `component:` frontmatter; keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
-**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `node skills/backlog-charter/scripts/extract-signals.js --json` first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
+**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `extract-signals.js --json` from the installed skill's `scripts/` directory first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
 
 `spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional while the spec remains compact: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
 
