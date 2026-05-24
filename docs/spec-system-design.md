@@ -90,6 +90,29 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 | `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a primary `component:` tag | structurally bounded append between magic markers; rejects anything else |
 | `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to CHARTER Tier 3 if cross-cutting |
 
+### Stale-spec lifecycle
+
+Accepted specs are useful only while they still match product reality. The system therefore needs a small reassessment loop, but not autonomous self-editing:
+
+1. **Setpoint:** `CHARTER.md` and `spec/capabilities.md` describe the accepted project/capability contracts.
+2. **Sensor:** relay and sprint execution append bounded observations as `## Learnings` or sprint context.
+3. **Diagnosis:** deterministic scripts report structural signals first (`capabilities-doctor.js`, `component-lint.js`); `backlog-charter reassess` turns those signals into a report.
+4. **Human gate:** accepted changes route through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learnings compaction edit.
+5. **No silent controller:** reassess may recommend edits, promotion, or archival, but it must not edit CHARTER direction, capability Goal/Scope/Behaviors/Hard Constraints, Decisions, or Learnings while diagnosing.
+
+This keeps freedom where agents need it (reasoning over evidence) and control where the spec could otherwise rationalize itself into noise.
+
+### Command surface and reserved names
+
+The current callable surface is `backlog-charter` with `create`, `amend`, `grill`, and `reassess` modes. There are no callable `spec-*` skills today.
+
+The names `spec-grill`, `spec-reassess`, and `spec-learn` are reserved/non-callable future split candidates. They should appear only in naming-policy discussion until a split is justified by concrete signal:
+
+- `skills/backlog-charter/SKILL.md` exceeds the local compactness budget (about 250 lines in this repo)
+- mode instructions no longer fit a single understandable spine
+- users repeatedly ask for `spec-*` commands and fail to discover `backlog-charter`
+- capability/reassess work no longer reads as CHARTER lifecycle work
+
 ### Why single-file, not per-capability
 
 One `spec/capabilities.md` is the default because it is easy to read, grep, and hand to an agent in one shot. The budget is about scanability, not feature count: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only when the file exceeds 500 lines, has more than 15 capabilities, or ownership boundaries demand separate review paths.
@@ -156,11 +179,29 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
   └─ Component-tag conflict resolution rule: one primary capability slug; multi-component values fail lint
 ```
 
+### Reassess MVP follow-up
+
+After v0.1, the next increment is deliberately smaller than full automation:
+
+```
+PR-4: stale-spec reassess MVP
+  ├─ docs/spec-system-design.md                    (+stale-spec lifecycle and naming policy)
+  ├─ skills/backlog-charter/SKILL.md               (+report-only reassess mode)
+  └─ skills/backlog-charter/references/reassess.md (NEW, report heuristics)
+       ↓
+       (dogfood: run reassess manually on dev-backlog and a larger repo shape)
+       ↓
+Future only if dogfood proves need:
+  ├─ new reassess seed script
+  ├─ sprint-close advisory hints
+  └─ relay-merge reassess hints
+```
+
 ### Build-order rationale
 
 1. **Template first** because the layered structure is the only innovation token; everything else (scripts, hooks) is plumbing. Validate the structure with a real dogfood (writing dev-backlog's own `spec/capabilities.md`) before building scaffolding around it.
 2. **Bootstrap second** because brownfield extraction is the proof that this works on "any real repo, not just greenfield toys." Test against `dev-relay` (rich enough, real enough).
-3. **Live-update last** because it's a cross-repo change touching `dev-relay`'s merge path. Highest blast radius, do it once the upstream pieces are solid.
+3. **Live-update last for v0.1** because it's a cross-repo change touching `dev-relay`'s merge path. Highest blast radius, do it once the upstream pieces are solid.
 
 ---
 
@@ -173,7 +214,8 @@ PR-3: live-update wiring (cross-repo: dev-backlog + dev-relay)
 | Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
 | Cross-capability dependency graph | Over-engineering; readable from prose | Multiple capability authors complain about silent coupling |
 | Per-capability `revision:` / `last_amended:` | `git blame` is the source of truth | Auditing demand from outside the team |
-| Auto-promotion of O5 (CHARTER auto-reassess) | `## Learnings` is the manual feedback channel for now; auto-reassess deserves its own design doc | One full quarter of `## Learnings` data to inform the auto-reassess spec |
+| Automated reassess hooks in sprint-close / relay-merge | Manual report-only reassess must prove useful before hooks add noise to execution paths | Repeated manual reassess reports produce the same actionable recommendation |
+| Auto-promotion of Learnings into Decisions or CHARTER | Promotion changes accepted authority and must stay human-gated | Explicit user asks for a promotion pass and reviews the proposed diff |
 
 ---
 
@@ -195,7 +237,7 @@ Strangler-fig. None of these requires re-architecture, just expansion:
 1. `spec/capabilities.md` outgrows comfort → `split-capabilities.js` migrates to `spec/components/<name>.md`. SKILL.md routes the same gates over the new file shape.
 2. Decision volume justifies ADRs → `spec/decisions/<NNNN>-<slug>.md` with a tiny ADR template. Per-capability `## Decisions` sections become a "lite" entry point.
 3. Working agent shows rationalization tells in grill mode → adversarial grill runs as a subagent with separate context. `backlog-charter` SKILL.md gains a `--adversarial-subagent` flag.
-4. `spec-grill` / `spec-learn` extracted as named skills only if `backlog-charter`'s SKILL.md exceeds 250 lines and the modes feel forced.
+4. Reserved/non-callable names (`spec-grill`, `spec-reassess`, `spec-learn`) become real skills only if the triggers in [Command surface and reserved names](#command-surface-and-reserved-names) fire.
 
 Every L-tier feature is a YAGNI-violating addition until it's not. Defer until signal.
 
@@ -209,6 +251,8 @@ Every L-tier feature is a YAGNI-violating addition until it's not. Defer until s
 
 Compaction is human-gated or doctor-suggested. Relay's bounded writer may append between markers, but it must not silently delete, rewrite, or archive Learnings.
 
+`backlog-charter reassess` may recommend compaction, promotion, or archival. If the user accepts a Learning Action, reassess ends and the edit happens as a separate user-approved manual change; diagnosis itself does not rewrite Learnings.
+
 ---
 
 ## Dogfood plan
@@ -219,10 +263,24 @@ The most authentic test of this spec system is applying it to projects we alread
 2. **dev-relay** (brownfield — established code, no CHARTER yet). Validates the full brownfield path: `extract-signals.js` → grill → `spec/capabilities.md` written end-to-end. Also exercises live-update since dev-relay *is* the relay-merge surface.
 3. **Large-repo fixture** — a deterministic tamgu_note-shaped fixture with many feature folders and workflow commit scopes. Protects against treating feature count as capability count without depending on a private checkout.
 4. **(optional, after both)** A real product repo from outside this workspace. Highest signal but lowest control. Worth doing once internal dogfood looks healthy.
+5. **Manual reassess pass** — run `backlog-charter reassess` on dev-backlog and one larger repo shape before adding sprint-close or relay-merge hooks. The test is whether the report produces a useful next action without creating churn.
 
 Each dogfood produces:
 - A `spec/capabilities.md` in the target repo
 - Reusable signal feedback for spec-system v0.2 (more findings, like the CHARTER dogfood pattern that produced #93–#98)
+
+### Reassess MVP dogfood note (2026-05-24)
+
+Manual reassess evidence was checked before adding a new seed script:
+
+| Repo | Command | Result | Reassess implication |
+|---|---|---|---|
+| dev-backlog | `node skills/dev-backlog/scripts/capabilities-doctor.js --json` | 5 capabilities, 178 lines, 0 warnings, 0 hard failures | compactness and Learnings marker evidence is sufficient for a no-change structural finding |
+| dev-backlog | `node skills/dev-backlog/scripts/component-lint.js --json` | 5 declared capabilities, 0 sprint files, 0 issues | routing evidence is sufficient; no sprint data means no usage-frequency inference |
+| tamgu_note | `node <dev-backlog-skill-dir>/scripts/capabilities-doctor.js --capabilities spec/capabilities.md --json` | 7 capabilities, 232 lines, 0 warnings, 0 hard failures | large-repo-shaped spec remains within budget |
+| tamgu_note | `node <dev-backlog-skill-dir>/scripts/component-lint.js --sprints-dir backlog/sprints --capabilities spec/capabilities.md --json` | 19 sprint files, 0 component issues | routing evidence is sufficient on a larger real repo shape |
+
+Decision: existing doctor/lint JSON is enough for the MVP reassess mode to produce bounded structural evidence and no-change recommendations. Do not add `capabilities-reassess-seed.js` until manual reassess dogfood exposes a repeated gap that doctor/lint cannot represent.
 
 ---
 
@@ -232,7 +290,7 @@ This design advances dev-backlog's own CHARTER Objectives:
 
 - **O3 (active):** `<5-min reference axis usable` — capability specs *extend* the 5-min property below CHARTER. Not advance to validated on this; one more independent project required.
 - **O4 (active):** `drift detectable without manual triage` — `## Learnings` + `component-lint.js` are direct drift-detection surfaces. Same proof-gate.
-- **O5 (deferred):** `auto-reassess wired into relay-merge / sprint completion` — `## Learnings` append is the manual precursor. After v0.1 ships and accumulates data, O5 spec gets written with real evidence.
+- **O5 (deferred):** `auto-reassess wired into relay-merge / sprint completion` — report-only `backlog-charter reassess` is the manual precursor. Do not wire hooks until manual reassess repeatedly produces useful, low-noise recommendations.
 - **O6 (deferred):** `/goal completion-condition auto-emission from CHARTER + active sprint` — unchanged.
 
 Status advance for any of these is gated on independent-project proof, per CHARTER Tier 2 discipline.
