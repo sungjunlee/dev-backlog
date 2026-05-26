@@ -21,6 +21,15 @@ The default answer can be "no change." Do not manufacture churn just because the
 
 Learning Actions are the user-gated family for keeping recent Learnings inline, promoting durable facts to Decisions, promoting cross-cutting facts to CHARTER Decisions, or archiving old history outside the hot startup path. If the user accepts one, end reassess and perform a separate user-approved manual edit. Do not treat that edit as part of reassess diagnosis.
 
+## Cadence Triggers
+
+Run a lightweight reassess pass when either condition applies:
+
+- A major model, coding-agent tool, or repo harness change affects how agents read instructions, call tools, or preserve context.
+- An active project has used the spec-system for 3-6 months without a spec health review.
+
+Keep this low-noise: the review can still conclude "no change," and it does not create an automatic edit path. Treat `CLAUDE.md` / `AGENTS.md` as development-harness context during this pass. They can explain local commands, agent workflow, and guardrails, but they do not override README, CHARTER, issues, code structure, or accepted capability contracts as product authority.
+
 ## Evidence Order
 
 Prefer bounded evidence before broad reading:
@@ -29,7 +38,8 @@ Prefer bounded evidence before broad reading:
 2. `component-lint.js --json` for sprint `component:` routing drift.
 3. `CHARTER.md` Objectives and Decisions when a recommendation could affect project-wide direction.
 4. `spec/capabilities.md` capability blocks named by the evidence.
-5. Latest five completed sprint files, plus the active sprint when it exists.
+5. `CLAUDE.md` / `AGENTS.md` only when the reassess question involves harness behavior, local commands, or agent context loading.
+6. Latest five completed sprint files, plus the active sprint when it exists.
 
 If a script is missing, say it was skipped and continue with file reads. Missing `CHARTER.md` or `spec/capabilities.md` is not an error; it is an opt-in state with a next-step recommendation.
 

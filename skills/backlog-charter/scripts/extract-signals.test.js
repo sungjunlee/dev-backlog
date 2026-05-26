@@ -11,6 +11,7 @@ const {
   readOptionalFile,
   readCharterObjectives,
   summarizeReadme,
+  buildSignalAuthority,
   buildCapability,
   mergeCandidates,
   extractSignals,
@@ -219,6 +220,23 @@ Tamgu Note helps parents discover children's hidden talents through AI-powered a
   });
 });
 
+describe("buildSignalAuthority", () => {
+  it("labels CLAUDE.md/AGENTS.md as development-harness authority", () => {
+    const authority = buildSignalAuthority({
+      readmeFound: true,
+      harnessFiles: ["CLAUDE.md", "AGENTS.md"],
+      sourceRoot: { name: "src", path: "/repo/src" },
+      commitsScanned: 4,
+      charterObjectiveCount: 1,
+    });
+
+    const harness = authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
+    assert.match(harness.note, /does not create product capability boundaries/);
+  });
+});
+
 describe("buildCapability", () => {
   it("includes a CHARTER objective hint when objectives are present", () => {
     const cap = buildCapability({
@@ -330,6 +348,7 @@ revision: 1
 
     assert.equal(result.inventory.readmeFound, true);
     assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["CLAUDE.md"]);
     assert.equal(result.inventory.sourceRoot, "src");
     assert.equal(result.inventory.sourceDirCount, 2);
     assert.equal(result.inventory.commitsScanned, 5);
@@ -345,6 +364,27 @@ revision: 1
     assert.equal(ingest.provenance.directory, "src/ingest/");
     assert.match(ingest.candidate_goal, /logging pipeline/);
     assert.match(ingest.candidate_goal, /O1/);
+
+    const harness = result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
+  });
+
+  it("development harness files do not create capability candidates by themselves", () => {
+    write(repo, "CLAUDE.md", "# Development\n\nUse pnpm. Keep PRs small.\n");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "",
+    });
+
+    assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["CLAUDE.md"]);
+    assert.deepEqual(result.capabilities, []);
+    assert.equal(
+      result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md").authority,
+      "development-harness",
+    );
   });
 
   it("brownfield commit-scope-only: keeps provenance explicit without fake ownership", () => {
