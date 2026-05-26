@@ -4,20 +4,21 @@
  *
  * Usage: ./scripts/extract-signals.js [--repo-root PATH] [--commit-limit N] [--dry-run] [--json]
  *
- * Reads repo signals in priority order and reports raw capability seeds that
+ * Reads repo signals and reports raw capability seeds that
  * grill mode can interview against. Does not write spec/capabilities.md —
  * grill mode owns admission, merging, splitting, and naming.
  *
- * Signals (priority):
- *   1. README.md                — top-level product framing
- *   2. CLAUDE.md / AGENTS.md    — explicit conventions and capability hints
- *   3. Top-level source dirs    — src/, lib/, app/, packages/, skills/
- *                                 (each subdir is a capability candidate)
- *   4. Last N commit messages   — conventional-commit scopes cluster usage
- *   5. CHARTER.md Objectives    — capabilities should serve at least one
+ * Signal authority:
+ *   - README.md / CHARTER.md    — product authority
+ *   - Top-level source dirs     — repo-structure evidence
+ *   - CLAUDE.md / AGENTS.md     — development-harness conventions
+ *   - Last N commit messages    — history
  *
  * Output: JSON of shape
- *   { capabilities: [{ name, signals, candidate_goal, candidate_scope }] }
+ *   {
+ *     signal_authority: [{ signal, authority, found, note }],
+ *     capabilities: [{ name, signals, candidate_goal, candidate_scope }]
+ *   }
  *
  * Same inputs produce the same draft (deterministic ordering).
  */
@@ -29,6 +30,41 @@ const { execFileSync } = require("child_process");
 const SOURCE_ROOT_CANDIDATES = ["src", "lib", "app", "packages", "skills"];
 const SUMMARY_DIR_LIMIT = 5;
 const DEFAULT_COMMIT_LIMIT = 100;
+
+function buildSignalAuthority({ readmeFound, charterFound, harnessFiles, sourceRoot, commitsScanned }) {
+  return [
+    {
+      signal: "README.md",
+      authority: "product",
+      found: readmeFound,
+      note: "User-facing product framing; can seed Problem, Approach, and capability goals.",
+    },
+    {
+      signal: "CHARTER.md",
+      authority: "product",
+      found: charterFound,
+      note: "Accepted project axis; Objectives can constrain capability candidates.",
+    },
+    {
+      signal: "CLAUDE.md/AGENTS.md",
+      authority: "development-harness",
+      found: harnessFiles.length > 0,
+      note: "Agent workflow and repo conventions; does not create product capability boundaries by itself.",
+    },
+    {
+      signal: sourceRoot ? `${sourceRoot.name}/` : "source root",
+      authority: "repo-structure",
+      found: sourceRoot !== null,
+      note: "Code organization evidence; useful as raw candidate surface, not final capability authority.",
+    },
+    {
+      signal: "git commit scopes",
+      authority: "history",
+      found: commitsScanned > 0,
+      note: "Recent work history; clusters usage but does not override accepted specs.",
+    },
+  ];
+}
 
 function usage() {
   return "Usage: extract-signals.js [--repo-root PATH] [--commit-limit N] [--dry-run] [--json]";
@@ -229,9 +265,13 @@ function extractSignals({
   const deps = { readFile, fileExists, statSync, readdir, exec };
 
   const readme = readOptionalFile(path.join(repoRoot, "README.md"), deps);
-  const claudeMd =
-    readOptionalFile(path.join(repoRoot, "CLAUDE.md"), deps) ||
-    readOptionalFile(path.join(repoRoot, "AGENTS.md"), deps);
+  const charter = readOptionalFile(path.join(repoRoot, "CHARTER.md"), deps);
+  const claudeMd = readOptionalFile(path.join(repoRoot, "CLAUDE.md"), deps);
+  const agentsMd = readOptionalFile(path.join(repoRoot, "AGENTS.md"), deps);
+  const harnessFiles = [
+    ["CLAUDE.md", claudeMd],
+    ["AGENTS.md", agentsMd],
+  ].filter(([, content]) => content !== null).map(([name]) => name);
   const sourceRoot = detectSourceRoot(repoRoot, deps);
   const dirNames = listCapabilityCandidates(sourceRoot, deps);
   const commitMessages = getRecentCommitMessages(repoRoot, commitLimit, deps);
@@ -242,13 +282,22 @@ function extractSignals({
   const inventory = {
     repoRoot: path.resolve(repoRoot),
     readmeFound: readme !== null,
-    claudeMdFound: claudeMd !== null,
+    charterFound: charter !== null,
+    claudeMdFound: harnessFiles.length > 0,
+    harnessFiles,
     sourceRoot: sourceRoot ? sourceRoot.name : null,
     sourceDirCount: dirNames.length,
     commitsScanned: commitMessages.length,
     commitScopeCount: scopeCounts.size,
     charterObjectiveCount: charterObjectives.length,
   };
+  const signalAuthority = buildSignalAuthority({
+    readmeFound: readme !== null,
+    charterFound: charter !== null,
+    harnessFiles,
+    sourceRoot,
+    commitsScanned: commitMessages.length,
+  });
 
   const candidates = sourceRoot ? mergeCandidates({ sourceRoot, dirNames, scopeCounts }) : [];
 
@@ -262,7 +311,7 @@ function extractSignals({
     }),
   );
 
-  return { inventory, capabilities };
+  return { inventory, signal_authority: signalAuthority, capabilities };
 }
 
 function formatHumanReport(result) {
@@ -271,10 +320,10 @@ function formatHumanReport(result) {
   lines.push(`Repo: ${inventory.repoRoot}`);
   lines.push("Signals:");
   lines.push(`  - README.md: ${inventory.readmeFound ? "found" : "missing"}`);
-  lines.push(`  - CLAUDE.md/AGENTS.md: ${inventory.claudeMdFound ? "found" : "missing"}`);
+  lines.push(`  - CHARTER.md: ${inventory.charterFound ? "found" : "missing"}; objectives: ${inventory.charterObjectiveCount}`);
+  lines.push(`  - CLAUDE.md/AGENTS.md: ${inventory.claudeMdFound ? `found (${(inventory.harnessFiles || []).join(", ")})` : "missing"}; authority: development-harness`);
   lines.push(`  - source root: ${inventory.sourceRoot ?? "none detected"} (${inventory.sourceDirCount} dir(s))`);
   lines.push(`  - commits scanned: ${inventory.commitsScanned}; scopes seen: ${inventory.commitScopeCount}`);
-  lines.push(`  - CHARTER objectives: ${inventory.charterObjectiveCount}`);
   lines.push("");
 
   if (capabilities.length === 0) {
@@ -319,6 +368,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+  buildSignalAuthority,
   parseArgs,
   detectSourceRoot,
   listCapabilityCandidates,

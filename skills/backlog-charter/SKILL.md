@@ -49,7 +49,7 @@ Absence is supported. Projects opt in by creating the file; other skills degrade
 |------|---------------------|
 | `CHARTER.md` | What good looks like / why (the yardstick) |
 | `_context.md` | Operational facts you would otherwise rediscover (HOW-knowledge) |
-| `CLAUDE.md` | How to work in this repo (conventions) |
+| `CLAUDE.md` / `AGENTS.md` | How agents work in this repo (development harness; not product authority by default) |
 | `README.md` | Outward-facing introduction |
 
 ## 3 Tiers
@@ -66,7 +66,7 @@ A stable core makes the moving parts meaningful. This tiering prevents the axis 
 
 Use create mode when `CHARTER.md` is absent at the repo root, or when invoked as `backlog-charter create` and no charter exists.
 
-1. Draft from repo signals: `README.md` ≻ `CLAUDE.md` ≻ open epics/issues ≻ recent commits ≻ `CHANGELOG.md`. When signals conflict, surface the conflict in the interview rather than picking silently.
+1. Draft from repo signals: product/user-facing signals (`README.md`, open epics/issues, `CHANGELOG.md`) before development-harness signals (`CLAUDE.md`, `AGENTS.md`). Harness files may inform workflow conventions, local commands, and repo-specific guardrails, but they do not override README, CHARTER, issues, code structure, or user interview answers for product/capability authority unless they explicitly describe product boundaries. When signals conflict, surface the conflict in the interview rather than picking silently.
 2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives. Follow the checklist in `references/create.md` — Problem framing options, the wedge test for Approach, Non-Goals elicitation, and Objective framing that cites `references/objectives.md`.
 3. Write repo-root `CHARTER.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`. The Decisions table may be left empty — seed 3–5 rows only when prior design docs, ADRs, or notable merged PRs already record direction; remember that whatever lands becomes immutable from revision 2.
 
@@ -102,7 +102,7 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use grill mode to author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. Invoked as `backlog-charter grill` (greenfield: no `spec/capabilities.md` yet) or `backlog-charter grill <capability-slug>` (rerun: polish one capability without touching others). Capability slugs are strict routing handles used by sprint `component:` frontmatter; keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
-**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `extract-signals.js --repo-root <target-repo> --json` from the installed skill's `scripts/` directory first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
+**On a brownfield repo** (existing code, no `spec/capabilities.md`), run `extract-signals.js --repo-root <target-repo> --json` from the installed skill's `scripts/` directory first. It draws from README, CLAUDE.md/AGENTS.md, top-level source dirs, the last 100 commit messages, and `CHARTER.md` Objectives, and reports raw capability signals with draft Goal + draft Scope. Use the draft as interview seed only; grill mode still pressure-tests every admitted capability through the admission test and then pressure-tests every Behavior and Hard Constraint through the 3-axis test before commit. The script labels signal authority: README/CHARTER/issues are product authority, source directories are repo-structure evidence, commit scopes are history, and CLAUDE.md/AGENTS.md are development-harness context. Harness context can seed questions about conventions and workflow, but it must not create accepted capability boundaries by itself. The script clusters by code organization (directory names, commit scopes), while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim. The script never writes `spec/capabilities.md` itself — that decision belongs to grill.
 
 `spec/capabilities.md` lives at the target repo root in `spec/`. Layout, mutation rules, and rationale are in [`docs/spec-system-design.md`](../../docs/spec-system-design.md). The single-file shape is intentional while the spec remains compact: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
 
@@ -160,7 +160,7 @@ See `references/capabilities.md` for additional grill heuristics (placeholder on
 
 ## Reassess Mode
 
-Use reassess mode when the user asks whether `CHARTER.md` or `spec/capabilities.md` is stale, asks to review Learnings, or wants a periodic spec health check.
+Use reassess mode when the user asks whether `CHARTER.md` or `spec/capabilities.md` is stale, asks to review Learnings, wants a periodic spec health check, or when major model/tool/harness changes could alter how agents interpret repo context.
 
 Reassess never edits files. It diagnoses drift and recommends next actions; accepted fixes must run through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
 

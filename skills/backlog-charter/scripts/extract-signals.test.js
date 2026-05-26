@@ -11,6 +11,7 @@ const {
   readOptionalFile,
   readCharterObjectives,
   summarizeReadme,
+  buildSignalAuthority,
   buildCapability,
   mergeCandidates,
   extractSignals,
@@ -219,6 +220,37 @@ Tamgu Note helps parents discover children's hidden talents through AI-powered a
   });
 });
 
+describe("buildSignalAuthority", () => {
+  it("labels CLAUDE.md/AGENTS.md as development-harness authority", () => {
+    const authority = buildSignalAuthority({
+      readmeFound: true,
+      charterFound: true,
+      harnessFiles: ["CLAUDE.md", "AGENTS.md"],
+      sourceRoot: { name: "src", path: "/repo/src" },
+      commitsScanned: 4,
+    });
+
+    const harness = authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
+    assert.match(harness.note, /does not create product capability boundaries/);
+  });
+
+  it("labels an objective-empty CHARTER.md as found product authority", () => {
+    const authority = buildSignalAuthority({
+      readmeFound: false,
+      charterFound: true,
+      harnessFiles: [],
+      sourceRoot: null,
+      commitsScanned: 0,
+    });
+
+    const charter = authority.find((entry) => entry.signal === "CHARTER.md");
+    assert.equal(charter.authority, "product");
+    assert.equal(charter.found, true);
+  });
+});
+
 describe("buildCapability", () => {
   it("includes a CHARTER objective hint when objectives are present", () => {
     const cap = buildCapability({
@@ -329,7 +361,9 @@ revision: 1
     });
 
     assert.equal(result.inventory.readmeFound, true);
+    assert.equal(result.inventory.charterFound, true);
     assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["CLAUDE.md"]);
     assert.equal(result.inventory.sourceRoot, "src");
     assert.equal(result.inventory.sourceDirCount, 2);
     assert.equal(result.inventory.commitsScanned, 5);
@@ -345,6 +379,59 @@ revision: 1
     assert.equal(ingest.provenance.directory, "src/ingest/");
     assert.match(ingest.candidate_goal, /logging pipeline/);
     assert.match(ingest.candidate_goal, /O1/);
+
+    const harness = result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
+  });
+
+  it("reports CHARTER.md as found even when it has no Objectives", () => {
+    write(repo, "CHARTER.md", "# Charter\n\n## Decisions\n");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "",
+    });
+
+    assert.equal(result.inventory.charterFound, true);
+    assert.equal(result.inventory.charterObjectiveCount, 0);
+    assert.equal(
+      result.signal_authority.find((entry) => entry.signal === "CHARTER.md").found,
+      true,
+    );
+  });
+
+  it("development harness files do not create capability candidates by themselves", () => {
+    write(repo, "CLAUDE.md", "# Development\n\nUse pnpm. Keep PRs small.\n");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "",
+    });
+
+    assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["CLAUDE.md"]);
+    assert.deepEqual(result.capabilities, []);
+    assert.equal(
+      result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md").authority,
+      "development-harness",
+    );
+  });
+
+  it("AGENTS.md-only is treated as development-harness without creating capabilities", () => {
+    write(repo, "AGENTS.md", "# Agent Rules\n\nUse npm run lint.\n");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "",
+    });
+
+    assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["AGENTS.md"]);
+    assert.deepEqual(result.capabilities, []);
+    const harness = result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
   });
 
   it("brownfield commit-scope-only: keeps provenance explicit without fake ownership", () => {
@@ -437,7 +524,7 @@ describe("formatHumanReport", () => {
   it("renders the greenfield path", () => {
     const result = {
       inventory: {
-        repoRoot: "/x", readmeFound: false, claudeMdFound: false,
+        repoRoot: "/x", readmeFound: false, charterFound: false, claudeMdFound: false,
         sourceRoot: null, sourceDirCount: 0,
         commitsScanned: 0, commitScopeCount: 0, charterObjectiveCount: 0,
       },
@@ -449,7 +536,7 @@ describe("formatHumanReport", () => {
   it("renders raw capability signals under the summary limit", () => {
     const result = {
       inventory: {
-        repoRoot: "/x", readmeFound: true, claudeMdFound: false,
+        repoRoot: "/x", readmeFound: true, charterFound: false, claudeMdFound: false,
         sourceRoot: "src", sourceDirCount: 2,
         commitsScanned: 10, commitScopeCount: 2, charterObjectiveCount: 0,
       },

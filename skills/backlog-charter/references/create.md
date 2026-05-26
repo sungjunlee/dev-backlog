@@ -9,10 +9,10 @@ Create mode step 1 draws from repo signals. When signals are rich, weight them b
 ### Priority order
 
 1. **`README.md`** — outward-facing problem framing, audience, and approach. Highest fidelity for Problem and Approach.
-2. **`CLAUDE.md`** (or `AGENTS.md`, `GEMINI.md`) — internal working conventions; second-highest for Approach + Non-Goals.
-3. **Open epics and issues** — current execution surface; useful for Objectives and active scope.
-4. **Recent commits** (last ~30 merged PRs) — what is actually being built; corrects for stale README.
-5. **`CHANGELOG.md`** — shipped reality; useful when commits are noisy.
+2. **Open epics and issues** — current execution surface; useful for Objectives and active scope.
+3. **Recent commits** (last ~30 merged PRs) — what is actually being built; corrects for stale README.
+4. **`CHANGELOG.md`** — shipped reality; useful when commits are noisy.
+5. **`CLAUDE.md`** (or `AGENTS.md`, `GEMINI.md`) — development-harness conventions: local commands, agent workflow, and guardrails.
 
 Stop at the first three signals that produce a coherent draft. More signals beyond that mean diminishing returns and longer interview prep.
 
@@ -23,6 +23,8 @@ Stop at the first three signals that produce a coherent draft. More signals beyo
 - Surface the absence in the interview: "There is no README — I drafted Problem from issue titles; correct me where I'm wrong."
 
 ### Conflict handling
+
+`CLAUDE.md` / `AGENTS.md` can explain how to work in the repo, but they are not product authority by default. Use them to seed questions about conventions and workflow; do not let them override README, issues, shipped behavior, or user answers unless they explicitly describe product boundaries.
 
 When signals disagree (e.g., README says "CLI tool," CLAUDE.md says "web app," commits show both), do not pick silently.
 

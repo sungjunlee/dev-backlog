@@ -110,6 +110,12 @@ Accepted specs are useful only while they still match product reality. The syste
 
 This keeps freedom where agents need it (reasoning over evidence) and control where the spec could otherwise rationalize itself into noise.
 
+Run this loop after major model/tool/harness releases that change agent behavior, and every 3-6 months on active spec-system projects. The cadence is a review trigger only; it does not authorize automatic edits.
+
+### Operational validation
+
+Anthropic's May 14, 2026 large-codebase Claude Code guidance independently supports the same operating pattern: lean layered context, on-demand skills, deterministic hooks/scripts, and periodic context maintenance. Treat that post as external validation for this design's shape, not as a new dependency or a reason to add LSP, MCP, plugin, or auto-reassess machinery to dev-backlog.
+
 ### Learning Actions
 
 `## Learnings` is a live sensor, not an audit log. Keep the most recent 5-7 entries inline per capability so the file stays useful during agent startup.

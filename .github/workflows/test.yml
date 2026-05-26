@@ -17,7 +17,7 @@ jobs:
           node-version: '20'
 
       - name: Node tests
-        run: node --test skills/dev-backlog/scripts/*.test.js
+        run: node --test skills/*/scripts/*.test.js
 
       - name: Bash smoke tests
         run: bash skills/dev-backlog/scripts/smoke-test.sh
