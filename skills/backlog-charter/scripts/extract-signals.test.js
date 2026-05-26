@@ -418,6 +418,22 @@ revision: 1
     );
   });
 
+  it("AGENTS.md-only is treated as development-harness without creating capabilities", () => {
+    write(repo, "AGENTS.md", "# Agent Rules\n\nUse npm run lint.\n");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "",
+    });
+
+    assert.equal(result.inventory.claudeMdFound, true);
+    assert.deepEqual(result.inventory.harnessFiles, ["AGENTS.md"]);
+    assert.deepEqual(result.capabilities, []);
+    const harness = result.signal_authority.find((entry) => entry.signal === "CLAUDE.md/AGENTS.md");
+    assert.equal(harness.authority, "development-harness");
+    assert.equal(harness.found, true);
+  });
+
   it("brownfield commit-scope-only: keeps provenance explicit without fake ownership", () => {
     mkdir(repo, "src/worker");
     const commits = ["feat(progress-sync): one", "fix(progress-sync): two"];
