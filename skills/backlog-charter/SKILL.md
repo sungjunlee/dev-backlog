@@ -1,7 +1,7 @@
 ---
 name: backlog-charter
 argument-hint: "[create|amend|grill|reassess]"
-description: Create, amend, grill, and reassess the project spec axis: CHARTER.md plus spec/capabilities.md. Use to establish or evolve project direction, author capability contracts, review stale specs, recommend Learning Actions, or decide whether Behaviors/Constraints still match execution evidence. 프로젝트 축, 기준, 헌장, 능력 명세, stale spec, spec reassess.
+description: "Create, amend, grill, and reassess the project spec axis: CHARTER.md plus spec/capabilities.md. Use to establish or evolve project direction, author capability contracts, review stale specs, recommend Learning Actions, or decide whether Behaviors/Constraints still match execution evidence. 프로젝트 축, 기준, 헌장, 능력 명세, stale spec, spec reassess."
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
   related-skills: "dev-backlog, backlog-triage"
