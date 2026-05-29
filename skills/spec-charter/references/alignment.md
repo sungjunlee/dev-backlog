@@ -1,6 +1,6 @@
 # Charter Alignment Mapping
 
-Use this reference when mapping backlog work to `CHARTER.md` Objectives. The mapping is semantic, prompt-driven analysis: compare issue or epic title/body against objective predicates and Non-Goals.
+Use this reference when mapping backlog work to charter Objectives. Read `spec/charter.md` first; if absent, fall back to legacy root `CHARTER.md`; if both are absent, skip Alignment. The mapping is semantic, prompt-driven analysis: compare issue or epic title/body against objective predicates and Non-Goals.
 
 ## Issue To Objective Mapping
 
@@ -35,6 +35,6 @@ Start the Alignment report with a compact coverage line:
 
 Use the first count for open issues that map to at least one objective. Mention neglected objectives or contradictions after the separator.
 
-## Proposed CHARTER Changes
+## Proposed Charter Changes
 
-When findings suggest the charter may need to evolve, format proposals as a seed for `spec-charter` amend. The triage or planning report proposes only; `spec-charter` owns gated mutation of `CHARTER.md`.
+When findings suggest the charter may need to evolve, format proposals as a seed for `spec-charter` amend. The triage or planning report proposes only; `spec-charter` owns gated mutation of `spec/charter.md`.

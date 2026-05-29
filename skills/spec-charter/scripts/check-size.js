@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Lint CHARTER.md size against the ~5-minute-read property.
+ * Lint spec/charter.md size against the ~5-minute-read property.
  *
  * Usage: ./scripts/check-size.js [--path PATH] [--strict] [--json]
  *
- * Reads CHARTER.md (default ./CHARTER.md), counts words + lines, and
+ * Reads spec/charter.md by default, counts words + lines, and
  * prints a summary. Warns above 1000 words (~5 min at 200 wpm) or
  * 80 lines and suggests candidates to collapse (long deferred lists,
  * oversized Decisions rationale).
@@ -12,7 +12,7 @@
  * Exit codes:
  *   0  ok or warnings (advisory)
  *   1  --strict and the file exceeds either threshold
- *   2  CHARTER.md not found
+ *   2  charter not found
  */
 
 const fs = require("fs");
@@ -22,13 +22,14 @@ const WORD_LIMIT = 1000;
 const LINE_LIMIT = 80;
 const WORDS_PER_MINUTE = 200;
 const LONG_RATIONALE_CHARS = 140;
+const DEFAULT_CHARTER_PATH = path.join("spec", "charter.md");
 
 function usage() {
   return "Usage: check-size.js [--path PATH] [--strict] [--json]";
 }
 
 function parseArgs(args) {
-  const options = { charterPath: "CHARTER.md", strict: false, json: false };
+  const options = { charterPath: DEFAULT_CHARTER_PATH, strict: false, json: false };
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -182,7 +183,7 @@ function formatWarnings(result) {
 }
 
 function checkSize({
-  charterPath,
+  charterPath = DEFAULT_CHARTER_PATH,
   readFile = fs.readFileSync,
   fileExists = fs.existsSync,
 } = {}) {
@@ -212,7 +213,7 @@ function main() {
     if (parsed.json) {
       console.log(JSON.stringify({ found: false, charterPath: result.charterPath }, null, 2));
     } else {
-      console.error(`CHARTER.md not found at ${result.charterPath}`);
+      console.error(`charter not found at ${result.charterPath}`);
     }
     process.exit(2);
   }

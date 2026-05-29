@@ -1,6 +1,6 @@
 # Reassess-Mode Heuristics
 
-Use this reference in `spec-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
+Use this reference in `spec-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `spec-charter amend`, `spec-system-map amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
 
 ## Policy Ownership
 
@@ -14,12 +14,12 @@ Reassess is the controller review, not the writer.
 
 - Sensors: `## Learnings`, sprint `component:` handles, doctor/lint output, recent sprint context.
 - Diagnosis: the reassess report.
-- Controller action: user-approved `amend`, `grill`, or Learning Action.
-- Forbidden shortcut: silently editing accepted CHARTER direction or capability contracts during reassess.
+- Controller action: user-approved `amend`, `system-map`, `grill`, or Learning Action.
+- Forbidden shortcut: silently editing accepted charter direction or capability contracts during reassess.
 
 The default answer can be "no change." Do not manufacture churn just because the user asked for a reassessment.
 
-Learning Actions are the user-gated family for keeping recent Learnings inline, promoting durable facts to Decisions, promoting cross-cutting facts to CHARTER Decisions, or archiving old history outside the hot startup path. If the user accepts one, end reassess and perform a separate user-approved manual edit. Do not treat that edit as part of reassess diagnosis.
+Learning Actions are the user-gated family for keeping recent Learnings inline, promoting durable facts to Decisions, promoting cross-cutting facts to charter Decisions, or archiving old history outside the hot startup path. If the user accepts one, end reassess and perform a separate user-approved manual edit. Do not treat that edit as part of reassess diagnosis.
 
 ## Cadence Triggers
 
@@ -28,7 +28,7 @@ Run a lightweight reassess pass when either condition applies:
 - A major model, coding-agent tool, or repo harness change affects how agents read instructions, call tools, or preserve context.
 - An active project has used the spec-system for 3-6 months without a spec health review.
 
-Keep this low-noise: the review can still conclude "no change," and it does not create an automatic edit path. Treat `CLAUDE.md` / `AGENTS.md` as development-harness context during this pass. They can explain local commands, agent workflow, and guardrails, but they do not override README, CHARTER, issues, code structure, or accepted capability contracts as product authority.
+Keep this low-noise: the review can still conclude "no change," and it does not create an automatic edit path. Treat `CLAUDE.md` / `AGENTS.md` as development-harness context during this pass. They can explain local commands, agent workflow, and guardrails, but they do not override README, charter, issues, code structure, or accepted capability contracts as product authority.
 
 ## Evidence Order
 
@@ -36,12 +36,13 @@ Prefer bounded evidence before broad reading:
 
 1. `capabilities-doctor.js --json` for compactness, marker health, and inline Learnings count.
 2. `component-lint.js --json` for sprint `component:` routing drift.
-3. `CHARTER.md` Objectives and Decisions when a recommendation could affect project-wide direction.
-4. `spec/capabilities.md` capability blocks named by the evidence.
-5. `CLAUDE.md` / `AGENTS.md` only when the reassess question involves harness behavior, local commands, or agent context loading.
-6. Latest five completed sprint files, plus the active sprint when it exists.
+3. `spec/charter.md` Objectives and Decisions when a recommendation could affect project-wide direction.
+4. `spec/system-map.md` when evidence points to stale project-wide structure, boundaries, flows, or invariants.
+5. `spec/capabilities.md` capability blocks named by the evidence.
+6. `CLAUDE.md` / `AGENTS.md` only when the reassess question involves harness behavior, local commands, or agent context loading.
+7. Latest five completed sprint files, plus the active sprint when it exists.
 
-If a script is missing, say it was skipped and continue with file reads. Missing `CHARTER.md` or `spec/capabilities.md` is not an error; it is an opt-in state with a next-step recommendation.
+If a script is missing, say it was skipped and continue with file reads. Missing `spec/charter.md`, `spec/system-map.md`, or `spec/capabilities.md` is not an error; it is an opt-in state with a next-step recommendation.
 
 ## Report Shape
 
@@ -56,11 +57,14 @@ Use this structure unless the user asks for a shorter answer:
 ### No Change
 - <area that still matches current evidence>
 
+### System Map Candidates
+- <area> — evidence: <signal>; suspected change: <shape/boundary/flow/invariant/pointer>; next: `spec-system-map amend`
+
 ### Grill Candidates
 - <capability> — evidence: <signal>; suspected change: <contract area>; next: `spec-grill <capability>`
 
 ### Amend Candidates
-- <CHARTER item> — evidence: <signal>; suspected change: <direction/objective/decision>; next: `spec-charter amend`
+- <charter item> — evidence: <signal>; suspected change: <direction/objective/decision>; next: `spec-charter amend`
 
 ### Learning Actions
 - Keep inline: <recent high-signal Learnings>
@@ -94,6 +98,17 @@ Recommend `spec-grill <capability>` when any of these are true:
 
 Do not rewrite the capability during reassess. Name the block and the suspected edit.
 
+### System Map Candidate
+
+Recommend `spec-system-map amend` when evidence affects project-wide structure without changing why/good-state:
+
+- runtime boundaries changed across capabilities
+- a core flow has a new step, owner, or external system
+- a project-wide invariant is missing, stale, or contradicted
+- the map copied module details that should be demoted to linked docs
+
+Do not rewrite the map during reassess. Name the suspected section and the evidence.
+
 ### Amend Candidate
 
 Recommend `spec-charter amend` when evidence affects project-wide direction:
@@ -101,7 +116,7 @@ Recommend `spec-charter amend` when evidence affects project-wide direction:
 - a repeated Learning changes multiple capabilities
 - an Objective appears validated or deferred but lacks proof
 - a Non-Goal is repeatedly violated by accepted work
-- a capability-level Decision is cross-cutting enough to belong in CHARTER
+- a capability-level Decision is cross-cutting enough to belong in `spec/charter.md`
 
 Do not weaken an Objective so the available proof appears sufficient.
 
@@ -111,7 +126,7 @@ Learning Action is the canonical umbrella for accepted Learnings cleanup after r
 
 Keep recent Learnings inline when they are still useful startup context.
 
-Promote a Learning to `## Decisions` when it has become a durable capability rule. Promote to CHARTER Decisions only when it affects more than one capability or changes the project-wide axis.
+Promote a Learning to `## Decisions` when it has become a durable capability rule. Promote to charter Decisions only when it affects more than one capability or changes the project-wide axis.
 
 Archive older Learnings when they are useful history but no longer startup context. Reassess may recommend a Learning Action, but the actual edit is human-gated.
 

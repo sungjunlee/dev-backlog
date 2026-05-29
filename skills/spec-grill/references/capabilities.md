@@ -37,10 +37,10 @@ Bad Goal lines usually describe diagnosis, implementation, or an internal tool. 
 |---|---|
 | "Reduce context loss across sprints." | "An agent resuming work mid-session reads the active sprint file and acts on in-flight items without re-asking what is going on." |
 | "`sync-pull.js` mirrors GitHub." | "Open GitHub Issues are mirrored into `backlog/tasks/*.md` without diverging on local AC checkbox state." |
-| "Backlog triage with CHARTER awareness." | "Open Issues are classified, related, flagged stale, and aligned to CHARTER Objectives without humans maintaining a parallel triage spreadsheet." |
-| "Keep CHARTER short." | "A user creates or amends `CHARTER.md` through tier-gated discipline and the file stays a 5-minute read." |
+| "Backlog triage with charter awareness." | "Open Issues are classified, related, flagged stale, and aligned to charter Objectives without humans maintaining a parallel triage spreadsheet." |
+| "Keep charter short." | "A user creates or amends `spec/charter.md` through tier-gated discipline and the file stays a 5-minute read." |
 
-Move diagnosis-side framing to CHARTER Problem. Move scripts and file names to In-scope unless the script is the user-visible surface.
+Move diagnosis-side framing to the charter Problem. Move scripts and file names to In-scope unless the script is the user-visible surface.
 
 ## Behavior vs. Hard Constraint
 
@@ -108,9 +108,9 @@ It must not touch:
 - `### Learnings`
 - `### Decisions`
 - other capability blocks
-- `CHARTER.md`, unless the user separately invokes amend mode
+- `spec/charter.md`, unless the user separately invokes amend mode
 
-If a rerun discovers a cross-cutting decision, append it to the relevant Decisions table or promote it to CHARTER via amend mode. Do not rewrite old Decisions rows.
+If a rerun discovers a cross-cutting decision, append it to the relevant Decisions table or promote it to `spec/charter.md` via amend mode. Do not rewrite old Decisions rows.
 
 ## Capability Count Guidance
 
@@ -142,7 +142,7 @@ dev-backlog has four skill directories, but six capabilities:
 
 - `sprint-execution` owns the active sprint as the execution hub.
 - `backlog-sync` owns the GitHub Issues to task-file mirror.
-- `spec-charter` owns CHARTER lifecycle and report-only reassess.
+- `spec-charter` owns charter lifecycle and report-only reassess.
 - `spec-grill` owns `spec/capabilities.md` authoring and capability-contract pressure tests.
 - `triage-grooming` owns backlog classification and relationship reports.
 - `task-progress-reporting` owns monthly progress issue synchronization.
@@ -180,7 +180,7 @@ Use the canonical policy in `docs/spec-system-design.md` and the operational rep
 
 - keep recent Learnings inline when they still help startup context
 - promote durable capability facts to `## Decisions`
-- promote cross-cutting facts to CHARTER Decisions
+- promote cross-cutting facts to charter Decisions
 - archive older history outside the hot `spec/capabilities.md` path
 
 Do not let relay delete or rewrite Learnings. A Learning Action is human-gated or doctor-suggested, not an automatic side effect of a merge.

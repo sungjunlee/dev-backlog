@@ -9,7 +9,7 @@
  * grill mode owns admission, merging, splitting, and naming.
  *
  * Signal authority:
- *   - README.md / CHARTER.md    — product authority
+ *   - README.md / spec/charter.md — product authority
  *   - Top-level source dirs     — repo-structure evidence
  *   - CLAUDE.md / AGENTS.md     — development-harness conventions
  *   - Last N commit messages    — history
@@ -26,12 +26,17 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const {
+  CANONICAL_CHARTER_PATH,
+  LEGACY_CHARTER_PATH,
+  resolveCharterPath,
+} = require("../../dev-backlog/scripts/spec-paths.js");
 
 const SOURCE_ROOT_CANDIDATES = ["src", "lib", "app", "packages", "skills"];
 const SUMMARY_DIR_LIMIT = 5;
 const DEFAULT_COMMIT_LIMIT = 100;
 
-function buildSignalAuthority({ readmeFound, charterFound, harnessFiles, sourceRoot, commitsScanned }) {
+function buildSignalAuthority({ readmeFound, charterFound, charterSource, harnessFiles, sourceRoot, commitsScanned }) {
   return [
     {
       signal: "README.md",
@@ -40,10 +45,12 @@ function buildSignalAuthority({ readmeFound, charterFound, harnessFiles, sourceR
       note: "User-facing product framing; can seed Problem, Approach, and capability goals.",
     },
     {
-      signal: "CHARTER.md",
+      signal: "spec/charter.md",
       authority: "product",
       found: charterFound,
-      note: "Accepted project axis; Objectives can constrain capability candidates.",
+      note: charterSource === "legacy"
+        ? "Accepted project axis found through legacy root CHARTER.md fallback; migrate to spec/charter.md."
+        : "Accepted project axis; Objectives can constrain capability candidates.",
     },
     {
       signal: "CLAUDE.md/AGENTS.md",
@@ -172,12 +179,24 @@ function readOptionalFile(filePath, { readFile = fs.readFileSync, fileExists = f
   }
 }
 
+function resolveCharterFile(repoRoot, deps = {}) {
+  const resolved = resolveCharterPath({ repoRoot, fileExists: deps.fileExists });
+  if (!resolved.found) {
+    return { found: false, path: resolved.charterPath, source: resolved.source, content: null };
+  }
+  return {
+    found: true,
+    path: resolved.charterPath,
+    source: resolved.source,
+    content: readOptionalFile(resolved.charterPath, deps),
+  };
+}
+
 function readCharterObjectives(repoRoot, deps = {}) {
-  const charterPath = path.join(repoRoot, "CHARTER.md");
-  const content = readOptionalFile(charterPath, deps);
-  if (!content) return [];
+  const charter = resolveCharterFile(repoRoot, deps);
+  if (!charter.content) return [];
   const objectives = [];
-  for (const line of content.split("\n")) {
+  for (const line of charter.content.split("\n")) {
     const match = line.match(/^- (O\d+) \[(validated|active|deferred)\]\s+(.*?)(?:\s+·\s+src:|\s*$)/);
     if (match) {
       objectives.push({ id: match[1], status: match[2], predicate: match[3].trim() });
@@ -218,7 +237,7 @@ function buildCapability({ name, sourceRootName, signals, readmeSummary, charter
     : `Inferred from commit scope '${name}'. Confirm the owning source surface and out-of-scope boundary in grill.`;
 
   const objectiveHint = charterObjectives.length > 0
-    ? ` Candidate CHARTER objective served: ${charterObjectives[0].id} (${charterObjectives[0].predicate.slice(0, 80)}${charterObjectives[0].predicate.length > 80 ? "..." : ""}). Confirm in grill.`
+    ? ` Candidate charter objective served: ${charterObjectives[0].id} (${charterObjectives[0].predicate.slice(0, 80)}${charterObjectives[0].predicate.length > 80 ? "..." : ""}). Confirm in grill.`
     : "";
 
   return {
@@ -265,7 +284,7 @@ function extractSignals({
   const deps = { readFile, fileExists, statSync, readdir, exec };
 
   const readme = readOptionalFile(path.join(repoRoot, "README.md"), deps);
-  const charter = readOptionalFile(path.join(repoRoot, "CHARTER.md"), deps);
+  const charter = resolveCharterFile(repoRoot, deps);
   const claudeMd = readOptionalFile(path.join(repoRoot, "CLAUDE.md"), deps);
   const agentsMd = readOptionalFile(path.join(repoRoot, "AGENTS.md"), deps);
   const harnessFiles = [
@@ -282,7 +301,9 @@ function extractSignals({
   const inventory = {
     repoRoot: path.resolve(repoRoot),
     readmeFound: readme !== null,
-    charterFound: charter !== null,
+    charterFound: charter.found,
+    charterPath: charter.found ? charter.path : null,
+    charterSource: charter.source,
     claudeMdFound: harnessFiles.length > 0,
     harnessFiles,
     sourceRoot: sourceRoot ? sourceRoot.name : null,
@@ -293,7 +314,8 @@ function extractSignals({
   };
   const signalAuthority = buildSignalAuthority({
     readmeFound: readme !== null,
-    charterFound: charter !== null,
+    charterFound: charter.found,
+    charterSource: charter.source,
     harnessFiles,
     sourceRoot,
     commitsScanned: commitMessages.length,
@@ -320,7 +342,7 @@ function formatHumanReport(result) {
   lines.push(`Repo: ${inventory.repoRoot}`);
   lines.push("Signals:");
   lines.push(`  - README.md: ${inventory.readmeFound ? "found" : "missing"}`);
-  lines.push(`  - CHARTER.md: ${inventory.charterFound ? "found" : "missing"}; objectives: ${inventory.charterObjectiveCount}`);
+  lines.push(`  - spec/charter.md: ${inventory.charterFound ? `found (${inventory.charterSource})` : "missing"}; objectives: ${inventory.charterObjectiveCount}`);
   lines.push(`  - CLAUDE.md/AGENTS.md: ${inventory.claudeMdFound ? `found (${(inventory.harnessFiles || []).join(", ")})` : "missing"}; authority: development-harness`);
   lines.push(`  - source root: ${inventory.sourceRoot ?? "none detected"} (${inventory.sourceDirCount} dir(s))`);
   lines.push(`  - commits scanned: ${inventory.commitsScanned}; scopes seen: ${inventory.commitScopeCount}`);
@@ -375,6 +397,9 @@ module.exports = {
   extractCommitScopes,
   getRecentCommitMessages,
   readOptionalFile,
+  resolveCharterFile,
+  CANONICAL_CHARTER_PATH,
+  LEGACY_CHARTER_PATH,
   readCharterObjectives,
   summarizeReadme,
   buildCapability,

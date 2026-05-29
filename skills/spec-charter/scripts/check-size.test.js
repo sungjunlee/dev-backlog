@@ -17,8 +17,8 @@ const {
 } = require("./check-size.js");
 
 describe("parseArgs", () => {
-  it("defaults to CHARTER.md, not strict, not json", () => {
-    assert.deepEqual(parseArgs([]), { charterPath: "CHARTER.md", strict: false, json: false });
+  it("defaults to spec/charter.md, not strict, not json", () => {
+    assert.deepEqual(parseArgs([]), { charterPath: path.join("spec", "charter.md"), strict: false, json: false });
   });
 
   it("accepts --strict and --json", () => {
@@ -203,7 +203,8 @@ describe("checkSize", () => {
   it("reads and analyzes a real on-disk file", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "check-size-"));
     try {
-      const file = path.join(dir, "CHARTER.md");
+      const file = path.join(dir, "spec", "charter.md");
+      fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, "---\nrevision: 1\n---\n\nHello world\n");
       const result = checkSize({ charterPath: file });
       assert.equal(result.found, true);

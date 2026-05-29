@@ -9,7 +9,7 @@ metadata:
 
 # Spec Grill
 
-Author `spec/capabilities.md`, the middle layer between `CHARTER.md` and the active sprint. `spec-grill` is not a file generator; it pressure-tests existing repo signals into durable capability contracts.
+Author `spec/capabilities.md`, the middle layer between `spec/charter.md` and the active sprint. `spec-grill` is not a file generator; it pressure-tests existing repo signals into durable capability contracts.
 
 Use this after `spec-charter create` on existing/brownfield repos, or whenever the user asks to define capability boundaries, component contracts, Behaviors, or Hard Constraints.
 
@@ -40,11 +40,11 @@ End every run with a short summary:
 
 ## Brownfield Signal Rules
 
-`extract-signals.js` draws from README, `CHARTER.md`, `CLAUDE.md`/`AGENTS.md`, top-level source dirs, and recent commit messages.
+`extract-signals.js` draws from README, `spec/charter.md` with legacy root `CHARTER.md` fallback, `CLAUDE.md`/`AGENTS.md`, top-level source dirs, and recent commit messages.
 
 Use the draft as interview seed only. The script labels signal authority:
 
-- README/CHARTER/issues are product authority.
+- README/charter/issues are product authority.
 - source directories are repo-structure evidence.
 - commit scopes are history.
 - `CLAUDE.md`/`AGENTS.md` are development-harness context.
@@ -60,7 +60,7 @@ The file's mutation discipline:
 - Goal / In-scope / Out-of-scope: human-gated through this skill.
 - Expected Behaviors / Hard Constraints: human-gated and must pass the 3-axis predicate test.
 - `## Learnings`: not an interview target; appended only by the bounded Learnings writer between magic markers.
-- `## Decisions`: append-only by convention; promote cross-cutting decisions to `CHARTER.md` through `spec-charter amend`.
+- `## Decisions`: append-only by convention; promote cross-cutting decisions to `spec/charter.md` through `spec-charter amend`.
 
 ## Capability Admission Test
 
@@ -81,7 +81,7 @@ Use this as a bloat check before the per-capability flow. A large feature-first 
 
 For each capability, walk the user through this order; do not skip ahead:
 
-1. **Goal** — one sentence: what the user can observe when this works. Diagnosis-side framing belongs in CHARTER; capability Goal is the observable outcome.
+1. **Goal** — one sentence: what the user can observe when this works. Diagnosis-side framing belongs in the charter; capability Goal is the observable outcome.
 2. **In-scope / Out-of-scope** — what this capability owns, and the boundary it deliberately respects. Out-of-scope prevents creep.
 3. **Expected Behaviors** — three verifiable predicates. Each one must pass the 3-axis test below. Reject and rewrite until it does.
 4. **Hard Constraints** — two bright-lines this capability never crosses, even if asked. Adversarial-Goodhart defenses live here.
@@ -104,4 +104,4 @@ On first run, copy `templates/capabilities.md` to `spec/capabilities.md` at the 
 
 After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited.
 
-See `references/capabilities.md` for additional grill heuristics and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide CHARTER layer.
+See `references/capabilities.md` for additional grill heuristics and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide charter layer.

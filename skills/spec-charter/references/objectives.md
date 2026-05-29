@@ -6,7 +6,7 @@ The shape:
 
 > `O<n> [status]    <verifiable predicate> · src: <user|inferred|execution>`
 
-The predicate should map to a verification path you could write down today: a command to run, a scenario to walk through, a count to take. If you cannot name the verification, the predicate is not yet verifiable — sharpen it before committing it to CHARTER.
+The predicate should map to a verification path you could write down today: a command to run, a scenario to walk through, a count to take. If you cannot name the verification, the predicate is not yet verifiable — sharpen it before committing it to the charter.
 
 ## ✅ Good Predicates
 
@@ -18,14 +18,14 @@ Each example pairs a predicate with the concrete check that would advance its st
 2. **"An agent resuming a sprint mid-session sees in-flight `[~]` items it did not author and can act on them without re-asking the user"**
    *Verification:* open the active sprint file in a fresh session; confirm `[~]` markers + PR refs are readable. A continuity predicate verified by a single observation.
 
-3. **"A user can answer 'is this project still on track?' in under 5 minutes against `CHARTER.md`"**
-   *Verification:* timed read + answer against the live CHARTER. Mixed-rigor: not a script, but a timed scenario with a binary outcome. (This is dev-backlog's own O3.)
+3. **"A user can answer 'is this project still on track?' in under 5 minutes against `spec/charter.md`"**
+   *Verification:* timed read + answer against the live charter. Mixed-rigor: not a script, but a timed scenario with a binary outcome. (This is dev-backlog's own O3.)
 
 4. **"Every open Issue maps to an active or deferred Objective without manual triage"**
    *Verification:* `backlog-triage` Alignment Check report shows 0 orphans on the current backlog. A drift predicate with an existing tool as the check.
 
-5. **"A new contributor reads `CHARTER.md` in under 5 minutes and can name one explicitly rejected scope"**
-   *Verification:* word count + Non-Goals section non-empty + onboarding scenario. Cheap to observe; sharper than "CHARTER is short."
+5. **"A new contributor reads `spec/charter.md` in under 5 minutes and can name one explicitly rejected scope"**
+   *Verification:* word count + Non-Goals section non-empty + onboarding scenario. Cheap to observe; sharper than "charter is short."
 
 Notice the shape: each one names **who** does **what** with a **measurable outcome**. None of them say "improve" or "implement."
 
@@ -45,9 +45,9 @@ Each failure mode appears regularly. The rewrite shows the move that fixes it.
    *Failure:* unfalsifiable opinion. Whose DX, doing what, judged how?
    *Rewrite:* "An agent dispatches a relay run with one command and no manual edits to manifest files." Name the actor, the action, the observable.
 
-4. **"Adopt CHARTER everywhere"**
+4. **"Adopt charter everywhere"**
    *Failure:* process declaration, not a user-facing outcome. Confuses the project's internal habit with what the project produces.
-   *Rewrite:* "Every active project in this workspace has a committed `CHARTER.md` at repo root." Make it a count, not a vibe.
+   *Rewrite:* "Every active project in this workspace has a committed `spec/charter.md`." Make it a count, not a vibe.
 
 5. **"Reduce context loss across sessions"**
    *Failure:* direction without verification — true when? observed by whom?

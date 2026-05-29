@@ -1,7 +1,7 @@
 # Spec System Design (v0.1)
 
 **Status:** Approved (M tier) · **Date:** 2026-05-23 · **Author:** session capture
-**Supersedes:** — · **Related:** [`CHARTER.md`](../CHARTER.md), [`skills/spec-charter/`](../skills/spec-charter/), [`skills/spec-grill/`](../skills/spec-grill/)
+**Supersedes:** - · **Related:** [`spec/charter.md`](../spec/charter.md), [`spec/system-map.md`](../spec/system-map.md), [`skills/spec-charter/`](../skills/spec-charter/), [`skills/spec-system-map/`](../skills/spec-system-map/), [`skills/spec-grill/`](../skills/spec-grill/)
 
 A layered, brownfield-friendly project spec system that survives multi-day autonomous agent execution without rubber-stamping itself into uselessness. This doc captures the current architecture, durable policy, research grounding, and historical implementation evidence.
 
@@ -9,16 +9,17 @@ A layered, brownfield-friendly project spec system that survives multi-day auton
 
 ## Problem
 
-`CHARTER.md` works as a 5-min reference axis (north star + verifiable predicates + immutable decisions). But on real projects two gaps appear:
+`spec/charter.md` works as a 5-min reference axis (north star + verifiable predicates + immutable decisions). But on real projects three gaps appear:
 
 1. **No middle layer.** Between "the whole project's north star" and "this sprint's task list" there is no place to write *"this capability does X for the user, within these boundaries, and never violates Y."* Mid-day autonomous agents either over-interpret the charter or fly blind on per-capability specifics.
 2. **No live-feedback path.** Learnings from completed work (a working pattern, a measured number, a discovered constraint) accrue in PR descriptions and disappear from the agent's reachable context within a sprint or two.
+3. **No stable system-shape map.** Generic `ARCHITECTURE.md` files often mix whole-system maps, module notes, ADRs, and runbooks. `spec/system-map.md` is the narrower high-level map.
 
 For autonomous runs that span days, this means: setpoint exists, sensor doesn't, controller drifts. Research-grounded framing in [Research](#research-grounding) below.
 
 ## Goals
 
-- Layered: north star (CHARTER) → capability specs (new) → live learnings (new)
+- Layered: north star (`spec/charter.md`) -> system map (`spec/system-map.md`) -> capability specs (`spec/capabilities.md`) -> live learnings
 - Works greenfield and brownfield (signal extraction from existing repos)
 - Detail level calibrated to *help* AI agents, not constrain them into Goodhart's law
 - Lower layers can update live without human edit, via structurally bounded channels
@@ -28,7 +29,7 @@ For autonomous runs that span days, this means: setpoint exists, sensor doesn't,
 
 ## Non-Goals
 
-- Replace `CHARTER.md` (this extends it)
+- Replace `spec/charter.md` (this extends it)
 - Per-capability file proliferation on day 1 (strangler-fig path preserved, not paved)
 - ADR ceremony before decision volume justifies it
 - Autonomous spec self-editing by working agents (adversarial-Goodhart risk, see Research)
@@ -40,9 +41,11 @@ For autonomous runs that span days, this means: setpoint exists, sensor doesn't,
 
 ```
 repo/
-├─ CHARTER.md                ← Tier 1 (frozen-ish, 5-min read, north star)
 ├─ spec/
-│  └─ capabilities.md        ← NEW: layered capability spec, single file
+│  ├─ README.md              ← project spec index
+│  ├─ charter.md             ← Tier 1 (frozen-ish, 5-min read, north star)
+│  ├─ system-map.md          ← high-level system shape, boundaries, flows, invariants
+│  └─ capabilities.md        ← layered capability spec, single file
 │     #
 │     # ## Capability: <name>
 │     #   Goal                          (frozen — amend-gated)
@@ -65,7 +68,8 @@ Agents need room to reason in prose. They also need stable coordinates when anot
 
 ```
 Free-form reasoning
-  CHARTER prose
+  charter prose
+  system-map prose
   capability Goal / Scope / Behaviors
   sprint Plan / Running Context
 
@@ -83,31 +87,33 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 
 | Layer | Who writes | When | Gate |
 |---|---|---|---|
-| `CHARTER.md` Problem/Approach/Non-Goals | human via `spec-charter amend` | rarely | Tier 1 gate (existing) |
-| `CHARTER.md` Objectives | human via amend; status advance proof-gated | when an objective is added/removed/proven | Tier 2 gate (existing) |
-| `CHARTER.md` Decisions | append-only | when a non-trivial cross-cutting decision is made | Tier 3 (existing) |
+| `spec/charter.md` Problem/Approach/Non-Goals | human via `spec-charter amend` | rarely | Tier 1 gate |
+| `spec/charter.md` Objectives | human via amend; status advance proof-gated | when an objective is added/removed/proven | Tier 2 gate |
+| `spec/charter.md` Decisions | append-only | when a non-trivial cross-cutting decision is made | Tier 3 |
+| `spec/system-map.md` system shape/boundaries/flows/invariants/pointers | human via `spec-system-map` | when project-wide structure changes | high-level-only gate; demote subsystem details |
 | `spec/capabilities.md` Goal/Scope/Behaviors/HardConstraints per capability | human via `spec-grill` | when a capability's contract changes | challenge + confirm + apply |
 | `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a primary `component:` tag | structurally bounded append between magic markers; rejects anything else |
-| `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to CHARTER Tier 3 if cross-cutting |
+| `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to charter Tier 3 if cross-cutting |
 
 ### Reassess source-of-truth map
 
 | Artifact | Owns | Does not own |
 |---|---|---|
-| `skills/spec-charter/SKILL.md` | CHARTER create/amend and report-only reassess dispatch contract | capability authoring details |
+| `skills/spec-charter/SKILL.md` | `spec/charter.md` create/amend and report-only reassess dispatch contract | capability authoring details |
 | `skills/spec-charter/references/reassess.md` | operational reassess procedure: evidence order, report shape, recommendation rules, Learning Actions, stale-spec failure modes | durable naming policy or historical build notes |
-| `skills/spec-grill/SKILL.md` | `spec/capabilities.md` authoring, brownfield signal admission, and 3-axis predicate test | CHARTER mutation rules |
+| `skills/spec-system-map/SKILL.md` | `spec/system-map.md` create/amend flow and high-level-only boundary | charter mutation rules or capability contracts |
+| `skills/spec-grill/SKILL.md` | `spec/capabilities.md` authoring, brownfield signal admission, and 3-axis predicate test | charter mutation rules |
 | `docs/spec-system-design.md` | durable design policy: lifecycle, naming policy, mutation discipline, split/defer triggers, historical rationale | step-by-step skill execution details |
 
 ### Stale-spec lifecycle
 
 Accepted specs are useful only while they still match product reality. The system therefore needs a small reassessment loop, but not autonomous self-editing:
 
-1. **Setpoint:** `CHARTER.md` and `spec/capabilities.md` describe the accepted project/capability contracts.
+1. **Setpoint:** `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` describe the accepted project/system/capability contracts.
 2. **Sensor:** relay and sprint execution append bounded observations as `## Learnings` or sprint context.
 3. **Diagnosis:** deterministic scripts report structural signals first (`capabilities-doctor.js`, `component-lint.js`); `spec-charter reassess` turns those signals into a report.
 4. **Human gate:** accepted changes route through `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
-5. **No silent controller:** reassess may recommend edits, promotion, or archival, but it must not edit CHARTER direction, capability Goal/Scope/Behaviors/Hard Constraints, Decisions, or Learnings while diagnosing.
+5. **No silent controller:** reassess may recommend edits, promotion, or archival, but it must not edit charter direction, system-map structure, capability Goal/Scope/Behaviors/Hard Constraints, Decisions, or Learnings while diagnosing.
 
 This keeps freedom where agents need it (reasoning over evidence) and control where the spec could otherwise rationalize itself into noise.
 
@@ -125,7 +131,7 @@ Learning Action is the canonical umbrella term for accepted cleanup after reasse
 
 - **Keep inline** when a recent Learning is still useful startup context.
 - **Promote to capability Decisions** when it describes a durable capability-level rule.
-- **Promote to CHARTER Decisions** when it changes the project-wide axis.
+- **Promote to charter Decisions** when it changes the project-wide axis.
 - **Archive outside the hot `spec/capabilities.md` path** when it is useful history but no longer startup context.
 
 Reassess may recommend a Learning Action, but diagnosis itself does not rewrite Learnings. The edit is a separate user-approved manual change.
@@ -134,10 +140,11 @@ Reassess may recommend a Learning Action, but diagnosis itself does not rewrite 
 
 The current callable spec-series surface is:
 
-- `spec-charter` — create/amend `CHARTER.md` and run report-only reassess.
+- `spec-charter` — create/amend `spec/charter.md` and run report-only reassess.
+- `spec-system-map` — create/amend `spec/system-map.md` as the high-level project map.
 - `spec-grill` — create/refine `spec/capabilities.md` from repo signals.
 
-This split exists because existing-repo onboarding naturally needs `CHARTER.md` first and capability contracts next; hiding the second step behind a charter-named `grill` mode made the intended path hard to discover.
+This split exists because existing-repo onboarding naturally needs charter first, then a high-level system map, then capability contracts; hiding later steps behind a charter-named mode made the intended path hard to discover.
 
 The names `spec-reassess` and `spec-learn` are reserved/non-callable future split candidates. They should appear only in naming-policy discussion until a split is justified by concrete signal:
 
@@ -169,11 +176,11 @@ From Langosco et al. 2022 (goal misgeneralization) + Manheim & Garrabrant 2018 (
 
 ### 2. Control-theory framing
 
-A multi-day autonomous run with no in-loop ground-truth check is **open-loop control** and will drift. The CHARTER alone is a setpoint without a sensor. `## Learnings` is the minimum-viable sensor: each run feeds back a one-line ground-truth observation that the next run can read.
+A multi-day autonomous run with no in-loop ground-truth check is **open-loop control** and will drift. The charter alone is a setpoint without a sensor. `## Learnings` is the minimum-viable sensor: each run feeds back a one-line ground-truth observation that the next run can read.
 
 ### 3. Spec-language stability discipline
 
-Across OKRs, ADRs, Constitutional AI, and TLA+: the design choice most copied is **immutability after acceptance** (Nygard). `CHARTER.md` Tier 3 already enforces this; `spec/capabilities.md` extends it via append-only `## Learnings` and `## Decisions` sections.
+Across OKRs, ADRs, Constitutional AI, and TLA+: the design choice most copied is **immutability after acceptance** (Nygard). `spec/charter.md` Tier 3 already enforces this; `spec/capabilities.md` extends it via append-only `## Learnings` and `## Decisions` sections.
 
 ### The 3-axis predicate test (for grill mode)
 
@@ -188,12 +195,12 @@ Before any capability Behavior or Hard Constraint is committed:
 | Deferred | Rationale | Promotion trigger |
 |---|---|---|
 | Per-capability files (`spec/components/*.md`) | YAGNI; a compact single file is easier to read and route through while under budget | `spec/capabilities.md` > 500 lines, >15 capabilities, or ownership demands |
-| ADR directory (`spec/decisions/*.md`) | CHARTER Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
+| ADR directory (`spec/decisions/*.md`) | Charter Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
 | Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
 | Cross-capability dependency graph | Over-engineering; readable from prose | Multiple capability authors complain about silent coupling |
 | Per-capability `revision:` / `last_amended:` | `git blame` is the source of truth | Auditing demand from outside the team |
 | Automated reassess hooks in sprint-close / relay-merge | Manual report-only reassess must prove useful before hooks add noise to execution paths | Repeated manual reassess reports produce the same actionable recommendation |
-| Auto-promotion of Learnings into Decisions or CHARTER | Promotion changes accepted authority and must stay human-gated | Explicit user asks for a promotion pass and reviews the proposed diff |
+| Auto-promotion of Learnings into Decisions or charter | Promotion changes accepted authority and must stay human-gated | Explicit user asks for a promotion pass and reviews the proposed diff |
 
 ---
 
@@ -205,7 +212,7 @@ These are current policy anchors carried forward from implementation. They are n
 - **D3** `spec/capabilities.md` size warning threshold — resolved: warn above 12 capabilities or 400 lines; recommend split above 500 lines, 15 capabilities, or ownership-boundary pressure.
 - **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
 - **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
-- **D6** Spec-series command surface — resolved: `spec-charter` owns `CHARTER.md`; `spec-grill` owns `spec/capabilities.md`; `spec-reassess` remains reserved until report-only usage justifies a split.
+- **D6** Spec-series command surface — resolved: `spec-charter` owns `spec/charter.md`; `spec-system-map` owns `spec/system-map.md`; `spec-grill` owns `spec/capabilities.md`; `spec-reassess` remains reserved until report-only usage justifies a split.
 
 ---
 
@@ -237,7 +244,7 @@ PR-1: template + SKILL.md extension (no executable code)
   ├─ docs/spec-system-design.md                    (this file)
   ├─ skills/spec-grill/templates/capabilities.md   (NEW)
   ├─ skills/spec-grill/SKILL.md                    (capability grill contract)
-  └─ CHARTER.md                                    (no change; just verify alignment)
+  └─ spec/charter.md                              (no change; just verify alignment)
        ↓
        (dogfood: write spec/capabilities.md for dev-backlog itself)
        ↓
@@ -288,15 +295,15 @@ This section records calibration evidence. It should inform future changes, but 
 
 The most authentic test of this spec system is applying it to projects we already understand:
 
-1. **dev-backlog itself** (greenfield-ish — `CHARTER.md` exists, no capabilities file yet). Authors: us. Validates greenfield grill + the layered shape on a project we know cold.
-2. **dev-relay** (brownfield — established code, no CHARTER yet). Validates the full brownfield path: `extract-signals.js` → grill → `spec/capabilities.md` written end-to-end. Also exercises live-update since dev-relay *is* the relay-merge surface.
+1. **dev-backlog itself** (greenfield-ish — `spec/charter.md` exists, no capabilities file yet). Authors: us. Validates greenfield grill + the layered shape on a project we know cold.
+2. **dev-relay** (brownfield — established code, no charter yet). Validates the full brownfield path: `extract-signals.js` -> grill -> `spec/capabilities.md` written end-to-end. Also exercises live-update since dev-relay *is* the relay-merge surface.
 3. **Large-repo fixture** — a deterministic tamgu_note-shaped fixture with many feature folders and workflow commit scopes. Protects against treating feature count as capability count without depending on a private checkout.
 4. **(optional, after both)** A real product repo from outside this workspace. Highest signal but lowest control. Worth doing once internal dogfood looks healthy.
 5. **Manual reassess pass** — run `spec-charter reassess` on dev-backlog and one larger repo shape before adding sprint-close or relay-merge hooks. The test is whether the report produces a useful next action without creating churn.
 
 Each dogfood produces:
 - A `spec/capabilities.md` in the target repo
-- Reusable signal feedback for spec-system v0.2 (more findings, like the CHARTER dogfood pattern that produced #93–#98)
+- Reusable signal feedback for spec-system v0.2 (more findings, like the charter dogfood pattern that produced #93-#98)
 
 ### Reassess MVP dogfood note (2026-05-24)
 
@@ -313,13 +320,13 @@ Decision: existing doctor/lint JSON is enough for the MVP reassess mode to produ
 
 ---
 
-## CHARTER alignment (self-check)
+## Charter alignment (self-check)
 
-This design advances dev-backlog's own CHARTER Objectives:
+This design advances dev-backlog's own charter Objectives:
 
-- **O3 (active):** `<5-min reference axis usable` — capability specs *extend* the 5-min property below CHARTER. Not advance to validated on this; one more independent project required.
+- **O3 (active):** `<5-min reference axis usable` — capability specs *extend* the 5-min property below the charter. Not advance to validated on this; one more independent project required.
 - **O4 (active):** `drift detectable without manual triage` — `## Learnings` + `component-lint.js` are direct drift-detection surfaces. Same proof-gate.
 - **O5 (deferred):** `auto-reassess wired into relay-merge / sprint completion` — report-only `spec-charter reassess` is the manual precursor. Do not wire hooks until manual reassess repeatedly produces useful, low-noise recommendations.
-- **O6 (deferred):** `/goal completion-condition auto-emission from CHARTER + active sprint` — unchanged.
+- **O6 (deferred):** `/goal completion-condition auto-emission from charter + active sprint` — unchanged.
 
-Status advance for any of these is gated on independent-project proof, per CHARTER Tier 2 discipline.
+Status advance for any of these is gated on independent-project proof, per charter Tier 2 discipline.

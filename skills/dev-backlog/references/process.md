@@ -25,7 +25,7 @@ Two files at most (`_context.md` + active sprint), full picture.
 When starting a new sprint:
 
 0. If an active sprint exists, set its `status: completed` and write a final Progress entry first.
-1. If repo-root `CHARTER.md` exists, read its `active` Objectives first. Derive the sprint as the projection of those objectives onto not-yet-done work, and record the advanced Objective IDs in sprint frontmatter `objectives: [O1, O3]`. If absent, plan exactly as before and leave `objectives: []`.
+1. If `spec/charter.md` exists, read its `active` Objectives first. If it is absent, fall back to legacy root `CHARTER.md`. Derive the sprint as the projection of those objectives onto not-yet-done work, and record the advanced Objective IDs in sprint frontmatter `objectives: [O1, O3]`. If both are absent, plan exactly as before and leave `objectives: []`.
 2. Create GitHub milestone: `gh api repos/{owner}/{repo}/milestones -f title="Sprint W13" -f due_on="2026-03-28"`
 3. Assign issues: `gh issue edit <N> --milestone "Sprint W13"`
 4. Pull issues to `backlog/tasks/`
