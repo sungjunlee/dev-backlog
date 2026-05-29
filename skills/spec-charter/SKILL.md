@@ -4,14 +4,14 @@ argument-hint: "[create|amend|reassess]"
 description: "Create, amend, and reassess spec/charter.md as the project-wide spec axis. Use to establish or evolve project direction, Objectives, Non-Goals, Decisions, stale spec findings, project charter, 기준, 헌장, 방향성, spec axis."
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
-  related-skills: "spec-grill, dev-backlog, backlog-triage"
+  related-skills: "spec-system-map, spec-grill, dev-backlog, backlog-triage"
 ---
 
 # Spec Charter
 
 Create and amend `spec/charter.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable.
 
-`spec/charter.md` is the first layer, not the whole large-repo spec. On existing/brownfield repos, finish create mode by recommending `spec-grill` so the user can author `spec/capabilities.md` from real repo signals.
+`spec/charter.md` is the first layer, not the whole large-repo spec. On existing/brownfield repos, finish create mode by recommending `spec-system-map` for `spec/system-map.md` and `spec-grill` for `spec/capabilities.md` from real repo signals.
 
 ## Execution Contract
 
@@ -35,7 +35,7 @@ Resolve helper scripts from the installed `spec-charter` skill directory, not fr
 
 End every mode with a short summary:
 
-- `create`: created files, unresolved assumptions, and whether `spec-grill` is the recommended next step.
+- `create`: created files, unresolved assumptions, and whether `spec-system-map` and `spec-grill` are recommended next steps.
 - `amend`: accepted changes, refused/parked changes, proof cited for status advances, and size-check result.
 - `reassess`: required report sections from the Reassess Mode dispatch contract, with one recommended next step.
 
@@ -71,7 +71,7 @@ Use create mode when neither `spec/charter.md` nor legacy root `CHARTER.md` exis
 1. Draft from repo signals: product/user-facing signals (`README.md`, open epics/issues, `CHANGELOG.md`) before development-harness signals (`CLAUDE.md`, `AGENTS.md`). Harness files may inform workflow conventions, local commands, and repo-specific guardrails, but they do not override README, charter, issues, code structure, or user interview answers for product/capability authority unless they explicitly describe product boundaries. When signals conflict, surface the conflict in the interview rather than picking silently.
 2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives. Follow the checklist in `references/create.md`: Problem framing options, the wedge test for Approach, Non-Goals elicitation, and Objective framing that cites `references/objectives.md`.
 3. Create `spec/` if needed, then write `spec/charter.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`. The Decisions table may be left empty. Seed 3-5 rows only when prior design docs, ADRs, or notable merged PRs already record direction; whatever lands becomes immutable from revision 2.
-4. If the target repo is brownfield, recommend `spec-grill` as the next step. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
+4. If the target repo is brownfield, recommend `spec-system-map` and `spec-grill` as the next steps. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
 
 Objective conventions:
 
@@ -105,13 +105,13 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 
 Use reassess mode when the user asks whether `spec/charter.md`, `spec/system-map.md`, or `spec/capabilities.md` is stale, asks to review Learnings, wants a periodic spec health check, or when major model/tool/harness changes could alter how agents interpret repo context.
 
-Reassess never edits files. It diagnoses drift and recommends next actions; accepted fixes must run through `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
+Reassess never edits files. It diagnoses drift and recommends next actions; accepted fixes must run through `spec-charter amend`, `spec-system-map amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
 
 Dispatch contract:
 
 1. Resolve helper scripts from the installed dev-backlog skill directory; if unavailable, report **Missing Evidence**.
 2. Start with bounded evidence: `capabilities-doctor.js --json`, `component-lint.js --json`, named charter, system-map, or capability sections, the active sprint, and at most the latest five completed sprint files.
-3. Emit these report sections: **Evidence**, **No Change**, **Grill Candidates**, **Amend Candidates**, **Learning Actions**, **Missing Evidence**, **Recommended Next Step**.
+3. Emit these report sections: **Evidence**, **No Change**, **System Map Candidates**, **Grill Candidates**, **Amend Candidates**, **Learning Actions**, **Missing Evidence**, **Recommended Next Step**.
 4. Use `references/reassess.md` as the source of truth for evidence order, report shape, recommendation rules, Learning Actions, and stale-spec failure modes.
 
 ## References
@@ -121,4 +121,5 @@ Dispatch contract:
 - `references/alignment.md` — shared work-to-objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
 - `references/objectives.md` — verifiable-predicate examples, common rewrite patterns, 30-second test.
 - `references/reassess.md` — report-only stale-spec reassessment: evidence sources, output shape, Learning Actions, and failure modes.
+- [`../spec-system-map/SKILL.md`](../spec-system-map/SKILL.md) — companion skill for authoring `spec/system-map.md`.
 - [`../spec-grill/SKILL.md`](../spec-grill/SKILL.md) — companion skill for authoring `spec/capabilities.md`.

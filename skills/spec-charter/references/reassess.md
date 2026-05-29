@@ -1,6 +1,6 @@
 # Reassess-Mode Heuristics
 
-Use this reference in `spec-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
+Use this reference in `spec-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `spec-charter amend`, `spec-system-map amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
 
 ## Policy Ownership
 
@@ -14,7 +14,7 @@ Reassess is the controller review, not the writer.
 
 - Sensors: `## Learnings`, sprint `component:` handles, doctor/lint output, recent sprint context.
 - Diagnosis: the reassess report.
-- Controller action: user-approved `amend`, `grill`, or Learning Action.
+- Controller action: user-approved `amend`, `system-map`, `grill`, or Learning Action.
 - Forbidden shortcut: silently editing accepted charter direction or capability contracts during reassess.
 
 The default answer can be "no change." Do not manufacture churn just because the user asked for a reassessment.
@@ -57,6 +57,9 @@ Use this structure unless the user asks for a shorter answer:
 ### No Change
 - <area that still matches current evidence>
 
+### System Map Candidates
+- <area> — evidence: <signal>; suspected change: <shape/boundary/flow/invariant/pointer>; next: `spec-system-map amend`
+
 ### Grill Candidates
 - <capability> — evidence: <signal>; suspected change: <contract area>; next: `spec-grill <capability>`
 
@@ -94,6 +97,17 @@ Recommend `spec-grill <capability>` when any of these are true:
 - component usage shows the capability owns work its Scope does not mention
 
 Do not rewrite the capability during reassess. Name the block and the suspected edit.
+
+### System Map Candidate
+
+Recommend `spec-system-map amend` when evidence affects project-wide structure without changing why/good-state:
+
+- runtime boundaries changed across capabilities
+- a core flow has a new step, owner, or external system
+- a project-wide invariant is missing, stale, or contradicted
+- the map copied module details that should be demoted to linked docs
+
+Do not rewrite the map during reassess. Name the suspected section and the evidence.
 
 ### Amend Candidate
 

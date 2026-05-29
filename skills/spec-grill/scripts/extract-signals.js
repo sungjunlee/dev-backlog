@@ -26,12 +26,15 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const {
+  CANONICAL_CHARTER_PATH,
+  LEGACY_CHARTER_PATH,
+  resolveCharterPath,
+} = require("../../dev-backlog/scripts/spec-paths.js");
 
 const SOURCE_ROOT_CANDIDATES = ["src", "lib", "app", "packages", "skills"];
 const SUMMARY_DIR_LIMIT = 5;
 const DEFAULT_COMMIT_LIMIT = 100;
-const CANONICAL_CHARTER_PATH = path.join("spec", "charter.md");
-const LEGACY_CHARTER_PATH = "CHARTER.md";
 
 function buildSignalAuthority({ readmeFound, charterFound, charterSource, harnessFiles, sourceRoot, commitsScanned }) {
   return [
@@ -177,18 +180,16 @@ function readOptionalFile(filePath, { readFile = fs.readFileSync, fileExists = f
 }
 
 function resolveCharterFile(repoRoot, deps = {}) {
-  const candidates = [
-    { relPath: CANONICAL_CHARTER_PATH, source: "canonical" },
-    { relPath: LEGACY_CHARTER_PATH, source: "legacy" },
-  ];
-  for (const candidate of candidates) {
-    const filePath = path.join(repoRoot, candidate.relPath);
-    const content = readOptionalFile(filePath, deps);
-    if (content !== null) {
-      return { found: true, path: filePath, source: candidate.source, content };
-    }
+  const resolved = resolveCharterPath({ repoRoot, fileExists: deps.fileExists });
+  if (!resolved.found) {
+    return { found: false, path: resolved.charterPath, source: resolved.source, content: null };
   }
-  return { found: false, path: path.join(repoRoot, CANONICAL_CHARTER_PATH), source: "absent", content: null };
+  return {
+    found: true,
+    path: resolved.charterPath,
+    source: resolved.source,
+    content: readOptionalFile(resolved.charterPath, deps),
+  };
 }
 
 function readCharterObjectives(repoRoot, deps = {}) {
@@ -397,6 +398,8 @@ module.exports = {
   getRecentCommitMessages,
   readOptionalFile,
   resolveCharterFile,
+  CANONICAL_CHARTER_PATH,
+  LEGACY_CHARTER_PATH,
   readCharterObjectives,
   summarizeReadme,
   buildCapability,
