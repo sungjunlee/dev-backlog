@@ -1,6 +1,6 @@
 # dev-backlog Capabilities
 
-The middle layer between [`CHARTER.md`](../CHARTER.md) and the active sprint. Each block describes one subsystem-worth of work with a frozen-ish contract and a structurally bounded live-feedback channel.
+The middle layer between [`charter.md`](charter.md) and the active sprint. Each block describes one subsystem-worth of work with a frozen-ish contract and a structurally bounded live-feedback channel.
 
 Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `spec-grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `## Decisions` is append-only by convention.
 
@@ -77,18 +77,18 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ## Capability: spec-charter
 
-**Goal:** A user creates, amends, or reassesses `CHARTER.md` through tier-gated discipline, and the file stays a 5-minute read.
+**Goal:** A user creates, amends, or reassesses `spec/charter.md` through tier-gated discipline, and the file stays a 5-minute read.
 
 **In-scope:**
 - `spec-charter` create + amend + reassess modes
 - Three-tier discipline (Direction / Predicates / History) and the proof gate for Objective status advances
 - `check-size.js` budget enforcement after every amend
-- Brownfield handoff guidance to `spec-grill` after initial CHARTER creation
+- Brownfield handoff guidance to `spec-system-map` and `spec-grill` after initial charter creation
 
 **Out-of-scope:**
 - Authoring per-capability contracts in `spec/capabilities.md` (`spec-grill` capability)
 - Charter deletion — no supported path
-- Reading `CHARTER.md` from sibling skills (each does it directly; this capability does not gate reads)
+- Reading `spec/charter.md` from sibling skills (each does it directly; this capability does not gate reads)
 
 ### Expected Behaviors
 - After `amend` lands a real diff, `revision` increments by exactly 1 and `last_amended` advances to that day; a no-op invocation never bumps either field.
@@ -106,24 +106,60 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 ### Decisions
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
-| 2026-05-22 | CHARTER is a separate file at repo root, not merged into `_context.md` | Yardstick must stay <5-min; HOW-knowledge would dilute it | — |
+| 2026-05-22 | CHARTER is a separate file, not merged into `_context.md` | Yardstick must stay <5-min; HOW-knowledge would dilute it | — |
 | 2026-05-22 | `backlog-charter` is a third sibling skill, not folded into `dev-backlog` | Different concern (axis lifecycle vs. execution) | — |
-| 2026-05-29 | `backlog-charter` is renamed to `spec-charter` for CHARTER lifecycle work | The artifact is a project spec axis, not a backlog-only helper | 2026-05-22 |
+| 2026-05-29 | `backlog-charter` is renamed to `spec-charter` for charter lifecycle work | The artifact is a project spec axis, not a backlog-only helper | 2026-05-22 |
+| 2026-05-29 | New charter files live at `spec/charter.md`; root `CHARTER.md` is legacy fallback | Multiple project spec artifacts need one durable home under `spec/` | 2026-05-22 |
+
+---
+
+## Capability: spec-system-map
+
+**Goal:** A user captures project-wide system shape in `spec/system-map.md` without letting it become an exhaustive architecture encyclopedia.
+
+**In-scope:**
+- `spec-system-map` create + amend modes
+- `spec/system-map.md` template and dogfood artifact
+- Boundaries between charter, system map, and capability contracts
+- Demotion of module details, endpoint lists, and runbook commands into linked docs
+
+**Out-of-scope:**
+- Mutating `spec/charter.md` direction or Objectives (`spec-charter` capability)
+- Authoring per-capability contracts (`spec-grill` capability)
+- Replacing ADRs, runbooks, generated API docs, or implementation notes
+
+### Expected Behaviors
+- Create mode writes `spec/system-map.md` and creates `spec/` when needed.
+- The map includes System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, and Where To Go Next.
+- Brownfield uncertainty is labeled as an assumption instead of filled with invented details.
+
+### Hard Constraints
+- Never include exhaustive module inventories, endpoint lists, deployment commands, or temporary TODOs in `spec/system-map.md`.
+- Never promote a subsystem detail unless it changes a project-wide boundary, flow, storage/external system, or invariant.
+
+### Learnings
+<!-- LEARN:BEGIN -->
+<!-- LEARN:END -->
+
+### Decisions
+| date | decision | rationale | supersedes |
+| --- | --- | --- | --- |
+| 2026-05-29 | Use `system-map.md`, not `ARCHITECTURE.md`, for the high-level project map | The name narrows scope away from mixed architecture/runbook/module docs | — |
 
 ---
 
 ## Capability: spec-grill
 
-**Goal:** A user turns existing repo signals into compact `spec/capabilities.md` capability contracts instead of stopping at a project-wide CHARTER.
+**Goal:** A user turns existing repo signals into compact `spec/capabilities.md` capability contracts instead of stopping at a project-wide charter.
 
 **In-scope:**
 - `spec-grill` greenfield and brownfield capability authoring
-- `extract-signals.js` raw candidate seeding from README, CHARTER, source roots, harness files, and commit scopes
+- `extract-signals.js` raw candidate seeding from README, charter, source roots, harness files, and commit scopes
 - Capability admission, Goal/Scope interview, Expected Behaviors, and Hard Constraints
 - `templates/capabilities.md` and `references/capabilities.md`
 
 **Out-of-scope:**
-- Mutating `CHARTER.md` direction or Objectives (`spec-charter` capability)
+- Mutating `spec/charter.md` direction or Objectives (`spec-charter` capability)
 - Appending runtime Learnings after relay runs (bounded writer contract outside grill)
 - Treating directory names or commit scopes as accepted capabilities without interview admission
 
@@ -149,11 +185,11 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ## Capability: triage-grooming
 
-**Goal:** Open Issues are classified, related, flagged stale, and aligned to CHARTER Objectives without humans maintaining a parallel triage spreadsheet.
+**Goal:** Open Issues are classified, related, flagged stale, and aligned to charter Objectives without humans maintaining a parallel triage spreadsheet.
 
 **In-scope:**
 - `backlog-triage` collect / relate / stale / report / apply pipeline
-- CHARTER-aware Alignment Check (Issue → active Objective mapping)
+- Charter-aware Alignment Check (Issue → active Objective mapping)
 - Triage snapshots (v2 collector) and the advisory triage report artifact
 
 **Out-of-scope:**

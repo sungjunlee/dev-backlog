@@ -98,10 +98,11 @@ Optional spec-series setup:
 
 ```text
 /spec-charter create
+/spec-system-map
 /spec-grill
 ```
 
-`spec-charter` creates the project-wide `CHARTER.md` axis. On existing repos, follow it with `spec-grill` to author `spec/capabilities.md`, the middle layer of capability contracts and Hard Constraints.
+`spec-charter` creates the project-wide `spec/charter.md` axis. On existing repos, follow it with `spec-system-map` for `spec/system-map.md` and `spec-grill` for `spec/capabilities.md`. The spec index lives at [spec/README.md](spec/README.md).
 
 For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 

@@ -11,7 +11,7 @@ metadata:
 
 README covers install and human quick start. This skill file is the execution contract for agents: file roles, sprint structure, process, and script behavior.
 
-Related skills: [`spec-charter`](../spec-charter/SKILL.md) for the optional `CHARTER.md` reference axis, [`spec-grill`](../spec-grill/SKILL.md) for `spec/capabilities.md`, and [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
+Related skills: [`spec-charter`](../spec-charter/SKILL.md) for the optional `spec/charter.md` reference axis, [`spec-system-map`](../spec-system-map/SKILL.md) for `spec/system-map.md`, [`spec-grill`](../spec-grill/SKILL.md) for `spec/capabilities.md`, and [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
 
 Two layers, each with a clear job:
 
@@ -61,7 +61,7 @@ backlog/
 ## Sprint File Format
 
 The sprint file in `backlog/sprints/` is the execution hub. One file per sprint.
-The `objectives` frontmatter field lists the `CHARTER.md` Objective IDs this sprint advances; it is `[]` when the project has no `CHARTER.md`.
+The `objectives` frontmatter field lists the charter Objective IDs this sprint advances; it is `[]` when the project has no `spec/charter.md` or legacy root `CHARTER.md`.
 The `component` field is one primary routing handle from `spec/capabilities.md`. It names the single capability whose `## Learnings` block receives an entry when a relay run merges. Empty string means no live-update target. If a sprint touches secondary areas, mention them in the sprint body or Running Context instead of adding more frontmatter values.
 
 ```markdown
@@ -206,7 +206,7 @@ Task files get AC checkboxes updated during work. Everything else (notes, decisi
 
 **Orient** → Read `_context.md` + active sprint file. No sprint? → Plan. All done? → Complete.
 
-**Plan** → If repo-root `CHARTER.md` exists, read its `active` Objectives first, project them onto not-yet-done work, and record advanced IDs in `objectives:`. If absent, plan as before and leave `objectives: []`.
+**Plan** -> If `spec/charter.md` exists, read its `active` Objectives first; otherwise fall back to legacy root `CHARTER.md`. Project Objectives onto not-yet-done work and record advanced IDs in `objectives:`. If both are absent, plan as before and leave `objectives: []`.
 
 **Work** → Option A (do it yourself): read batch → implement → verify AC → commit `Fixes #N`. Option B (delegate): follow the relay skill's dispatch process.
 
@@ -238,6 +238,6 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, n
 - `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — Sync the monthly GitHub Progress issue. `--finalize` adds the month-end block and closes the target month's issue idempotently.
 - `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close active sprint: set completed, move tasks, remind about context promotion
 - `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
-- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `CHARTER.md` with an actionable (non-deferred) status. Graceful no-op when `CHARTER.md` is absent.
+- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `spec/charter.md` (or legacy root `CHARTER.md`) with an actionable (non-deferred) status. Graceful no-op when both are absent.
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — Verify every `component:` value in sprint files resolves to one declared capability in `spec/capabilities.md`. Comma-separated multi-component values fail because `component:` is the primary routing handle; put secondary touches in sprint prose. Graceful no-op when `spec/capabilities.md` is absent.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — Check `spec/capabilities.md` compactness: capability count, line count, per-capability size, Learnings marker health, and inline Learnings budget. Default mode warns; `--strict` exits non-zero on hard split triggers or malformed Learnings markers.

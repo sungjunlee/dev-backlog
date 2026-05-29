@@ -35,7 +35,7 @@ describe("parseArgs", () => {
   it("uses defaults when nothing passed", () => {
     const parsed = parseArgs([]);
     assert.equal(parsed.sprintsDir, path.join("backlog", "sprints"));
-    assert.equal(parsed.charterPath, "CHARTER.md");
+    assert.equal(parsed.charterPath, null);
     assert.equal(parsed.json, false);
   });
 
@@ -171,30 +171,36 @@ describe("findDrift", () => {
 });
 
 describe("checkObjectives", () => {
-  it("returns charterFound:false when CHARTER.md is absent", () => {
+  it("returns charterFound:false when no canonical or legacy charter exists", () => {
     const result = checkObjectives({
-      charterPath: "/no/such/CHARTER.md",
-      fileExists: (p) => p !== "/no/such/CHARTER.md",
+      repoRoot: "/no/such",
+      fileExists: () => false,
     });
     assert.equal(result.charterFound, false);
+    assert.equal(result.charterSource, "absent");
+    assert.ok(result.checkedPaths.some((p) => p.endsWith(path.join("spec", "charter.md"))));
+    assert.ok(result.checkedPaths.some((p) => p.endsWith("CHARTER.md")));
     assert.equal(result.drift.length, 0);
   });
 
-  it("reports drift over real fixtures", () => {
+  it("uses spec/charter.md by default", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-full-"));
     try {
       const sprintsDir = path.join(dir, "backlog", "sprints");
       fs.mkdirSync(sprintsDir, { recursive: true });
-      fs.writeFileSync(path.join(dir, "CHARTER.md"), SAMPLE_CHARTER);
+      fs.mkdirSync(path.join(dir, "spec"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "spec", "charter.md"), SAMPLE_CHARTER);
       fs.writeFileSync(
         path.join(sprintsDir, "2026-05-x.md"),
         "---\nmilestone: x\nobjectives: [O3, O99]\n---\n",
       );
       const result = checkObjectives({
         sprintsDir,
-        charterPath: path.join(dir, "CHARTER.md"),
+        repoRoot: dir,
       });
       assert.equal(result.charterFound, true);
+      assert.equal(result.charterSource, "canonical");
+      assert.equal(result.charterPath, path.join(dir, "spec", "charter.md"));
       assert.equal(result.sprintCount, 1);
       assert.equal(result.drift.length, 1);
       assert.deepEqual(result.drift[0].missing, ["O99"]);
@@ -202,12 +208,39 @@ describe("checkObjectives", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("falls back to legacy root CHARTER.md", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-legacy-"));
+    try {
+      const sprintsDir = path.join(dir, "backlog", "sprints");
+      fs.mkdirSync(sprintsDir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "CHARTER.md"), SAMPLE_CHARTER);
+      const result = checkObjectives({ sprintsDir, repoRoot: dir });
+      assert.equal(result.charterFound, true);
+      assert.equal(result.charterSource, "legacy");
+      assert.equal(result.charterPath, path.join(dir, "CHARTER.md"));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("honors explicit --charter without fallback", () => {
+    const result = checkObjectives({
+      repoRoot: "/repo",
+      charterPath: "custom.md",
+      fileExists: (p) => p.endsWith(path.join("spec", "charter.md")),
+    });
+    assert.equal(result.charterFound, false);
+    assert.equal(result.charterSource, "explicit");
+    assert.equal(result.checkedPaths.length, 1);
+    assert.equal(result.checkedPaths[0], path.join("/repo", "custom.md"));
+  });
 });
 
 describe("formatReport", () => {
   it("renders absent-charter message", () => {
-    const result = { charterFound: false, charterPath: "CHARTER.md", drift: [], sprintCount: 0 };
-    assert.match(formatReport(result), /No CHARTER\.md/);
+    const result = { charterFound: false, charterPath: "spec/charter.md", drift: [], sprintCount: 0 };
+    assert.match(formatReport(result), /No spec\/charter\.md or legacy CHARTER\.md/);
   });
 
   it("renders no-drift summary", () => {

@@ -8,7 +8,8 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
-- Split the old `backlog-charter` surface into the spec-series skills `spec-charter` and `spec-grill`. `spec-charter` owns `CHARTER.md` create/amend/reassess; `spec-grill` owns `spec/capabilities.md` capability-contract authoring. Closes [#157](https://github.com/sungjunlee/dev-backlog/issues/157), [#158](https://github.com/sungjunlee/dev-backlog/issues/158), and [#159](https://github.com/sungjunlee/dev-backlog/issues/159).
+- Consolidated active spec-series artifacts under `spec/`: `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md`, with root `CHARTER.md` retained only as a legacy fallback. Added `spec-system-map`, `spec/README.md`, dogfood `spec/system-map.md`, and script/docs compatibility updates. Closes [#161](https://github.com/sungjunlee/dev-backlog/issues/161), [#162](https://github.com/sungjunlee/dev-backlog/issues/162), [#163](https://github.com/sungjunlee/dev-backlog/issues/163), [#164](https://github.com/sungjunlee/dev-backlog/issues/164), and [#165](https://github.com/sungjunlee/dev-backlog/issues/165).
+- Split the old `backlog-charter` surface into the spec-series skills `spec-charter` and `spec-grill`. `spec-charter` owns charter create/amend/reassess; `spec-grill` owns `spec/capabilities.md` capability-contract authoring. Closes [#157](https://github.com/sungjunlee/dev-backlog/issues/157), [#158](https://github.com/sungjunlee/dev-backlog/issues/158), and [#159](https://github.com/sungjunlee/dev-backlog/issues/159).
 
 ## [0.5.0] — 2026-05-22
 

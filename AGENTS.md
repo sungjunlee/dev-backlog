@@ -7,9 +7,12 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 ```
 skills/
   spec-charter/
-    SKILL.md               ← CHARTER.md create/amend + reassess contract
+    SKILL.md               ← spec/charter.md create/amend + reassess contract
     references/            ← Detailed specs (on-demand)
     scripts/               ← Deterministic helpers (node)
+  spec-system-map/
+    SKILL.md               ← spec/system-map.md high-level system map contract
+    templates/             ← Runtime system-map template
   spec-grill/
     SKILL.md               ← spec/capabilities.md grill contract
     references/            ← Detailed specs (on-demand)
@@ -35,6 +38,10 @@ skills/
 GitHub (what)  ↔  gh CLI  ↔  backlog/sprints/ (how + context)
                               backlog/tasks/   (thin mirror)
 ```
+
+## Project Spec Home
+
+Durable project specs live under `spec/`: `charter.md`, `system-map.md`, and `capabilities.md`. Root `CHARTER.md` is legacy fallback only.
 
 ## Working on This Project
 

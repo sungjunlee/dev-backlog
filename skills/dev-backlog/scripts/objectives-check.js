@@ -1,27 +1,30 @@
 #!/usr/bin/env node
 /**
  * Verify that every `objectives:` ID referenced by a sprint file still
- * exists in CHARTER.md with an actionable status.
+ * exists in spec/charter.md with an actionable status.
  *
  * Usage: ./scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]
  *
  * Reports two drift classes per sprint:
- *   - missing  : the ID is not in CHARTER.md at all (removed; IDs are never reused)
+ *   - missing  : the ID is not in the charter at all (removed; IDs are never reused)
  *   - deferred : the ID exists but is marked [deferred]; sprints should not target
  *                deferred objectives
  *
- * Graceful no-op when CHARTER.md is absent (most projects opt out of CHARTER).
+ * Graceful no-op when spec/charter.md and legacy CHARTER.md are absent.
  *
  * Exit codes:
- *   0  no drift found, or CHARTER.md absent
+ *   0  no drift found, or charter absent
  *   1  drift found (missing or deferred IDs referenced)
  */
 
 const fs = require("fs");
 const path = require("path");
+const {
+  CANONICAL_CHARTER_PATH,
+  resolveCharterPath,
+} = require("./spec-paths.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
-const DEFAULT_CHARTER_PATH = "CHARTER.md";
 
 function usage() {
   return "Usage: objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]";
@@ -30,7 +33,7 @@ function usage() {
 function parseArgs(args) {
   const options = {
     sprintsDir: DEFAULT_SPRINTS_DIR,
-    charterPath: DEFAULT_CHARTER_PATH,
+    charterPath: null,
     json: false,
   };
 
@@ -120,15 +123,24 @@ function findDrift(sprintFiles, charterObjectives, { readFile = fs.readFileSync 
 
 function checkObjectives({
   sprintsDir = DEFAULT_SPRINTS_DIR,
-  charterPath = DEFAULT_CHARTER_PATH,
+  charterPath = null,
+  repoRoot = process.cwd(),
   readFile = fs.readFileSync,
   fileExists = fs.existsSync,
   readdir = fs.readdirSync,
 } = {}) {
-  if (!fileExists(charterPath)) {
-    return { charterFound: false, charterPath, drift: [], sprintCount: 0 };
+  const resolved = resolveCharterPath({ repoRoot, charterPath, fileExists });
+  if (!resolved.found) {
+    return {
+      charterFound: false,
+      charterPath: resolved.charterPath,
+      charterSource: resolved.source,
+      checkedPaths: resolved.checkedPaths,
+      drift: [],
+      sprintCount: 0,
+    };
   }
-  const charterContent = readFile(charterPath, "utf-8");
+  const charterContent = readFile(resolved.charterPath, "utf-8");
   const charterObjectives = parseCharterObjectives(charterContent);
 
   const sprintFiles = listSprintFiles(sprintsDir, { readdir, fileExists });
@@ -136,7 +148,9 @@ function checkObjectives({
 
   return {
     charterFound: true,
-    charterPath,
+    charterPath: resolved.charterPath,
+    charterSource: resolved.source,
+    checkedPaths: resolved.checkedPaths,
     charterObjectiveIds: [...charterObjectives.keys()].sort(),
     sprintCount: sprintFiles.length,
     drift,
@@ -145,10 +159,10 @@ function checkObjectives({
 
 function formatReport(result) {
   if (!result.charterFound) {
-    return `No CHARTER.md at ${result.charterPath} — nothing to check.`;
+    return `No ${CANONICAL_CHARTER_PATH} or legacy CHARTER.md found — nothing to check.`;
   }
   const lines = [
-    `Checked ${result.sprintCount} sprint file(s) against ${result.charterObjectiveIds.length} CHARTER objective(s).`,
+    `Checked ${result.sprintCount} sprint file(s) against ${result.charterObjectiveIds.length} charter objective(s) from ${result.charterPath}.`,
   ];
   if (result.drift.length === 0) {
     lines.push("No drift detected ✓");
@@ -187,6 +201,7 @@ module.exports = {
   extractObjectivesField,
   parseSprintObjectives,
   parseCharterObjectives,
+  resolveCharterPath,
   listSprintFiles,
   findDrift,
   checkObjectives,
