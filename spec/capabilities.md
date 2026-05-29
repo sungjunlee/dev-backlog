@@ -2,7 +2,7 @@
 
 The middle layer between [`CHARTER.md`](../CHARTER.md) and the active sprint. Each block describes one subsystem-worth of work with a frozen-ish contract and a structurally bounded live-feedback channel.
 
-Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `backlog-charter grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `## Decisions` is append-only by convention.
+Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `spec-grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `## Decisions` is append-only by convention.
 
 Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs. Put secondary touches in sprint prose, not in frontmatter.
 
@@ -75,18 +75,18 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ---
 
-## Capability: charter-management
+## Capability: spec-charter
 
-**Goal:** A user creates or amends `CHARTER.md` through tier-gated discipline (no rubber-stamp) and the file stays a 5-minute read.
+**Goal:** A user creates, amends, or reassesses `CHARTER.md` through tier-gated discipline, and the file stays a 5-minute read.
 
 **In-scope:**
-- `backlog-charter` create + amend modes
+- `spec-charter` create + amend + reassess modes
 - Three-tier discipline (Direction / Predicates / History) and the proof gate for Objective status advances
 - `check-size.js` budget enforcement after every amend
-- `grill` mode is in this capability's scope as the authoring path for the middle layer (`spec/capabilities.md`)
+- Brownfield handoff guidance to `spec-grill` after initial CHARTER creation
 
 **Out-of-scope:**
-- Per-capability content of `spec/capabilities.md` (that lives in this file, not in `backlog-charter`)
+- Authoring per-capability contracts in `spec/capabilities.md` (`spec-grill` capability)
 - Charter deletion — no supported path
 - Reading `CHARTER.md` from sibling skills (each does it directly; this capability does not gate reads)
 
@@ -108,6 +108,42 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 | --- | --- | --- | --- |
 | 2026-05-22 | CHARTER is a separate file at repo root, not merged into `_context.md` | Yardstick must stay <5-min; HOW-knowledge would dilute it | — |
 | 2026-05-22 | `backlog-charter` is a third sibling skill, not folded into `dev-backlog` | Different concern (axis lifecycle vs. execution) | — |
+| 2026-05-29 | `backlog-charter` is renamed to `spec-charter` for CHARTER lifecycle work | The artifact is a project spec axis, not a backlog-only helper | 2026-05-22 |
+
+---
+
+## Capability: spec-grill
+
+**Goal:** A user turns existing repo signals into compact `spec/capabilities.md` capability contracts instead of stopping at a project-wide CHARTER.
+
+**In-scope:**
+- `spec-grill` greenfield and brownfield capability authoring
+- `extract-signals.js` raw candidate seeding from README, CHARTER, source roots, harness files, and commit scopes
+- Capability admission, Goal/Scope interview, Expected Behaviors, and Hard Constraints
+- `templates/capabilities.md` and `references/capabilities.md`
+
+**Out-of-scope:**
+- Mutating `CHARTER.md` direction or Objectives (`spec-charter` capability)
+- Appending runtime Learnings after relay runs (bounded writer contract outside grill)
+- Treating directory names or commit scopes as accepted capabilities without interview admission
+
+### Expected Behaviors
+- On brownfield repos without `spec/capabilities.md`, `extract-signals.js --repo-root <target> --json` emits deterministic raw candidates and labels signal authority before any contract is accepted.
+- `spec-grill <capability-slug>` edits only the named capability block and leaves other capability blocks, Learnings, and Decisions untouched.
+- Every accepted Behavior and Hard Constraint passes the authority, distributional, and manipulability axes before it is committed.
+
+### Hard Constraints
+- Never write a capability solely because a same-named directory or commit scope exists; raw signals require admission, merge, split, or refusal.
+- Never edit `### Learnings` between magic markers during grill; Learnings cleanup is a separate user-approved Learning Action.
+
+### Learnings
+<!-- LEARN:BEGIN -->
+<!-- LEARN:END -->
+
+### Decisions
+| date | decision | rationale | supersedes |
+| --- | --- | --- | --- |
+| 2026-05-29 | Capability authoring moves from hidden `backlog-charter grill` mode to `spec-grill` | Existing-repo users need a discoverable second step after `spec-charter create` | — |
 
 ---
 

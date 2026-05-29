@@ -1,6 +1,6 @@
 # Grill-Mode Heuristics for `spec/capabilities.md`
 
-Use this reference in `backlog-charter` grill mode after walking the per-capability interview flow in `SKILL.md`. The flow, 3-axis predicate test, and tier gates live in `SKILL.md`; this file captures concrete dogfood patterns so future grill sessions do not relearn them.
+Use this reference in `spec-grill` after walking the per-capability interview flow in `SKILL.md`. The flow, 3-axis predicate test, and tier gates live in `SKILL.md`; this file captures concrete dogfood patterns so future grill sessions do not relearn them.
 
 ## Naming: Slug Handle vs. Prose Contract
 
@@ -95,7 +95,7 @@ Fix: scope the claim to draft seeding.
 
 ## Rerun Protocol
 
-`backlog-charter grill <capability-slug>` may touch:
+`spec-grill <capability-slug>` may touch:
 
 - `Goal`
 - `In-scope`

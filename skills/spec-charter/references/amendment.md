@@ -1,6 +1,6 @@
 # Charter Amendment Guidance
 
-Use this reference in `backlog-charter` amend mode after re-reading the current repo-root `CHARTER.md`. The default bias is stability: no change unless concrete evidence shows the charter is stale, weak, or newly validated.
+Use this reference in `spec-charter` amend mode after re-reading the current repo-root `CHARTER.md`. The default bias is stability: no change unless concrete evidence shows the charter is stale, weak, or newly validated.
 
 ## Tier 1 Challenge Checklist
 

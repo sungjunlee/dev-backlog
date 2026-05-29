@@ -6,6 +6,14 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 
 ```
 skills/
+  spec-charter/
+    SKILL.md               ← CHARTER.md create/amend + reassess contract
+    references/            ← Detailed specs (on-demand)
+    scripts/               ← Deterministic helpers (node)
+  spec-grill/
+    SKILL.md               ← spec/capabilities.md grill contract
+    references/            ← Detailed specs (on-demand)
+    scripts/               ← Deterministic helpers (node)
   dev-backlog/
     SKILL.md               ← Core process (~194 lines)
     references/            ← Detailed specs (on-demand)

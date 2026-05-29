@@ -1,6 +1,6 @@
 # Reassess-Mode Heuristics
 
-Use this reference in `backlog-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
+Use this reference in `spec-charter reassess` after reading the Reassess Mode section in `SKILL.md`. The mode is a report-only stale-spec review. It helps the user decide whether to run `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
 
 ## Policy Ownership
 
@@ -57,10 +57,10 @@ Use this structure unless the user asks for a shorter answer:
 - <area that still matches current evidence>
 
 ### Grill Candidates
-- <capability> — evidence: <signal>; suspected change: <contract area>; next: `backlog-charter grill <capability>`
+- <capability> — evidence: <signal>; suspected change: <contract area>; next: `spec-grill <capability>`
 
 ### Amend Candidates
-- <CHARTER item> — evidence: <signal>; suspected change: <direction/objective/decision>; next: `backlog-charter amend`
+- <CHARTER item> — evidence: <signal>; suspected change: <direction/objective/decision>; next: `spec-charter amend`
 
 ### Learning Actions
 - Keep inline: <recent high-signal Learnings>
@@ -84,7 +84,7 @@ Recommend no change when Learnings are sparse, recent, non-repetitive, and do no
 
 ### Grill Candidate
 
-Recommend `backlog-charter grill <capability>` when any of these are true:
+Recommend `spec-grill <capability>` when any of these are true:
 
 - repeated Learnings show a new durable behavior or constraint
 - current Behaviors are too weak to explain how recent work succeeded
@@ -96,7 +96,7 @@ Do not rewrite the capability during reassess. Name the block and the suspected 
 
 ### Amend Candidate
 
-Recommend `backlog-charter amend` when evidence affects project-wide direction:
+Recommend `spec-charter amend` when evidence affects project-wide direction:
 
 - a repeated Learning changes multiple capabilities
 - an Objective appears validated or deferred but lacks proof
@@ -121,8 +121,8 @@ Archive older Learnings when they are useful history but no longer startup conte
 - **Semantic overreach:** deterministic counts are treated as proof of stale content. Fix by labeling counts as signals, not conclusions.
 - **Silent self-editing:** reassess edits Goal/Scope/Behaviors while diagnosing. Fix by routing through amend/grill.
 - **Unbounded scan:** the agent reads the whole repo and invents drift. Fix by starting from scripts and a bounded sprint window.
-- **Name confusion:** `spec-grill` or `spec-reassess` is described as callable before it exists. Fix by calling them reserved/non-callable future names.
+- **Name confusion:** `spec-reassess` is described as callable before it exists. Fix by calling it a reserved/non-callable future name.
 
 ## Reserved Names
 
-Naming policy lives in `docs/spec-system-design.md`. Summary: today the callable skill is `backlog-charter`. The names `spec-grill`, `spec-reassess`, and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.
+Naming policy lives in `docs/spec-system-design.md`. Summary: today the callable spec-series skills are `spec-charter` and `spec-grill`. The names `spec-reassess` and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.

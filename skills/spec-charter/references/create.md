@@ -1,6 +1,6 @@
 # Charter Create Mode: Signals, Interview, Seed Decisions
 
-Use this reference in `backlog-charter` create mode after confirming no repo-root `CHARTER.md` exists. The goal is a defensible first revision that survives its own proof gate — not a perfect axis on day one. Stability comes from amend mode; create mode just has to set a credible starting point.
+Use this reference in `spec-charter` create mode after confirming no repo-root `CHARTER.md` exists. The goal is a defensible first revision that survives its own proof gate — not a perfect axis on day one. Stability comes from amend mode; create mode just has to set a credible starting point.
 
 ## 1. Signal Collection (Priority + Conflict)
 

@@ -8,10 +8,15 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 
 ```text
 skills/
-  backlog-charter/
-    SKILL.md               ← CHARTER.md create/amend contract
-    references/            ← Amendment + alignment specs
+  spec-charter/
+    SKILL.md               ← CHARTER.md create/amend + reassess contract
+    references/            ← Amendment, alignment, objective, reassess specs
     templates/             ← Runtime CHARTER.md template
+  spec-grill/
+    SKILL.md               ← spec/capabilities.md grill contract
+    references/            ← Capability heuristics + spec-system research
+    scripts/               ← Brownfield signal extraction helper
+    templates/             ← Runtime capabilities template
   backlog-triage/
     SKILL.md               ← Open-issue grooming contract
     references/            ← Detailed specs (on-demand)

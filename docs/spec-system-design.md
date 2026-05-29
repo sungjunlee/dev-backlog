@@ -1,7 +1,7 @@
 # Spec System Design (v0.1)
 
 **Status:** Approved (M tier) · **Date:** 2026-05-23 · **Author:** session capture
-**Supersedes:** — · **Related:** [`CHARTER.md`](../CHARTER.md), [`skills/backlog-charter/`](../skills/backlog-charter/)
+**Supersedes:** — · **Related:** [`CHARTER.md`](../CHARTER.md), [`skills/spec-charter/`](../skills/spec-charter/), [`skills/spec-grill/`](../skills/spec-grill/)
 
 A layered, brownfield-friendly project spec system that survives multi-day autonomous agent execution without rubber-stamping itself into uselessness. This doc captures the current architecture, durable policy, research grounding, and historical implementation evidence.
 
@@ -24,7 +24,7 @@ For autonomous runs that span days, this means: setpoint exists, sensor doesn't,
 - Lower layers can update live without human edit, via structurally bounded channels
 - Interactive "grill-me" mode that pressure-tests specs into verifiable predicates
 - Loose documents, strict handles: prose stays flexible; machine-routing fields stay small and stable
-- Bias to simplicity: one new file family, zero new skill names
+- Bias to clarity: spec-series skill names match the artifact layer they operate on
 
 ## Non-Goals
 
@@ -83,10 +83,10 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 
 | Layer | Who writes | When | Gate |
 |---|---|---|---|
-| `CHARTER.md` Problem/Approach/Non-Goals | human via `backlog-charter amend` | rarely | Tier 1 gate (existing) |
+| `CHARTER.md` Problem/Approach/Non-Goals | human via `spec-charter amend` | rarely | Tier 1 gate (existing) |
 | `CHARTER.md` Objectives | human via amend; status advance proof-gated | when an objective is added/removed/proven | Tier 2 gate (existing) |
 | `CHARTER.md` Decisions | append-only | when a non-trivial cross-cutting decision is made | Tier 3 (existing) |
-| `spec/capabilities.md` Goal/Scope/Behaviors/HardConstraints per capability | human via `backlog-charter grill` (new mode) | when a capability's contract changes | challenge + confirm + apply |
+| `spec/capabilities.md` Goal/Scope/Behaviors/HardConstraints per capability | human via `spec-grill` | when a capability's contract changes | challenge + confirm + apply |
 | `spec/capabilities.md` `## Learnings` blocks | **`dev-relay/scripts/append-learnings.js`** | end of every successful relay run with a primary `component:` tag | structurally bounded append between magic markers; rejects anything else |
 | `spec/capabilities.md` `## Decisions` blocks | human | when a capability-level decision is made | append-only by convention; promote to CHARTER Tier 3 if cross-cutting |
 
@@ -94,8 +94,9 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 
 | Artifact | Owns | Does not own |
 |---|---|---|
-| `skills/backlog-charter/SKILL.md` | short dispatch contract: when to invoke modes, no-edit boundary, required reassess report sections | detailed reassess heuristics |
-| `skills/backlog-charter/references/reassess.md` | operational reassess procedure: evidence order, report shape, recommendation rules, Learning Actions, stale-spec failure modes | durable naming policy or historical build notes |
+| `skills/spec-charter/SKILL.md` | CHARTER create/amend and report-only reassess dispatch contract | capability authoring details |
+| `skills/spec-charter/references/reassess.md` | operational reassess procedure: evidence order, report shape, recommendation rules, Learning Actions, stale-spec failure modes | durable naming policy or historical build notes |
+| `skills/spec-grill/SKILL.md` | `spec/capabilities.md` authoring, brownfield signal admission, and 3-axis predicate test | CHARTER mutation rules |
 | `docs/spec-system-design.md` | durable design policy: lifecycle, naming policy, mutation discipline, split/defer triggers, historical rationale | step-by-step skill execution details |
 
 ### Stale-spec lifecycle
@@ -104,8 +105,8 @@ Accepted specs are useful only while they still match product reality. The syste
 
 1. **Setpoint:** `CHARTER.md` and `spec/capabilities.md` describe the accepted project/capability contracts.
 2. **Sensor:** relay and sprint execution append bounded observations as `## Learnings` or sprint context.
-3. **Diagnosis:** deterministic scripts report structural signals first (`capabilities-doctor.js`, `component-lint.js`); `backlog-charter reassess` turns those signals into a report.
-4. **Human gate:** accepted changes route through `backlog-charter amend`, `backlog-charter grill <capability>`, or a separate user-approved Learning Action.
+3. **Diagnosis:** deterministic scripts report structural signals first (`capabilities-doctor.js`, `component-lint.js`); `spec-charter reassess` turns those signals into a report.
+4. **Human gate:** accepted changes route through `spec-charter amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
 5. **No silent controller:** reassess may recommend edits, promotion, or archival, but it must not edit CHARTER direction, capability Goal/Scope/Behaviors/Hard Constraints, Decisions, or Learnings while diagnosing.
 
 This keeps freedom where agents need it (reasoning over evidence) and control where the spec could otherwise rationalize itself into noise.
@@ -131,14 +132,18 @@ Reassess may recommend a Learning Action, but diagnosis itself does not rewrite 
 
 ### Command surface and reserved names
 
-The current callable surface is `backlog-charter` with `create`, `amend`, `grill`, and `reassess` modes. There are no callable `spec-*` skills today.
+The current callable spec-series surface is:
 
-The names `spec-grill`, `spec-reassess`, and `spec-learn` are reserved/non-callable future split candidates. They should appear only in naming-policy discussion until a split is justified by concrete signal:
+- `spec-charter` — create/amend `CHARTER.md` and run report-only reassess.
+- `spec-grill` — create/refine `spec/capabilities.md` from repo signals.
 
-- `skills/backlog-charter/SKILL.md` exceeds the local compactness budget (about 250 lines in this repo)
-- mode instructions no longer fit a single understandable spine
-- users repeatedly ask for `spec-*` commands and fail to discover `backlog-charter`
-- capability/reassess work no longer reads as CHARTER lifecycle work
+This split exists because existing-repo onboarding naturally needs `CHARTER.md` first and capability contracts next; hiding the second step behind a charter-named `grill` mode made the intended path hard to discover.
+
+The names `spec-reassess` and `spec-learn` are reserved/non-callable future split candidates. They should appear only in naming-policy discussion until a split is justified by concrete signal:
+
+- reassess instructions no longer fit inside `spec-charter` without making the charter workflow muddy
+- users repeatedly ask for a dedicated report-only spec health command
+- Learning Actions become frequent enough to need their own trigger surface
 
 ### Why single-file, not per-capability
 
@@ -152,7 +157,7 @@ When the hard trigger fires, `split-capabilities.js` migrates to `spec/component
 
 ## Research grounding
 
-Full literature survey lives at [`references/spec-system-research.md`](../skills/backlog-charter/references/spec-system-research.md) (to be written; see follow-up issue). Three findings load-bear this design:
+Full literature survey lives at [`references/spec-system-research.md`](../skills/spec-grill/references/spec-system-research.md). Three findings load-bear this design:
 
 ### 1. The 3-mode failure taxonomy for autonomous-agent specs
 
@@ -200,6 +205,7 @@ These are current policy anchors carried forward from implementation. They are n
 - **D3** `spec/capabilities.md` size warning threshold — resolved: warn above 12 capabilities or 400 lines; recommend split above 500 lines, 15 capabilities, or ownership-boundary pressure.
 - **D4** Multi-component sprint task: resolved to one primary capability slug. Secondary touches are prose, not routing metadata.
 - **D5** `component:` tag freeform string vs declared-only enum? Resolved to declared capability slug, with `component-lint.js` catching typos before they reach Learnings.
+- **D6** Spec-series command surface — resolved: `spec-charter` owns `CHARTER.md`; `spec-grill` owns `spec/capabilities.md`; `spec-reassess` remains reserved until report-only usage justifies a split.
 
 ---
 
@@ -209,8 +215,8 @@ Strangler-fig. None of these requires re-architecture, just expansion:
 
 1. `spec/capabilities.md` outgrows comfort → `split-capabilities.js` migrates to `spec/components/<name>.md`. SKILL.md routes the same gates over the new file shape.
 2. Decision volume justifies ADRs → `spec/decisions/<NNNN>-<slug>.md` with a tiny ADR template. Per-capability `## Decisions` sections become a "lite" entry point.
-3. Working agent shows rationalization tells in grill mode → adversarial grill runs as a subagent with separate context. `backlog-charter` SKILL.md gains a `--adversarial-subagent` flag.
-4. Reserved/non-callable names (`spec-grill`, `spec-reassess`, `spec-learn`) become real skills only if the triggers in [Command surface and reserved names](#command-surface-and-reserved-names) fire.
+3. Working agent shows rationalization tells in grill mode -> adversarial grill runs as a subagent with separate context. `spec-grill` gains a documented adversarial-review option.
+4. Reserved/non-callable names (`spec-reassess`, `spec-learn`) become real skills only if the triggers in [Command surface and reserved names](#command-surface-and-reserved-names) fire.
 
 Every L-tier feature is a YAGNI-violating addition until it's not. Defer until signal.
 
@@ -229,16 +235,16 @@ This section records how the v0.1 spec system and reassess MVP were built. It is
 ```
 PR-1: template + SKILL.md extension (no executable code)
   ├─ docs/spec-system-design.md                    (this file)
-  ├─ skills/backlog-charter/templates/capabilities.md  (NEW)
-  ├─ skills/backlog-charter/SKILL.md               (+grill mode section)
+  ├─ skills/spec-grill/templates/capabilities.md   (NEW)
+  ├─ skills/spec-grill/SKILL.md                    (capability grill contract)
   └─ CHARTER.md                                    (no change; just verify alignment)
        ↓
        (dogfood: write spec/capabilities.md for dev-backlog itself)
        ↓
 PR-2: brownfield bootstrap (greenfield path also works)
-  ├─ skills/backlog-charter/scripts/extract-signals.js   (NEW, ~80 LOC)
-  ├─ skills/backlog-charter/scripts/extract-signals.test.js
-  └─ skills/backlog-charter/SKILL.md               (+brownfield invocation)
+  ├─ skills/spec-grill/scripts/extract-signals.js  (NEW, ~80 LOC)
+  ├─ skills/spec-grill/scripts/extract-signals.test.js
+  └─ skills/spec-grill/SKILL.md                    (+brownfield invocation)
        ↓
        (dogfood: run extract-signals on dev-relay → propose its spec/capabilities.md)
        ↓
@@ -257,8 +263,8 @@ PR #142 implemented the deliberately small follow-up after v0.1:
 ```
 PR-4: stale-spec reassess MVP
   ├─ docs/spec-system-design.md                    (+stale-spec lifecycle and naming policy)
-  ├─ skills/backlog-charter/SKILL.md               (+report-only reassess mode)
-  └─ skills/backlog-charter/references/reassess.md (NEW, report heuristics)
+  ├─ skills/spec-charter/SKILL.md                  (+report-only reassess mode)
+  └─ skills/spec-charter/references/reassess.md    (NEW, report heuristics)
        ↓
        (dogfood: run reassess manually on dev-backlog and a larger repo shape)
        ↓
@@ -286,7 +292,7 @@ The most authentic test of this spec system is applying it to projects we alread
 2. **dev-relay** (brownfield — established code, no CHARTER yet). Validates the full brownfield path: `extract-signals.js` → grill → `spec/capabilities.md` written end-to-end. Also exercises live-update since dev-relay *is* the relay-merge surface.
 3. **Large-repo fixture** — a deterministic tamgu_note-shaped fixture with many feature folders and workflow commit scopes. Protects against treating feature count as capability count without depending on a private checkout.
 4. **(optional, after both)** A real product repo from outside this workspace. Highest signal but lowest control. Worth doing once internal dogfood looks healthy.
-5. **Manual reassess pass** — run `backlog-charter reassess` on dev-backlog and one larger repo shape before adding sprint-close or relay-merge hooks. The test is whether the report produces a useful next action without creating churn.
+5. **Manual reassess pass** — run `spec-charter reassess` on dev-backlog and one larger repo shape before adding sprint-close or relay-merge hooks. The test is whether the report produces a useful next action without creating churn.
 
 Each dogfood produces:
 - A `spec/capabilities.md` in the target repo
@@ -313,7 +319,7 @@ This design advances dev-backlog's own CHARTER Objectives:
 
 - **O3 (active):** `<5-min reference axis usable` — capability specs *extend* the 5-min property below CHARTER. Not advance to validated on this; one more independent project required.
 - **O4 (active):** `drift detectable without manual triage` — `## Learnings` + `component-lint.js` are direct drift-detection surfaces. Same proof-gate.
-- **O5 (deferred):** `auto-reassess wired into relay-merge / sprint completion` — report-only `backlog-charter reassess` is the manual precursor. Do not wire hooks until manual reassess repeatedly produces useful, low-noise recommendations.
+- **O5 (deferred):** `auto-reassess wired into relay-merge / sprint completion` — report-only `spec-charter reassess` is the manual precursor. Do not wire hooks until manual reassess repeatedly produces useful, low-noise recommendations.
 - **O6 (deferred):** `/goal completion-condition auto-emission from CHARTER + active sprint` — unchanged.
 
 Status advance for any of these is gated on independent-project proof, per CHARTER Tier 2 discipline.

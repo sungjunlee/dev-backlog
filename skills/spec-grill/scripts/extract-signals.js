@@ -342,7 +342,7 @@ function formatHumanReport(result) {
     lines.push(`  ... and ${capabilities.length - SUMMARY_DIR_LIMIT} more (use --json for full draft)`);
   }
   lines.push("");
-  lines.push("Next: invoke `backlog-charter grill` to admit raw signals and interview compact capabilities into spec/capabilities.md.");
+  lines.push("Next: invoke `spec-grill` to admit raw signals and interview compact capabilities into spec/capabilities.md.");
   return lines.join("\n");
 }
 
