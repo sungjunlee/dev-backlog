@@ -1,6 +1,6 @@
 # Grill-Mode Heuristics for `spec/capabilities.md`
 
-Use this reference in `backlog-charter` grill mode after walking the per-capability interview flow in `SKILL.md`. The flow, 3-axis predicate test, and tier gates live in `SKILL.md`; this file captures concrete dogfood patterns so future grill sessions do not relearn them.
+Use this reference in `spec-grill` after walking the per-capability interview flow in `SKILL.md`. The flow, 3-axis predicate test, and tier gates live in `SKILL.md`; this file captures concrete dogfood patterns so future grill sessions do not relearn them.
 
 ## Naming: Slug Handle vs. Prose Contract
 
@@ -20,11 +20,11 @@ Do not use a sentence or comma-separated name:
 If the work touches several areas, keep the primary slug in sprint frontmatter and put the nuance in prose:
 
 ```yaml
-component: "charter-management"
+component: "spec-charter"
 ```
 
 ```md
-Touches: charter-management primarily; also affects backlog-sync docs.
+Touches: spec-charter primarily; also affects backlog-sync docs.
 ```
 
 Bias: the slug is the address; Goal/Scope text is the explanation.
@@ -95,7 +95,7 @@ Fix: scope the claim to draft seeding.
 
 ## Rerun Protocol
 
-`backlog-charter grill <capability-slug>` may touch:
+`spec-grill <capability-slug>` may touch:
 
 - `Goal`
 - `In-scope`
@@ -138,11 +138,12 @@ If two candidates share every meaningful Behavior and Hard Constraint, merge the
 
 ### dev-backlog example
 
-dev-backlog has three skill directories, but five capabilities:
+dev-backlog has four skill directories, but six capabilities:
 
 - `sprint-execution` owns the active sprint as the execution hub.
 - `backlog-sync` owns the GitHub Issues to task-file mirror.
-- `charter-management` owns CHARTER and capability-spec tier gates.
+- `spec-charter` owns CHARTER lifecycle and report-only reassess.
+- `spec-grill` owns `spec/capabilities.md` authoring and capability-contract pressure tests.
 - `triage-grooming` owns backlog classification and relationship reports.
 - `task-progress-reporting` owns monthly progress issue synchronization.
 

@@ -1,6 +1,6 @@
 # Objective Predicates: Good vs. Bad
 
-Use this reference in `backlog-charter` create mode (or amend, when adding objectives) to write Tier 2 entries that survive their own proof gate. An Objective is a **verifiable predicate** — a statement that can be checked true or false against the world, not a task to do or an aspiration to feel good about.
+Use this reference in `spec-charter` create mode (or amend, when adding objectives) to write Tier 2 entries that survive their own proof gate. An Objective is a **verifiable predicate** — a statement that can be checked true or false against the world, not a task to do or an aspiration to feel good about.
 
 The shape:
 

@@ -6,7 +6,9 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- Split the old `backlog-charter` surface into the spec-series skills `spec-charter` and `spec-grill`. `spec-charter` owns `CHARTER.md` create/amend/reassess; `spec-grill` owns `spec/capabilities.md` capability-contract authoring. Closes [#157](https://github.com/sungjunlee/dev-backlog/issues/157), [#158](https://github.com/sungjunlee/dev-backlog/issues/158), and [#159](https://github.com/sungjunlee/dev-backlog/issues/159).
 
 ## [0.5.0] — 2026-05-22
 

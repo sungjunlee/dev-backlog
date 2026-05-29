@@ -8,7 +8,7 @@ Mutation discipline (matches the design doc):
 
 | Section | Who writes | When | Gate |
 |---|---|---|---|
-| `Goal`, `In-scope`, `Out-of-scope` | human via `backlog-charter grill` | when the contract changes | challenge + confirm + apply |
+| `Goal`, `In-scope`, `Out-of-scope` | human via `spec-grill` | when the contract changes | challenge + confirm + apply |
 | `Expected Behaviors`, `Hard Constraints` | human via grill | when a behavior or bright-line changes | grill + 3-axis predicate test |
 | `## Learnings` (between magic markers) | `append-learnings.js` only | end of every successful relay run tagged with this primary capability slug | structurally bounded append; rejects writes outside markers |
 | `## Decisions` | human, append-only | when a capability-level decision is made | append-only by convention; promote to CHARTER if cross-cutting |

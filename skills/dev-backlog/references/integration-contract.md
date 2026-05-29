@@ -37,7 +37,7 @@ Extraction: read lines between the matched `## ` heading and the next `## ` head
 The optional `component:` field is one primary routing handle into `spec/capabilities.md`.
 
 ```yaml
-component: "charter-management"
+component: "spec-charter"
 ```
 
 Rules:

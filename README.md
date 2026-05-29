@@ -94,6 +94,15 @@ Then use the skill during your coding session:
 /dev-backlog sync
 ```
 
+Optional spec-series setup:
+
+```text
+/spec-charter create
+/spec-grill
+```
+
+`spec-charter` creates the project-wide `CHARTER.md` axis. On existing repos, follow it with `spec-grill` to author `spec/capabilities.md`, the middle layer of capability contracts and Hard Constraints.
+
 For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
 Important if you use `dev-relay`: sprint files are not fully freeform markdown.

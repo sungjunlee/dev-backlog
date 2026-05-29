@@ -21,7 +21,7 @@ Report these findings when present:
 |---------|----------|------|
 | `orphan work` | medium | An open issue maps to no objective. Ask whether to add an objective, defer the issue, or drop it. |
 | `neglected objective` | medium | An `active` objective has no open issue advancing it. Ask whether to plan work, defer the objective, or amend it. |
-| `contradiction` | high | An open issue violates a Non-Goal. Resolution requires dropping the issue or amending the Non-Goal through `backlog-charter` amend. |
+| `contradiction` | high | An open issue violates a Non-Goal. Resolution requires dropping the issue or amending the Non-Goal through `spec-charter` amend. |
 
 Contradictions are highest severity because they mean execution is crossing an explicit boundary.
 
@@ -37,4 +37,4 @@ Use the first count for open issues that map to at least one objective. Mention 
 
 ## Proposed CHARTER Changes
 
-When findings suggest the charter may need to evolve, format proposals as a seed for `backlog-charter` amend. The triage or planning report proposes only; `backlog-charter` owns gated mutation of `CHARTER.md`.
+When findings suggest the charter may need to evolve, format proposals as a seed for `spec-charter` amend. The triage or planning report proposes only; `spec-charter` owns gated mutation of `CHARTER.md`.

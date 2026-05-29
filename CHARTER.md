@@ -15,8 +15,9 @@ sessions is rebuilt from scratch each time.
 ## Approach           <!-- Tier 1 · Direction (human-gated) -->
 Keep GitHub Issues as the canonical task spec; add a thin, explicit,
 markdown-only execution hub (the active sprint file) that humans and agents
-both read and update. Companion skills (`backlog-triage`, `backlog-charter`)
-groom and orient the same GitHub-anchored state — they never replace it.
+both read and update. Companion skills (`backlog-triage`, `spec-charter`,
+`spec-grill`) groom and orient the same GitHub-anchored state — they never
+replace it.
 No server, no daemon, no hidden state, no silent sync.
 
 ## Non-Goals          <!-- Tier 1 · Direction (human-gated) -->
@@ -43,3 +44,4 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-05-22 | `CHARTER.md` is a separate file at repo root, not merged into `_context.md`           | The axis must stay a <5-min-read yardstick; `_context.md`'s HOW-knowledge would dilute it        | —          |
 | 2026-05-22 | The Alignment Check is prompt-driven inside `backlog-triage`, not a new `triage-*.js` | Issue→objective mapping is semantic, unlike the deterministic relate/stale scripts               | —          |
 | 2026-05-22 | Patterns from Fractal and gsd-2 are absorbed, not integrated                          | Both own the whole project lifecycle and conflict with the GitHub-Issues-anchored model          | —          |
+| 2026-05-29 | `backlog-charter` splits into `spec-charter` and `spec-grill`                         | Existing-repo onboarding needs a discoverable second step from project charter to capability contracts | 2026-05-22 |
