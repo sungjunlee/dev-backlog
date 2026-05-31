@@ -27,12 +27,14 @@ Sibling skill to dev-backlog, not a replacement. dev-backlog is the execution hu
 ### Phase 1 — Report (default, no mutations)
 
 1. **Collect** open issues → snapshot JSON (one `gh` fetch per run)
-2. **Analyze** — classification, relationships, stale/obsolete signals, and Alignment Check when `spec/charter.md` or legacy root `CHARTER.md` exists
+2. **Analyze** — classification, relationships, stale/obsolete signals, Alignment Check, and spec-aware Decision Review
 3. **Render** — one markdown report with anchored proposals
 
 Every script in this phase is read-only. Running any number of times is safe. The snapshot is the canonical artifact; all downstream analysis consumes it via `--snapshot PATH` (no re-fetch).
 
-Alignment Check is prompt-driven, not a `triage-*.js` script: read `spec/charter.md` first, fall back to legacy root `CHARTER.md`, then map open issues to Objectives using `../spec-charter/references/alignment.md` and emit an `## Alignment` report section. When both files are absent, skip this step entirely and keep the existing report shape.
+Alignment Check is prompt-driven, not a `triage-*.js` script: read `spec/charter.md` first, fall back to legacy root `CHARTER.md`, then map open issues to Objectives using `../spec-charter/references/alignment.md` and emit an `## Alignment` report section. When both files are absent, skip this step entirely.
+
+Decision Review is also prompt-driven and report-only: read `spec/charter.md` with legacy root `CHARTER.md` fallback, optionally read `spec/capabilities.md` and `spec/system-map.md`, then classify open issues into `Do Now`, `Shape First`, `Defer`, or `Drop / Close` using `references/decision-review.md`. Missing spec artifacts are graceful no-ops.
 
 ### Phase 2 — Apply (opt-in, explicit)
 
@@ -131,6 +133,21 @@ Issues that violate a Non-Goal (high severity).
 ### Proposed Charter Changes
 Seed proposals for `spec-charter` amend; triage does not mutate the charter.
 
+## Decision Review
+Evidence used: `spec/charter.md`; `spec/capabilities.md`; active sprint; snapshot signals.
+
+### Do Now
+Issues that strongly fit active Objectives, are ready enough to execute, and have high leverage.
+
+### Shape First
+Issues with promising objective fit but unclear acceptance criteria, ownership, or primary capability.
+
+### Defer
+Issues that are valid but not timely against the current charter, sprint, or dependency state.
+
+### Drop / Close
+Issues with explicit out-of-scope, contradiction, obsolete, or duplicate evidence. Any close proposal still needs an anchored checkbox before `--apply`.
+
 ## Apply Checklist
 Consolidated list of every anchored action for scan-and-check review. The apply step parses
 the whole report and dedupes by `(verb, issueNumber, normalizedArgs)` — this section and the
@@ -148,6 +165,7 @@ source sections above both count as acceptance surfaces (see `references/apply.m
 | AC checkboxes inside issue bodies (`AC:BEGIN`/`END`) | dev-backlog |
 | Open-issue classification, relationships, stale flags | backlog-triage |
 | Charter alignment of open issues | backlog-triage (report; charter mutations stay with `spec-charter`) |
+| Spec-aware Decision Review | backlog-triage (report; spec mutations stay with spec-series skills) |
 | Priority / milestone **proposals** | backlog-triage (report) |
 | Priority / milestone **mutations** | backlog-triage (`--apply`) |
 | Post-triage sprint planning | dev-backlog (reads report, edits sprint file) |
@@ -158,7 +176,7 @@ Recommended cadence: run backlog-triage weekly or bi-weekly. Feed the report's M
 
 ## Process
 
-**Collect -> Analyze -> Report.** One `gh` fetch, one snapshot, downstream scripts consume it via `--snapshot`. Re-fetching in each script is a bug; it creates drift across signals. During Analyze, run the prompt-driven Alignment Check when `spec/charter.md` or legacy root `CHARTER.md` is present; its Proposed Charter Changes feed `spec-charter` amend and are not applied by `triage-apply.js`, which only mutates GitHub issues.
+**Collect -> Analyze -> Report.** One `gh` fetch, one snapshot, downstream scripts consume it via `--snapshot`. Re-fetching in each script is a bug; it creates drift across signals. During Analyze, run prompt-driven Alignment when `spec/charter.md` or legacy root `CHARTER.md` is present, then run prompt-driven Decision Review from the resolved charter, optional `spec/capabilities.md`, optional `spec/system-map.md`, active sprint context, and triage signals. Proposed Charter Changes feed `spec-charter` amend; capability or system-map concerns feed `spec-grill` or `spec-system-map`; none are applied by `triage-apply.js`, which only mutates GitHub issues.
 
 **Review the report.** Read each proposal. Check the ones you accept (flip `[ ]` → `[x]`). Leave rejected ones unchecked. Do not delete anchor comments; unchecked anchors are ignored by apply.
 
@@ -193,6 +211,7 @@ Flags on individual scripts override config.
 - `references/relationships.md` — mention / blocks / depends-on / duplicate heuristics, evidence format
 - `references/stale.md` — obsolescence signals, thresholds, suggested-action grammar
 - `references/apply.md` — anchor grammar, parse rules, idempotency contract, apply-log schema
+- `references/decision-review.md` — prompt-driven Do Now / Shape First / Defer / Drop rubric
 - `../spec-charter/references/alignment.md` — prompt-driven charter work↔objective mapping and drift severity rules
 
 ---
