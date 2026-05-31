@@ -185,7 +185,7 @@ The contract for that integration lives in [references/integration-contract.md](
 
 ## Backlog Triage (sibling skill)
 
-`dev-backlog` runs the sprint. [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the open-issue pile that feeds into it — classification, relationships, stale / obsolete flags, priority proposals. It produces one markdown report under `backlog/triage/YYYY-MM-DD-report.md` that you review, check accepted proposals on, and apply behind an explicit `--apply`.
+`dev-backlog` runs the sprint. [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the open-issue pile that feeds into it — classification, relationships, stale / obsolete flags, priority proposals, Alignment, and spec-aware Decision Review. It produces one markdown report under `backlog/triage/YYYY-MM-DD-report.md` that you review, check accepted proposals on, and apply behind an explicit `--apply`.
 
 ```bash
 SKILL=/path/to/dev-backlog/skills/backlog-triage/scripts
@@ -205,7 +205,7 @@ GH_TOKEN="$(gh auth token)" TRIAGE_APPLY_INTEGRATION=1 \
   node --test $SKILL/triage-apply.integration.test.js
 ```
 
-Use `dev-backlog` when you know what to work on; use `backlog-triage` when the open-issue list has grown faster than your attention.
+Use `dev-backlog` when you know what to work on; use `backlog-triage` when the open-issue list has grown faster than your attention. When `spec/charter.md`, `spec/capabilities.md`, or `spec/system-map.md` exist, Decision Review uses them as optional evidence for `Do Now`, `Shape First`, `Defer`, and `Drop / Close`; missing spec files are skipped.
 The integration test is excluded from the default `node --test` path unless you explicitly set `TRIAGE_APPLY_INTEGRATION=1`. It targets the dedicated sandbox repo `sungjunlee/triage-apply-sandbox` and requires a `GH_TOKEN` that can mutate that repo.
 
 ## Script Entry Points
