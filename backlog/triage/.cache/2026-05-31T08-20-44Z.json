@@ -1,0 +1,103 @@
+{
+  "generated": "2026-05-31T08:20:44.427Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 73,
+      "title": "enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan",
+      "body": "Follow-up to #59 epic. Surfaced during Batch 2 reviews (#62, #63) and re-triaged on 2026-05-31.\n\n## Why now\n\nThe current backlog-triage snapshot cannot support several high-signal checks:\n\n- PR linkage: merged PR -> still-open issue requires per-issue closing PR references.\n- Comment mentions: issue-to-issue edges in comments require optional issue comments.\n- Duplicate of closed issue: stale/obsolete detection needs bounded closed-issue context.\n\nThe MVP scanners cover body-scan, keyword, and label signals. Snapshot v2 should add the missing data without breaking the default explicit-sync model.\n\n## Scope\n\nExtend `skills/backlog-triage/scripts/triage-collect.js` and snapshot consumers.\n\n1. Default snapshot v2 schema\n   - Add a snapshot schema/version marker.\n   - Add per-issue `closing_prs: [{number, state, mergedAt, url}]`; empty array when no closing PR is linked.\n   - Preserve the default one-fetch mental model; if GraphQL pagination is required, document exactly how it is invoked and why it is still one collection step.\n\n2. Optional `--with-comments` enrichment\n   - Default off.\n   - Adds `comments: [{author, body, createdAt}]` to each issue.\n   - May perform bounded per-issue calls; warn with expected API call count and concurrency cap.\n\n3. Optional `--with-closed-issues` enrichment\n   - Default off.\n   - Adds top-level `closed_issues: [{number, title, body, closedAt}]`.\n   - Bound by config window, defaulting to recently closed issues only.\n\n4. Downstream gating\n   - `triage-relate` PR-linkage and comment-mention scans should require the relevant snapshot fields/features.\n   - `triage-stale` duplicate-of-closed scans should require `closed_issues`.\n   - Missing optional fields must degrade clearly, not fail with undefined-field behavior.\n\n## Explicit out of scope\n\n- ML-based duplicate detection.\n- Cross-repo issue resolution.\n- Timeline events beyond closing-PR references.\n- Changing `sync-pull.js` behavior unless the migration is trivial and behavior-preserving.\n\n## Acceptance Criteria\n\n- [ ] Snapshot contains an explicit schema/version marker.\n- [ ] Per-issue `closing_prs` field is present on every default snapshot issue.\n- [ ] Default collection path is documented as one explicit collection step.\n- [ ] `--with-comments` is opt-in, documented with API-call cost, and concurrency-bounded.\n- [ ] `--with-closed-issues` is opt-in and bounded by config.\n- [ ] Existing schema tests are updated; new tests cover `closing_prs` via stubbed GraphQL/API response.\n- [ ] Downstream relate/stale scanners gate optional signals on snapshot features instead of assuming fields exist.\n- [ ] `sync-pull.js` behavior remains unchanged unless explicitly justified in the PR.\n",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-04-18T06:10:24Z",
+      "updatedAt": "2026-05-31T08:20:35Z",
+      "milestone": null,
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "30-90d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 112,
+      "title": "docs(spec-grill): add Behavior vs. Hard Constraint tiebreaker rule",
+      "body": "**Dogfooding finding (2026-05-23, PR #110; res scoped 2026-05-31).**\n\nSeveral predicates can be written either as an Expected Behavior or as a Hard Constraint. Example: triage-grooming's read-only default can be framed positively (default invocation is advisory; mutation requires `--apply`) or negatively (never mutate GitHub without `--apply`). Both can pass the 3-axis test.\n\nWithout a tie-breaker, two `spec-grill` sessions on the same capability can classify the same intent differently, creating avoidable diff churn.\n\n## Scope\n\nUpdate `skills/spec-grill/SKILL.md` and/or `skills/spec-grill/references/capabilities.md` with the classification rule.\n\n## Proposed rule\n\n- Positive normal outcome -> Expected Behavior.\n- Bright-line negation / anti-Goodhart guard -> Hard Constraint.\n- If both are valid, prefer the Hard Constraint only when the negative form protects against an optimization shortcut or data-loss shortcut.\n- If explicit user consent is valid, avoid the loophole phrase \"never X unless asked\"; write the consent condition as a Behavior instead.\n\n## Acceptance Criteria\n\n- [ ] `spec-grill` docs include the Behavior vs. Hard Constraint tie-breaker.\n- [ ] At least one example shows the same intent expressed both ways and explains the recommended placement.\n- [ ] Wording uses current `spec-grill` / `spec/capabilities.md` names, not retired `backlog-charter` paths.\n",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:37:58Z",
+      "updatedAt": "2026-05-31T08:20:36Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 113,
+      "title": "docs(spec-grill): make Goal observability check explicit outside the 3-axis test",
+      "body": "**Dogfooding finding (2026-05-23, PR #110; reduced scope 2026-05-31).**\n\n`spec-grill` now applies the 3-axis predicate test to Behaviors and Hard Constraints, and the Goal step already says a Goal should be an observable user/operator outcome. The remaining gap is explicit wording that Goals are not 3-axis predicates.\n\nGoals are observable outcomes, not verifiable predicates. Forcing Goals through the 3-axis test produces awkward, over-precise prose.\n\n## Scope\n\nUpdate `skills/spec-grill/SKILL.md` and/or `skills/spec-grill/references/capabilities.md` with the Goal check.\n\n## Proposed rule\n\n- Behaviors and Hard Constraints must pass the 3-axis predicate test.\n- Goals use a lighter check: can a user or operator observe this outcome in plain language without instrumentation?\n- If yes, the Goal is committable.\n- If no, sharpen the Goal, but do not force it through authority / distributional / manipulability axes.\n\n## Acceptance Criteria\n\n- [ ] `spec-grill` docs explicitly state that Goals are outside the 3-axis predicate test.\n- [ ] Goal-line check is documented as plain-language observability.\n- [ ] Wording uses current `spec-grill` / `spec/capabilities.md` names, not retired `backlog-charter` paths.\n",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:05Z",
+      "updatedAt": "2026-05-31T08:20:37Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 114,
+      "title": "docs(spec-grill): clarify capability-level Decisions seeding",
+      "body": "**Dogfooding finding (2026-05-23, PR #110; res scoped 2026-05-31).**\n\nWhen writing dev-backlog's own `spec/capabilities.md`, capability-level Decisions needed a clearer seeding rule. Some charter Decisions were useful inside a capability block; others would have been duplication.\n\nThe current question is not whether Decisions exist. It is when a cross-cutting charter Decision should be echoed at capability level, when a capability-only Decision should stay local, and when a capability-level finding should be promoted through `spec-charter amend`.\n\n## Scope\n\nUpdate `skills/spec-grill/references/capabilities.md`. Add a short pointer in `skills/spec-grill/SKILL.md` only if needed.\n\n## Proposed rule\n\n- Echo a `spec/charter.md` Decision at capability level only when the rationale is needed in context to understand a Behavior or Hard Constraint.\n- Otherwise, leave the capability Decisions table empty; the cross-cutting record lives in the charter.\n- Capability-only Decisions land in the capability block.\n- A capability-level Decision that affects more than one capability should be promoted through `spec-charter amend`; old Decisions rows remain append-only.\n\n## Acceptance Criteria\n\n- [ ] `references/capabilities.md` documents the Decisions seeding pattern.\n- [ ] The rule is explicit about echo vs. leave empty vs. local-only Decision.\n- [ ] Promotion rule from capability Decisions to `spec-charter amend` is documented.\n- [ ] Wording uses current `spec-charter` / `spec-grill` names, not retired `backlog-charter` paths.\n",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:20Z",
+      "updatedAt": "2026-05-31T08:20:38Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    }
+  ]
+}

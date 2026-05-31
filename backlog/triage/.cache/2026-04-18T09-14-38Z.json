@@ -1,0 +1,67 @@
+{
+  "generated": "2026-04-18T09:14:38.498Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 76,
+      "title": "test(backlog-triage): integration test for triage-apply against a disposable scratch repo",
+      "body": "Part of #59 (epic). Deferred from #65 per its AC: \"Automated integration test against a disposable scratch repo is **DEFERRED** to a follow-up issue; MVP ships with unit-level apply-parse tests.\"\n\n## Scope\n\nAdd an opt-in integration test that exercises `triage-apply.js --apply --yes` against a real (disposable) scratch repo. Shipped MVP (#65) covers:\n\n- `parseReport` / `dedupActions` / `toGhCommands` — pure, unit-tested\n- orchestration — tested with an injected `runGh` stub\n- dry-run pipeline — tested against a canonical fixture report\n- idempotency via JSONL apply log — tested by seeding the log\n\nWhat's NOT tested: actual `gh` invocation side effects on GitHub (label mutations, milestone assignments, issue closes, comment bodies). This follow-up closes that gap.\n\n## Approach\n\n- Create a disposable test repo (e.g., `sungjunlee/triage-apply-sandbox`) with a known baseline: a handful of open issues with labels, milestones, and bodies.\n- Run \\`triage-apply.js --apply --yes\\` against a pre-rendered triage report that points at those issues.\n- After the run, read issue state via \\`gh issue list --json\\` and assert:\n  - close / close-duplicate actions flipped issues to CLOSED with the expected comment + resolution reason\n  - set-priority removed the old priority label and added the new one (no duplicate \\`priority:\\\\*\\` labels remain)\n  - assign-milestone set the milestone correctly\n  - revisit added a comment but left the issue OPEN\n- Reset the sandbox to baseline via a teardown step (reopen issues, restore labels).\n\n## Gating\n\n- Opt-in only — runs under a \\`TRIAGE_APPLY_INTEGRATION=1\\` env flag, NOT by default in \\`node --test\\`.\n- Requires a \\`GH_TOKEN\\` with write access to the sandbox repo.\n- Skip the test with a clear message if the env flag or token is missing.\n\n## Why deferred\n\nReal-repo integration tests require a sandbox repo + credentials + teardown discipline that's out of scope for the #65 MVP. The decision layer unit tests + injected-runner orchestration tests already cover the argv composition and control flow — what's missing is end-to-end verification that the emitted argv actually does what we expect on GitHub's side.\n\n## Acceptance Criteria\n\n- [ ] Integration test file \\`skills/backlog-triage/scripts/triage-apply.integration.test.js\\`\n- [ ] Guarded by \\`TRIAGE_APPLY_INTEGRATION=1\\` env flag; skips cleanly without it\n- [ ] Uses a dedicated disposable sandbox repo (documented in the test file)\n- [ ] Covers all 5 MVP verbs: close, revisit, close-duplicate, set-priority, assign-milestone\n- [ ] Teardown reopens issues + restores labels so the test is rerunnable\n- [ ] README + SKILL.md updated with how to run the integration test (env flag, token requirement)",
+      "labels": [],
+      "createdAt": "2026-04-18T08:18:39Z",
+      "updatedAt": "2026-04-18T08:19:06Z",
+      "milestone": "Backlog Triage MVP",
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "<7d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 73,
+      "title": "enhance(backlog-triage): snapshot v2 — closing_prs via GraphQL + optional comments",
+      "body": "Follow-up to #59 epic. Surfaced during Batch 2 reviews (#62, #63) — both scripts legitimately need data that the MVP snapshot doesn't carry.\n\n## Why now\n\n- #62's \"PR linkage\" signal (merged PR → open issue) requires each snapshot issue to carry its closing-PR references. Not in MVP snapshot.\n- #62's \"Mentions in comments\" signal requires comments on each issue. Not in MVP snapshot.\n- #63's \"scanMergedPR\" and \"scanDuplicateOfClosed\" signals need the same data.\n\nShipped Batch 2 MVPs (#62, #63 after re-dispatch) cover body-scan + keyword + label signals — about 80% of the surface. This issue covers the remaining 20%.\n\n## Scope\n\nExtend `scripts/triage-collect.js`:\n\n1. **`closing_prs` via single GraphQL query** (hard requirement — single `gh` fetch preserved)\n   - Migrate the default fetch from `gh issue list --json` to `gh api graphql` with a query returning open issues + their `closedByPullRequestsReferences(first:5, includeClosedPrs:true)` nodes\n   - Per-issue key: `closing_prs: [{number, state, mergedAt, url}]`; empty array when no closing PR linked\n   - Paginate via GraphQL cursor if repo has > default-page-size open issues; keep it under one command invocation at the CLI level\n\n2. **Optional `--with-comments` flag** (per-issue fetch; breaks single-fetch contract behind an explicit opt-in)\n   - When enabled, adds `comments: [{author, body, createdAt}]` to each issue\n   - Default off; document the per-issue fetch cost in `references/classification.md`\n   - Surface N API calls warning when active\n\n3. **Optional `--with-closed-issues` flag** (second list query; supports duplicate-of-closed detection in #63)\n   - Adds top-level `closed_issues: [{number, title, body, closedAt}]` with the same filter bounds as open\n   - Limit to closed within last 180 days by default; configurable\n\n## Downstream plan\n\nAfter this ships:\n- **#62 follow-up**: implement PR-linkage edge kind + comment-mention scan (behind `--with-comments` snapshot requirement)\n- **#63 follow-up**: implement `scanMergedPR` + `scanDuplicateOfClosed` scanners, remove deferred-stub markers\n\nThese can be tracked as separate issues filed when this lands.\n\n## Explicit out of scope\n\n- ML-based duplicate detection (same as #59 out-of-scope list)\n- Cross-repo issue resolution\n- Timeline events beyond closing-PR references\n\n## AC\n\n- [ ] Per-issue `closing_prs` field present (array, possibly empty) on every snapshot issue\n- [ ] Default path still a single `gh` invocation (GraphQL query + pagination counts as one logical fetch)\n- [ ] `--with-comments` flag opt-in; documented N-API-call cost; fetches concurrency-bounded\n- [ ] `--with-closed-issues` flag opt-in; caps via config\n- [ ] Existing schema tests updated; new tests cover `closing_prs` presence via stubbed GraphQL response\n- [ ] `sync-pull.js` behavior unchanged (its fetch path can continue using the pre-existing `gh issue list` pattern for backwards compat, or migrate if straightforward)",
+      "labels": [],
+      "createdAt": "2026-04-18T06:10:24Z",
+      "updatedAt": "2026-04-18T06:10:31Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "<7d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 46,
+      "title": "Progress: April 2026",
+      "body": "<!-- dev-backlog:progress-issue month=2026-04 -->\n\n# Progress: April 2026\n\n## Summary\n\n| Metric | Count |\n| --- | --- |\n| Merged PRs (month) | 14 |\n| In-flight (open PRs) | 0 |\n| Stuck candidates | 0 |\n\n## Active Sprint\n\n_No active sprint._\n",
+      "labels": [],
+      "createdAt": "2026-04-08T10:58:41Z",
+      "updatedAt": "2026-04-17T04:06:13Z",
+      "milestone": null,
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    }
+  ]
+}

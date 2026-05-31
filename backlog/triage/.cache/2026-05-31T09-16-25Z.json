@@ -1,0 +1,31 @@
+{
+  "generated": "2026-05-31T09:16:25.289Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 73,
+      "title": "enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan",
+      "body": "Follow-up to #59 epic. Surfaced during Batch 2 reviews (#62, #63) and re-triaged on 2026-05-31.\n\n## Why now\n\nThe current backlog-triage snapshot cannot support several high-signal checks:\n\n- PR linkage: merged PR -> still-open issue requires per-issue closing PR references.\n- Comment mentions: issue-to-issue edges in comments require optional issue comments.\n- Duplicate of closed issue: stale/obsolete detection needs bounded closed-issue context.\n\nThe MVP scanners cover body-scan, keyword, and label signals. Snapshot v2 should add the missing data without breaking the default explicit-sync model.\n\n## Scope\n\nExtend `skills/backlog-triage/scripts/triage-collect.js` and snapshot consumers.\n\n1. Default snapshot v2 schema\n   - Add a snapshot schema/version marker.\n   - Add per-issue `closing_prs: [{number, state, mergedAt, url}]`; empty array when no closing PR is linked.\n   - Preserve the default one-fetch mental model; if GraphQL pagination is required, document exactly how it is invoked and why it is still one collection step.\n\n2. Optional `--with-comments` enrichment\n   - Default off.\n   - Adds `comments: [{author, body, createdAt}]` to each issue.\n   - May perform bounded per-issue calls; warn with expected API call count and concurrency cap.\n\n3. Optional `--with-closed-issues` enrichment\n   - Default off.\n   - Adds top-level `closed_issues: [{number, title, body, closedAt}]`.\n   - Bound by config window, defaulting to recently closed issues only.\n\n4. Downstream gating\n   - `triage-relate` PR-linkage and comment-mention scans should require the relevant snapshot fields/features.\n   - `triage-stale` duplicate-of-closed scans should require `closed_issues`.\n   - Missing optional fields must degrade clearly, not fail with undefined-field behavior.\n\n## Explicit out of scope\n\n- ML-based duplicate detection.\n- Cross-repo issue resolution.\n- Timeline events beyond closing-PR references.\n- Changing `sync-pull.js` behavior unless the migration is trivial and behavior-preserving.\n\n## Acceptance Criteria\n\n- [ ] Snapshot contains an explicit schema/version marker.\n- [ ] Per-issue `closing_prs` field is present on every default snapshot issue.\n- [ ] Default collection path is documented as one explicit collection step.\n- [ ] `--with-comments` is opt-in, documented with API-call cost, and concurrency-bounded.\n- [ ] `--with-closed-issues` is opt-in and bounded by config.\n- [ ] Existing schema tests are updated; new tests cover `closing_prs` via stubbed GraphQL/API response.\n- [ ] Downstream relate/stale scanners gate optional signals on snapshot features instead of assuming fields exist.\n- [ ] `sync-pull.js` behavior remains unchanged unless explicitly justified in the PR.\n",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-04-18T06:10:24Z",
+      "updatedAt": "2026-05-31T08:21:03Z",
+      "milestone": null,
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "30-90d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    }
+  ]
+}

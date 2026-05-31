@@ -1,0 +1,167 @@
+{
+  "generated": "2026-05-31T08:06:23.269Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 73,
+      "title": "enhance(backlog-triage): snapshot v2 — closing_prs via GraphQL + optional comments",
+      "body": "Follow-up to #59 epic. Surfaced during Batch 2 reviews (#62, #63) — both scripts legitimately need data that the MVP snapshot doesn't carry.\n\n## Why now\n\n- #62's \"PR linkage\" signal (merged PR → open issue) requires each snapshot issue to carry its closing-PR references. Not in MVP snapshot.\n- #62's \"Mentions in comments\" signal requires comments on each issue. Not in MVP snapshot.\n- #63's \"scanMergedPR\" and \"scanDuplicateOfClosed\" signals need the same data.\n\nShipped Batch 2 MVPs (#62, #63 after re-dispatch) cover body-scan + keyword + label signals — about 80% of the surface. This issue covers the remaining 20%.\n\n## Scope\n\nExtend `scripts/triage-collect.js`:\n\n1. **`closing_prs` via single GraphQL query** (hard requirement — single `gh` fetch preserved)\n   - Migrate the default fetch from `gh issue list --json` to `gh api graphql` with a query returning open issues + their `closedByPullRequestsReferences(first:5, includeClosedPrs:true)` nodes\n   - Per-issue key: `closing_prs: [{number, state, mergedAt, url}]`; empty array when no closing PR linked\n   - Paginate via GraphQL cursor if repo has > default-page-size open issues; keep it under one command invocation at the CLI level\n\n2. **Optional `--with-comments` flag** (per-issue fetch; breaks single-fetch contract behind an explicit opt-in)\n   - When enabled, adds `comments: [{author, body, createdAt}]` to each issue\n   - Default off; document the per-issue fetch cost in `references/classification.md`\n   - Surface N API calls warning when active\n\n3. **Optional `--with-closed-issues` flag** (second list query; supports duplicate-of-closed detection in #63)\n   - Adds top-level `closed_issues: [{number, title, body, closedAt}]` with the same filter bounds as open\n   - Limit to closed within last 180 days by default; configurable\n\n## Downstream plan\n\nAfter this ships:\n- **#62 follow-up**: implement PR-linkage edge kind + comment-mention scan (behind `--with-comments` snapshot requirement)\n- **#63 follow-up**: implement `scanMergedPR` + `scanDuplicateOfClosed` scanners, remove deferred-stub markers\n\nThese can be tracked as separate issues filed when this lands.\n\n## Explicit out of scope\n\n- ML-based duplicate detection (same as #59 out-of-scope list)\n- Cross-repo issue resolution\n- Timeline events beyond closing-PR references\n\n## AC\n\n- [ ] Per-issue `closing_prs` field present (array, possibly empty) on every snapshot issue\n- [ ] Default path still a single `gh` invocation (GraphQL query + pagination counts as one logical fetch)\n- [ ] `--with-comments` flag opt-in; documented N-API-call cost; fetches concurrency-bounded\n- [ ] `--with-closed-issues` flag opt-in; caps via config\n- [ ] Existing schema tests updated; new tests cover `closing_prs` presence via stubbed GraphQL response\n- [ ] `sync-pull.js` behavior unchanged (its fetch path can continue using the pre-existing `gh issue list` pattern for backwards compat, or migrate if straightforward)",
+      "labels": [],
+      "createdAt": "2026-04-18T06:10:24Z",
+      "updatedAt": "2026-04-18T06:10:31Z",
+      "milestone": null,
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "30-90d",
+        "activity": "warm",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 76,
+      "title": "test(backlog-triage): integration test for triage-apply against a disposable scratch repo",
+      "body": "Part of #59 (epic). Deferred from #65 per its AC: \"Automated integration test against a disposable scratch repo is **DEFERRED** to a follow-up issue; MVP ships with unit-level apply-parse tests.\"\n\n## Scope\n\nAdd an opt-in integration test that exercises `triage-apply.js --apply --yes` against a real (disposable) scratch repo. Shipped MVP (#65) covers:\n\n- `parseReport` / `dedupActions` / `toGhCommands` — pure, unit-tested\n- orchestration — tested with an injected `runGh` stub\n- dry-run pipeline — tested against a canonical fixture report\n- idempotency via JSONL apply log — tested by seeding the log\n\nWhat's NOT tested: actual `gh` invocation side effects on GitHub (label mutations, milestone assignments, issue closes, comment bodies). This follow-up closes that gap.\n\n## Approach\n\n- Create a disposable test repo (e.g., `sungjunlee/triage-apply-sandbox`) with a known baseline: a handful of open issues with labels, milestones, and bodies.\n- Run \\`triage-apply.js --apply --yes\\` against a pre-rendered triage report that points at those issues.\n- After the run, read issue state via \\`gh issue list --json\\` and assert:\n  - close / close-duplicate actions flipped issues to CLOSED with the expected comment + resolution reason\n  - set-priority removed the old priority label and added the new one (no duplicate \\`priority:\\\\*\\` labels remain)\n  - assign-milestone set the milestone correctly\n  - revisit added a comment but left the issue OPEN\n- Reset the sandbox to baseline via a teardown step (reopen issues, restore labels).\n\n## Gating\n\n- Opt-in only — runs under a \\`TRIAGE_APPLY_INTEGRATION=1\\` env flag, NOT by default in \\`node --test\\`.\n- Requires a \\`GH_TOKEN\\` with write access to the sandbox repo.\n- Skip the test with a clear message if the env flag or token is missing.\n\n## Why deferred\n\nReal-repo integration tests require a sandbox repo + credentials + teardown discipline that's out of scope for the #65 MVP. The decision layer unit tests + injected-runner orchestration tests already cover the argv composition and control flow — what's missing is end-to-end verification that the emitted argv actually does what we expect on GitHub's side.\n\n## Acceptance Criteria\n\n- [ ] Integration test file \\`skills/backlog-triage/scripts/triage-apply.integration.test.js\\`\n- [ ] Guarded by \\`TRIAGE_APPLY_INTEGRATION=1\\` env flag; skips cleanly without it\n- [ ] Uses a dedicated disposable sandbox repo (documented in the test file)\n- [ ] Covers all 5 MVP verbs: close, revisit, close-duplicate, set-priority, assign-milestone\n- [ ] Teardown reopens issues + restores labels so the test is rerunnable\n- [ ] README + SKILL.md updated with how to run the integration test (env flag, token requirement)",
+      "labels": [],
+      "createdAt": "2026-04-18T08:18:39Z",
+      "updatedAt": "2026-04-18T08:19:06Z",
+      "milestone": "Backlog Triage MVP",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "uncategorized",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "30-90d",
+        "activity": "warm",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 112,
+      "title": "docs(backlog-charter): add Behavior vs. Hard Constraint tiebreaker rule",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\nSeveral predicates worked as either an Expected Behavior or a Hard Constraint without a clear preference rule. Example: \\`triage-grooming\\`'s \\\"default is read-only\\\" can be stated as a Behavior (\\\"default invocation is advisory; mutation requires --apply\\\") or a Hard Constraint (\\\"never mutate without --apply\\\"). Both pass the 3-axis test.\n\nWithout a tiebreaker, two grill sessions on the same capability could classify it differently — that's diff churn.\n\n### Proposed\n\\`skills/backlog-charter/SKILL.md\\` Grill Mode adds a tiebreaker rule:\n\n- Positive framing (\\\"X happens when…\\\") → Expected Behavior\n- Bright-line negation (\\\"never X, regardless of input\\\") → Hard Constraint\n- When both fit, prefer Hard Constraint — the negative form is harder to subvert under optimization pressure\n\n### Acceptance Criteria\n- [ ] SKILL.md grill-mode section documents the tiebreaker\n- [ ] At least one example showing the same intent expressed both ways, with the recommended choice",
+      "labels": [
+        "documentation"
+      ],
+      "createdAt": "2026-05-23T11:37:58Z",
+      "updatedAt": "2026-05-23T11:39:18Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 113,
+      "title": "docs(backlog-charter): scope the 3-axis test (Behaviors/Constraints only; lighter check for Goals)",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\n\\`skills/backlog-charter/SKILL.md\\` says \\\"Behaviors / Hard Constraints are Tier-2-equivalent: each must pass the 3-axis test.\\\" It does NOT explicitly say Goals are exempt. During the dev-backlog dogfood I caught myself trying to 3-axis-test Goal lines and producing awkward, over-precise outcomes that read worse.\n\nGoals are *observable outcomes*, not *verifiable predicates*. They need a different check.\n\n### Proposed\nSKILL.md Grill Mode clarifies:\n\n- **3-axis test applies to Behaviors and Hard Constraints only.**\n- **Goals get a lighter check:** \\\"can a user observe this without instrumentation, in plain language?\\\" If yes, Goal is committable. If no, sharpen — but do not force the 3 axes.\n\n### Acceptance Criteria\n- [ ] SKILL.md explicitly scopes the 3-axis test\n- [ ] Goal-line check documented (e.g., \\\"plain-language observability\\\")",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:05Z",
+      "updatedAt": "2026-05-23T11:40:25Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 114,
+      "title": "docs(backlog-charter): clarify Decisions-seeding pattern (capability-level vs. CHARTER cross-ref)",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\nFor each capability in dev-backlog's \\`spec/capabilities.md\\` I had to decide whether to seed the \\`## Decisions\\` block. Three got seeded (charter-management with CHARTER's 2026-05-22 \\\"separate file\\\" + \\\"third sibling skill\\\" rows; triage-grooming with the 2026-05-22 \\\"Alignment Check is prompt-driven\\\" row; backlog-sync with a new 2026-05-23 row about machine-managed bodies). Two didn't (sprint-execution, task-progress-reporting) because no obvious CHARTER decision applied.\n\nTwo open questions:\n\n1. When does a CHARTER Decision get echoed at capability level? Duplication is bloat; pure cross-reference (\\\"see CHARTER 2026-05-22\\\") feels too thin.\n2. Is it OK for capability-level Decisions to be the *first home* of a decision that also belongs in CHARTER, or should it go to CHARTER first and then echo down?\n\n### Proposed\n\\`references/capabilities.md\\` grows a \\\"Decisions seeding\\\" subsection:\n\n- A CHARTER Decision is echoed at capability level only when the rationale is needed in-context to understand a Behavior or Hard Constraint. Otherwise, leave Decisions empty; the cross-cutting record lives in CHARTER.\n- A capability-level Decision that is genuinely cross-cutting (>1 capability affected) should be promoted to CHARTER on amend.\n- New capability-only decisions land at capability level; cross-reference back from CHARTER is fine but not required.\n\n### Acceptance Criteria\n- [ ] \\`references/capabilities.md\\` documents the seeding pattern\n- [ ] Pattern explicit about when to echo vs. when to leave empty\n- [ ] Promotion rule (capability → CHARTER) documented",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:20Z",
+      "updatedAt": "2026-05-23T11:39:41Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 118,
+      "title": "docs(relay-merge): finalize-run rerun blocked by worktree guard after cleanup — clarify append-learnings idempotency test path",
+      "body": "**Dogfooding finding (2026-05-23, real-world relay run on PR #117).**\n\nVerifying `append-learnings.js` idempotency at the script boundary works cleanly:\n\n```\n$ node append-learnings.js --repo dev-backlog --run-id <id> --pr 117 --json\n{\n  \"status\": \"skipped\",\n  \"reason\": \"idempotent_match\",\n  ...\n}\n```\n\nBut re-running `finalize-run.js --run-id <id>` (the natural way to test \"is this thing idempotent end-to-end?\") fails at a different guard:\n\n```\nError: finalize-run: manifest paths.worktree \"...5d81101d/dev-backlog\" is not contained\nunder the expected repo root \"...dev-backlog\" and is not a relay-owned worktree under\n\"...relay/worktrees\" that is bound to \"...dev-backlog/.git\" for repo \"dev-backlog\".\n```\n\nCause: cleanup already removed the worktree after the first finalize-run, so the worktree-path validator (a pre-merge guard) errors out before any post-merge step can re-run as a no-op.\n\nAppend-learnings's own idempotency is sound (substring match on `run #<id>`, byte-identical re-run). What's surprising is that the closest documented way to *check* it — re-running finalize-run — hits a different guard first.\n\n### Proposed\n\n`skills/relay-merge/SKILL.md` (dev-relay) gains a short note alongside the append-learnings paragraph:\n\n> The append-learnings idempotency contract holds at the script boundary (`status: \\\"skipped\\\"`, `reason: \\\"idempotent_match\\\"`). To exercise it directly, invoke `append-learnings.js` with the same `--run-id`, not `finalize-run.js` — the latter's worktree-path guard refuses re-runs once cleanup has executed.\n\nAlternatively (more invasive — defer unless other finalize-run rerun cases appear): teach the worktree guard to soft-pass when manifest state is already `merged` and `cleanup.cleanupStatus == \\\"succeeded\\\"`, so finalize-run becomes a true no-op after cleanup.\n\n### Acceptance Criteria\n- [ ] `skills/relay-merge/SKILL.md` (dev-relay repo) documents which script to invoke when validating append-learnings idempotency\n- [ ] Wording makes clear append-learnings's idempotency itself is intact; the limitation is in finalize-run's pre-merge guards\n\n### Context\n- Discovered during PR #117 verification run\n- See the run learnings entry under `## Capability: charter-management` in `spec/capabilities.md` (the very entry whose idempotency this finding tests)",
+      "labels": [
+        "documentation"
+      ],
+      "createdAt": "2026-05-23T13:17:19Z",
+      "updatedAt": "2026-05-23T13:18:16Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 119,
+      "title": "spec-system: append-learnings writes to working tree but doesn't commit/push — entries lost without explicit followup",
+      "body": "**Dogfooding finding (2026-05-23, real-world relay run on PR #117).**\n\nAfter PR #117 merged via `finalize-run.js`, the learnings entry landed in `spec/capabilities.md` exactly as designed — but **only in the local working tree.** The merge of #117 itself only carried the SKILL.md change to remote main; the learnings entry sits as `git status` modified content waiting for an explicit commit + push.\n\n```\n$ git status -s\n M spec/capabilities.md\n\n$ git diff spec/capabilities.md\n+- 2026-05-23 (run #issue-111-20260523131100686-d41da581): relay-merge of PR #117 [PR #117]\n <!-- LEARN:END -->\n```\n\nThis is a real durability problem. In normal use, a developer running `/relay-merge` won't think to immediately `git add spec/capabilities.md && git commit && git push` — the merge just finished, the run is done, the natural next move is to `git pull` for the next task. At that point the local change becomes uncommitted clutter that survives one `git stash` away from being lost.\n\nThe design doc (`docs/spec-system-design.md`) does not address this — search for \"commit\", \"push\", \"durable\", or \"persist\" returns nothing about the learnings entry lifecycle past the structural write.\n\n### Options (need maintainer judgment)\n\n1. **`append-learnings.js` auto-commits the entry** as a single-file commit (`docs(learnings): run #N → PR #M`) directly on the user's current branch. Simple but commits to the user's branch without asking, and may conflict with PRs in progress.\n\n2. **`finalize-run.js` post-merge does the commit + push** as part of the same atomic step that merges the PR. Mirrors how it already handles cleanup. Could fail loud if the branch isn't main (skip and warn, rather than push to a feature branch).\n\n3. **Separate `learnings.md` file** that is conventionally auto-committed, then `spec/capabilities.md` consumes it at render time. Higher complexity, breaks the single-file shape.\n\n4. **Document the manual step.** SKILL.md gains \"After `finalize-run` returns, commit + push `spec/capabilities.md` if dirty.\" Lowest mutation but most loss-prone in practice.\n\n### Recommendation\n\nOption 2 (post-merge commit + push from `finalize-run.js`), gated by:\n- Current branch == default branch (else skip + warn — don't push to a feature branch)\n- Working tree is clean *except* for `spec/capabilities.md` (else skip + warn — don't commit unrelated drift)\n- A new `--no-learnings-commit` flag for operators who want the file change but not the auto-commit (escape hatch)\n\nThis keeps the structural defense (only `append-learnings.js` writes between markers) and adds a thin orchestration layer that makes the writes durable by default.\n\n### Acceptance Criteria\n\n- [ ] Decision recorded in a new Decisions row for `merge-finalize` capability (when dev-relay adopts `spec/capabilities.md`) or in dev-backlog's design doc, on which option to pursue\n- [ ] If Options 1 or 2: implementation lands as a follow-up PR with tests for the dirty-tree and wrong-branch guards\n- [ ] If Option 4: SKILL.md gains the explicit manual-commit step\n\n### Severity\n\nHigher than #118. Without this fix, learnings entries are effectively a \"best-effort journal\" that needs manual discipline to survive. The whole structural-bounded-writer design is undermined if the writes don't persist.\n\n### Context\n\n- Discovered while verifying the live append-learnings entry for PR #117\n- Confirmed against `docs/spec-system-design.md` — durability of the write is not addressed\n- The entry from PR #117 is currently uncommitted in the maintainer's local working tree",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T13:27:11Z",
+      "updatedAt": "2026-05-23T13:29:05Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    }
+  ]
+}

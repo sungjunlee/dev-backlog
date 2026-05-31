@@ -1,0 +1,103 @@
+{
+  "generated": "2026-05-31T08:18:59.589Z",
+  "repo": "sungjunlee/dev-backlog",
+  "config_path": "backlog/triage-config.yml",
+  "issues": [
+    {
+      "number": 73,
+      "title": "enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan",
+      "body": "Follow-up to #59 epic. Surfaced during Batch 2 reviews (#62, #63) — both scripts legitimately need data that the MVP snapshot doesn't carry.\n\n## Why now\n\n- #62's \"PR linkage\" signal (merged PR → open issue) requires each snapshot issue to carry its closing-PR references. Not in MVP snapshot.\n- #62's \"Mentions in comments\" signal requires comments on each issue. Not in MVP snapshot.\n- #63's \"scanMergedPR\" and \"scanDuplicateOfClosed\" signals need the same data.\n\nShipped Batch 2 MVPs (#62, #63 after re-dispatch) cover body-scan + keyword + label signals — about 80% of the surface. This issue covers the remaining 20%.\n\n## Scope\n\nExtend `scripts/triage-collect.js`:\n\n1. **`closing_prs` via single GraphQL query** (hard requirement — single `gh` fetch preserved)\n   - Migrate the default fetch from `gh issue list --json` to `gh api graphql` with a query returning open issues + their `closedByPullRequestsReferences(first:5, includeClosedPrs:true)` nodes\n   - Per-issue key: `closing_prs: [{number, state, mergedAt, url}]`; empty array when no closing PR linked\n   - Paginate via GraphQL cursor if repo has > default-page-size open issues; keep it under one command invocation at the CLI level\n\n2. **Optional `--with-comments` flag** (per-issue fetch; breaks single-fetch contract behind an explicit opt-in)\n   - When enabled, adds `comments: [{author, body, createdAt}]` to each issue\n   - Default off; document the per-issue fetch cost in `references/classification.md`\n   - Surface N API calls warning when active\n\n3. **Optional `--with-closed-issues` flag** (second list query; supports duplicate-of-closed detection in #63)\n   - Adds top-level `closed_issues: [{number, title, body, closedAt}]` with the same filter bounds as open\n   - Limit to closed within last 180 days by default; configurable\n\n## Downstream plan\n\nAfter this ships:\n- **#62 follow-up**: implement PR-linkage edge kind + comment-mention scan (behind `--with-comments` snapshot requirement)\n- **#63 follow-up**: implement `scanMergedPR` + `scanDuplicateOfClosed` scanners, remove deferred-stub markers\n\nThese can be tracked as separate issues filed when this lands.\n\n## Explicit out of scope\n\n- ML-based duplicate detection (same as #59 out-of-scope list)\n- Cross-repo issue resolution\n- Timeline events beyond closing-PR references\n\n## AC\n\n- [ ] Per-issue `closing_prs` field present (array, possibly empty) on every snapshot issue\n- [ ] Default path still a single `gh` invocation (GraphQL query + pagination counts as one logical fetch)\n- [ ] `--with-comments` flag opt-in; documented N-API-call cost; fetches concurrency-bounded\n- [ ] `--with-closed-issues` flag opt-in; caps via config\n- [ ] Existing schema tests updated; new tests cover `closing_prs` presence via stubbed GraphQL response\n- [ ] `sync-pull.js` behavior unchanged (its fetch path can continue using the pre-existing `gh issue list` pattern for backwards compat, or migrate if straightforward)",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-04-18T06:10:24Z",
+      "updatedAt": "2026-05-31T08:18:31Z",
+      "milestone": null,
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "uncategorized",
+        "age": "30-90d",
+        "activity": "recent",
+        "milestone": "unassigned"
+      }
+    },
+    {
+      "number": 112,
+      "title": "docs(spec-grill): add Behavior vs. Hard Constraint tiebreaker rule",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\nSeveral predicates worked as either an Expected Behavior or a Hard Constraint without a clear preference rule. Example: \\`triage-grooming\\`'s \\\"default is read-only\\\" can be stated as a Behavior (\\\"default invocation is advisory; mutation requires --apply\\\") or a Hard Constraint (\\\"never mutate without --apply\\\"). Both pass the 3-axis test.\n\nWithout a tiebreaker, two grill sessions on the same capability could classify it differently — that's diff churn.\n\n### Proposed\n\\`skills/backlog-charter/SKILL.md\\` Grill Mode adds a tiebreaker rule:\n\n- Positive framing (\\\"X happens when…\\\") → Expected Behavior\n- Bright-line negation (\\\"never X, regardless of input\\\") → Hard Constraint\n- When both fit, prefer Hard Constraint — the negative form is harder to subvert under optimization pressure\n\n### Acceptance Criteria\n- [ ] SKILL.md grill-mode section documents the tiebreaker\n- [ ] At least one example showing the same intent expressed both ways, with the recommended choice",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:37:58Z",
+      "updatedAt": "2026-05-31T08:18:21Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 113,
+      "title": "docs(spec-grill): make Goal observability check explicit outside the 3-axis test",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\n\\`skills/backlog-charter/SKILL.md\\` says \\\"Behaviors / Hard Constraints are Tier-2-equivalent: each must pass the 3-axis test.\\\" It does NOT explicitly say Goals are exempt. During the dev-backlog dogfood I caught myself trying to 3-axis-test Goal lines and producing awkward, over-precise outcomes that read worse.\n\nGoals are *observable outcomes*, not *verifiable predicates*. They need a different check.\n\n### Proposed\nSKILL.md Grill Mode clarifies:\n\n- **3-axis test applies to Behaviors and Hard Constraints only.**\n- **Goals get a lighter check:** \\\"can a user observe this without instrumentation, in plain language?\\\" If yes, Goal is committable. If no, sharpen — but do not force the 3 axes.\n\n### Acceptance Criteria\n- [ ] SKILL.md explicitly scopes the 3-axis test\n- [ ] Goal-line check documented (e.g., \\\"plain-language observability\\\")",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:05Z",
+      "updatedAt": "2026-05-31T08:18:01Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    },
+    {
+      "number": 114,
+      "title": "docs(spec-grill): clarify capability-level Decisions seeding",
+      "body": "**Dogfooding finding (2026-05-23, PR #110).**\n\nFor each capability in dev-backlog's \\`spec/capabilities.md\\` I had to decide whether to seed the \\`## Decisions\\` block. Three got seeded (charter-management with CHARTER's 2026-05-22 \\\"separate file\\\" + \\\"third sibling skill\\\" rows; triage-grooming with the 2026-05-22 \\\"Alignment Check is prompt-driven\\\" row; backlog-sync with a new 2026-05-23 row about machine-managed bodies). Two didn't (sprint-execution, task-progress-reporting) because no obvious CHARTER decision applied.\n\nTwo open questions:\n\n1. When does a CHARTER Decision get echoed at capability level? Duplication is bloat; pure cross-reference (\\\"see CHARTER 2026-05-22\\\") feels too thin.\n2. Is it OK for capability-level Decisions to be the *first home* of a decision that also belongs in CHARTER, or should it go to CHARTER first and then echo down?\n\n### Proposed\n\\`references/capabilities.md\\` grows a \\\"Decisions seeding\\\" subsection:\n\n- A CHARTER Decision is echoed at capability level only when the rationale is needed in-context to understand a Behavior or Hard Constraint. Otherwise, leave Decisions empty; the cross-cutting record lives in CHARTER.\n- A capability-level Decision that is genuinely cross-cutting (>1 capability affected) should be promoted to CHARTER on amend.\n- New capability-only decisions land at capability level; cross-reference back from CHARTER is fine but not required.\n\n### Acceptance Criteria\n- [ ] \\`references/capabilities.md\\` documents the seeding pattern\n- [ ] Pattern explicit about when to echo vs. when to leave empty\n- [ ] Promotion rule (capability → CHARTER) documented",
+      "labels": [
+        "documentation",
+        "enhancement"
+      ],
+      "createdAt": "2026-05-23T11:38:20Z",
+      "updatedAt": "2026-05-31T08:18:19Z",
+      "milestone": "spec-system v0.1 dogfood polish",
+      "closing_prs": [],
+      "buckets": {
+        "label": {
+          "type": "docs",
+          "priority": "medium",
+          "status": "todo"
+        },
+        "theme": "docs",
+        "age": "7-30d",
+        "activity": "recent",
+        "milestone": "assigned"
+      }
+    }
+  ]
+}
