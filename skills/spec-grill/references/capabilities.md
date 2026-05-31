@@ -42,6 +42,8 @@ Bad Goal lines usually describe diagnosis, implementation, or an internal tool. 
 
 Move diagnosis-side framing to the charter Problem. Move scripts and file names to In-scope unless the script is the user-visible surface.
 
+Goals are not 3-axis predicates. Use a lighter check: can a user or operator observe the outcome in plain language without instrumentation? If yes, the Goal is committable. If no, sharpen the outcome, but do not force authority / distributional / manipulability wording into the Goal.
+
 ## Behavior vs. Hard Constraint
 
 Use Behaviors for expected positive outcomes. Use Hard Constraints for bright lines that remain true even when a user asks for the tempting shortcut.
@@ -54,6 +56,19 @@ Use Behaviors for expected positive outcomes. Use Hard Constraints for bright li
 | "Never close, relabel, or comment without `--apply`." | Hard Constraint | It protects the source of truth from silent mutation. |
 
 Avoid "never do X unless asked" as a Hard Constraint. The phrase "unless asked" is a loophole. If explicit user consent is valid, make it a Behavior with the consent condition.
+
+Tie-breaker:
+
+- Positive normal outcome -> Expected Behavior.
+- Bright-line negation or anti-Goodhart guard -> Hard Constraint.
+- If both are valid, prefer the Hard Constraint only when the negative form blocks an optimization shortcut, silent mutation, or data-loss shortcut.
+
+Example pair:
+
+| Same intent | Better placement | Why |
+|---|---|---|
+| "Default triage is advisory and mutations require `--apply`." | Expected Behavior | It describes the ordinary user-visible flow and valid consent path. |
+| "Never close, relabel, or comment on an issue without `--apply`." | Hard Constraint | It protects the GitHub source of truth against silent mutation. |
 
 ## 3-Axis Test Examples
 
@@ -111,6 +126,25 @@ It must not touch:
 - `spec/charter.md`, unless the user separately invokes amend mode
 
 If a rerun discovers a cross-cutting decision, append it to the relevant Decisions table or promote it to `spec/charter.md` via amend mode. Do not rewrite old Decisions rows.
+
+## Decisions Seeding
+
+Capability-level Decisions should explain local contract choices, not duplicate the charter.
+
+Use this rule:
+
+- Echo a `spec/charter.md` Decision at capability level only when its rationale is needed to understand a Behavior or Hard Constraint in that capability.
+- Leave Decisions empty when the charter row is merely historical context; the cross-cutting record already lives in `spec/charter.md`.
+- Put capability-only Decisions in that capability block.
+- Promote any capability Decision that affects more than one capability through `spec-charter amend`; append a new charter Decision instead of rewriting old rows.
+
+Examples:
+
+| Situation | Placement |
+|---|---|
+| "Alignment Check is prompt-driven" explains why `triage-grooming` has no `triage-align.js`. | Echo at `triage-grooming` level. |
+| "New charter files live under `spec/`" affects multiple spec skills. | Keep/promote in `spec/charter.md`; echo only where it explains a constraint. |
+| "`sync-pull --update` preserves non-machine-managed bodies." | Capability-only Decision under `backlog-sync`. |
 
 ## Capability Count Guidance
 

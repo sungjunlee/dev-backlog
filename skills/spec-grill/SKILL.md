@@ -81,7 +81,7 @@ Use this as a bloat check before the per-capability flow. A large feature-first 
 
 For each capability, walk the user through this order; do not skip ahead:
 
-1. **Goal** — one sentence: what the user can observe when this works. Diagnosis-side framing belongs in the charter; capability Goal is the observable outcome.
+1. **Goal** — one sentence: what the user can observe when this works. Diagnosis-side framing belongs in the charter; capability Goal is the observable outcome. Do not run Goals through the 3-axis predicate test; use plain-language observability instead.
 2. **In-scope / Out-of-scope** — what this capability owns, and the boundary it deliberately respects. Out-of-scope prevents creep.
 3. **Expected Behaviors** — three verifiable predicates. Each one must pass the 3-axis test below. Reject and rewrite until it does.
 4. **Hard Constraints** — two bright-lines this capability never crosses, even if asked. Adversarial-Goodhart defenses live here.
@@ -98,10 +98,12 @@ Every Behavior and Hard Constraint must pass all three axes before it is committ
 
 A predicate that passes all three is committable. A predicate that fails any axis is rewritten or split, never rubber-stamped.
 
+Classify positive normal outcomes as Expected Behaviors. Classify bright-line negations and anti-Goodhart guards as Hard Constraints. When both forms fit, prefer the Hard Constraint only when the negative form protects against an optimization or data-loss shortcut.
+
 ## Writing Rules
 
 On first run, copy `templates/capabilities.md` to `spec/capabilities.md` at the repo root, then walk the interview for one capability. On rerun, edit only the named capability block and leave the rest of the file untouched.
 
-After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited.
+After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited. Echo charter Decisions at capability level only when they explain a Behavior or Hard Constraint; promote cross-cutting capability Decisions through `spec-charter amend`.
 
 See `references/capabilities.md` for additional grill heuristics and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide charter layer.
