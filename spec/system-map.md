@@ -20,7 +20,7 @@ spec/
 ## Runtime Boundaries
 
 - `skills/dev-backlog/` owns sprint execution, task mirrors, and progress helper scripts.
-- `skills/backlog-triage/` owns advisory issue grooming and charter Alignment reports.
+- `skills/backlog-triage/` owns advisory issue grooming, charter Alignment reports, and spec-aware Decision Review.
 - `skills/spec-charter/` owns `spec/charter.md` lifecycle and charter proof gates.
 - `skills/spec-system-map/` owns this high-level system map.
 - `skills/spec-grill/` owns `spec/capabilities.md` authoring.
@@ -31,7 +31,7 @@ spec/
 1. **Sync:** `sync-pull.js` mirrors open GitHub Issues into `backlog/tasks/`.
 2. **Plan:** sprint planning reads charter Objectives when present, then writes one active file under `backlog/sprints/`.
 3. **Execute:** agents read the active sprint, update Plan state and Progress, and keep task context local.
-4. **Groom:** `backlog-triage` produces advisory reports; mutations require explicit user action.
+4. **Groom:** `backlog-triage` produces advisory reports with classification, relationships, stale signals, Alignment, and Decision Review; mutations require explicit user action.
 5. **Spec evolve:** `spec-charter`, `spec-system-map`, and `spec-grill` update durable project specs through their own gates.
 
 ## Storage And External Systems

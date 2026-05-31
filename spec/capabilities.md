@@ -185,11 +185,12 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ## Capability: triage-grooming
 
-**Goal:** Open Issues are classified, related, flagged stale, and aligned to charter Objectives without humans maintaining a parallel triage spreadsheet.
+**Goal:** Open Issues are classified, related, flagged stale, aligned to charter Objectives, and reviewed for next action without humans maintaining a parallel triage spreadsheet.
 
 **In-scope:**
 - `backlog-triage` collect / relate / stale / report / apply pipeline
 - Charter-aware Alignment Check (Issue → active Objective mapping)
+- Spec-aware Decision Review (`Do Now`, `Shape First`, `Defer`, `Drop / Close`)
 - Triage snapshots (v2 collector) and the advisory triage report artifact
 
 **Out-of-scope:**
@@ -200,6 +201,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 ### Expected Behaviors
 - Default `backlog-triage` invocation is **advisory** — it produces a markdown report and never mutates GitHub state. Mutation requires `--apply`.
 - Alignment Check maps every open Issue to ≥1 active Objective OR surfaces it as an orphan in the report — no silent drops.
+- Decision Review uses charter, capabilities, system map, active sprint context, and triage signals as bounded evidence, then emits non-mutating recommendations.
 - A `triage-collect` snapshot is reproducible: against unchanged GitHub state, two invocations produce a byte-identical snapshot modulo `collected_at` timestamp.
 
 ### Hard Constraints
@@ -214,6 +216,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-05-22 | Alignment Check is prompt-driven inside `backlog-triage`, not a new `triage-*.js` | Issue → Objective mapping is semantic, unlike the deterministic relate/stale scripts | — |
+| 2026-05-31 | Decision Review is prompt-driven and report-only inside `backlog-triage` | Final backlog recommendations need semantic spec evidence; `triage-apply.js` should remain limited to explicit issue mutations | — |
 
 ---
 

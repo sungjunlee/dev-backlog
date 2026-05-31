@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-05-23
-revision: 1
+last_amended: 2026-05-31
+revision: 2
 ---
 
 # dev-backlog Charter
@@ -46,3 +46,4 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-05-22 | Patterns from Fractal and gsd-2 are absorbed, not integrated                          | Both own the whole project lifecycle and conflict with the GitHub-Issues-anchored model          | —          |
 | 2026-05-29 | `backlog-charter` splits into `spec-charter` and `spec-grill`                         | Existing-repo onboarding needs a discoverable second step from project charter to capability contracts | 2026-05-22 |
 | 2026-05-29 | New charter files live at `spec/charter.md`; root `CHARTER.md` is legacy fallback     | Charter, system map, and capabilities should share one project spec home under `spec/`           | 2026-05-22 |
+| 2026-05-31 | `backlog-triage` adds spec-aware Decision Review as a prompt-driven report layer      | Final issue recommendations need semantic evidence from charter, capabilities, system map, and sprint context; mutations stay explicit | —          |
