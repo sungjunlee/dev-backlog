@@ -35,9 +35,11 @@ Resolve helper scripts from the installed `spec-charter` skill directory, not fr
 
 End every mode with a short summary:
 
-- `create`: created files, unresolved assumptions, and whether `spec-system-map` and `spec-grill` are recommended next steps.
+- `create`: created files, unresolved assumptions, and a concrete next natural-language action. On brownfield repos, recommend creating `spec/system-map.md` before asking `spec-grill` to review capability boundaries.
 - `amend`: accepted changes, refused/parked changes, proof cited for status advances, and size-check result.
-- `reassess`: required report sections from the Reassess Mode dispatch contract, with one recommended next step.
+- `reassess`: required report sections from the Reassess Mode dispatch contract, with one recommended next natural-language action.
+
+When recommending follow-up spec work, do not require users to memorize downstream arguments such as `map`, `fill`, or `audit`. Prefer plain actions like "create the system map" or "ask spec-grill to review candidate capability boundaries." Include 2-5 candidate boundary names only when they are supported by evidence from README, `spec/system-map.md`, scripts, tests, docs, or recent commit scopes.
 
 ## What spec/charter.md Is
 
@@ -71,7 +73,7 @@ Use create mode when neither `spec/charter.md` nor legacy root `CHARTER.md` exis
 1. Draft from repo signals: product/user-facing signals (`README.md`, open epics/issues, `CHANGELOG.md`) before development-harness signals (`CLAUDE.md`, `AGENTS.md`). Harness files may inform workflow conventions, local commands, and repo-specific guardrails, but they do not override README, charter, issues, code structure, or user interview answers for product/capability authority unless they explicitly describe product boundaries. When signals conflict, surface the conflict in the interview rather than picking silently.
 2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives. Follow the checklist in `references/create.md`: Problem framing options, the wedge test for Approach, Non-Goals elicitation, and Objective framing that cites `references/objectives.md`.
 3. Create `spec/` if needed, then write `spec/charter.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`. The Decisions table may be left empty. Seed 3-5 rows only when prior design docs, ADRs, or notable merged PRs already record direction; whatever lands becomes immutable from revision 2.
-4. If the target repo is brownfield, recommend `spec-system-map` and `spec-grill` as the next steps. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
+4. If the target repo is brownfield, recommend `spec-system-map` as the next step when `spec/system-map.md` is absent. After the map exists, recommend asking `spec-grill` to review candidate capability boundaries. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
 
 Objective conventions:
 
@@ -106,6 +108,8 @@ See `references/amendment.md` for deep challenge and proof-gate heuristics.
 Use reassess mode when the user asks whether `spec/charter.md`, `spec/system-map.md`, or `spec/capabilities.md` is stale, asks to review Learnings, wants a periodic spec health check, or when major model/tool/harness changes could alter how agents interpret repo context.
 
 Reassess never edits files. It diagnoses drift and recommends next actions; accepted fixes must run through `spec-charter amend`, `spec-system-map amend`, `spec-grill <capability>`, or a separate user-approved Learning Action.
+
+If reassess finds that `spec/system-map.md` is missing on a brownfield repo, recommend creating the system map before capability grilling. If `spec/system-map.md` exists and `spec/capabilities.md` is missing or thin, recommend asking `spec-grill` to review the candidate capability boundaries. Name concrete candidates only when evidence supports them; otherwise say which evidence is missing.
 
 Dispatch contract:
 

@@ -9,6 +9,16 @@ const {
   listCapabilityCandidates,
   extractCommitScopes,
   readOptionalFile,
+  slugifyCandidate,
+  collectSystemMapCandidates,
+  collectReadmeCandidates,
+  collectSkillCandidates,
+  collectScriptCandidates,
+  collectCliCommandCandidates,
+  collectSourceSurfaceCandidates,
+  collectDocCandidates,
+  collectTestCandidates,
+  collectSourceTestCandidates,
   resolveCharterFile,
   readCharterObjectives,
   summarizeReadme,
@@ -231,6 +241,76 @@ Tamgu Note helps parents discover children's hidden talents through AI-powered a
   });
 });
 
+describe("evidence collectors", () => {
+  let repo;
+  beforeEach(() => { repo = makeRepo(); });
+  afterEach(() => { fs.rmSync(repo, { recursive: true, force: true }); });
+
+  it("slugifies candidate handles deterministically", () => {
+    assert.equal(slugifyCandidate("Sync Pull!"), "sync-pull");
+    assert.equal(slugifyCandidate("`backlog-sync`"), "backlog-sync");
+  });
+
+  it("parses system-map candidate boundaries", () => {
+    const systemMap = `# Map
+
+## Candidate Capability Boundaries
+
+- \`backlog-sync\` - evidence: sync flow; owns task mirrors; uncertainty: triage boundary.
+- \`triage-grooming\` - evidence: report flow; owns issue review; uncertainty: apply boundary.
+
+## Where To Go Next
+`;
+    const candidates = collectSystemMapCandidates(systemMap);
+    assert.deepEqual(candidates.map((c) => c.name), ["backlog-sync", "triage-grooming"]);
+    assert.match(candidates[0].signal, /sync flow/);
+  });
+
+  it("collects README capability-like bullets only under relevant headings", () => {
+    const readme = `# Project
+
+## Features
+- \`backlog-sync\` - mirror issues locally
+- Triage grooming: classify issues
+
+## License
+- MIT
+`;
+    const candidates = collectReadmeCandidates(readme);
+    assert.deepEqual(candidates.map((c) => c.name), ["backlog-sync", "triage-grooming"]);
+  });
+
+  it("collects skill, script, docs, and paired test evidence", () => {
+    write(repo, "skills/spec-grill/SKILL.md", `---
+name: spec-grill
+description: Create capability contracts.
+---
+`);
+    write(repo, "skills/spec-grill/scripts/extract-signals.js", "");
+    write(repo, "skills/spec-grill/scripts/extract-signals.test.js", "");
+    write(repo, "skills/spec-grill/references/capabilities.md", "# Capability reference\n");
+    write(repo, "docs/spec-system-design.md", "# Spec design\n");
+
+    assert.deepEqual(collectSkillCandidates(repo).map((c) => c.name), ["spec-grill"]);
+    assert.ok(collectScriptCandidates(repo).some((c) => c.name === "extract-signals"));
+    assert.ok(collectTestCandidates(repo).some((c) => c.name === "extract-signals"));
+    assert.deepEqual(collectDocCandidates(repo), []);
+    assert.ok(collectDocCandidates(repo, {}, ["spec-system"]).some((c) => c.signal.includes("docs/spec-system-design.md")));
+  });
+
+  it("collects source commands, source surfaces, and source tests", () => {
+    write(repo, "src/kwi/cli/commands/github-pr-export.ts", "");
+    write(repo, "src/kwi/cli/commands/github-pr-export.test.ts", "");
+    write(repo, "src/kwi/sources/confluence.ts", "");
+    write(repo, "src/kwi/sources/jira/index.ts", "");
+    write(repo, "tests/unit/sources/confluence.test.ts", "");
+
+    assert.deepEqual(collectCliCommandCandidates(repo).map((c) => c.name), ["github-pr-export"]);
+    assert.deepEqual(collectSourceSurfaceCandidates(repo).map((c) => c.name), ["confluence", "jira"]);
+    assert.deepEqual(collectSourceTestCandidates(repo).map((c) => c.name), ["confluence"]);
+  });
+});
+
 describe("buildSignalAuthority", () => {
   it("labels CLAUDE.md/AGENTS.md as development-harness authority", () => {
     const authority = buildSignalAuthority({
@@ -375,6 +455,7 @@ revision: 1
     assert.equal(result.inventory.readmeFound, true);
     assert.equal(result.inventory.charterFound, true);
     assert.equal(result.inventory.charterSource, "canonical");
+    assert.equal(result.inventory.systemMapFound, false);
     assert.equal(result.inventory.claudeMdFound, true);
     assert.deepEqual(result.inventory.harnessFiles, ["CLAUDE.md"]);
     assert.equal(result.inventory.sourceRoot, "src");
@@ -390,6 +471,9 @@ revision: 1
     assert.ok(ingest.signals.some((s) => s.includes("src/ingest/")));
     assert.ok(ingest.signals.some((s) => s.includes("commit-scope:ingest")));
     assert.equal(ingest.provenance.directory, "src/ingest/");
+    assert.ok(ingest.evidence.source_dirs.includes("src/ingest/"));
+    assert.ok(ingest.evidence.commits.some((s) => s.includes("commit-scope:ingest")));
+    assert.deepEqual(ingest.missing_evidence, ["spec/system-map.md"]);
     assert.match(ingest.candidate_goal, /logging pipeline/);
     assert.match(ingest.candidate_goal, /O1/);
 
@@ -458,8 +542,61 @@ revision: 1
     const progressSync = result.capabilities.find((c) => c.name === "progress-sync");
     assert.ok(progressSync);
     assert.equal(progressSync.provenance.directory, null);
+    assert.ok(progressSync.evidence.commits.some((s) => s.includes("commit-scope:progress-sync")));
     assert.match(progressSync.candidate_scope, /Confirm the owning source surface/);
     assert.doesNotMatch(progressSync.candidate_scope, /src\/progress-sync/);
+  });
+
+  it("groups system-map, skill, script, docs, tests, and commits under candidates", () => {
+    write(repo, "README.md", `# Project
+
+## Features
+- \`backlog-sync\` - mirror issues locally
+`);
+    write(repo, "spec/system-map.md", `# Map
+
+## Candidate Capability Boundaries
+
+- \`backlog-sync\` - evidence: sync flow; owns task mirrors; uncertainty: triage boundary.
+`);
+    write(repo, "skills/backlog-sync/SKILL.md", `---
+name: backlog-sync
+description: Mirror issues.
+---
+`);
+    write(repo, "skills/backlog-sync/scripts/sync-pull.js", "");
+    write(repo, "skills/backlog-sync/scripts/sync-pull.test.js", "");
+    write(repo, "docs/backlog-sync-guide.md", "# Backlog sync guide\n");
+    write(repo, "src/kwi/cli/commands/github-pr-export.ts", "");
+    write(repo, "src/kwi/sources/confluence.ts", "");
+    write(repo, "tests/unit/sources/confluence.test.ts", "");
+
+    const result = extractSignals({
+      repoRoot: repo,
+      exec: () => "feat(backlog-sync): add mirror\nfix(backlog-sync): preserve AC",
+    });
+
+    const candidate = result.capabilities.find((c) => c.name === "backlog-sync");
+    assert.ok(candidate);
+    assert.ok(candidate.evidence.system_map.length > 0);
+    assert.ok(candidate.evidence.readme.length > 0);
+    assert.ok(candidate.evidence.skill.length > 0);
+    assert.ok(candidate.evidence.commits.length > 0);
+    assert.equal(candidate.missing_evidence.length, 0);
+
+    const syncPull = result.capabilities.find((c) => c.name === "sync-pull");
+    assert.ok(syncPull);
+    assert.ok(syncPull.evidence.scripts.length > 0);
+    assert.ok(syncPull.evidence.tests.length > 0);
+
+    const githubPrExport = result.capabilities.find((c) => c.name === "github-pr-export");
+    assert.ok(githubPrExport);
+    assert.ok(githubPrExport.evidence.scripts.length > 0);
+
+    const confluence = result.capabilities.find((c) => c.name === "confluence");
+    assert.ok(confluence);
+    assert.ok(confluence.evidence.source_dirs.length > 0);
+    assert.ok(confluence.evidence.tests.length > 0);
   });
 
   it("brownfield-thin: only src/ + commits, no README/CLAUDE", () => {

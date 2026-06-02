@@ -50,6 +50,16 @@ spec/
 - `spec/capabilities.md` remains compact enough to read at session start.
 - Completed sprint files are immutable history.
 
+## Candidate Capability Boundaries
+
+- `sprint-execution` - evidence: active sprint flow and completed-sprint invariant; owns sprint planning, in-flight state, and progress context; uncertainty: whether future relay learning writes should remain in this boundary.
+- `backlog-sync` - evidence: GitHub Issues -> task mirror flow and explicit sync invariant; owns issue-to-task mirroring and local AC preservation; uncertainty: whether richer triage snapshots should stay separate.
+- `triage-grooming` - evidence: advisory grooming flow and Decision Review use of spec evidence; owns issue classification, relationship, stale, alignment, and decision reports; uncertainty: whether closing-PR snapshot enrichment changes this contract.
+- `spec-charter` - evidence: canonical `spec/charter.md` invariant and proof-gated direction flow; owns project axis lifecycle; uncertainty: how concrete downstream routing recommendations should be generated.
+- `spec-system-map` - evidence: project-wide shape and boundary map flow; owns high-level system structure without module inventory; uncertainty: how much candidate boundary detail is useful before it becomes capability content.
+- `spec-grill` - evidence: capability contract flow and compact capability invariant; owns capability admission, predicate pressure tests, and report-first boundary review; uncertainty: how evidence grouping should influence candidate naming.
+- `task-progress-reporting` - evidence: progress helper scripts and GitHub Progress issue lifecycle; owns monthly progress issue updates and finalization; uncertainty: whether comment enrichment belongs here or in a separate integration boundary.
+
 ## Where To Go Next
 
 - Product direction: [`charter.md`](charter.md)
