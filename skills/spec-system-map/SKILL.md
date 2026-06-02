@@ -32,9 +32,10 @@ When no mode is specified, route by file state. Create `spec/` if needed.
 
 1. Read bounded signals: `spec/charter.md` if present, `README.md`, `AGENTS.md`/`CLAUDE.md`, top-level directories, package/config files, and existing docs that appear architecture-related.
 2. Draft from `templates/system-map.md`; keep sections short and link out instead of expanding subsystem detail.
-3. Include these sections: System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Where To Go Next.
+3. Include these sections: System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Candidate Capability Boundaries, Where To Go Next.
 4. If the repo is brownfield, explicitly mark uncertain boundaries as assumptions rather than inventing detail.
-5. Recommend `spec-grill` when the map reveals durable capability boundaries that are not yet in `spec/capabilities.md`.
+5. Use Candidate Capability Boundaries to hand off concrete, short candidates to `spec-grill`. Each candidate should name evidence, the contract surface it appears to own, and the uncertainty `spec-grill` must resolve.
+6. Recommend asking `spec-grill` to review the candidate capability boundaries when the map reveals durable boundaries that are not yet in `spec/capabilities.md`.
 
 ## Amend Mode
 
@@ -51,6 +52,7 @@ Before finishing, verify:
 - Every section names current project-wide facts, not aspirational design.
 - The map links to deeper docs instead of copying them.
 - No subsystem gets more detail than the whole-system flow needs.
+- Candidate Capability Boundaries are short handoff candidates, not a module inventory.
 - No stale module-level TODOs, endpoint inventories, or runbook commands are included.
 
 ## Eval Prompts

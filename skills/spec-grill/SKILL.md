@@ -1,6 +1,6 @@
 ---
 name: spec-grill
-argument-hint: "[capability-slug]"
+argument-hint: "[natural-language request]"
 description: "Create or refine spec/capabilities.md by grilling existing repo signals into capability contracts, Behaviors, and Hard Constraints. Use after spec-charter on existing repos, or when users ask for capability specs, component contracts, middle-layer specs, repo capability boundaries, 능력 명세, or grill."
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
@@ -15,10 +15,19 @@ Use this after `spec-charter create` on existing/brownfield repos, or whenever t
 
 ## Execution Contract
 
-### Invocation
+### Intent Router
 
-- `spec-grill`: greenfield or brownfield capability-spec creation. If `spec/capabilities.md` does not exist, create it from `templates/capabilities.md`, then interview one capability at a time.
-- `spec-grill <capability-slug>`: refine exactly one existing capability block. If the file is absent, fall back to greenfield mode and surface the absence.
+Do not require users to memorize arguments. Interpret the user's request and choose the safest matching route. Power-user aliases such as `map`, `fill`, `audit`, and exact capability slugs are accepted, but they are optional shorthand, not the primary workflow.
+
+| User intent | Route | Writes? |
+|-------------|-------|---------|
+| No argument, ambiguous capability request, or "look at the capabilities" | **Grill Report**: diagnose current evidence and recommend next action. | No |
+| "Find capability candidates", "map repo capability boundaries", or `map` | **Candidate Boundary Report**: collect raw candidates and classify them as accepted / rejected / merged / split candidates. | No |
+| "Add the next missing capability", "fill the missing capability", or `fill` | **Next Capability Proposal**: propose exactly one missing capability and ask for confirmation before editing. | Only after confirmation |
+| Mentions a known capability slug or natural-language capability area | **Specific Capability Review**: resolve the mention to one capability or candidate and deep-review only that block or candidate. | No by default |
+| "Audit capabilities", "find overlap", "find stale contracts", "find weak predicates", or `audit` | **Capability Audit Report**: report stale, overlapping, weak, or unsupported capability predicates. | No |
+
+If intent is unclear, prefer report-only. If the user asks for an edit while evidence is weak, emit the report first, identify the missing evidence, and ask before writing.
 
 Capability slugs are strict routing handles used by sprint `component:` frontmatter. Keep them lowercase and singular, then put nuance in Goal/Scope prose.
 
@@ -26,7 +35,7 @@ Capability slugs are strict routing handles used by sprint `component:` frontmat
 
 Resolve helper scripts from the installed `spec-grill` skill directory, not from the target repo. In a source checkout, that means the local `scripts/` directory beside this `SKILL.md`. Always pass the target repo explicitly (`--repo-root <target-repo>`) so helpers do not inspect the skill directory by accident.
 
-On a brownfield repo with no `spec/capabilities.md`, run `extract-signals.js --repo-root <target-repo> --json` first. The script reports raw capability signals with draft Goal + draft Scope. It never writes `spec/capabilities.md`; admission, merging, splitting, and naming belong to this skill.
+On a brownfield repo with no `spec/capabilities.md`, or when candidate evidence is requested, run `extract-signals.js --repo-root <target-repo> --json` first. The script reports raw capability evidence. It never writes `spec/capabilities.md`; admission, merging, splitting, and naming belong to this skill.
 
 ### Completion Contract
 
@@ -36,11 +45,53 @@ End every run with a short summary:
 - predicates rejected or rewritten
 - constraints added
 - raw candidates merged/split/refused
+- behaviors promoted to constraints
+- missing proof or evidence
 - follow-up Learning Actions if any
+
+### Grill Report Contract
+
+Use this report shape for no-arg, ambiguous, candidate-discovery, and audit routes unless the user asks for a shorter answer:
+
+```md
+## Grill Report
+
+### Evidence Read
+- <file/script/signal and what it proves>
+
+### Evidence Missing
+- <missing charter/system-map/tests/docs/surface that weakens confidence>
+
+### Raw Candidates
+- <candidate> - evidence: <signals>; caveat: <why it is not accepted yet>
+
+### Accepted / Rejected / Merged / Split Candidates
+- Accepted: <candidate> - <reason>
+- Rejected: <candidate> - <reason>
+- Merged: <candidate A> + <candidate B> -> <candidate C> - <reason>
+- Split: <candidate> -> <candidate A>, <candidate B> - <reason>
+
+### Sharp Questions
+- <candidate>: <pressure question that must be answered before editing>
+
+### 3-Axis Predicate Findings
+- Rejected predicates: <predicate> - failed <axis>
+- Rewritten predicates: <before> -> <after>
+- Behaviors promoted to constraints: <behavior> -> <constraint>
+- Missing proof/evidence: <predicate> - needs <test/doc/runtime invariant/receipt>
+
+### Proposed Next Capability
+- <slug> - <why this is the next safest contract to write or revise>
+
+### Recommended Edit
+- <specific edit command or "no edit yet">
+```
+
+Separate diagnosis from mutation. The report can recommend edits, but it must not edit `spec/capabilities.md` unless the user clearly asked for editing or confirms the proposed edit.
 
 ## Brownfield Signal Rules
 
-`extract-signals.js` draws from README, `spec/charter.md` with legacy root `CHARTER.md` fallback, `CLAUDE.md`/`AGENTS.md`, top-level source dirs, and recent commit messages.
+`extract-signals.js` draws from README, `spec/charter.md` with legacy root `CHARTER.md` fallback, `spec/system-map.md`, `CLAUDE.md`/`AGENTS.md`, top-level source dirs, skill files, script surfaces, docs, tests, and recent commit messages.
 
 Use the draft as interview seed only. The script labels signal authority:
 
@@ -49,7 +100,7 @@ Use the draft as interview seed only. The script labels signal authority:
 - commit scopes are history.
 - `CLAUDE.md`/`AGENTS.md` are development-harness context.
 
-Harness context can seed questions about conventions and workflow, but it must not create accepted capability boundaries by itself. The script clusters by code organization, while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim.
+Harness context can seed questions about conventions and workflow, but it must not create accepted capability boundaries by itself. The script clusters evidence from code organization and command surfaces, while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim.
 
 ## File Shape
 
@@ -102,7 +153,7 @@ Classify positive normal outcomes as Expected Behaviors. Classify bright-line ne
 
 ## Writing Rules
 
-On first run, copy `templates/capabilities.md` to `spec/capabilities.md` at the repo root, then walk the interview for one capability. On rerun, edit only the named capability block and leave the rest of the file untouched.
+When the user accepts a first capability edit and `spec/capabilities.md` is absent, copy `templates/capabilities.md` to `spec/capabilities.md` at the repo root, then write only the accepted capability. On rerun, edit only the named capability block and leave the rest of the file untouched.
 
 After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited. Echo charter Decisions at capability level only when they explain a Behavior or Hard Constraint; promote cross-cutting capability Decisions through `spec-charter amend`.
 

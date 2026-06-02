@@ -121,6 +121,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 - `spec-system-map` create + amend modes
 - `spec/system-map.md` template and dogfood artifact
 - Boundaries between charter, system map, and capability contracts
+- Candidate Capability Boundaries handoff to `spec-grill`
 - Demotion of module details, endpoint lists, and runbook commands into linked docs
 
 **Out-of-scope:**
@@ -130,12 +131,13 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ### Expected Behaviors
 - Create mode writes `spec/system-map.md` and creates `spec/` when needed.
-- The map includes System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, and Where To Go Next.
+- The map includes System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Candidate Capability Boundaries, and Where To Go Next.
 - Brownfield uncertainty is labeled as an assumption instead of filled with invented details.
 
 ### Hard Constraints
 - Never include exhaustive module inventories, endpoint lists, deployment commands, or temporary TODOs in `spec/system-map.md`.
 - Never promote a subsystem detail unless it changes a project-wide boundary, flow, storage/external system, or invariant.
+- Never let Candidate Capability Boundaries become accepted capability contracts; `spec-grill` owns admission, merge, split, and refusal.
 
 ### Learnings
 <!-- LEARN:BEGIN -->
@@ -150,12 +152,13 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ## Capability: spec-grill
 
-**Goal:** A user turns existing repo signals into compact `spec/capabilities.md` capability contracts instead of stopping at a project-wide charter.
+**Goal:** A user reviews existing repo signals through a report-first grill flow, then turns accepted boundaries into compact `spec/capabilities.md` capability contracts.
 
 **In-scope:**
-- `spec-grill` greenfield and brownfield capability authoring
-- `extract-signals.js` raw candidate seeding from README, charter, source roots, harness files, and commit scopes
+- `spec-grill` natural-language intent routing and report-first diagnosis
+- `extract-signals.js` raw evidence grouping from README, charter, system map, source roots, skill files, script surfaces, docs, tests, harness files, and commit scopes
 - Capability admission, Goal/Scope interview, Expected Behaviors, and Hard Constraints
+- Grill Report sections: Evidence Read, Evidence Missing, Raw Candidates, Accepted / Rejected / Merged / Split Candidates, Sharp Questions, 3-Axis Predicate Findings, Proposed Next Capability, and Recommended Edit
 - `templates/capabilities.md` and `references/capabilities.md`
 
 **Out-of-scope:**
@@ -164,12 +167,14 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 - Treating directory names or commit scopes as accepted capabilities without interview admission
 
 ### Expected Behaviors
-- On brownfield repos without `spec/capabilities.md`, `extract-signals.js --repo-root <target> --json` emits deterministic raw candidates and labels signal authority before any contract is accepted.
+- Ambiguous or no-argument `spec-grill` requests emit a report and do not edit files.
+- On brownfield repos, `extract-signals.js --repo-root <target> --json` emits deterministic evidence-grouped raw candidates and labels signal authority before any contract is accepted.
 - `spec-grill <capability-slug>` edits only the named capability block and leaves other capability blocks, Learnings, and Decisions untouched.
 - Every accepted Behavior and Hard Constraint passes the authority, distributional, and manipulability axes before it is committed.
 
 ### Hard Constraints
 - Never write a capability solely because a same-named directory or commit scope exists; raw signals require admission, merge, split, or refusal.
+- Never require users to memorize `map`, `fill`, or `audit`; those are optional shorthand over natural-language intent routing.
 - Never edit `### Learnings` between magic markers during grill; Learnings cleanup is a separate user-approved Learning Action.
 
 ### Learnings
