@@ -216,7 +216,12 @@ describe("lintComponents", () => {
       fileExists: (p) => p !== "/no/such/spec/capabilities.md",
     });
     assert.equal(result.capabilitiesFound, false);
+    assert.equal(result.structuralOnly, true);
+    assert.equal(result.coverage, "not_assessed");
     assert.equal(result.issues.length, 0);
+    assert.equal(result.checkedSprintCount, 0);
+    assert.equal(result.routedSprintCount, 0);
+    assert.equal(result.unroutedSprintCount, 0);
   });
 
   it("flags real fixture drift end-to-end", () => {
@@ -233,8 +238,13 @@ describe("lintComponents", () => {
       );
       const result = lintComponents({ sprintsDir, capabilitiesPath: capPath });
       assert.equal(result.capabilitiesFound, true);
+      assert.equal(result.structuralOnly, true);
+      assert.equal(result.coverage, "not_assessed");
       assert.equal(result.declaredCapabilities.length, 3);
       assert.equal(result.issues.length, 1);
+      assert.equal(result.checkedSprintCount, 1);
+      assert.equal(result.routedSprintCount, 1);
+      assert.equal(result.unroutedSprintCount, 0);
       assert.deepEqual(result.issues[0].unknown, ["typo-cap"]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -256,6 +266,9 @@ describe("lintComponents", () => {
       const result = lintComponents({ sprintsDir, capabilitiesPath: capPath });
       assert.equal(result.capabilitiesFound, true);
       assert.equal(result.sprintCount, 1);
+      assert.equal(result.checkedSprintCount, 1);
+      assert.equal(result.routedSprintCount, 1);
+      assert.equal(result.unroutedSprintCount, 0);
       assert.deepEqual(result.issues, []);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -285,9 +298,15 @@ describe("formatReport", () => {
       capabilitiesPath: "spec/capabilities.md",
       declaredCapabilities: ["a", "b"],
       sprintCount: 3,
+      checkedSprintCount: 3,
+      routedSprintCount: 2,
+      unroutedSprintCount: 1,
       issues: [],
     };
-    assert.match(formatReport(result), /All component values resolve/);
+    const report = formatReport(result);
+    assert.match(report, /Routing handles checked/);
+    assert.match(report, /routed 2, unrouted 1/);
+    assert.match(report, /Coverage: not assessed/);
   });
 
   it("renders issue listing with errors", () => {

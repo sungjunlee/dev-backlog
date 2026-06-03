@@ -106,6 +106,8 @@ created_date: 'YYYY-MM-DD'
 
 dev-relay reads AC via LLM context from whatever structure the body provides. The `<!-- AC:BEGIN/END -->` markers are a convention, not machine-parsed by dev-relay.
 
+Task-file AC is the issue mirror and local progress surface. It is not the relay review anchor by itself. relay-plan freezes Done Criteria and rubrics in the relay run artifacts, and relay-review evaluates against that frozen snapshot. `spec/*` files may read task AC or frozen Done Criteria as evidence for durable rules, but must not copy issue-specific AC, rubrics, or review notes into charter, system-map, or capability specs.
+
 ## Cross-Sprint Context (`_context.md`) Sections
 
 dev-relay reads `_context.md` for project-level knowledge. The following `## ` headings are expected:

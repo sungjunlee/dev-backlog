@@ -9,3 +9,9 @@ Durable project-level specs live here. Root docs stay focused on entrypoints and
 | [`capabilities.md`](capabilities.md) | Capability contracts: Goal, Scope, Expected Behaviors, Hard Constraints, Learnings, and Decisions. |
 
 Use `spec-charter` for `charter.md`, `spec-system-map` for `system-map.md`, and `spec-grill` for `capabilities.md`.
+
+## Boundary
+
+`spec/*` files hold durable project, system, and capability contracts. Task acceptance criteria stay in GitHub Issues and `backlog/tasks/` mirrors; sprint execution context stays in `backlog/sprints/`; relay Done Criteria, rubrics, and review notes stay in dev-relay run artifacts.
+
+Spec skills may read task AC and sprint evidence to understand current reality, but they must not copy issue-specific AC, frozen Done Criteria, or review notes into durable specs.

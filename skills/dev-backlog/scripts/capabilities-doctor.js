@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * Health check for spec/capabilities.md compactness and Learnings hygiene.
+ * This is a structural check only; it does not assess task AC, relay Done
+ * Criteria, or capability predicate coverage.
  *
  * Usage: ./scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]
  *
@@ -165,6 +167,8 @@ function analyzeCapabilities({
   if (!fileExists(capabilitiesPath)) {
     return {
       found: false,
+      structuralOnly: true,
+      coverage: "not_assessed",
       capabilitiesPath,
       thresholds,
       lineCount: 0,
@@ -220,6 +224,8 @@ function analyzeCapabilities({
 
   return {
     found: true,
+    structuralOnly: true,
+    coverage: "not_assessed",
     capabilitiesPath,
     thresholds,
     lineCount,
@@ -237,16 +243,22 @@ function hasHardFailures(result) {
 
 function formatReport(result) {
   if (!result.found) {
-    return `No spec/capabilities.md at ${result.capabilitiesPath} — nothing to check.`;
+    return [
+      "Structural check only: capability spec hygiene and compactness.",
+      "Coverage: not assessed for task AC, relay Done Criteria, or capability predicate coverage.",
+      `No spec/capabilities.md at ${result.capabilitiesPath} — nothing to check.`,
+    ].join("\n");
   }
 
   const lines = [
+    "Structural check only: capability spec hygiene and compactness.",
+    "Coverage: not assessed for task AC, relay Done Criteria, or capability predicate coverage.",
     `Checked ${result.capabilityCount} capability/capabilities across ${result.lineCount} line(s).`,
     `Budget: target ${result.thresholds.targetCapabilitiesMin}-${result.thresholds.targetCapabilitiesMax}, warn >${result.thresholds.warnCapabilities} or >${result.thresholds.warnLines} lines, split >${result.thresholds.hardCapabilities} or >${result.thresholds.hardLines} lines.`,
   ];
 
   if (result.warnings.length === 0 && result.hardFailures.length === 0) {
-    lines.push("Capability spec is compact ✓");
+    lines.push("Capability spec hygiene is within compactness budget.");
   }
 
   if (result.warnings.length > 0) {
