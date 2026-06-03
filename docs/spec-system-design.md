@@ -83,6 +83,25 @@ Strict handles
 
 The rule: constrain the address, not the thought. `component:` is a routing handle, so it is one primary capability slug. Multi-capability work belongs in sprint prose or Running Context, where agents can explain the secondary touches without making downstream writers guess.
 
+### Task acceptance boundary
+
+`spec/*` artifacts may read task acceptance criteria, relay Done Criteria, sprint context, PR reviews, and issue discussions as evidence. They must not copy those task-scoped artifacts into durable specs.
+
+| Artifact | Owns |
+|---|---|
+| GitHub Issues and `backlog/tasks/` | task definition and AC checkboxes, mirrored locally for execution progress |
+| dev-relay run artifacts | frozen Done Criteria, rubrics, executor evidence, review anchors, and review notes |
+| `backlog/sprints/` | execution plan, ordering, Running Context, and Progress |
+| `spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md` | durable project direction, system shape, capability contracts, and bounded Learnings |
+
+When task evidence reveals a durable rule, restate the durable rule in charter/system/capability language. Do not preserve issue wording, per-task checklist items, or review anchors in `spec/*`.
+
+### Deep survey, shallow artifact
+
+Spec creation should inspect the repo deeply enough to avoid shallow guesses: code entrypoints, package/config scripts, tests, docs, storage/state surfaces, external systems, and recent execution history when available. The accepted spec stays compact. Evidence inventories, endpoint lists, command catalogs, temporary TODOs, and uncertainty detail belong in the run report as `Evidence Read` / `Evidence Missing`, not in hot spec files.
+
+This preserves the existing readability budgets: `spec/charter.md` remains a 5-minute reference, `spec/system-map.md` remains a high-level map, and `spec/capabilities.md` remains a compact contract file. `spec-system-map create` applies the survey before drafting the map; `spec-grill` uses the survey to decide whether a raw candidate has enough support to become a capability.
+
 ### Mutation discipline per layer
 
 | Layer | Who writes | When | Gate |

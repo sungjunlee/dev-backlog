@@ -2,6 +2,8 @@
 /**
  * Verify that every `component:` value referenced by a sprint file resolves
  * to a declared capability in spec/capabilities.md.
+ * This is a structural routing-handle check only; it does not assess task AC,
+ * relay Done Criteria, or capability coverage.
  *
  * Usage: ./scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]
  *
@@ -135,6 +137,35 @@ function findIssues(sprintFiles, declared, { readFile = fs.readFileSync } = {}) 
   return issues;
 }
 
+function parseSprintStatus(content) {
+  const frontmatter = parseFrontmatter(content);
+  if (!frontmatter) return "";
+  const match = frontmatter.match(/^status:\s*["']?([^"'\n]+)["']?\s*$/m);
+  return match ? match[1].trim() : "";
+}
+
+function countSprintRouting(sprintFiles, { readFile = fs.readFileSync } = {}) {
+  const stats = {
+    checkedSprintCount: sprintFiles.length,
+    routedSprintCount: 0,
+    unroutedSprintCount: 0,
+    activeSprintCount: 0,
+    legacySprintCount: 0,
+  };
+
+  for (const file of sprintFiles) {
+    const content = readFile(file, "utf-8");
+    const components = parseSprintComponents(content);
+    if (components.length > 0) stats.routedSprintCount += 1;
+    else stats.unroutedSprintCount += 1;
+
+    if (parseSprintStatus(content) === "active") stats.activeSprintCount += 1;
+    else stats.legacySprintCount += 1;
+  }
+
+  return stats;
+}
+
 function lintComponents({
   sprintsDir = DEFAULT_SPRINTS_DIR,
   capabilitiesPath = DEFAULT_CAPABILITIES_PATH,
@@ -143,19 +174,35 @@ function lintComponents({
   readdir = fs.readdirSync,
 } = {}) {
   if (!fileExists(capabilitiesPath)) {
-    return { capabilitiesFound: false, capabilitiesPath, issues: [], sprintCount: 0 };
+    return {
+      capabilitiesFound: false,
+      structuralOnly: true,
+      coverage: "not_assessed",
+      capabilitiesPath,
+      issues: [],
+      sprintCount: 0,
+      checkedSprintCount: 0,
+      routedSprintCount: 0,
+      unroutedSprintCount: 0,
+      activeSprintCount: 0,
+      legacySprintCount: 0,
+    };
   }
   const capsContent = readFile(capabilitiesPath, "utf-8");
   const declared = parseCapabilityNames(capsContent);
 
   const sprintFiles = listSprintFiles(sprintsDir, { readdir, fileExists });
+  const routingStats = countSprintRouting(sprintFiles, { readFile });
   const issues = findIssues(sprintFiles, declared, { readFile });
 
   return {
     capabilitiesFound: true,
+    structuralOnly: true,
+    coverage: "not_assessed",
     capabilitiesPath,
     declaredCapabilities: [...declared].sort(),
     sprintCount: sprintFiles.length,
+    ...routingStats,
     issues,
   };
 }
@@ -166,13 +213,20 @@ function hasErrors(result) {
 
 function formatReport(result) {
   if (!result.capabilitiesFound) {
-    return `No spec/capabilities.md at ${result.capabilitiesPath} — nothing to lint.`;
+    return [
+      "Structural check only: component routing handles.",
+      "Coverage: not assessed for task AC, relay Done Criteria, or capability coverage.",
+      `No spec/capabilities.md at ${result.capabilitiesPath} — nothing to lint.`,
+    ].join("\n");
   }
   const lines = [
-    `Linted ${result.sprintCount} sprint file(s) against ${result.declaredCapabilities.length} declared capability/capabilities.`,
+    "Structural check only: component routing handles.",
+    "Coverage: not assessed for task AC, relay Done Criteria, or capability coverage.",
+    `Routing handles checked: ${result.checkedSprintCount ?? result.sprintCount} sprint file(s); routed ${result.routedSprintCount ?? "unknown"}, unrouted ${result.unroutedSprintCount ?? "unknown"}; active ${result.activeSprintCount ?? "unknown"}, legacy ${result.legacySprintCount ?? "unknown"}.`,
+    `Declared capability handles: ${result.declaredCapabilities.length}.`,
   ];
   if (result.issues.length === 0) {
-    lines.push("All component values resolve ✓");
+    lines.push("All non-empty component routing handles resolve.");
     return lines.join("\n");
   }
   for (const issue of result.issues) {
@@ -212,6 +266,8 @@ module.exports = {
   parseSprintComponents,
   parseCapabilityNames,
   listSprintFiles,
+  parseSprintStatus,
+  countSprintRouting,
   classifyComponents,
   findIssues,
   lintComponents,

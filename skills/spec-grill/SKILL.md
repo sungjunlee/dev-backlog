@@ -44,7 +44,7 @@ End every run with a short summary:
 - capability blocks created or edited
 - predicates rejected or rewritten
 - constraints added
-- raw candidates merged/split/refused
+- raw candidates merged/split/refused, with raw signal, supporting evidence, and missing evidence separated
 - behaviors promoted to constraints
 - missing proof or evidence
 - follow-up Learning Actions if any
@@ -63,7 +63,7 @@ Use this report shape for no-arg, ambiguous, candidate-discovery, and audit rout
 - <missing charter/system-map/tests/docs/surface that weakens confidence>
 
 ### Raw Candidates
-- <candidate> - evidence: <signals>; caveat: <why it is not accepted yet>
+- <candidate> - raw signal: <surface>; supporting evidence: <docs/code/tests/history>; missing evidence: <gap>
 
 ### Accepted / Rejected / Merged / Split Candidates
 - Accepted: <candidate> - <reason>
@@ -102,6 +102,8 @@ Use the draft as interview seed only. The script labels signal authority:
 
 Harness context can seed questions about conventions and workflow, but it must not create accepted capability boundaries by itself. The script clusters evidence from code organization and command surfaces, while real capabilities are functional contracts; expect grill mode to merge, split, or regroup raw signals rather than adopt them verbatim.
 
+Accepted brownfield capabilities need code-understood support, not just surface signals. Normally require at least two evidence classes, such as system-map boundary + scripts, source surface + tests, README/product signal + command surface, or recurring commits + docs/tests. A single strong user statement may override this, but the report must say that explicitly.
+
 ## File Shape
 
 `spec/capabilities.md` lives at the target repo root in `spec/`. The single-file shape is intentional while the spec remains compact: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only above 500 lines, above 15 capabilities, or when ownership boundaries demand separate review paths.
@@ -120,6 +122,7 @@ Before interviewing a candidate capability, decide whether it deserves to exist.
 Admit a capability only when most of these are true:
 
 - It is a repeated decision boundary, not just a directory name or commit scope.
+- It is supported by at least two evidence classes in brownfield mode, unless the user explicitly authorizes a single-source capability.
 - It owns a primary relay-learning destination.
 - Its Goal can be stated as an observable user or operator outcome.
 - Its Behaviors and Hard Constraints differ meaningfully from neighboring candidates.
@@ -127,6 +130,8 @@ Admit a capability only when most of these are true:
 - If one candidate needs more than five Behaviors to feel complete, split it along the contract boundary the extra Behaviors describe.
 
 Use this as a bloat check before the per-capability flow. A large feature-first app may have many feature folders but only 5-10 durable capability contracts.
+
+Directory-only, commit-scope-only, or harness-context-only candidates remain interview seeds. Report them as missing supporting evidence instead of accepting them silently.
 
 ## Per-Capability Interview Flow
 
@@ -158,3 +163,9 @@ When the user accepts a first capability edit and `spec/capabilities.md` is abse
 After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited. Echo charter Decisions at capability level only when they explain a Behavior or Hard Constraint; promote cross-cutting capability Decisions through `spec-charter amend`.
 
 See `references/capabilities.md` for additional grill heuristics and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide charter layer.
+
+## Pressure Prompts
+
+- "Create capabilities from a repo where only top-level directories are known." Expected: use directories as raw signals only; require supporting evidence before admission.
+- "A commit scope appears often but has no docs, tests, or distinct behavior." Expected: keep it as an interview seed or merge it into a supported capability.
+- "User says this weakly evidenced surface is important." Expected: allow admission only with the user-authorized override called out in the report.

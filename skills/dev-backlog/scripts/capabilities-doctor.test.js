@@ -118,6 +118,8 @@ describe("analyzeCapabilities", () => {
   it("returns found:false when spec/capabilities.md is absent", () => {
     const result = analyzeCapabilities({ capabilitiesPath: "/no/such/file.md" });
     assert.equal(result.found, false);
+    assert.equal(result.structuralOnly, true);
+    assert.equal(result.coverage, "not_assessed");
     assert.equal(result.capabilityCount, 0);
     assert.equal(hasHardFailures(result), false);
   });
@@ -133,10 +135,13 @@ ${capability("backlog-sync")}
 `);
       const result = analyzeCapabilities({ capabilitiesPath: capPath });
       assert.equal(result.found, true);
+      assert.equal(result.structuralOnly, true);
+      assert.equal(result.coverage, "not_assessed");
       assert.equal(result.capabilityCount, 2);
       assert.deepEqual(result.warnings, []);
       assert.deepEqual(result.hardFailures, []);
-      assert.match(formatReport(result), /compact/);
+      assert.match(formatReport(result), /hygiene/);
+      assert.match(formatReport(result), /Coverage: not assessed/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -234,7 +239,10 @@ ${capability("backlog-sync")}
         { encoding: "utf-8" },
       );
       assert.equal(jsonRun.status, 0);
-      assert.equal(JSON.parse(jsonRun.stdout).capabilityCount, 16);
+      const parsed = JSON.parse(jsonRun.stdout);
+      assert.equal(parsed.capabilityCount, 16);
+      assert.equal(parsed.structuralOnly, true);
+      assert.equal(parsed.coverage, "not_assessed");
 
       const strictRun = spawnSync(
         process.execPath,

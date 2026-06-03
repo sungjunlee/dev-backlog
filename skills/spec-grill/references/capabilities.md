@@ -206,6 +206,26 @@ Split later when either trigger is true:
 
 Until then, single-file is easier for agents: one read, one grep surface, fewer paths to rediscover.
 
+## Surface Signals vs. Code-Understood Evidence
+
+Raw signals are candidate seeds:
+
+- top-level directories
+- feature folders
+- commit scopes
+- script names
+- harness instructions
+
+Code-understood evidence supports admission:
+
+- a system-map boundary plus command/script surfaces that operate on it
+- source paths plus tests that reveal intended behavior
+- README/product docs plus an entrypoint users or agents actually invoke
+- recurring commits plus docs or tests that show a stable contract
+- sprint or issue evidence that repeats the same decision boundary across tasks
+
+Do not admit a brownfield capability from one weak signal alone. Directory-only and commit-scope-only candidates stay in the interview queue unless the user explicitly authorizes the capability as durable. When accepted on override, the grill report should say which evidence is missing so future work can confirm or merge it.
+
 ## Learning Actions
 
 `## Learnings` is recent operational memory, not an endless audit log. Grill mode may notice that a capability is over its 5-7 Learning budget, but it should recommend a user-approved Learning Action rather than define a separate cleanup workflow here.

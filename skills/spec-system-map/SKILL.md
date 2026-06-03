@@ -31,11 +31,14 @@ When no mode is specified, route by file state. Create `spec/` if needed.
 ## Create Mode
 
 1. Read bounded signals: `spec/charter.md` if present, `README.md`, `AGENTS.md`/`CLAUDE.md`, top-level directories, package/config files, and existing docs that appear architecture-related.
-2. Draft from `templates/system-map.md`; keep sections short and link out instead of expanding subsystem detail.
-3. Include these sections: System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Candidate Capability Boundaries, Where To Go Next.
-4. If the repo is brownfield, explicitly mark uncertain boundaries as assumptions rather than inventing detail.
-5. Use Candidate Capability Boundaries to hand off concrete, short candidates to `spec-grill`. Each candidate should name evidence, the contract surface it appears to own, and the uncertainty `spec-grill` must resolve.
-6. Recommend asking `spec-grill` to review the candidate capability boundaries when the map reveals durable boundaries that are not yet in `spec/capabilities.md`.
+2. Run a Repo Evidence Pass before drafting. Inspect enough code reality to understand system shape: entrypoints and command surfaces, package/config scripts, runtime boundaries, storage/state surfaces, external systems, tests that reveal intended behavior, and recent commit/sprint evidence when available.
+3. Draft from `templates/system-map.md`; keep sections short and link out instead of expanding subsystem detail.
+4. Include these sections: System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Candidate Capability Boundaries, Where To Go Next.
+5. If the repo is brownfield, explicitly mark uncertain boundaries as assumptions rather than inventing detail.
+6. Use Candidate Capability Boundaries to hand off concrete, short candidates to `spec-grill`. Each candidate should name evidence, the contract surface it appears to own, and the uncertainty `spec-grill` must resolve.
+7. Recommend asking `spec-grill` to review the candidate capability boundaries when the map reveals durable boundaries that are not yet in `spec/capabilities.md`.
+
+The Repo Evidence Pass is an agent checklist, not a new script. Report evidence in the conversation, not as inventory inside `spec/system-map.md`.
 
 ## Amend Mode
 
@@ -54,12 +57,21 @@ Before finishing, verify:
 - No subsystem gets more detail than the whole-system flow needs.
 - Candidate Capability Boundaries are short handoff candidates, not a module inventory.
 - No stale module-level TODOs, endpoint inventories, or runbook commands are included.
+- Brownfield maps are not based only on README/top-level directory skimming; unsupported boundaries are labeled as assumptions.
+
+## Completion Output
+
+End create mode with:
+
+- `Evidence Read`: concise bullets naming the concrete docs, entrypoints, configs, tests, storage/external surfaces, and history inspected.
+- `Evidence Missing`: concise bullets naming unavailable or ambiguous evidence that affects confidence.
 
 ## Eval Prompts
 
 Use these as quick pressure tests when changing the skill or a generated map:
 
 - "Create a system map for an existing repo with many modules and no architecture docs." Expected: short `spec/system-map.md`, uncertainty labeled, subsystem details linked or deferred.
+- "Create a system map after reading only README and top-level folders." Expected: continue the Repo Evidence Pass before drafting or label the map as insufficiently evidenced.
 - "Update this map with a new helper function and endpoint." Expected: refuse or demote as too low-level unless it changes a project-wide flow or invariant.
 - "Turn this ARCHITECTURE.md into spec/system-map.md." Expected: preserve high-level boundaries and flows, remove runbook/API/module inventories, add pointers.
 

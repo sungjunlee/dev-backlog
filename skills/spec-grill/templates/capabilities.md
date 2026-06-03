@@ -22,6 +22,8 @@ Compactness budget:
 
 Do not create one capability per feature folder. A capability is a durable contract boundary with distinct Behaviors and Hard Constraints.
 
+Do not store issue-specific acceptance criteria, relay Done Criteria, scoring rubrics, or review notes here. Those belong to GitHub/task files, sprint files, and dev-relay run artifacts. Capability specs may be informed by that evidence, but they record only durable contracts.
+
 ---
 
 ## Capability: <slug>
