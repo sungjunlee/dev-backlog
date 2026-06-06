@@ -356,7 +356,7 @@ describe("triage-report integration chain", () => {
     assert.match(markdown, /<!-- triage:close #104 reason="inactive\/stale: no activity for 107 days; exceeds stale_days threshold \(60\); no milestone assigned" -->/);
     assert.match(markdown, /<!-- triage:close #105 reason="labeled wontfix; explicit wontfix signal" -->/);
     assert.match(markdown, /<!-- triage:close #106 reason="labeled invalid; explicit invalid signal" -->/);
-    assert.match(markdown, /PR-merged edges deferred/);
+    assert.match(markdown, /PR\/comment relationship signals deferred/);
     assert.match(markdown, /closing-PR-already-merged and duplicate-of-closed signals deferred/);
 
     // Classification groups must match Done Criteria: theme / label / age.

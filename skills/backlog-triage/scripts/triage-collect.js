@@ -16,6 +16,7 @@ const GRAPHQL_PAGE_SIZE = 100;
 const DEFAULT_CLOSED_ISSUE_DAYS = 180;
 const DEFAULT_CLOSED_ISSUE_LIMIT = 200;
 const DEFAULT_COMMENT_FETCH_CONCURRENCY = 5;
+const SNAPSHOT_SCHEMA_VERSION = 2;
 const OPEN_ISSUES_QUERY = `
   query($owner: String!, $name: String!, $pageSize: Int!, $endCursor: String) {
     repository(owner: $owner, name: $name) {
@@ -528,6 +529,7 @@ function isProgressIssue(issue) {
 
 function buildSnapshot({ issues, repo, generated, configPath = CONFIG_PATH, config, closedIssues }) {
   const snapshot = {
+    schema_version: SNAPSHOT_SCHEMA_VERSION,
     generated,
     repo,
     config_path: configPath,

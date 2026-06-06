@@ -44,8 +44,10 @@ Each candidate includes a non-empty `evidence` object.
 
 For `invalid`, only `matchedLabel` and `labels` change accordingly.
 
-## Deferred to #73 / follow-up
+## Deferred follow-ups
 
-- `PR already merged`: deferred to #73 because the current snapshot does not include `closing_prs` linkage.
-- `Duplicate of closed`: deferred to #73 because the current snapshot does not include closed-issue state for duplicate targets.
+- `PR already merged`: collector v2 includes `closing_prs`, but stale analysis still needs a conservative rule before suggesting closure.
+- `Duplicate of closed`: `--with-closed-issues` can include bounded closed-issue context, but stale analysis still needs a tested title/body matching rule before suggesting merge-or-close actions.
 - `Referenced code removed`: deferred because the current snapshot has no code-removal evidence and no follow-up implementation is defined yet.
+
+The first two signals are tracked in #190.
