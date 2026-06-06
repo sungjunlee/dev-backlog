@@ -1,7 +1,7 @@
 ---
 id: BACK-189
 title: 'enhance(backlog-triage): emit comment and closing-PR relationship signals'
-status: In Progress
+status: Done
 labels:
   - documentation
   - enhancement
@@ -24,8 +24,8 @@ Suggested signals:
 
 ## Acceptance Criteria
 
-- [ ] Comment mention scanning runs only when issue `comments` arrays are present.
-- [ ] Comment-derived edges carry evidence that identifies comment source separately from issue body evidence.
-- [ ] Closing-PR edges use `closing_prs` and do not imply an automatic close recommendation by themselves.
-- [ ] Missing optional fields degrade cleanly without warnings or undefined-field behavior.
-- [ ] Relationship docs and tests cover both enabled and absent-field paths.
+- [x] Comment mention scanning runs only when issue `comments` arrays are present.
+- [x] Comment-derived edges carry evidence that identifies comment source separately from issue body evidence.
+- [x] Closing-PR edges use `closing_prs` and do not imply an automatic close recommendation by themselves.
+- [x] Missing optional fields degrade cleanly without warnings or undefined-field behavior.
+- [x] Relationship docs and tests cover both enabled and absent-field paths.
