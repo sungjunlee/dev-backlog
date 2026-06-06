@@ -1,7 +1,7 @@
 ---
 id: BACK-73
 title: 'enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan'
-status: To Do
+status: Done
 labels:
   - documentation
   - enhancement

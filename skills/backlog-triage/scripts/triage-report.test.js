@@ -26,6 +26,21 @@ function makeSnapshot() {
         number: 101,
         title: "OAuth token refresh flow",
         body: "Blocks #102. See #105 for docs follow-up.",
+        comments: [
+          {
+            author: "octocat",
+            body: "Comment follow-up in #103.",
+            createdAt: "2026-04-18T01:00:00.000Z",
+          },
+        ],
+        closing_prs: [
+          {
+            number: 88,
+            state: "MERGED",
+            mergedAt: "2026-04-18T01:15:00.000Z",
+            url: "https://github.com/sungjunlee/dev-backlog/pull/88",
+          },
+        ],
         labels: ["type:feature", "priority:medium"],
         createdAt: "2026-04-10T01:30:00.000Z",
         updatedAt: "2026-04-17T01:30:00.000Z",
@@ -356,7 +371,9 @@ describe("triage-report integration chain", () => {
     assert.match(markdown, /<!-- triage:close #104 reason="inactive\/stale: no activity for 107 days; exceeds stale_days threshold \(60\); no milestone assigned" -->/);
     assert.match(markdown, /<!-- triage:close #105 reason="labeled wontfix; explicit wontfix signal" -->/);
     assert.match(markdown, /<!-- triage:close #106 reason="labeled invalid; explicit invalid signal" -->/);
-    assert.match(markdown, /PR\/comment relationship signals deferred/);
+    assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
+    assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
+    assert.match(markdown, /comment and closing-PR relationship signals run only when snapshot v2 fields are present/);
     assert.match(markdown, /closing-PR-already-merged and duplicate-of-closed signals deferred/);
 
     // Classification groups must match Done Criteria: theme / label / age.

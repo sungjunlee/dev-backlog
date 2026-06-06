@@ -7,8 +7,10 @@ const {
   parseArgs,
   extractIssueRefs,
   scanMentions,
+  scanCommentMentions,
   scanBlocks,
   scanDependsOn,
+  scanMergedPrLinks,
   findDuplicateCandidates,
   analyzeSnapshot,
   readSnapshotFile,
@@ -125,6 +127,64 @@ describe("scanMentions", () => {
   });
 });
 
+describe("scanCommentMentions", () => {
+  it("comment-mentions: emits comment references only when comments arrays are present", () => {
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({
+          number: 100,
+          comments: [
+            {
+              author: "octocat",
+              body: "Follow-up lives in #101. Ignore self #100 and closed #999.",
+              createdAt: "2026-04-18T01:00:00.000Z",
+            },
+          ],
+        }),
+        makeIssue({ number: 101, comments: "not an array" }),
+      ],
+    });
+
+    assert.deepEqual(scanCommentMentions(snapshot), [
+      {
+        from: 100,
+        to: 101,
+        kind: "comment-mentions",
+        confidence: 0.65,
+        evidence: {
+          source: "comment",
+          author: "octocat",
+          createdAt: "2026-04-18T01:00:00.000Z",
+          match: "#101",
+          snippet: "Follow-up lives in #101.",
+        },
+      },
+    ]);
+  });
+
+  it("comment-mentions: missing optional comments fields degrade to no edges", () => {
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, body: "See #101." }),
+        makeIssue({ number: 101 }),
+      ],
+    });
+
+    assert.deepEqual(scanCommentMentions(snapshot), []);
+  });
+
+  it("comment-mentions: malformed comment entries degrade to no edges", () => {
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, comments: [null, "not an object", { body: null }] }),
+        makeIssue({ number: 101 }),
+      ],
+    });
+
+    assert.deepEqual(scanCommentMentions(snapshot), []);
+  });
+});
+
 describe("scanBlocks", () => {
   it("blocks: emits blocks and closes phrases with concrete evidence", () => {
     const snapshot = makeSnapshot({
@@ -190,6 +250,57 @@ describe("scanDependsOn", () => {
     assert.match(edges[0].evidence.snippet, /Blocked by #100/);
     assert.match(edges[1].evidence.snippet, /depends on #102/);
     assert.match(edges[2].evidence.snippet, /depends-on #103/);
+  });
+});
+
+describe("scanMergedPrLinks", () => {
+  it("merged-pr-link: emits merged closing PR metadata without implying a close action", () => {
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({
+          number: 100,
+          closing_prs: [
+            { number: 10, state: "OPEN", mergedAt: null, url: "https://github.com/owner/name/pull/10" },
+            { number: 11, state: "MERGED", mergedAt: "2026-04-18T02:00:00.000Z", url: "https://github.com/owner/name/pull/11" },
+          ],
+        }),
+        makeIssue({ number: 101 }),
+      ],
+    });
+
+    assert.deepEqual(scanMergedPrLinks(snapshot), [
+      {
+        from: 100,
+        to: 100,
+        kind: "merged-pr-link",
+        confidence: 1,
+        evidence: {
+          source: "closing_prs",
+          pr: {
+            number: 11,
+            state: "MERGED",
+            mergedAt: "2026-04-18T02:00:00.000Z",
+            url: "https://github.com/owner/name/pull/11",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("merged-pr-link: missing optional closing_prs fields degrade to no edges", () => {
+    const snapshot = makeSnapshot({ issues: [makeIssue({ number: 100 })] });
+
+    assert.deepEqual(scanMergedPrLinks(snapshot), []);
+  });
+
+  it("merged-pr-link: malformed closing_prs entries degrade to no edges", () => {
+    const snapshot = makeSnapshot({
+      issues: [
+        makeIssue({ number: 100, closing_prs: [null, "not an object", { state: "MERGED", mergedAt: null }] }),
+      ],
+    });
+
+    assert.deepEqual(scanMergedPrLinks(snapshot), []);
   });
 });
 

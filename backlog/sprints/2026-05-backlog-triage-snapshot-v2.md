@@ -1,6 +1,6 @@
 ---
 milestone: backlog-triage snapshot v2
-status: active
+status: completed
 started: 2026-05-31
 due: TBD
 objectives: [O4]
@@ -15,7 +15,7 @@ Shape and implement #73 so backlog-triage can see closing PR links, optional com
 ## Plan
 Start with a short technical split before implementation. The issue is larger than a doc polish item because it touches collection schema and downstream scanners.
 
-- [ ] #73 enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan
+- [x] #73 enhance(backlog-triage): snapshot v2 schema for closing PRs, comments, and closed-issue scan → PR #191 (merged)
 
 ## Running Context
 - Current `triage-relate` and `triage-stale` explicitly defer PR-merged and duplicate-of-closed signals until snapshot v2 fields exist.
@@ -25,3 +25,5 @@ Start with a short technical split before implementation. The issue is larger th
 
 ## Progress
 - 2026-05-31: Open issue set synced locally; #73 mirror created under `backlog/tasks/`. Previous spec-grill dogfood sprint completed after PR #175 landed.
+- 2026-06-06: #73 completed via PR #191. Collector v2 now emits explicit `schema_version: 2`; downstream analyzer work was split into #189 (relationships) and #190 (stale/obsolete signals).
+- 2026-06-06: Sprint closed. 1/1 tasks completed.

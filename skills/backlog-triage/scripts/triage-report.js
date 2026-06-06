@@ -6,8 +6,8 @@ const { readSnapshot } = require("./triage-stale.js");
 
 const ANCHOR_PATTERN = /<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->/;
 const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
-const DEFERRED_RELATIONSHIPS_MARKER =
-  "_(PR/comment relationship signals deferred — collector fields exist; analyzer rules tracked in #189)_";
+const OPTIONAL_RELATIONSHIPS_MARKER =
+  "_(comment and closing-PR relationship signals run only when snapshot v2 fields are present)_";
 const DEFERRED_OBSOLETE_MARKER =
   "_(closing-PR-already-merged and duplicate-of-closed signals deferred — collector fields exist; stale rules tracked in #190)_";
 
@@ -247,6 +247,13 @@ function formatRelationshipEdge(edge, issueIndex) {
   const left = fromIssue ? issueRef(fromIssue) : `#${edge.from}`;
   const right = toIssue ? issueRef(toIssue) : `#${edge.to}`;
 
+  if (edge.kind === "merged-pr-link") {
+    const pr = edge.evidence?.pr || {};
+    const prLabel = pr.number ? `PR #${pr.number}` : "merged PR";
+    const mergedAt = pr.mergedAt ? `; mergedAt ${pr.mergedAt}` : "";
+    return `- ${left} merged-pr-link ${prLabel}${mergedAt}`;
+  }
+
   if (edge.kind === "duplicate-candidate") {
     const overlap = Array.isArray(edge.evidence?.overlap) && edge.evidence.overlap.length > 0
       ? `; overlap: ${edge.evidence.overlap.join(", ")}`
@@ -262,19 +269,19 @@ function renderRelationships(relate, issueIndex) {
   const lines = ["## Relationships"];
 
   if (!relate) {
-    lines.push("_(no input provided)_", "", DEFERRED_RELATIONSHIPS_MARKER);
+    lines.push("_(no input provided)_", "", OPTIONAL_RELATIONSHIPS_MARKER);
     return lines.join("\n");
   }
 
   if (relate.edges.length === 0) {
-    lines.push("_(none)_", "", DEFERRED_RELATIONSHIPS_MARKER);
+    lines.push("_(none)_", "", OPTIONAL_RELATIONSHIPS_MARKER);
     return lines.join("\n");
   }
 
   for (const edge of [...relate.edges].sort((left, right) => left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind))) {
     lines.push(formatRelationshipEdge(edge, issueIndex));
   }
-  lines.push("", DEFERRED_RELATIONSHIPS_MARKER);
+  lines.push("", OPTIONAL_RELATIONSHIPS_MARKER);
   return lines.join("\n");
 }
 
@@ -428,7 +435,9 @@ function buildRelationshipCounts(relate) {
 
   for (const edge of relate.edges) {
     counts.set(edge.from, (counts.get(edge.from) || 0) + 1);
-    counts.set(edge.to, (counts.get(edge.to) || 0) + 1);
+    if (edge.to !== edge.from) {
+      counts.set(edge.to, (counts.get(edge.to) || 0) + 1);
+    }
   }
   return counts;
 }
@@ -731,7 +740,7 @@ if (require.main === module) main();
 
 module.exports = {
   ANCHOR_PATTERN,
-  DEFERRED_RELATIONSHIPS_MARKER,
+  OPTIONAL_RELATIONSHIPS_MARKER,
   DEFERRED_OBSOLETE_MARKER,
   usage,
   parseArgs,

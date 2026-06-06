@@ -157,10 +157,17 @@ function makeEdge({ from, to, kind, confidence, evidence }) {
   return { from, to, kind, confidence, evidence };
 }
 
+function edgeIdentity(edge) {
+  if (edge.kind === "merged-pr-link") {
+    return `${edge.from}:${edge.to}:${edge.kind}:${edge.evidence?.pr?.number || ""}`;
+  }
+  return `${edge.from}:${edge.to}:${edge.kind}`;
+}
+
 function dedupeEdges(edges) {
   const seen = new Set();
   return edges.filter((edge) => {
-    const key = `${edge.from}:${edge.to}:${edge.kind}`;
+    const key = edgeIdentity(edge);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -191,6 +198,41 @@ function scanMentions(snapshot) {
           },
         })
       );
+    }
+  }
+
+  return dedupeEdges(edges);
+}
+
+function scanCommentMentions(snapshot) {
+  const edges = [];
+  const openNumbers = snapshotIssueNumbers(snapshot);
+
+  for (const issue of snapshot.issues) {
+    const comments = Array.isArray(issue.comments) ? issue.comments : [];
+
+    for (const comment of comments) {
+      const body = typeof comment?.body === "string" ? comment.body : "";
+      for (const ref of extractIssueRefs(body)) {
+        if (issue.number === ref.number) continue;
+        if (!openNumbers.has(ref.number)) continue;
+
+        edges.push(
+          makeEdge({
+            from: issue.number,
+            to: ref.number,
+            kind: "comment-mentions",
+            confidence: 0.65,
+            evidence: {
+              source: "comment",
+              author: typeof comment?.author === "string" ? comment.author : null,
+              createdAt: typeof comment?.createdAt === "string" ? comment.createdAt : null,
+              match: ref.match,
+              snippet: ref.snippet,
+            },
+          })
+        );
+      }
     }
   }
 
@@ -247,6 +289,39 @@ function scanDependsOn(snapshot) {
     "depends-on",
     1
   );
+}
+
+function scanMergedPrLinks(snapshot) {
+  const edges = [];
+
+  for (const issue of snapshot.issues) {
+    const closingPrs = Array.isArray(issue.closing_prs) ? issue.closing_prs : [];
+
+    for (const pr of closingPrs) {
+      const state = typeof pr?.state === "string" ? pr.state.toUpperCase() : "";
+      if (state !== "MERGED" || typeof pr?.mergedAt !== "string" || !pr.mergedAt) continue;
+
+      edges.push(
+        makeEdge({
+          from: issue.number,
+          to: issue.number,
+          kind: "merged-pr-link",
+          confidence: 1,
+          evidence: {
+            source: "closing_prs",
+            pr: {
+              number: Number.isInteger(pr?.number) ? pr.number : null,
+              state: pr.state,
+              mergedAt: pr.mergedAt,
+              url: typeof pr?.url === "string" ? pr.url : null,
+            },
+          },
+        })
+      );
+    }
+  }
+
+  return dedupeEdges(edges);
 }
 
 function tokenizeTitle(title) {
@@ -369,13 +444,22 @@ function resolveBacklogDir(snapshot) {
 function analyzeSnapshot(snapshot, { config = readTriageConfig(resolveBacklogDir(snapshot)) } = {}) {
   return sortEdges([
     ...scanMentions(snapshot),
+    ...scanCommentMentions(snapshot),
     ...scanBlocks(snapshot),
     ...scanDependsOn(snapshot),
+    ...scanMergedPrLinks(snapshot),
     ...findDuplicateCandidates(snapshot, config),
   ]);
 }
 
 function formatEdge(edge) {
+  if (edge.kind === "merged-pr-link") {
+    const pr = edge.evidence?.pr || {};
+    const prLabel = pr.number ? `PR #${pr.number}` : "merged PR";
+    const mergedAt = pr.mergedAt ? ` merged at ${pr.mergedAt}` : "";
+    return `#${edge.from} ${edge.kind} ${prLabel}${mergedAt}`;
+  }
+
   if (edge.kind === "duplicate-candidate") {
     return `#${edge.from} ${edge.kind} #${edge.to} (${edge.confidence.toFixed(2)}) ${edge.evidence.titles.from} <> ${edge.evidence.titles.to}`;
   }
@@ -422,8 +506,10 @@ module.exports = {
   maskFencedCodeBlocks,
   extractIssueRefs,
   scanMentions,
+  scanCommentMentions,
   scanBlocks,
   scanDependsOn,
+  scanMergedPrLinks,
   findDuplicateCandidates,
   readSnapshotFile,
   analyzeSnapshot,
