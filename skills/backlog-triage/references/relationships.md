@@ -119,11 +119,13 @@ Evidence payloads vary by kind:
 }
 ```
 
-## Deferred to #73
+## Deferred follow-ups
 
-These signals are intentionally out of scope for `#62` because the current snapshot schema does not include the required fields:
+The snapshot collector now has the raw fields for these signals, but `triage-relate.js` does not emit them yet:
 
 - `comments`-based mention scan
-  - Reason: the snapshot currently carries `issue.body` only, so comment text is unavailable without extending the snapshot in `#73`.
+  - Requires: `--with-comments` snapshot enrichment and a clear edge shape that distinguishes issue-body evidence from comment evidence.
 - `merged-pr-link` edge kind
-  - Reason: PR linkage depends on `closing_prs` metadata that is also deferred to the `#73` snapshot extension.
+  - Requires: interpreting per-issue `closing_prs` without turning every linked PR into a close recommendation.
+
+Tracked in #189.

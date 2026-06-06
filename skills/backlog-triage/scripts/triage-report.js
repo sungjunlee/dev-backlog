@@ -7,9 +7,9 @@ const { readSnapshot } = require("./triage-stale.js");
 const ANCHOR_PATTERN = /<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->/;
 const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
 const DEFERRED_RELATIONSHIPS_MARKER =
-  "_(PR-merged edges deferred — requires snapshot v2 `closing_prs`; tracked in #73)_";
+  "_(PR/comment relationship signals deferred — collector fields exist; analyzer rules tracked in #189)_";
 const DEFERRED_OBSOLETE_MARKER =
-  "_(closing-PR-already-merged and duplicate-of-closed signals deferred — requires snapshot v2; tracked in #73)_";
+  "_(closing-PR-already-merged and duplicate-of-closed signals deferred — collector fields exist; stale rules tracked in #190)_";
 
 function usage() {
   return "Usage: triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--out PATH] [--json]";

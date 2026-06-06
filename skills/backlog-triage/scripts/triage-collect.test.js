@@ -324,6 +324,7 @@ describe("collectSnapshot", () => {
     assert.equal(fs.existsSync(expectedPath), true);
 
     const written = JSON.parse(fs.readFileSync(expectedPath, "utf-8"));
+    assert.equal(written.schema_version, 2);
     assert.equal(written.repo, "sungjunlee/dev-backlog");
     assert.equal(written.config_path, "backlog/triage-config.yml");
     assert.equal(written.issues.length, 1);
@@ -400,6 +401,7 @@ describe("collectSnapshot", () => {
     });
 
     assert.equal(result.snapshot.repo, "sungjunlee/dev-backlog");
+    assert.equal(result.snapshot.schema_version, 2);
     assert.equal(calls[0].command, "git");
     assert.deepEqual(calls[0].args, ["remote", "get-url", "origin"]);
     assert.equal(calls[1].command, "gh");

@@ -26,6 +26,22 @@ duplicate_threshold: 0.75
 - `closed_issue_limit` caps how many recent closed issues are collected for snapshot v2 enrichment.
 - `stale_days` and `duplicate_threshold` are collected as config-as-data for downstream scripts (`triage-stale`, `triage-relate`); `triage-collect` does not apply them yet.
 
+## Snapshot shape
+
+Each snapshot has an explicit schema marker:
+
+```json
+{
+  "schema_version": 2,
+  "generated": "2026-04-18T01:30:00.000Z",
+  "repo": "owner/name",
+  "config_path": "backlog/triage-config.yml",
+  "issues": []
+}
+```
+
+`schema_version: 2` means default issue entries include `closing_prs`, while `comments` and top-level `closed_issues` remain opt-in enrichment fields.
+
 ## Per-issue snapshot shape
 
 Each entry in `snapshot.issues` has:
