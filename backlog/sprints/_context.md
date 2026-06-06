@@ -13,3 +13,4 @@
 - Resolve `progress-sync` metric semantics in `#49` before doing structural refactors in `#50`
 - `progress-sync` and the bash helpers both parse sprint/task markdown, so contract drift needs explicit coverage
 - `sync-pull.js --update` refreshes task frontmatter and, for machine-managed issues whose **incoming GitHub body** starts with the `<!-- dev-backlog:progress-issue month=` marker, also refreshes the markdown body; every other task mirror keeps its existing body so local AC checkbox state is preserved
+- Backlog triage snapshot enrichments stay explicit and bounded: `--with-comments` and `--with-closed-issues` are opt-in, while downstream scanners must gracefully gate on optional fields instead of assuming they exist.

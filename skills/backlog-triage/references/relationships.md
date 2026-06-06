@@ -1,10 +1,12 @@
 # Relationships
 
-**Purpose.** `triage-relate.js` reads a previously collected issue snapshot and emits read-only relationship edges for four snapshot-resident signals:
+**Purpose.** `triage-relate.js` reads a previously collected issue snapshot and emits read-only relationship edges for snapshot-resident signals:
 
 - `mentions` from plain `#123` references in issue bodies
+- `comment-mentions` from plain `#123` references in optional issue comments
 - `blocks` from explicit blocking / closing phrases in issue bodies
 - `depends-on` from explicit dependency phrases in issue bodies
+- `merged-pr-link` from per-issue merged closing PR metadata
 - `duplicate-candidate` from title-token Jaccard overlap
 
 Every emitted edge carries evidence taken directly from the snapshot so downstream report rendering can show why the relationship was inferred without re-fetching from GitHub.
@@ -21,6 +23,23 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
 - Confidence: `0.75`
 - Evidence:
   - `match`: matched issue reference, for example `#123`
+  - `snippet`: normalized sentence/line fragment containing the match
+
+### `comment-mentions`
+
+- Source: `issue.comments[].body`
+- Gate: runs only when `comments` is present as an array; missing or malformed optional fields emit no edges
+- Match rule: same issue-reference parser as body `mentions`
+- Filters:
+  - ignore self-references
+  - ignore references to issues absent from `snapshot.issues`
+  - ignore fenced-code and URL-fragment noise
+- Confidence: `0.65`
+- Evidence:
+  - `source`: `"comment"`
+  - `author`: comment author when present
+  - `createdAt`: comment timestamp when present
+  - `match`: matched issue reference
   - `snippet`: normalized sentence/line fragment containing the match
 
 ### `blocks`
@@ -45,6 +64,20 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
 - Evidence:
   - `phrase`: normalized matched phrase, for example `depends on #123`
   - `snippet`: normalized sentence/line fragment containing the phrase
+
+### `merged-pr-link`
+
+- Source: `issue.closing_prs`
+- Gate: runs only when `closing_prs` is present as an array
+- Match rule: emit only entries with `state: "MERGED"` and a non-empty `mergedAt`
+- Confidence: `1`
+- Action semantics: advisory relationship evidence only; this does not imply an automatic close recommendation
+- Evidence:
+  - `source`: `"closing_prs"`
+  - `pr.number`: closing PR number
+  - `pr.state`: closing PR state
+  - `pr.mergedAt`: merge timestamp
+  - `pr.url`: closing PR URL when present
 
 ### `duplicate-candidate`
 
@@ -80,7 +113,7 @@ All edges share the outer shape:
 {
   "from": 100,
   "to": 101,
-  "kind": "mentions|blocks|depends-on|duplicate-candidate",
+  "kind": "mentions|comment-mentions|blocks|depends-on|merged-pr-link|duplicate-candidate",
   "confidence": 0.75,
   "evidence": {}
 }
@@ -97,12 +130,38 @@ Evidence payloads vary by kind:
 }
 ```
 
+- `comment-mentions`
+
+```json
+{
+  "source": "comment",
+  "author": "octocat",
+  "createdAt": "2026-04-18T01:00:00.000Z",
+  "match": "#101",
+  "snippet": "Follow-up lives in #101."
+}
+```
+
 - `blocks` / `depends-on`
 
 ```json
 {
   "phrase": "depends on #101",
   "snippet": "This depends on #101 before rollout."
+}
+```
+
+- `merged-pr-link`
+
+```json
+{
+  "source": "closing_prs",
+  "pr": {
+    "number": 88,
+    "state": "MERGED",
+    "mergedAt": "2026-04-18T01:15:00.000Z",
+    "url": "https://github.com/owner/name/pull/88"
+  }
 }
 ```
 
@@ -121,11 +180,4 @@ Evidence payloads vary by kind:
 
 ## Deferred follow-ups
 
-The snapshot collector now has the raw fields for these signals, but `triage-relate.js` does not emit them yet:
-
-- `comments`-based mention scan
-  - Requires: `--with-comments` snapshot enrichment and a clear edge shape that distinguishes issue-body evidence from comment evidence.
-- `merged-pr-link` edge kind
-  - Requires: interpreting per-issue `closing_prs` without turning every linked PR into a close recommendation.
-
-Tracked in #189.
+`triage-relate.js` is intentionally still read-only. Turning `merged-pr-link` into a stale / obsolete close candidate belongs to `triage-stale.js` and is tracked separately in #190.
