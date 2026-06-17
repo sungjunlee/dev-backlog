@@ -140,4 +140,4 @@ Archive older Learnings when they are useful history but no longer startup conte
 
 ## Reserved Names
 
-Naming policy lives in `docs/spec-system-design.md`. Summary: today the callable spec-series skills are `spec-charter` and `spec-grill`. The names `spec-reassess` and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.
+Naming policy lives in `docs/spec-system-design.md`. Summary: today the callable spec-series skills are `spec-charter`, `spec-system-map`, and `spec-grill`. The names `spec-reassess` and `spec-learn` are reserved/non-callable future split candidates. Mention them only when discussing naming policy or split triggers, not as commands the user can run.

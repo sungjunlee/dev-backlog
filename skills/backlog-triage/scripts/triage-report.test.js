@@ -14,6 +14,8 @@ const {
   writeReportFile,
   formatStaleEvidence,
   staleCandidateToAction,
+  buildRelationshipCounts,
+  collectActiveSprintIssueNumbers,
 } = require("./triage-report.js");
 
 function makeSnapshot() {
@@ -145,6 +147,7 @@ describe("parseArgs", () => {
         snapshotPath: "snapshot.json",
         relatePath: "relate.json",
         stalePath: "stale.json",
+        activeSprintPath: undefined,
         outPath: "report.md",
         json: true,
       }
@@ -234,6 +237,52 @@ describe("renderer helpers", () => {
     });
     assert.equal(action.verb, "close");
     assert.match(action.evidence, /label=wontfix/);
+
+    const mergedPr = formatStaleEvidence({
+      evidence: {
+        pr: { number: 88, mergedAt: "2026-04-18T01:15:00.000Z" },
+        milestone: null,
+      },
+    });
+    assert.match(mergedPr, /PR #88 merged 2026-04-18/);
+
+    const duplicate = formatStaleEvidence({
+      evidence: {
+        target: { number: 50 },
+        score: 1,
+      },
+    });
+    assert.match(duplicate, /target=#50/);
+    assert.match(duplicate, /score=1.00/);
+  });
+
+  it("collects protected issue refs only from active sprint Plan and Running Context", () => {
+    const content = [
+      "## Plan",
+      "- [ ] #101 Active task",
+      "",
+      "## Running Context",
+      "- Keep #102 open while executing.",
+      "",
+      "## Progress",
+      "- Mention #103 historically only.",
+      "",
+    ].join("\n");
+
+    assert.deepEqual([...collectActiveSprintIssueNumbers(content)].sort((left, right) => left - right), [101, 102]);
+  });
+
+  it("does not count merged-pr-link as a planning relationship", () => {
+    const counts = buildRelationshipCounts({
+      edges: [
+        { from: 101, to: 101, kind: "merged-pr-link" },
+        { from: 102, to: 103, kind: "mentions" },
+      ],
+    });
+
+    assert.equal(counts.has(101), false);
+    assert.equal(counts.get(102), 1);
+    assert.equal(counts.get(103), 1);
   });
 
   it("renders no-input placeholders for omitted relate/stale inputs", () => {
@@ -278,6 +327,86 @@ describe("renderer helpers", () => {
     const markdown = renderReport(model);
     assert.match(markdown, /#107 the important part is here because the keyword /);
     assert.doesNotMatch(markdown, /#107 feat\(foo\):/);
+  });
+
+  it("suppresses obsolete close proposals for issues protected by active sprint state", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+        {
+          number: 105,
+          title: "Audit token rotation docs cleanup",
+          reason: "labeled wontfix; explicit wontfix signal",
+          suggested_action: "close",
+          evidence: { matchedLabel: "wontfix", milestone: null },
+        },
+      ],
+    };
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+      activeSprintContent: ["## Plan", "- [ ] #104 Keep this active", "", "## Running Context", "- #105 is under review"].join("\n"),
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.doesNotMatch(obsolete, /triage:close #104/);
+    assert.doesNotMatch(obsolete, /triage:close #105/);
+  });
+
+  it("merged-pr-link alone does not create priority or milestone proposals", () => {
+    const snapshot = {
+      generated: "2026-04-18T01:30:00.000Z",
+      repo: "sungjunlee/dev-backlog",
+      issues: [
+        {
+          number: 201,
+          title: "Single merged issue",
+          body: "",
+          labels: ["type:feature", "priority:medium"],
+          createdAt: "2026-04-10T01:30:00.000Z",
+          updatedAt: "2026-04-17T01:30:00.000Z",
+          milestone: null,
+          buckets: {
+            label: { type: "feature", priority: "medium", status: "todo" },
+            theme: "uncategorized",
+            age: "7-30d",
+            activity: "recent",
+            milestone: "unassigned",
+          },
+        },
+      ],
+    };
+    const relate = {
+      edges: [
+        {
+          from: 201,
+          to: 201,
+          kind: "merged-pr-link",
+          confidence: 1,
+          evidence: { pr: { number: 88, mergedAt: "2026-04-18T01:15:00.000Z" } },
+        },
+      ],
+    };
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate,
+      stale: null,
+    });
+
+    assert.equal(model.anchors.some((anchor) => anchor.section === "priority"), false);
+    assert.equal(model.anchors.some((anchor) => anchor.section === "milestone"), false);
   });
 });
 
@@ -368,13 +497,14 @@ describe("triage-report integration chain", () => {
     }
 
     assert.match(markdown, /^---\ngenerated: 2026-04-18\nrepo: sungjunlee\/dev-backlog\nsnapshot: .*fixture-snapshot\.json\nopen_issues: 6\n---/m);
+    assert.match(markdown, /<!-- triage:close #101 reason="merged closing PR detected: PR #88 merged at 2026-04-18T01:15:00.000Z" -->/);
     assert.match(markdown, /<!-- triage:close #104 reason="inactive\/stale: no activity for 107 days; exceeds stale_days threshold \(60\); no milestone assigned" -->/);
     assert.match(markdown, /<!-- triage:close #105 reason="labeled wontfix; explicit wontfix signal" -->/);
     assert.match(markdown, /<!-- triage:close #106 reason="labeled invalid; explicit invalid signal" -->/);
     assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
     assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
     assert.match(markdown, /comment and closing-PR relationship signals run only when snapshot v2 fields are present/);
-    assert.match(markdown, /closing-PR-already-merged and duplicate-of-closed signals deferred/);
+    assert.match(markdown, /merged closing-PR and duplicate-of-closed signals run only when snapshot v2 fields are present/);
 
     // Classification groups must match Done Criteria: theme / label / age.
     const classificationBlock = markdown.split(/^##\s+Classification/m)[1].split(/^##\s/m)[0];
@@ -400,7 +530,7 @@ describe("triage-report integration chain", () => {
 
     // Obsolete Candidates must carry a compact evidence line per item.
     const obsoleteBlock = markdown.split(/^##\s+Obsolete Candidates/m)[1].split(/^##\s/m)[0];
-    for (const issueNumber of [104, 105, 106]) {
+    for (const issueNumber of [101, 104, 105, 106]) {
       const anchorRegex = new RegExp(`<!-- triage:close #${issueNumber} [^>]*-->[\\s\\S]*?- \\[ \\] [^\\n]+\\n\\s+- _evidence: [^\\n]+_`);
       assert.match(obsoleteBlock, anchorRegex, `expected evidence line for obsolete #${issueNumber}`);
     }

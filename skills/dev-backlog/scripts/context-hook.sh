@@ -27,8 +27,17 @@ if [ ! -d "$SPRINTS_DIR" ]; then
   exit 0
 fi
 
-ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
-if [ -z "$ACTIVE" ]; then
+if ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null); then
+  ACTIVE_STATUS=0
+else
+  ACTIVE_STATUS=$?
+fi
+if [ "$ACTIVE_STATUS" -eq 2 ]; then
+  echo "[Sprint warning] Multiple active sprints found; resolve backlog/sprints/ before editing."
+  exit 0
+fi
+
+if [ "$ACTIVE_STATUS" -ne 0 ]; then
   exit 0
 fi
 

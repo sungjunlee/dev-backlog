@@ -160,6 +160,37 @@ assert_contains "find: returns active file" "$OUT" "active.md"
 assert_not_contains "find: excludes _context.md" "$OUT" "_context.md"
 assert_not_contains "find: excludes completed" "$OUT" "completed.md"
 
+rm "$TEST_DIR/sprints/active.md"
+set +e
+OUT=$(find_active_sprint "$TEST_DIR/sprints")
+STATUS=$?
+set -e
+assert_equals "find: no active exit code" "$STATUS" "1"
+assert_equals "find: no active output" "$OUT" ""
+
+cat > "$TEST_DIR/sprints/active-a.md" << 'EOF'
+---
+status: active
+---
+EOF
+
+cat > "$TEST_DIR/sprints/active-b.md" << 'EOF'
+---
+status: active
+---
+EOF
+
+ERR="$TEST_DIR/find-active-error.txt"
+set +e
+OUT=$(find_active_sprint "$TEST_DIR/sprints" 2>"$ERR")
+STATUS=$?
+set -e
+assert_equals "find: multiple active exit code" "$STATUS" "2"
+assert_equals "find: multiple active stdout empty" "$OUT" ""
+assert_contains "find: multiple active error heading" "$(cat "$ERR")" "Multiple active sprint files found"
+assert_contains "find: multiple active lists first" "$(cat "$ERR")" "active-a.md"
+assert_contains "find: multiple active lists second" "$(cat "$ERR")" "active-b.md"
+
 # ============================================================
 # next.sh integration tests
 # ============================================================
@@ -329,6 +360,44 @@ assert_contains "no-active: message" "$OUT" "No active sprint"
 
 OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
 assert_contains "status no-active: message" "$OUT" "no active sprint"
+
+# --- Multiple active sprints ---
+cat > "$TEST_DIR/backlog/sprints/2026-03-active-a.md" << 'EOF'
+---
+status: active
+---
+
+## Plan
+- [ ] #1 Task A
+EOF
+
+cat > "$TEST_DIR/backlog/sprints/2026-03-active-b.md" << 'EOF'
+---
+status: active
+---
+
+## Plan
+- [ ] #2 Task B
+EOF
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "next multiple-active: exit code" "$STATUS" "1"
+assert_contains "next multiple-active: message" "$OUT" "Multiple active sprints found"
+assert_contains "next multiple-active: lists first" "$OUT" "2026-03-active-a.md"
+assert_contains "next multiple-active: lists second" "$OUT" "2026-03-active-b.md"
+
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog" 2>&1)
+assert_contains "status multiple-active: warning" "$OUT" "Multiple active sprints found"
+assert_contains "status multiple-active: lists first" "$OUT" "2026-03-active-a.md"
+assert_contains "status multiple-active: lists second" "$OUT" "2026-03-active-b.md"
+
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog" 2>&1)
+assert_contains "hook multiple-active: warning" "$OUT" "Multiple active sprints found"
+
+rm "$TEST_DIR/backlog/sprints/2026-03-active-a.md" "$TEST_DIR/backlog/sprints/2026-03-active-b.md"
 
 # --- status.sh: local files section ---
 mkdir -p "$TEST_DIR/backlog/tasks"
@@ -522,6 +591,25 @@ title: Unrelated
 status: To Do
 ---
 EOF
+
+cat > "$TEST_DIR/backlog/sprints/2026-03-other-active.md" << 'EOF'
+---
+status: active
+---
+
+## Plan
+- [x] #50 Other task
+EOF
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "close multiple-active: exit code" "$STATUS" "1"
+assert_contains "close multiple-active: refuses ambiguous close" "$OUT" "Refusing to close an ambiguous sprint"
+assert_contains "close multiple-active: lists first" "$OUT" "2026-03-auth.md"
+assert_contains "close multiple-active: lists second" "$OUT" "2026-03-other-active.md"
+rm "$TEST_DIR/backlog/sprints/2026-03-other-active.md"
 
 # --- dry-run test ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" --dry-run 2>&1)

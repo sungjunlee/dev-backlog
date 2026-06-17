@@ -7,6 +7,7 @@ const {
   parseArgs,
   buildIssueLines,
   buildSprintContent,
+  listActiveSprintFiles,
   createSprintFile,
 } = require("./sprint-init.js");
 
@@ -112,6 +113,50 @@ describe("createSprintFile", () => {
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
     assert.match(written, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
+  });
+
+  it("lists active sprint files sorted and excludes _context.md", () => {
+    fs.writeFileSync(path.join(tmpDir, "2026-04-beta.md"), "---\nstatus: active\n---\n");
+    fs.writeFileSync(path.join(tmpDir, "2026-04-alpha.md"), "---\nstatus: active\n---\n");
+    fs.writeFileSync(path.join(tmpDir, "2026-04-done.md"), "---\nstatus: completed\n---\n");
+    fs.writeFileSync(path.join(tmpDir, "_context.md"), "status: active\n");
+
+    assert.deepEqual(listActiveSprintFiles(tmpDir), [
+      "2026-04-alpha.md",
+      "2026-04-beta.md",
+    ]);
+  });
+
+  it("refuses to create a new active sprint when another active sprint exists", () => {
+    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+
+    assert.throws(() => {
+      createSprintFile({
+        topic: "next-sprint",
+        milestone: "Sprint W14",
+        dryRun: false,
+        sprintsDir: tmpDir,
+        today: new Date("2026-04-05T09:00:00Z"),
+        getDue: () => "2026-04-12",
+        getIssues: () => [],
+      });
+    }, /Active sprint already exists: 2026-04-current\.md/);
+  });
+
+  it("also refuses dry-run creation when another active sprint exists", () => {
+    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+
+    assert.throws(() => {
+      createSprintFile({
+        topic: "next-sprint",
+        milestone: "Sprint W14",
+        dryRun: true,
+        sprintsDir: tmpDir,
+        today: new Date("2026-04-05T09:00:00Z"),
+        getDue: () => "2026-04-12",
+        getIssues: () => [],
+      });
+    }, /Active sprint already exists: 2026-04-current\.md/);
   });
 
   it("returns placeholder metadata on dry-run when milestone has no issues", () => {

@@ -50,15 +50,21 @@ spec/
 - `spec/capabilities.md` remains compact enough to read at session start.
 - Completed sprint files are immutable history.
 
-## Candidate Capability Boundaries
+## Accepted Capability Contracts
 
-- `sprint-execution` - evidence: active sprint flow and completed-sprint invariant; owns sprint planning, in-flight state, and progress context; uncertainty: whether future relay learning writes should remain in this boundary.
-- `backlog-sync` - evidence: GitHub Issues -> task mirror flow and explicit sync invariant; owns issue-to-task mirroring and local AC preservation; uncertainty: whether richer triage snapshots should stay separate.
-- `triage-grooming` - evidence: advisory grooming flow and Decision Review use of spec evidence; owns issue classification, relationship, stale, alignment, and decision reports; uncertainty: whether closing-PR snapshot enrichment changes this contract.
-- `spec-charter` - evidence: canonical `spec/charter.md` invariant and proof-gated direction flow; owns project axis lifecycle; uncertainty: how concrete downstream routing recommendations should be generated.
-- `spec-system-map` - evidence: project-wide shape and boundary map flow; owns high-level system structure without module inventory; uncertainty: how much candidate boundary detail is useful before it becomes capability content.
-- `spec-grill` - evidence: capability contract flow and compact capability invariant; owns capability admission, predicate pressure tests, and report-first boundary review; uncertainty: how evidence grouping should influence candidate naming.
-- `task-progress-reporting` - evidence: progress helper scripts and GitHub Progress issue lifecycle; owns monthly progress issue updates and finalization; uncertainty: whether comment enrichment belongs here or in a separate integration boundary.
+Accepted capability contracts live in [`capabilities.md`](capabilities.md). Current boundaries are:
+
+- `sprint-execution` - sprint planning, in-flight state, progress context, and active/completed sprint invariants.
+- `backlog-sync` - GitHub issue mirroring, local task cache format, and AC preservation.
+- `triage-grooming` - advisory issue classification, relationships, stale signals, Alignment, Decision Review, and report/apply boundaries.
+- `spec-charter` - project axis lifecycle and proof-gated charter mutation.
+- `spec-system-map` - high-level system structure, runtime boundaries, flows, invariants, and durable pointers.
+- `spec-grill` - capability admission, predicate pressure tests, and compact `spec/capabilities.md` contracts.
+- `task-progress-reporting` - monthly GitHub Progress issue synchronization and finalization.
+
+## Open Boundary Questions
+
+No active unresolved boundary question is recorded in this map. New candidate boundaries should go through `spec-grill`; project-wide structure changes should go through `spec-system-map amend`.
 
 ## Where To Go Next
 

@@ -71,7 +71,7 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
 - Gate: runs only when `closing_prs` is present as an array
 - Match rule: emit only entries with `state: "MERGED"` and a non-empty `mergedAt`
 - Confidence: `1`
-- Action semantics: advisory relationship evidence only; this does not imply an automatic close recommendation
+- Action semantics: advisory relationship evidence only; it does not independently create priority or milestone proposals. `triage-stale.js` is responsible for turning the same snapshot metadata into an explicit close candidate.
 - Evidence:
   - `source`: `"closing_prs"`
   - `pr.number`: closing PR number
@@ -178,6 +178,4 @@ Evidence payloads vary by kind:
 }
 ```
 
-## Deferred follow-ups
-
-`triage-relate.js` is intentionally still read-only. Turning `merged-pr-link` into a stale / obsolete close candidate belongs to `triage-stale.js` and is tracked separately in #190.
+`triage-relate.js` is intentionally still read-only. Close or duplicate proposals belong to `triage-stale.js` and still require report review plus an accepted apply checkbox before any GitHub mutation.

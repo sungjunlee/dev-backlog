@@ -222,8 +222,8 @@ All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` and run from the target proje
 
 - `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run]` — fetch open issues, write snapshot to `backlog/triage/.cache/<ISO-timestamp>.json`. Read-only.
 - `scripts/triage-relate.js --snapshot PATH [--json]` — detect mentions / blocks / depends-on / duplicates. Errors if snapshot missing or malformed.
-- `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale / obsolete candidates with evidence.
-- `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--out PATH] [--json]` — render the markdown report with anchor comments. Re-runnable; creates `.bak` on overwrite.
+- `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale / obsolete candidates with evidence, including optional v2 merged-PR and duplicate-of-closed signals.
+- `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]` — render the markdown report with anchor comments. Re-runnable; creates `.bak` on overwrite.
 - `scripts/triage-apply.js <report.md> [--apply] [--yes] [--json]` — parse anchor+checkbox pairs, execute accepted actions via `gh`. Default dry-run. Idempotent. Appends to `backlog/triage/<date>-apply.log` (JSONL).
 - `scripts/triage-apply.integration.test.js` — opt-in live integration coverage for `triage-apply.js` against the disposable sandbox repo `sungjunlee/triage-apply-sandbox`. Requires `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN` with write access.
 

@@ -33,8 +33,17 @@ if [ ! -d "$SPRINTS_DIR" ]; then
   exit 1
 fi
 
-ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
-if [ -z "$ACTIVE" ]; then
+ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+ACTIVE_STATUS=$?
+if [ "$ACTIVE_STATUS" -eq 2 ]; then
+  echo "Multiple active sprints found. Refusing to close an ambiguous sprint:"
+  find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+    echo "  - $(basename "$sprint")"
+  done
+  exit 1
+fi
+
+if [ "$ACTIVE_STATUS" -ne 0 ]; then
   echo "No active sprint to close."
   exit 0
 fi

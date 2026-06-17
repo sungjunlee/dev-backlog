@@ -48,7 +48,7 @@ backlog/
 
 ### sprints/ Rules
 
-- **One active sprint at a time.** The file with `status: active` is the current sprint.
+- **One active sprint at a time.** Exactly one `status: active` sprint is valid; scripts warn/refuse ambiguous active sprint state instead of picking one arbitrarily.
 - **Naming: `YYYY-MM-<topic>.md`** — date prefix for timeline, topic for content.
   - Task-focused: `2026-03-auth-system.md`, `2026-04-payment-integration.md`
   - Time-focused: `2026-03-W13-misc.md`, `2026-03-tech-debt.md`
@@ -228,15 +228,15 @@ Full process details: `references/process.md` (Orient, Create, Plan, Work, Compl
 
 All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, not the target project). Run from the target project root.
 
-- `scripts/lib.sh` — Shared bash functions: `find_active_sprint`, `count_checkboxes`, `extract_section`
+- `scripts/lib.sh` — Shared bash functions: `find_active_sprint`, `find_active_sprints`, `count_checkboxes`, `extract_section`
 - `scripts/lib.js` — Shared Node functions: `slugify`, `escapeYaml`, `readConfig`, `estimateSize`
 - `scripts/init.sh [project-name]` — Bootstrap `backlog/` directory with config.yml
-- `scripts/next.sh` — Show next actionable batch from active sprint (zero LLM cost)
+- `scripts/next.sh` — Show next actionable batch from the single active sprint (zero LLM cost)
 - `scripts/status.sh` — Project status from sprint file + GitHub
 - `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — Pull open GitHub issues to local backlog/tasks/. By default it fetches all open issues; `--limit N` caps the fetch size. PREFIX defaults to config.yml's `task_prefix`. `--update` refreshes frontmatter while preserving local AC checkboxes. `--json` emits a machine-readable summary.
-- `scripts/sprint-init.js "auth-system" [--milestone "Name"] [--dry-run] [--json]` — Generate sprint file skeleton. `--json` emits the target sprint file path plus metadata.
+- `scripts/sprint-init.js "auth-system" [--milestone "Name"] [--dry-run] [--json]` — Generate sprint file skeleton; refuses to create a second active sprint. `--json` emits the target sprint file path plus metadata.
 - `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — Sync the monthly GitHub Progress issue. `--finalize` adds the month-end block and closes the target month's issue idempotently.
-- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close active sprint: set completed, move tasks, remind about context promotion
+- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close the single active sprint: set completed, move tasks, remind about context promotion
 - `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `spec/charter.md` (or legacy root `CHARTER.md`) with an actionable (non-deferred) status. Graceful no-op when both are absent.
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — Verify every `component:` value in sprint files resolves to one declared capability in `spec/capabilities.md`. Comma-separated multi-component values fail because `component:` is the primary routing handle; put secondary touches in sprint prose. Graceful no-op when `spec/capabilities.md` is absent.
