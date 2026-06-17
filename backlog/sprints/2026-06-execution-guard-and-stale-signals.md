@@ -1,6 +1,6 @@
 ---
 milestone: 2026-06 execution guard and stale signals
-status: active
+status: completed
 started: 2026-06-17
 due: TBD
 objectives: [O4]
@@ -33,3 +33,4 @@ Agents can resume dev-backlog work from local sprint/task state without being mi
 - 2026-06-18: Implemented #193 active-sprint ambiguity guards across lib/next/status/context-hook/sprint-close/sprint-init and added smoke + node tests.
 - 2026-06-18: Implemented #190 merged closing-PR and duplicate-of-closed stale signals, advisory-only merged-pr-link planning behavior, and active-sprint close protection.
 - 2026-06-18: Completed #194 spec-series doc refresh; craft-critique pass found no follow-up edits. Verification: smoke-test, full node test suite, capabilities-doctor --strict, component-lint all pass.
+- 2026-06-18: Sprint closed. 3/3 tasks completed.
