@@ -77,7 +77,19 @@ ${issueLines.join("\n")}
 
 ## Progress
 [Timestamped log — update at end of each session/batch]
-`;
+  `;
+}
+
+function listActiveSprintFiles(sprintsDir) {
+  if (!fs.existsSync(sprintsDir)) return [];
+
+  return fs.readdirSync(sprintsDir)
+    .filter((file) => file.endsWith(".md") && file !== "_context.md")
+    .filter((file) => {
+      const content = fs.readFileSync(path.join(sprintsDir, file), "utf-8");
+      return /^status: active$/m.test(content);
+    })
+    .sort();
 }
 
 function createSprintResult({
@@ -150,9 +162,16 @@ function createSprintFile({
   const topicSlug = slugify(topic) || "sprint";
   const sprintFile = path.join(sprintsDir, `${datePrefix}-${topicSlug}.md`);
   const existingFile = fileExists(sprintFile);
+  const activeSprintFiles = listActiveSprintFiles(sprintsDir);
 
   if (existingFile && !dryRun) {
     throw new Error(`Sprint file already exists: ${sprintFile}`);
+  }
+
+  if (activeSprintFiles.length > 0 && !existingFile) {
+    throw new Error(
+      `Active sprint already exists: ${activeSprintFiles.join(", ")}. Close it before creating another active sprint.`
+    );
   }
 
   const due = existingFile ? "TBD" : getDue(milestone);
@@ -228,6 +247,7 @@ module.exports = {
   parseArgs,
   buildIssueLines,
   buildSprintContent,
+  listActiveSprintFiles,
   createSprintFile,
   printResult,
 };

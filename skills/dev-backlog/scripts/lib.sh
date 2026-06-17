@@ -9,12 +9,41 @@ RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
 
-# Find the active sprint file (status: active in frontmatter).
+# List active sprint files (status: active in frontmatter).
+# Usage: find_active_sprints "$SPRINTS_DIR"
+find_active_sprints() {
+  local sprints_dir="$1"
+  find "$sprints_dir" -maxdepth 1 -name "*.md" ! -name "_context.md" \
+    -exec grep -l "^status: active" {} + 2>/dev/null | sort
+}
+
+# Find the active sprint file.
+# Return codes:
+#   0: exactly one active sprint, printed to stdout
+#   1: no active sprint
+#   2: multiple active sprints, printed to stderr
 # Usage: ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
 find_active_sprint() {
   local sprints_dir="$1"
-  find "$sprints_dir" -maxdepth 1 -name "*.md" ! -name "_context.md" \
-    -exec grep -l "^status: active" {} + 2>/dev/null | head -1
+  local active
+  local count
+
+  active=$(find_active_sprints "$sprints_dir")
+  count=$(printf "%s\n" "$active" | grep -c . || true)
+
+  if [ "$count" -eq 0 ]; then
+    return 1
+  fi
+
+  if [ "$count" -gt 1 ]; then
+    {
+      echo "Multiple active sprint files found:"
+      printf "%s\n" "$active" | sed 's/^/  /'
+    } >&2
+    return 2
+  fi
+
+  printf "%s\n" "$active"
 }
 
 # Count checkbox states in a sprint file (single awk pass).

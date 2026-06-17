@@ -9,10 +9,10 @@ const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
 const OPTIONAL_RELATIONSHIPS_MARKER =
   "_(comment and closing-PR relationship signals run only when snapshot v2 fields are present)_";
 const DEFERRED_OBSOLETE_MARKER =
-  "_(closing-PR-already-merged and duplicate-of-closed signals deferred — collector fields exist; stale rules tracked in #190)_";
+  "_(merged closing-PR and duplicate-of-closed signals run only when snapshot v2 fields are present)_";
 
 function usage() {
-  return "Usage: triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--out PATH] [--json]";
+  return "Usage: triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]";
 }
 
 function parseArgs(args) {
@@ -20,6 +20,7 @@ function parseArgs(args) {
     snapshotPath: undefined,
     relatePath: undefined,
     stalePath: undefined,
+    activeSprintPath: undefined,
     outPath: undefined,
     json: false,
   };
@@ -60,6 +61,19 @@ function parseArgs(args) {
     }
     if (arg.startsWith("--out=")) {
       options.outPath = arg.slice("--out=".length);
+      continue;
+    }
+    if (arg === "--active-sprint") {
+      const nextValue = args[index + 1];
+      if (!nextValue) {
+        return { ...options, error: `Missing value for --active-sprint. ${usage()}` };
+      }
+      options.activeSprintPath = nextValue;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--active-sprint=")) {
+      options.activeSprintPath = arg.slice("--active-sprint=".length);
       continue;
     }
 
@@ -185,6 +199,37 @@ function groupBy(items, keyFn) {
 
 function sortIssues(issues) {
   return [...issues].sort((left, right) => left.number - right.number);
+}
+
+function extractMarkdownSection(content, heading) {
+  const source = String(content || "");
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^##\\s+${escapedHeading}\\s*$`, "m");
+  const match = source.match(pattern);
+  if (!match || match.index === undefined) return "";
+
+  const start = match.index + match[0].length;
+  const rest = source.slice(start);
+  const nextHeading = rest.search(/^##\s+/m);
+  return (nextHeading === -1 ? rest : rest.slice(0, nextHeading)).trim();
+}
+
+function collectActiveSprintIssueNumbers(content) {
+  const protectedNumbers = new Set();
+  const sections = [
+    extractMarkdownSection(content, "Plan"),
+    extractMarkdownSection(content, "Running Context"),
+  ];
+
+  for (const section of sections) {
+    const pattern = /(^|[^A-Za-z0-9_])#(\d+)\b/g;
+    let match;
+    while ((match = pattern.exec(section)) !== null) {
+      protectedNumbers.add(Number(match[2]));
+    }
+  }
+
+  return protectedNumbers;
 }
 
 function sortGroupEntries(groups, orderHint) {
@@ -324,6 +369,17 @@ function formatStaleEvidence(candidate) {
   } else if (ev.updatedAt) {
     parts.push(`updated ${String(ev.updatedAt).slice(0, 10)}`);
   }
+  if (ev.pr && typeof ev.pr === "object") {
+    const prLabel = ev.pr.number ? `PR #${ev.pr.number}` : "merged PR";
+    const mergedAt = ev.pr.mergedAt ? ` merged ${String(ev.pr.mergedAt).slice(0, 10)}` : "";
+    parts.push(`${prLabel}${mergedAt}`);
+  }
+  if (ev.target && typeof ev.target === "object" && Number.isInteger(ev.target.number)) {
+    parts.push(`target=#${ev.target.number}`);
+  }
+  if (typeof ev.score === "number") {
+    parts.push(`score=${ev.score.toFixed(2)}`);
+  }
   if ("milestone" in ev) {
     parts.push(ev.milestone ? `milestone=${ev.milestone}` : "no milestone");
   }
@@ -374,12 +430,13 @@ function staleCandidateToAction(candidate) {
   return null;
 }
 
-function buildObsoleteActions(stale) {
+function buildObsoleteActions(stale, { protectedIssueNumbers = new Set() } = {}) {
   if (!stale) return [];
   return dedupeActions(
     stale.candidates
       .map(staleCandidateToAction)
       .filter(Boolean)
+      .filter((action) => !protectedIssueNumbers.has(action.issueNumber))
   );
 }
 
@@ -434,6 +491,7 @@ function buildRelationshipCounts(relate) {
   if (!relate) return counts;
 
   for (const edge of relate.edges) {
+    if (edge.kind === "merged-pr-link") continue;
     counts.set(edge.from, (counts.get(edge.from) || 0) + 1);
     if (edge.to !== edge.from) {
       counts.set(edge.to, (counts.get(edge.to) || 0) + 1);
@@ -626,9 +684,10 @@ function buildFrontmatter(snapshot, snapshotPath) {
   ].join("\n");
 }
 
-function buildReportModel({ snapshot, snapshotPath, relate, stale }) {
+function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintContent = "" }) {
   const issueIndex = buildIssueIndex(snapshot);
-  const obsoleteActions = buildObsoleteActions(stale);
+  const protectedIssueNumbers = collectActiveSprintIssueNumbers(activeSprintContent);
+  const obsoleteActions = buildObsoleteActions(stale, { protectedIssueNumbers });
   const priorityActions = buildPriorityActions(snapshot, relate, obsoleteActions);
   const milestoneActions = buildMilestoneActions(snapshot, relate, obsoleteActions, priorityActions);
   const allActions = [...obsoleteActions, ...priorityActions, ...milestoneActions];
@@ -695,11 +754,15 @@ function loadInputs(options) {
   const stale = options.stalePath
     ? readJsonFile(options.stalePath, { label: "stale JSON", validate: validateStaleResult })
     : null;
+  const activeSprintContent = options.activeSprintPath
+    ? fs.readFileSync(path.resolve(options.activeSprintPath), "utf-8")
+    : "";
 
   return {
     snapshot,
     relate,
     stale,
+    activeSprintContent,
   };
 }
 
@@ -721,6 +784,7 @@ function main() {
       snapshotPath: options.snapshotPath,
       relate: inputs.relate,
       stale: inputs.stale,
+      activeSprintContent: inputs.activeSprintContent,
     });
     markdown = renderReport(reportModel);
   } catch (error) {
@@ -750,7 +814,10 @@ module.exports = {
   readJsonFile,
   validateRelateResult,
   validateStaleResult,
+  extractMarkdownSection,
+  collectActiveSprintIssueNumbers,
   buildObsoleteActions,
+  buildRelationshipCounts,
   buildPriorityActions,
   buildMilestoneActions,
   formatStaleEvidence,

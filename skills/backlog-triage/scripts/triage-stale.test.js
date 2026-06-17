@@ -11,6 +11,8 @@ const {
   pickAction,
   scanInactive,
   scanWontfixInvalid,
+  scanMergedClosingPr,
+  scanDuplicateOfClosed,
   resolveThresholdDays,
   analyzeSnapshot,
 } = require("./triage-stale.js");
@@ -66,9 +68,11 @@ describe("pickAction", () => {
     assert.equal(pickAction(SIGNALS.INACTIVE), "close");
     assert.equal(pickAction(SIGNALS.WONTFIX), "close");
     assert.equal(pickAction(SIGNALS.INVALID), "close");
+    assert.equal(pickAction(SIGNALS.MERGED_CLOSING_PR), "close");
   });
 
   it("keeps revisit and merge-into actions available for future signals", () => {
+    assert.equal(pickAction(SIGNALS.DUPLICATE_OF_CLOSED, { targetIssueNumber: 42 }), "merge-into:#42");
     assert.equal(pickAction("future-signal", { targetIssueNumber: 42 }), "merge-into:#42");
     assert.equal(pickAction("future-signal"), "revisit");
   });
@@ -138,6 +142,72 @@ describe("scanWontfixInvalid", () => {
 
 });
 
+describe("scanMergedClosingPr", () => {
+  it("flags open issues with merged closing PR metadata", () => {
+    const [candidate] = scanMergedClosingPr({
+      number: 700,
+      title: "Close after merged PR",
+      updatedAt: "2026-07-01T00:00:00.000Z",
+      milestone: null,
+      closing_prs: [
+        {
+          number: 91,
+          state: "MERGED",
+          mergedAt: "2026-07-02T00:00:00.000Z",
+          url: "https://github.com/org/repo/pull/91",
+        },
+      ],
+    });
+
+    assert.equal(candidate.number, 700);
+    assert.equal(candidate.suggested_action, "close");
+    assert.match(candidate.reason, /merged closing PR/i);
+    assert.equal(candidate.evidence.pr.number, 91);
+  });
+
+  it("ignores absent or unmerged closing PR fields", () => {
+    assert.deepEqual(scanMergedClosingPr({ number: 701, title: "No optional field" }), []);
+    assert.deepEqual(
+      scanMergedClosingPr({
+        number: 702,
+        title: "Open PR",
+        closing_prs: [{ number: 92, state: "OPEN", mergedAt: null }],
+      }),
+      []
+    );
+  });
+});
+
+describe("scanDuplicateOfClosed", () => {
+  it("flags high-confidence duplicates of closed issues", () => {
+    const [candidate] = scanDuplicateOfClosed(
+      { number: 710, title: "OAuth token refresh worker" },
+      [
+        {
+          number: 44,
+          title: "OAuth token refresh worker",
+          state: "closed",
+          closedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ]
+    );
+
+    assert.equal(candidate.suggested_action, "merge-into:#44");
+    assert.match(candidate.reason, /duplicate of closed issue #44/i);
+    assert.equal(candidate.evidence.target.number, 44);
+    assert.equal(candidate.evidence.exactTitle, true);
+  });
+
+  it("does not flag low-overlap closed issues", () => {
+    const candidates = scanDuplicateOfClosed(
+      { number: 711, title: "OAuth token refresh worker" },
+      [{ number: 45, title: "Documentation table formatting", state: "closed" }]
+    );
+
+    assert.deepEqual(candidates, []);
+  });
+});
+
 describe("resolveThresholdDays and analyzeSnapshot", () => {
   let tempBacklogDir;
 
@@ -183,5 +253,30 @@ describe("resolveThresholdDays and analyzeSnapshot", () => {
     assert.ok(numbers.includes(504));
     assert.ok(!inactiveCandidates.some((candidate) => candidate.number === 501));
     assert.ok(!numbers.includes(502));
+  });
+
+  it("includes optional merged-PR and duplicate-of-closed stale signals when snapshot fields are present", () => {
+    const snapshot = loadFixtureSnapshot();
+    snapshot.issues.push({
+      number: 700,
+      title: "Close after merged PR",
+      labels: [],
+      updatedAt: "2026-07-15T00:00:00.000Z",
+      milestone: null,
+      closing_prs: [{ number: 91, state: "MERGED", mergedAt: "2026-07-16T00:00:00.000Z" }],
+    });
+    snapshot.issues.push({
+      number: 701,
+      title: "OAuth token refresh worker",
+      labels: [],
+      updatedAt: "2026-07-15T00:00:00.000Z",
+      milestone: null,
+    });
+    snapshot.closed_issues = [{ number: 44, title: "OAuth token refresh worker", state: "closed" }];
+
+    const result = analyzeSnapshot(snapshot, { config: { stale_days: 60 } });
+
+    assert.ok(result.candidates.some((candidate) => candidate.number === 700 && candidate.suggested_action === "close"));
+    assert.ok(result.candidates.some((candidate) => candidate.number === 701 && candidate.suggested_action === "merge-into:#44"));
   });
 });

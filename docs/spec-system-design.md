@@ -175,7 +175,7 @@ The names `spec-reassess` and `spec-learn` are reserved/non-callable future spli
 
 One `spec/capabilities.md` is the default because it is easy to read, grep, and hand to an agent in one shot. The budget is about scanability, not feature count: target 5-10 capabilities, warn above 12 capabilities or 400 lines, and split only when the file exceeds 500 lines, has more than 15 capabilities, or ownership boundaries demand separate review paths.
 
-Dogfood calibrated this rule. dev-backlog has six capabilities and produces a 214-line spec. tamgu_note, a larger Flutter/Firebase app, has 15+ feature surfaces plus workflow scopes like `e2e`, `test`, `sprint`, and `backlog`; treating every folder or commit scope as a capability would exceed the split trigger immediately. Capabilities are durable contract boundaries, not directory names.
+Dogfood calibrated this rule. dev-backlog currently has seven capabilities and produces a 258-line spec, still within the compactness budget. tamgu_note, a larger Flutter/Firebase app, has 15+ feature surfaces plus workflow scopes like `e2e`, `test`, `sprint`, and `backlog`; treating every folder or commit scope as a capability would exceed the split trigger immediately. Capabilities are durable contract boundaries, not directory names.
 
 When the hard trigger fires, `split-capabilities.js` migrates to `spec/components/<name>.md`. Until then, keep the compact single-file shape. Make-the-change-easy, then make the easy change (Beck).
 
@@ -330,8 +330,8 @@ Manual reassess evidence was checked before adding a new seed script:
 
 | Repo | Command | Result | Reassess implication |
 |---|---|---|---|
-| dev-backlog | `node skills/dev-backlog/scripts/capabilities-doctor.js --json` | 6 capabilities, 214 lines, 0 warnings, 0 hard failures | compactness and Learnings marker evidence is sufficient for a no-change structural finding |
-| dev-backlog | `node skills/dev-backlog/scripts/component-lint.js --json` | 6 declared capabilities, 0 sprint files, 0 issues | routing evidence is sufficient; no sprint data means no usage-frequency inference |
+| dev-backlog | `node skills/dev-backlog/scripts/capabilities-doctor.js --json` | 7 capabilities, 258 lines, 0 warnings, 0 hard failures | compactness and Learnings marker evidence is sufficient for a no-change structural finding |
+| dev-backlog | `node skills/dev-backlog/scripts/component-lint.js --json` | 7 declared capabilities, 10 sprint files, 1 active sprint, 0 issues | routing evidence is sufficient; legacy/unrouted sprint files do not imply capability drift |
 | tamgu_note | `node <dev-backlog-skill-dir>/scripts/capabilities-doctor.js --capabilities spec/capabilities.md --json` | 7 capabilities, 232 lines, 0 warnings, 0 hard failures | large-repo-shaped spec remains within budget |
 | tamgu_note | `node <dev-backlog-skill-dir>/scripts/component-lint.js --sprints-dir backlog/sprints --capabilities spec/capabilities.md --json` | 19 sprint files, 0 component issues | routing evidence is sufficient on a larger real repo shape |
 
