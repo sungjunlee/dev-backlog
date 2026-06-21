@@ -13,11 +13,7 @@ Create or amend `spec/system-map.md`, the high-level map of how the project is s
 
 ## Boundary
 
-| File | Role |
-|------|------|
-| `spec/charter.md` | Why / good state / Objectives / Decisions |
-| `spec/system-map.md` | System shape / runtime boundaries / core flows / invariants / pointers |
-| `spec/capabilities.md` | Capability-level contracts / Hard Constraints / Learnings |
+Use `../spec-charter/references/spec-axis.md` as the shared file-boundary reference. This skill owns only `spec/system-map.md`: system shape, runtime boundaries, core flows, storage/external systems, invariants, and pointers.
 
 Do not turn `system-map.md` into exhaustive module documentation, API reference, runbook, ADR log, or implementation notes. Demote subsystem detail to linked docs; promote only project-wide structure or invariants.
 
@@ -78,5 +74,6 @@ Use these as quick pressure tests when changing the skill or a generated map:
 ## References
 
 - `templates/system-map.md` — starting shape for `spec/system-map.md`.
+- [`../spec-charter/references/spec-axis.md`](../spec-charter/references/spec-axis.md) — shared file-boundary and authority rules.
 - [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) — project charter lifecycle.
 - [`../spec-grill/SKILL.md`](../spec-grill/SKILL.md) — capability-contract lifecycle.

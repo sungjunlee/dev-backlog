@@ -9,222 +9,134 @@ metadata:
 
 # Backlog Triage
 
-Open-issue grooming as a two-phase loop:
+Real job: inspect open GitHub Issues, produce an advisory triage report, and apply only human-accepted issue mutations through stable anchor comments.
+
+Sibling skill to `dev-backlog`, not a replacement. `dev-backlog` owns sprint execution, progress, milestones, and AC mirrors. `backlog-triage` owns open-issue classification, relationships, stale signals, priority/milestone proposals, and optional accepted GitHub mutations.
+
+## Phase Model
 
 ```
-Phase 1 — Report (advisory)          Phase 2 — Apply (explicit)
-  collect → relate → stale              review report → --apply
-      ↓                                       ↓
-  single markdown report                gh mutations via anchors
+Phase 1 — Report (default, read-only)     Phase 2 — Apply (explicit mutation)
+  collect -> analyze -> render              review report -> --apply
+       |                                          |
+  one snapshot + markdown report             gh mutations + JSONL audit log
 ```
 
-Sibling skill to dev-backlog, not a replacement. dev-backlog is the execution hub (sprints, progress, milestones). backlog-triage is advisory: it inspects the open issue set and proposes changes. You decide; it applies only what you've approved.
+| Phase | Step | Completion boundary |
+| --- | --- | --- |
+| Report | Collect | One `gh` fetch writes a snapshot JSON; downstream steps use `--snapshot PATH` and do not re-fetch. |
+| Report | Analyze | Classification, relationships, stale/obsolete signals, Alignment, and Decision Review are computed from the same snapshot/spec evidence. |
+| Report | Render | One markdown report is written with anchored proposals and a consolidated Apply Checklist. |
+| Apply | Review | A human accepts proposals by flipping paired checkboxes from `[ ]` to `[x]`; unchecked anchors remain inert. |
+| Apply | Dry-run | `triage-apply.js <report.md>` prints intended `gh` mutations without writing. |
+| Apply | Mutate | `triage-apply.js <report.md> --apply` executes only accepted actions; `--yes` is required for non-interactive apply. |
+| Apply | Re-run | Re-running apply is idempotent and logs `already-applied` for completed actions. |
 
----
+Report mode is always safe to rerun. Apply mode is opt-in and must preserve an audit log beside the report.
 
-## Two-Phase Model
+## Report Evidence
 
-### Phase 1 — Report (default, no mutations)
-
-1. **Collect** open issues → snapshot JSON (one `gh` fetch per run)
-2. **Analyze** — classification, relationships, stale/obsolete signals, Alignment Check, and spec-aware Decision Review
-3. **Render** — one markdown report with anchored proposals
-
-Every script in this phase is read-only. Running any number of times is safe. The snapshot is the canonical artifact; all downstream analysis consumes it via `--snapshot PATH` (no re-fetch).
-
-Alignment Check is prompt-driven, not a `triage-*.js` script: read `spec/charter.md` first, fall back to legacy root `CHARTER.md`, then map open issues to Objectives using `../spec-charter/references/alignment.md` and emit an `## Alignment` report section. When both files are absent, skip this step entirely.
-
-Decision Review is also prompt-driven and report-only: read `spec/charter.md` with legacy root `CHARTER.md` fallback, optionally read `spec/capabilities.md` and `spec/system-map.md`, then classify open issues into `Do Now`, `Shape First`, `Defer`, or `Drop / Close` using `references/decision-review.md`. Missing spec artifacts are graceful no-ops.
-
-### Phase 2 — Apply (opt-in, explicit)
-
-Humans review the report and mark accepted proposals (flip `[ ]` → `[x]`). Then:
-
-```bash
-# Run from the target project root; scripts live under ${CLAUDE_SKILL_DIR}/scripts/.
-node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md               # dry-run
-node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply       # with confirmation
-node "${CLAUDE_SKILL_DIR}/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md --apply --yes # CI-safe
-
-# Live integration coverage (opt-in only; disposable sandbox repo + write token required)
-GH_TOKEN="$(gh auth token)" TRIAGE_APPLY_INTEGRATION=1 \
-  node --test "${CLAUDE_SKILL_DIR}/scripts/triage-apply.integration.test.js"
-```
-
-Default is **dry-run**. `--apply` requires confirmation unless `--yes`. Idempotent: re-running after a partial apply emits `already-applied` log entries for actions already executed.
-The integration test is intentionally separate from the default `node --test` path. It mutates the dedicated sandbox repo `sungjunlee/triage-apply-sandbox`, so it only runs when `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN` are both present.
-
----
-
-## Directory Layout
-
-```
-backlog/
-├── triage/
-│   ├── .cache/                       # Snapshots (downstream scripts read from here)
-│   │   └── 2026-04-18T01-30-00Z.json
-│   ├── 2026-04-18-report.md          # Triage report (human entry point)
-│   └── 2026-04-18-apply.log          # JSONL audit trail of apply run
-└── triage-config.yml                 # Thresholds, theme keywords, weights
-```
-
-The triage report is a **derived artifact**. GitHub Issues remain the source of truth. Regenerating from the snapshot must reproduce the same proposals.
-
----
+- Snapshot JSON is the canonical input artifact for a triage run.
+- Alignment is prompt-driven: read `spec/charter.md`, fall back to legacy root `CHARTER.md`, then use `../spec-charter/references/alignment.md`. When both charter files are absent, skip the mapping work and render `## Alignment` as skipped because no charter evidence exists.
+- Decision Review is prompt-driven and report-only: read the resolved charter, optional `spec/capabilities.md`, optional `spec/system-map.md`, active sprint context, and triage signals; use `references/decision-review.md`.
+- Spec-axis boundaries live in `../spec-charter/references/spec-axis.md`; triage may propose charter/capability/system-map follow-ups but must not mutate those specs.
 
 ## Anchor-Comment Apply Contract
 
-Every actionable proposal in the report carries a stable anchor comment paired with a visible checkbox:
+Every actionable proposal pairs a stable machine anchor with a visible checkbox:
 
 ```markdown
 <!-- triage:close #42 reason="merged PR #87 already exists" -->
-- [ ] close #42 — merged PR #87 already exists
+- [ ] close #42 - merged PR #87 already exists
 ```
 
-- The **anchor comment** is the machine contract.
-- The **checkbox** is the human confirmation surface.
-- An action is accepted when **both** the anchor exists AND its paired checkbox is `[x]`.
+Rules:
 
-This mirrors dev-backlog's `<!-- AC:BEGIN --><!-- AC:END -->` convention and survives markdown reformatting, so a human editing the report cannot silently break the parse.
+- The anchor comment is the machine contract.
+- The paired checkbox is the human confirmation surface.
+- An action is accepted only when the anchor exists and its paired checkbox is `[x]`.
+- Unknown verbs parse without crashing and are skipped by consumers that do not implement them.
+- Duplicate proposal surfaces are deduped by `(verb, issueNumber, normalizedArgs)`.
 
-See `references/apply.md` for the full anchor grammar, parse rules, and audit-log schema.
-
----
+See `references/apply.md` for anchor grammar, parse rules, dedupe behavior, idempotency, and audit-log schema.
 
 ## Report Shape
 
-```markdown
----
-generated: 2026-04-18
-repo: owner/name
-snapshot: backlog/triage/.cache/2026-04-18T01-30-00Z.json
-open_issues: 12
----
+The report is a derived artifact under `backlog/triage/`. GitHub Issues remain the source of truth.
 
-# Backlog Triage — 2026-04-18
+Required sections:
 
-## Classification
-By theme / label / age — grouped tables.
+- `## Classification` — issue buckets by theme, label, age, activity, and milestone state.
+- `## Relationships` — mentions, blocks, depends-on, duplicate candidates, and merged closing PR links.
+- `## Obsolete Candidates` — anchored close/revisit proposals with evidence.
+- `## Priority Proposals` — anchored priority proposals with rationale.
+- `## Milestone Suggestions` — anchored milestone proposals grouped into candidate sprint clusters.
+- `## Alignment` — objective coverage, orphan work, neglected objectives, contradictions, and proposed charter changes; when no charter exists, record that alignment was skipped.
+- `## Decision Review` — `Do Now`, `Shape First`, `Defer`, and `Drop / Close`.
+- `## Apply Checklist` — consolidated review surface for every anchored action.
 
-## Relationships
-Edges list (mentions, blocks, depends-on, duplicate candidates).
+Full section examples and rubric details live in `references/classification.md`, `references/relationships.md`, `references/stale.md`, `references/decision-review.md`, and `references/apply.md`.
 
-## Obsolete Candidates
-anchor + checkbox + evidence per item.
-
-## Priority Proposals
-anchor + checkbox + rationale per item.
-
-## Milestone Suggestions
-Unplanned issues grouped into candidate next sprints.
-
-## Alignment
-Coverage: 7/9 open issues → objectives ✓ · O3 has no work ⚠
-
-### Orphan Work
-Issues that map to no Objective (medium severity).
-
-### Neglected Objectives
-Active Objectives with no open issue advancing them (medium severity).
-
-### Contradictions
-Issues that violate a Non-Goal (high severity).
-
-### Proposed Charter Changes
-Seed proposals for `spec-charter` amend; triage does not mutate the charter.
-
-## Decision Review
-Evidence used: `spec/charter.md`; `spec/capabilities.md`; active sprint; snapshot signals.
-
-### Do Now
-Issues that strongly fit active Objectives, are ready enough to execute, and have high leverage.
-
-### Shape First
-Issues with promising objective fit but unclear acceptance criteria, ownership, or primary capability.
-
-### Defer
-Issues that are valid but not timely against the current charter, sprint, or dependency state.
-
-### Drop / Close
-Issues with explicit out-of-scope, contradiction, obsolete, or duplicate evidence. Any close proposal still needs an anchored checkbox before `--apply`.
-
-## Apply Checklist
-Consolidated list of every anchored action for scan-and-check review. The apply step parses
-the whole report and dedupes by `(verb, issueNumber, normalizedArgs)` — this section and the
-source sections above both count as acceptance surfaces (see `references/apply.md`).
-```
-
----
-
-## Relationship to dev-backlog
+## Relationship To dev-backlog
 
 | Concern | Owner |
-|---------|-------|
-| Sprint files, execution plan, Running Context | dev-backlog |
-| Milestone lifecycle, monthly progress issue | dev-backlog |
-| AC checkboxes inside issue bodies (`AC:BEGIN`/`END`) | dev-backlog |
-| Open-issue classification, relationships, stale flags | backlog-triage |
-| Charter alignment of open issues | backlog-triage (report; charter mutations stay with `spec-charter`) |
-| Spec-aware Decision Review | backlog-triage (report; spec mutations stay with spec-series skills) |
-| Priority / milestone **proposals** | backlog-triage (report) |
-| Priority / milestone **mutations** | backlog-triage (`--apply`) |
-| Post-triage sprint planning | dev-backlog (reads report, edits sprint file) |
+| --- | --- |
+| Sprint files, execution plan, Running Context | `dev-backlog` |
+| Milestone lifecycle and monthly progress issue | `dev-backlog` |
+| AC checkboxes inside issue bodies (`AC:BEGIN` / `AC:END`) | `dev-backlog` |
+| Open-issue classification, relationships, stale flags | `backlog-triage` |
+| Charter alignment of open issues | `backlog-triage` report; mutations route to `spec-charter` |
+| Capability/system-map concerns | `backlog-triage` report; mutations route to `spec-grill` or `spec-system-map` |
+| Priority/milestone proposals and accepted mutations | `backlog-triage` |
+| Post-triage sprint planning | `dev-backlog` |
 
-Recommended cadence: run backlog-triage weekly or bi-weekly. Feed the report's Milestone Suggestions into the next dev-backlog sprint.
+Recommended cadence: run `backlog-triage` weekly or bi-weekly, then feed accepted Milestone Suggestions into the next `dev-backlog` sprint.
 
----
+## Script Resolution
 
-## Process
+Resolve scripts from the installed `backlog-triage` skill directory, not from the target project. In a source checkout, that is the local `scripts/` directory beside this `SKILL.md`; in an installed skill, locate the active skill directory and run the same script from there. Run scripts from the target project root. Operational scripts support `--json` for composition.
 
-**Collect -> Analyze -> Report.** One `gh` fetch, one snapshot, downstream scripts consume it via `--snapshot`. Re-fetching in each script is a bug; it creates drift across signals. During Analyze, run prompt-driven Alignment when `spec/charter.md` or legacy root `CHARTER.md` is present, then run prompt-driven Decision Review from the resolved charter, optional `spec/capabilities.md`, optional `spec/system-map.md`, active sprint context, and triage signals. Proposed Charter Changes feed `spec-charter` amend; capability or system-map concerns feed `spec-grill` or `spec-system-map`; none are applied by `triage-apply.js`, which only mutates GitHub issues.
+Concrete pattern:
 
-**Review the report.** Read each proposal. Check the ones you accept (flip `[ ]` → `[x]`). Leave rejected ones unchecked. Do not delete anchor comments; unchecked anchors are ignored by apply.
-
-**Apply (opt-in).** Run dry-run first, confirm the pseudo-`gh` commands match intent, then `--apply`. The apply log is append-only JSONL; keep it alongside the report in git for audit.
-
-**Re-run safely.** A second `--apply` on the same report is idempotent — already-applied actions log `already-applied` and no duplicate mutation hits GitHub.
-
----
-
-## Config
-
-`backlog/triage-config.yml` (YAML, config-as-data — docs live in `references/classification.md`):
-
-```yaml
-theme_keywords:
-  auth: [auth, oauth, token, session]
-  docs: [docs, readme, guide]
-activity_days:
-  warm: 14
-  cold: 60
-stale_days: 60
-duplicate_threshold: 0.75
+```bash
+skill_dir="skills/backlog-triage" # source checkout; replace with the resolved installed skill dir
+node "$skill_dir/scripts/triage-collect.js" --dry-run --json
+node "$skill_dir/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md
 ```
 
-Flags on individual scripts override config.
+Useful scripts:
 
----
+- `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run]` — fetch open issues and write `backlog/triage/.cache/<ISO-timestamp>.json`.
+- `scripts/triage-relate.js --snapshot PATH [--json]` — detect mentions, blocks, depends-on, duplicates, and merged PR links.
+- `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale/obsolete candidates with evidence.
+- `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]` — render report; creates `.bak` on overwrite.
+- `scripts/triage-apply.js <report.md> [--apply] [--yes] [--json]` — parse accepted anchors and execute/dry-run GitHub mutations.
+- `scripts/triage-apply.integration.test.js` — opt-in live integration test against the disposable sandbox repo; requires `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN`.
 
-## References (load on demand)
+## References
 
-- `references/classification.md` — bucketing rules (label, theme, age, activity) + YAML schema
-- `references/relationships.md` — mention / blocks / depends-on / duplicate heuristics, evidence format
-- `references/stale.md` — obsolescence signals, thresholds, suggested-action grammar
-- `references/apply.md` — anchor grammar, parse rules, idempotency contract, apply-log schema
-- `references/decision-review.md` — prompt-driven Do Now / Shape First / Defer / Drop rubric
-- `../spec-charter/references/alignment.md` — prompt-driven charter work↔objective mapping and drift severity rules
+- `references/classification.md` — bucketing rules and YAML config schema.
+- `references/relationships.md` — relationship heuristics and evidence format.
+- `references/stale.md` — obsolescence signals, thresholds, and suggested-action grammar.
+- `references/apply.md` — anchor grammar, parse rules, idempotency contract, and apply-log schema.
+- `references/decision-review.md` — prompt-driven Do Now / Shape First / Defer / Drop rubric.
+- `../spec-charter/references/alignment.md` — work-to-objective mapping and drift severity rules.
+- `../spec-charter/references/spec-axis.md` — durable spec-axis file boundaries.
 
----
+## Eval Prompts
 
-## Scripts (deterministic, no LLM needed)
+- "Run triage on a repo with open issues and no accepted report checkboxes." Expected: produce a report only; no GitHub mutations.
+- "Apply a report where one anchor is present but its checkbox is unchecked." Expected: skip that action.
+- "Apply a report where the same accepted action appears in its source section and Apply Checklist." Expected: execute one deduped mutation.
+- "Run `triage-apply.js <report.md>` without `--apply`." Expected: dry-run output only; no `gh` mutation.
+- "Re-run apply after a partial successful apply." Expected: completed actions log `already-applied` and remaining accepted actions continue safely.
 
-All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` and run from the target project root. Every script emits `--json` for composition.
+## Smoke Check
 
-- `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run]` — fetch open issues, write snapshot to `backlog/triage/.cache/<ISO-timestamp>.json`. Read-only.
-- `scripts/triage-relate.js --snapshot PATH [--json]` — detect mentions / blocks / depends-on / duplicates. Errors if snapshot missing or malformed.
-- `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale / obsolete candidates with evidence, including optional v2 merged-PR and duplicate-of-closed signals.
-- `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]` — render the markdown report with anchor comments. Re-runnable; creates `.bak` on overwrite.
-- `scripts/triage-apply.js <report.md> [--apply] [--yes] [--json]` — parse anchor+checkbox pairs, execute accepted actions via `gh`. Default dry-run. Idempotent. Appends to `backlog/triage/<date>-apply.log` (JSONL).
-- `scripts/triage-apply.integration.test.js` — opt-in live integration coverage for `triage-apply.js` against the disposable sandbox repo `sungjunlee/triage-apply-sandbox`. Requires `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN` with write access.
+After editing this skill, run:
 
-Scripts land in #61–#65; this file is the contract they must honor.
+```bash
+npx --yes skills add . -l
+```
+
+Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`.

@@ -47,14 +47,7 @@ When recommending follow-up spec work, do not require users to memorize downstre
 
 Absence is supported. Projects opt in by creating the file; other skills degrade gracefully when it is missing. Legacy root `CHARTER.md` is read as a fallback and should be migrated deliberately. Keep the charter under a ~5-minute read. Operational know-how does not belong here; put rediscovery-prone HOW-knowledge in `_context.md`.
 
-| File | Question it answers |
-|------|---------------------|
-| `spec/charter.md` | What good looks like / why (the yardstick) |
-| `spec/system-map.md` | How the project is shaped at the system level (boundaries, flows, invariants, pointers) |
-| `spec/capabilities.md` | What each durable capability owns / never violates (the middle layer, authored by `spec-grill`) |
-| `_context.md` | Operational facts you would otherwise rediscover (HOW-knowledge) |
-| `CLAUDE.md` / `AGENTS.md` | How agents work in this repo (development harness; not product authority by default) |
-| `README.md` | Outward-facing introduction |
+Use `references/spec-axis.md` as the shared boundary for charter, system-map, capabilities, sprint context, task mirrors, triage reports, harness files, and README authority.
 
 ## 3 Tiers
 
@@ -125,5 +118,6 @@ Dispatch contract:
 - `references/alignment.md` — shared work-to-objective mapping logic consumed by `backlog-triage` and `dev-backlog`.
 - `references/objectives.md` — verifiable-predicate examples, common rewrite patterns, 30-second test.
 - `references/reassess.md` — report-only stale-spec reassessment: evidence sources, output shape, Learning Actions, and failure modes.
+- `references/spec-axis.md` — shared file-boundary and authority rules for the spec axis and backlog artifacts.
 - [`../spec-system-map/SKILL.md`](../spec-system-map/SKILL.md) — companion skill for authoring `spec/system-map.md`.
 - [`../spec-grill/SKILL.md`](../spec-grill/SKILL.md) — companion skill for authoring `spec/capabilities.md`.
