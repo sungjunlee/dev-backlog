@@ -13,6 +13,8 @@ Author `spec/capabilities.md`, the middle layer between `spec/charter.md` and th
 
 Use this after `spec-charter create` on existing/brownfield repos, or whenever the user asks to define capability boundaries, component contracts, Behaviors, or Hard Constraints.
 
+Use `../spec-charter/references/spec-axis.md` as the shared file-boundary reference. This skill owns only `spec/capabilities.md`; charter direction routes to `spec-charter`, system shape routes to `spec-system-map`, and sprint execution context stays with `dev-backlog`.
+
 ## Execution Contract
 
 ### Intent Router
@@ -162,7 +164,7 @@ When the user accepts a first capability edit and `spec/capabilities.md` is abse
 
 After applying an accepted change, do not bump a revision number on `spec/capabilities.md`; `git blame` is the source of truth. Note in the conversation which capability was edited. Echo charter Decisions at capability level only when they explain a Behavior or Hard Constraint; promote cross-cutting capability Decisions through `spec-charter amend`.
 
-See `references/capabilities.md` for additional grill heuristics and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide charter layer.
+See `references/capabilities.md` for additional grill heuristics, [`../spec-charter/references/spec-axis.md`](../spec-charter/references/spec-axis.md) for shared file boundaries, and [`../spec-charter/SKILL.md`](../spec-charter/SKILL.md) for the project-wide charter layer.
 
 ## Pressure Prompts
 

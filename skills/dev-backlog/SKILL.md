@@ -9,235 +9,168 @@ metadata:
 
 # Dev Backlog
 
-README covers install and human quick start. This skill file is the execution contract for agents: file roles, sprint structure, process, and script behavior.
+Real job: keep GitHub Issues as the task source of truth while using `backlog/sprints/` as the local execution hub for planning, context, progress, and handoff.
 
-Related skills: [`spec-charter`](../spec-charter/SKILL.md) for the optional `spec/charter.md` reference axis, [`spec-system-map`](../spec-system-map/SKILL.md) for `spec/system-map.md`, [`spec-grill`](../spec-grill/SKILL.md) for `spec/capabilities.md`, and [`backlog-triage`](../backlog-triage/SKILL.md) for weekly backlog grooming before you plan the next sprint.
+README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, must-do steps, and completion criteria.
 
-Two layers, each with a clear job:
+Related skills: [`spec-charter`](../spec-charter/SKILL.md) for `spec/charter.md`, [`spec-system-map`](../spec-system-map/SKILL.md) for `spec/system-map.md`, [`spec-grill`](../spec-grill/SKILL.md) for `spec/capabilities.md`, and [`backlog-triage`](../backlog-triage/SKILL.md) for advisory backlog review before sprint planning.
+
+## Mode Router
+
+| User intent | Mode | Completion boundary |
+| --- | --- | --- |
+| "where are we?", "orient", "status" | `orient` | Active sprint, latest progress, and next unchecked batch are identified. |
+| "plan sprint", "make sprint", "start work" with no active sprint | `plan` | One active sprint file exists with Goal, ordered Plan, `objectives:`, and `component:`. |
+| "work #N", "continue", "do next batch" | `work` | Issue AC is verified, task/sprint state is updated, and GitHub receives a meaningful status signal. |
+| "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
+| "sync", "pull issues", "refresh backlog" | `sync` | GitHub/local mirrors are explicitly refreshed; no silent background sync. |
+| "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
+
+If `backlog/` does not exist, bootstrap it with `mkdir -p backlog/{sprints,tasks,completed}` and create `backlog/config.yml`; see `references/file-format.md`.
+
+## Core Contracts
 
 ```
 GitHub (source of truth — what to do)
   Issues, Milestones, Labels, Comments, PR links
-  Defines tasks. Visible to collaborators. Persists across tools.
        ↕  gh CLI (sync is always explicit)
 Local (execution hub — how to do it)
-  backlog/sprints/   ← THE working file. Plan, context, notes, progress.
-  backlog/tasks/     ← Thin mirror of GitHub issues (sync cache).
+  backlog/sprints/   <- working files: plan, context, notes, progress
+  backlog/tasks/     <- thin GitHub issue mirrors and AC checkboxes
 ```
 
-**The sprint file is where you live during execution.** Start every session by reading it. Update it as you work. It carries context across tasks and sessions.
+- Exactly one sprint file may have `status: active`; scripts warn/refuse ambiguous active sprint state.
+- Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
+- Keep task files thin. AC checkboxes may update there; decisions, progress, and cross-task context stay in the sprint file.
+- Completed sprints stay as the permanent execution record.
+- Spec-axis boundaries live in `../spec-charter/references/spec-axis.md`; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
 
----
+## Sprint File Contract
 
-## Directory Structure
+One active sprint file in `backlog/sprints/YYYY-MM-<topic>.md` carries:
 
-```
-backlog/
-├── sprints/              # Sprint execution (the core)
-│   ├── _context.md      # Cross-sprint persistent context
-│   ├── 2026-03-auth-system.md        # Active (status: active)
-│   └── 2026-02-api-v2-migration.md   # Past (status: completed)
-├── tasks/                # GitHub issue mirror (thin sync)
-│   ├── BACK-42 - OAuth.md
-│   └── BACK-43 - Rate-limit.md
-├── completed/            # Archived done tasks
-└── config.yml            # Project config
-```
+| Section / field | Purpose | Completion check |
+| --- | --- | --- |
+| `status: active` | Marks the single active sprint | No other sprint is active. |
+| `objectives: [O1]` | Charter Objective IDs advanced by the sprint | IDs exist and are actionable, or `[]` when no charter exists. |
+| `component: "slug"` | Primary capability and relay-Learnings routing handle | Resolves to one capability whose `## Learnings` block receives relay-merge entries, or empty when no target exists. |
+| `## Goal` | Sprint-level success statement | One sentence describing done state. |
+| `## Plan` | Ordered batches with issue refs and estimates | Every planned task has a checkbox and issue number. |
+| `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
+| `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
 
-**Bootstrap (first time):** If `backlog/` doesn't exist, create it: `mkdir -p backlog/{sprints,tasks,completed}`. See `references/file-format.md` for config.yml and task file format. See `references/github-sync.md` for one-time label setup.
-
-### sprints/ Rules
-
-- **One active sprint at a time.** Exactly one `status: active` sprint is valid; scripts warn/refuse ambiguous active sprint state instead of picking one arbitrarily.
-- **Naming: `YYYY-MM-<topic>.md`** — date prefix for timeline, topic for content.
-  - Task-focused: `2026-03-auth-system.md`, `2026-04-payment-integration.md`
-  - Time-focused: `2026-03-W13-misc.md`, `2026-03-tech-debt.md`
-  - The filename alone should tell you "when and what was worked on."
-- **`_context.md`** holds knowledge that outlives any single sprint — architecture decisions, conventions, recurring gotchas. Sprint-specific context stays in the sprint file's Running Context; project-level context goes here.
-- **Completed sprints stay.** They're the record of what happened, what was decided, and why. Don't delete them.
-
----
-
-## Sprint File Format
-
-The sprint file in `backlog/sprints/` is the execution hub. One file per sprint.
-The `objectives` frontmatter field lists the charter Objective IDs this sprint advances; it is `[]` when the project has no `spec/charter.md` or legacy root `CHARTER.md`.
-The `component` field is one primary routing handle from `spec/capabilities.md`. It names the single capability whose `## Learnings` block receives an entry when a relay run merges. Empty string means no live-update target. If a sprint touches secondary areas, mention them in the sprint body or Running Context instead of adding more frontmatter values.
-
-```markdown
----
-milestone: Sprint W13
-status: active
-started: 2026-03-22
-due: 2026-03-28
-objectives: [O1, O3]
-component: "auth"
----
-
-# Auth + API Foundation
-
-## Goal
-One sentence: what's true when this sprint is done.
-
-## Plan
-Ordered batches. Small tasks grouped into one session.
-
-### Batch 1 — DB + seed (one session)
-- [x] #38 DB schema setup (~15min)
-- [x] #39 Seed data script (~10min)
-
-### Batch 2 — Core auth
-- [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
-
-### Batch 3 — Hardening (one session)
-- [ ] #43 Rate limiting (~30min)
-- [ ] #44 Input validation (~20min)
-
-### Batch 4 — Verification
-- [ ] #45 Integration tests (~1hr)
-
-## Running Context
-Carries across all tasks in this sprint. Add entries as you learn things.
-- argon2 for hashing (decided in #42 — GPU resistant, memory-hard)
-- rate limit middleware: middleware/rateLimit.ts
-- test DB: docker-compose.test.yml
-- IMPORTANT: token refresh must use sliding window, not fixed expiry
-
-## Progress
-- 2026-03-22 AM: Batch 1 done. Schema + seed in one session.
-- 2026-03-22 PM: #42 started. 3/5 AC done. Token refresh logic remaining.
-- 2026-03-23 AM: #42 complete. Started Batch 3.
-```
-
-### Plan checkbox states
+Plan checkbox states:
 
 | Marker | Meaning | Set by |
-|--------|---------|--------|
-| `[ ]` | Not started | sprint-init.js or manual |
-| `[~]` | In-flight — dispatched, PR under review | dev-relay (after dispatch) |
-| `[x]` | Done — merged or completed | Manual or dev-relay (after merge) |
+| --- | --- | --- |
+| `[ ]` | Not started | `sprint-init.js` or manual planning |
+| `[~]` | In-flight: dispatched, PR under review, or actively worked | Manual or dev-relay |
+| `[x]` | Done: merged or completed | Manual or dev-relay after verification |
 
-```
-[ ] #42 OAuth2 flow              ← Planning (sprint-init or manual)
- │
- ├─ Do yourself ──→ [x] #42       ← commit "Fixes #42"
- └─ Delegate ─────→ [~] #42 → PR #87 (reviewing)
-                     │
-                     └──────────→ [x] #42 → PR #87 (merged)
-```
+Full sprint and task-file examples live in `references/file-format.md`.
 
-### dev-relay data flow
+## Execution Path
 
-```
-backlog/sprints/{active}.md          backlog/tasks/{PREFIX}-{N}.md
-┌──────────────────────┐             ┌────────────────────┐
-│ ## Plan               │──reads───→ │ AC checkboxes      │──→ relay-plan
-│  [ ] / [~] / [x]     │←─writes──  └────────────────────┘
-│ ## Running Context    │←─writes──  relay-merge (learnings)
-│ ## Progress           │←─writes──  relay-merge (audit log)
-└──────────────────────┘
-```
+### Orient
 
-### What each section does
+1. Read `_context.md` if present.
+2. Find the single active sprint; if none exists, inspect open GitHub issues and route to `plan`.
+3. Read the active sprint's Goal, Plan, Running Context, and latest Progress.
+4. Identify the next unchecked Plan item or route to `complete` when all items are done.
 
-| Section | Purpose | When to update |
-|---------|---------|---------------|
-| **Goal** | Sprint-level success criteria | Once, at planning |
-| **Plan** | Ordered batches with issue refs + time estimates | At planning; adjust if scope changes |
-| **Running Context** | Decisions, conventions, gotchas that span tasks | During work — whenever you learn something that affects later tasks |
-| **Progress** | Timestamped log of what happened | End of each session or batch |
+Done when you can name the current sprint state and the next actionable batch.
 
-### Cross-Sprint Context (`_context.md`)
+### Plan
 
-Some knowledge outlives a single sprint. When you notice a Running Context entry that's project-level (not sprint-specific), promote it to `backlog/sprints/_context.md`:
+1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; use `objectives: []` when both are absent.
+2. Pull/inspect open issues and assign the sprint milestone when applicable.
+3. Create one active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:`.
+4. Refuse to create a second active sprint until the previous one is completed.
 
-```markdown
-# Project Context
+Done when the sprint file is the single active execution hub and each planned issue has a clear batch position.
 
-## Architecture Decisions
-- argon2 for all password hashing (2026-03-22, Sprint W13)
-- API versioning via URL prefix /v1/ (2026-03-15, Sprint W12)
+### Work
 
-## Conventions
-- All new endpoints need rate limiting middleware
-- Test DB via docker-compose.test.yml, never local postgres
-- Commit format: Fixes #N or Refs #N
+1. Read the current batch and each task file's Description and AC.
+2. Mark meaningful GitHub/local status before work when useful.
+3. Implement or delegate through dev-relay.
+4. Verify every AC item before checking it off.
+5. Update Plan checkbox, Running Context, Progress, and GitHub issue comments/labels as appropriate.
 
-## Known Gotchas
-- token refresh must use sliding window (fixed expiry caused logout storms)
-- Safari doesn't send cookies on first redirect — workaround in auth middleware
-```
+Done when verified work is reflected in task AC, sprint progress, and GitHub state.
 
-At sprint start, read `_context.md` alongside the new sprint file. At sprint end, review Running Context and promote anything that future sprints need to know.
+### Complete
 
----
+Per issue: all AC checked, implementation merged or committed with `Fixes #N`, Plan checked, and Progress updated.
 
-## Task Files (thin GitHub mirror)
+For a whole sprint:
 
-Files in `backlog/tasks/` are synced copies of GitHub Issues — kept thin on purpose. Their job is to let AI read issue details without an API call.
+1. Set `status: completed` and write a final Progress entry.
+2. Move completed task files from `backlog/tasks/` to `backlog/completed/`.
+3. Promote project-level Running Context entries to `_context.md`.
+4. Leave the sprint file in place as the permanent record.
 
-```yaml
----
-id: BACK-42
-title: Implement OAuth2 flow
-status: In Progress
-labels: [auth, backend]
-priority: high
-milestone: Sprint W13
-created_date: '2026-03-22'
----
+Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
-## Description
-[Synced from GitHub issue body]
+### Sync
 
-## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [x] Valid credentials return JWT token
-- [x] Expired tokens get 401 response
-- [ ] Test coverage > 90%
-<!-- AC:END -->
+- Pull GitHub -> local at sprint start and when issues change.
+- Push local -> GitHub at meaningful milestones: status labels, progress comments, closing issues.
+- Never mutate GitHub silently; sync is an explicit action.
+
+Done when the user can tell which direction changed and what was updated.
+
+### Next
+
+Read the active sprint and return the first unchecked actionable batch. If no active sprint exists or the sprint is done, say whether to plan the next sprint or inspect unplanned GitHub work.
+
+## Script Resolution
+
+Resolve scripts from the installed `dev-backlog` skill directory, not from the target project. In a source checkout, that is the local `scripts/` directory beside this `SKILL.md`; in an installed skill, locate the active skill directory and run the same script from there. Run scripts from the target project root.
+
+Concrete pattern:
+
+```bash
+skill_dir="skills/dev-backlog" # source checkout; replace with the resolved installed skill dir
+bash "$skill_dir/scripts/next.sh"
+node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 ```
 
-Task files get AC checkboxes updated during work. Everything else (notes, decisions, context) goes in the **sprint file**, not here.
+Useful scripts:
 
----
+- `scripts/init.sh [project-name]` — bootstrap `backlog/` with config and directories.
+- `scripts/next.sh` — show the next actionable batch.
+- `scripts/status.sh` — summarize sprint file + GitHub state.
+- `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — pull open GitHub issues into `backlog/tasks/`.
+- `scripts/sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` — create one active sprint skeleton; refuses a second active sprint.
+- `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — sync monthly progress issue.
+- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — close the single active sprint.
+- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
+- `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
+- `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
 
-## Process
+## References
 
-**Orient** → Read `_context.md` + active sprint file. No sprint? → Plan. All done? → Complete.
+- `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Sync/Quick Fix/Unplanned Work/Next workflow.
+- `references/file-format.md` — Backlog.md-compatible config/task format and sprint examples.
+- `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
+- `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
+- `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 
-**Plan** -> If `spec/charter.md` exists, read its `active` Objectives first; otherwise fall back to legacy root `CHARTER.md`. Project Objectives onto not-yet-done work and record advanced IDs in `objectives:`. If both are absent, plan as before and leave `objectives: []`.
+## Eval Prompts
 
-**Work** → Option A (do it yourself): read batch → implement → verify AC → commit `Fixes #N`. Option B (delegate): follow the relay skill's dispatch process.
+- "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name latest Progress, and return the first unchecked batch.
+- "Plan a sprint when another sprint is already `status: active`." Expected: refuse or complete the old sprint first; never create a second active sprint.
+- "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
+- "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.
+- "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.
 
-**Complete** → Check off Plan, add Progress entry. Sprint done? → set `status: completed`, move tasks to `completed/`, promote Running Context to `_context.md`.
+## Smoke Check
 
-Full process details: `references/process.md` (Orient, Create, Plan, Work, Complete, Sync, Quick Fix, Unplanned Work, Next).
+After editing this skill, run:
 
----
+```bash
+npx --yes skills add . -l
+```
 
-## References (load on demand)
-
-- `references/file-format.md` — Backlog.md file format, config.yml, task file fields, naming conventions
-- `references/github-sync.md` — `gh` CLI patterns: label setup, milestone management, sync commands
-- `references/workflow-patterns.md` — Sprint planning, bug triage, feature breakdown, retrospective
-- `references/integration-contract.md` — dev-relay ↔ dev-backlog interop surface: file paths, sections, regex patterns
-- [`../backlog-triage/SKILL.md`](../backlog-triage/SKILL.md) — sibling skill for weekly backlog review before sprint planning
-
-## Scripts (deterministic, no LLM needed)
-
-All scripts live in `${CLAUDE_SKILL_DIR}/scripts/` (the skill's own directory, not the target project). Run from the target project root.
-
-- `scripts/lib.sh` — Shared bash functions: `find_active_sprint`, `find_active_sprints`, `count_checkboxes`, `extract_section`
-- `scripts/lib.js` — Shared Node functions: `slugify`, `escapeYaml`, `readConfig`, `estimateSize`
-- `scripts/init.sh [project-name]` — Bootstrap `backlog/` directory with config.yml
-- `scripts/next.sh` — Show next actionable batch from the single active sprint (zero LLM cost)
-- `scripts/status.sh` — Project status from sprint file + GitHub
-- `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — Pull open GitHub issues to local backlog/tasks/. By default it fetches all open issues; `--limit N` caps the fetch size. PREFIX defaults to config.yml's `task_prefix`. `--update` refreshes frontmatter while preserving local AC checkboxes. `--json` emits a machine-readable summary.
-- `scripts/sprint-init.js "auth-system" [--milestone "Name"] [--dry-run] [--json]` — Generate sprint file skeleton; refuses to create a second active sprint. `--json` emits the target sprint file path plus metadata.
-- `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — Sync the monthly GitHub Progress issue. `--finalize` adds the month-end block and closes the target month's issue idempotently.
-- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — Close the single active sprint: set completed, move tasks, remind about context promotion
-- `scripts/context-hook.sh [backlog-dir]` — One-line sprint summary for Claude Code PreToolUse hook (always exits 0)
-- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — Verify every `objectives:` ID in sprint files still exists in `spec/charter.md` (or legacy root `CHARTER.md`) with an actionable (non-deferred) status. Graceful no-op when both are absent.
-- `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — Verify every `component:` value in sprint files resolves to one declared capability in `spec/capabilities.md`. Comma-separated multi-component values fail because `component:` is the primary routing handle; put secondary touches in sprint prose. Graceful no-op when `spec/capabilities.md` is absent.
-- `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — Check `spec/capabilities.md` compactness: capability count, line count, per-capability size, Learnings marker health, and inline Learnings budget. Default mode warns; `--strict` exits non-zero on hard split triggers or malformed Learnings markers.
+Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`.
