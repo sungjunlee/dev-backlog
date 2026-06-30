@@ -130,7 +130,3 @@ Useful scripts:
 - "Apply a report where the same accepted action appears in its source section and Apply Checklist." Expected: execute one deduped mutation.
 - "Run `triage-apply.js <report.md>` without `--apply`." Expected: dry-run output only; no `gh` mutation.
 - "Re-run apply after a partial successful apply." Expected: completed actions log `already-applied` and remaining accepted actions continue safely.
-
-## Smoke Check
-
-After editing this skill bundle, run the repository-level skill discovery smoke check documented in `README.md`.

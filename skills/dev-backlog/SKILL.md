@@ -164,7 +164,3 @@ Useful scripts:
 - "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
 - "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.
 - "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.
-
-## Smoke Check
-
-After editing this skill bundle, run the repository-level skill discovery smoke check documented in `README.md`.
