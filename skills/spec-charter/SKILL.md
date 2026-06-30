@@ -1,7 +1,7 @@
 ---
 name: spec-charter
 argument-hint: "[create|amend|reassess]"
-description: "Create, amend, and reassess spec/charter.md as the project-wide spec axis. Use to establish or evolve project direction, Objectives, Non-Goals, Decisions, stale spec findings, project charter, 기준, 헌장, 방향성, spec axis."
+description: "Manage spec/charter.md as the project charter. Use to create, amend, or reassess project direction, Objectives, Non-Goals, Decisions, stale spec-axis findings, 기준, 헌장, 방향성."
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-system-map, spec-grill, dev-backlog, backlog-triage"
@@ -11,7 +11,7 @@ metadata:
 
 Create and amend `spec/charter.md`, the opt-in project reference axis used to measure backlog work, sprint plans, and drift. This skill is rerunnable.
 
-`spec/charter.md` is the first layer, not the whole large-repo spec. On existing/brownfield repos, finish create mode by recommending `spec-system-map` for `spec/system-map.md` and `spec-grill` for `spec/capabilities.md` from real repo signals.
+`spec/charter.md` is the first layer, not the whole large-repo spec. On existing/brownfield repos, finish create mode by recommending the next spec-axis action from real repo signals.
 
 ## Execution Contract
 
@@ -35,7 +35,7 @@ Resolve helper scripts from the installed `spec-charter` skill directory, not fr
 
 End every mode with a short summary:
 
-- `create`: created files, unresolved assumptions, and a concrete next natural-language action. On brownfield repos, recommend creating `spec/system-map.md` before asking `spec-grill` to review capability boundaries.
+- `create`: created files, unresolved assumptions, and a concrete next natural-language action. On brownfield repos, create `spec/system-map.md` first when absent; recommend `spec-grill` only when capability candidates are evidence-backed.
 - `amend`: accepted changes, refused/parked changes, proof cited for status advances, and size-check result.
 - `reassess`: required report sections from the Reassess Mode dispatch contract, with one recommended next natural-language action.
 
@@ -66,7 +66,7 @@ Use create mode when neither `spec/charter.md` nor legacy root `CHARTER.md` exis
 1. Draft from repo signals: product/user-facing signals (`README.md`, open epics/issues, `CHANGELOG.md`) before development-harness signals (`CLAUDE.md`, `AGENTS.md`). Harness files may inform workflow conventions, local commands, and repo-specific guardrails, but they do not override README, charter, issues, code structure, or user interview answers for product/capability authority unless they explicitly describe product boundaries. When signals conflict, surface the conflict in the interview rather than picking silently.
 2. Interview the user to fill and sharpen Problem, Approach, Non-Goals, and initial Objectives. Follow the checklist in `references/create.md`: Problem framing options, the wedge test for Approach, Non-Goals elicitation, and Objective framing that cites `references/objectives.md`.
 3. Create `spec/` if needed, then write `spec/charter.md` from `templates/charter.md` with `revision: 1` and today's `last_amended`. The Decisions table may be left empty. Seed 3-5 rows only when prior design docs, ADRs, or notable merged PRs already record direction; whatever lands becomes immutable from revision 2.
-4. If the target repo is brownfield, recommend `spec-system-map` as the next step when `spec/system-map.md` is absent. After the map exists, recommend asking `spec-grill` to review candidate capability boundaries. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
+4. If the target repo is brownfield, use the create-mode completion contract to choose the next spec-axis action. Brownfield signals include existing source roots (`src/`, `app/`, `lib/`, `packages/`, `skills/`), commit history, tests/scripts/config, open issues, or multiple top-level feature/workflow surfaces.
 
 Objective conventions:
 
@@ -106,7 +106,7 @@ If reassess finds that `spec/system-map.md` is missing on a brownfield repo, rec
 
 Dispatch contract:
 
-1. Resolve helper scripts from the installed dev-backlog skill directory; if unavailable, report **Missing Evidence**.
+1. Resolve cross-skill helper scripts from the installed `dev-backlog` skill directory (`capabilities-doctor.js`, `component-lint.js`); if unavailable, report **Missing Evidence**.
 2. Start with bounded evidence: `capabilities-doctor.js --json`, `component-lint.js --json`, named charter, system-map, or capability sections, the active sprint, and at most the latest five completed sprint files.
 3. Emit these report sections: **Evidence**, **No Change**, **System Map Candidates**, **Grill Candidates**, **Amend Candidates**, **Learning Actions**, **Missing Evidence**, **Recommended Next Step**.
 4. Use `references/reassess.md` as the source of truth for evidence order, report shape, recommendation rules, Learning Actions, and stale-spec failure modes.

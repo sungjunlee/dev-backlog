@@ -1,7 +1,7 @@
 ---
 name: spec-system-map
 argument-hint: "[create|amend]"
-description: "Create or amend spec/system-map.md as a high-level project system map. Use for architecture scope confusion, system shape, runtime boundaries, core flows, invariants, storage/external systems, or SYSTEM_MAP."
+description: "Manage spec/system-map.md as the high-level system map. Use for project shape, runtime boundaries, core flows, invariants, storage or external systems, architecture scope confusion."
 compatibility: Requires git. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, dev-backlog"
@@ -43,6 +43,8 @@ The Repo Evidence Pass is an agent checklist, not a new script. Report evidence 
 3. Move low-level module details, endpoint lists, deployment commands, and temporary implementation notes out of the map.
 4. If a change is really a capability contract, route it to `spec-grill`. If it changes why/good-state, route it to `spec-charter amend`.
 
+Done when the map reflects only evidence-backed project-wide changes, low-level detail has been demoted or refused, charter/capability changes have been routed out, and the final response names evidence read and evidence missing.
+
 ## Quality Checks
 
 Before finishing, verify:
@@ -57,7 +59,7 @@ Before finishing, verify:
 
 ## Completion Output
 
-End create mode with:
+End create and amend mode with:
 
 - `Evidence Read`: concise bullets naming the concrete docs, entrypoints, configs, tests, storage/external surfaces, and history inspected.
 - `Evidence Missing`: concise bullets naming unavailable or ambiguous evidence that affects confidence.
