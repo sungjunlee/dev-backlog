@@ -1,7 +1,7 @@
 ---
 name: dev-backlog
 argument-hint: "[orient|plan|work|next|sync] [issue-number]"
-description: Manage development work through GitHub Issues + local sprint files. Issues/Milestones are the source of truth; local sprint files handle execution — batching, ordering, context, and progress. Use for creating issues, planning sprints, checking what to work on, reviewing progress, syncing with GitHub, managing milestones, backlog, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+description: Manage GitHub-Issue-backed sprint execution. Use for issue mirrors, sprint planning or closing, next-work selection, progress sync, milestone-backed backlog work, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
@@ -167,10 +167,4 @@ Useful scripts:
 
 ## Smoke Check
 
-After editing this skill, run:
-
-```bash
-npx --yes skills add . -l
-```
-
-Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`.
+After editing this skill bundle, run the repository-level skill discovery smoke check documented in `README.md`.

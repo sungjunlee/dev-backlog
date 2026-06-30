@@ -1,7 +1,7 @@
 ---
 name: backlog-triage
 argument-hint: "[collect|relate|stale|report|apply] [options]"
-description: Interactive backlog grooming for open GitHub Issues. Classifies, relates, flags stale/obsolete, and proposes priorities — produces a markdown triage report you review before applying. Advisory by default; mutations require explicit --apply. Use for backlog review, issue grooming, stale cleanup, priority re-ranking, 백로그 정리, 이슈 검토, 트리아지, 정리.
+description: Triage open GitHub Issues into an advisory report. Use for issue grooming, stale or obsolete detection, relationship mapping, priority and milestone proposals, accepted-action apply, 백로그 정리, 이슈 검토, 트리아지.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, dev-backlog, relay, relay-plan"
@@ -133,10 +133,4 @@ Useful scripts:
 
 ## Smoke Check
 
-After editing this skill, run:
-
-```bash
-npx --yes skills add . -l
-```
-
-Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`.
+After editing this skill bundle, run the repository-level skill discovery smoke check documented in `README.md`.
