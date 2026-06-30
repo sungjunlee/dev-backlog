@@ -106,15 +106,15 @@ Optional spec-series setup:
 
 For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
-## Verification
+## Maintainer Verification
 
-After editing this skill bundle, run the discovery smoke check from the repository root:
+After editing this repository's skill bundle, run the discovery smoke check from the repository root:
 
 ```bash
 npx --yes skills add . -l
 ```
 
-Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`.
+Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`. This verifies bundle packaging and frontmatter discovery; those sibling skills are not runtime dependencies for every `dev-backlog` invocation.
 
 Important if you use `dev-relay`: sprint files are not fully freeform markdown.
 These details are load-bearing for automation:
