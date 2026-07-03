@@ -3,7 +3,7 @@ milestone: 2026-07 SSOT decision and O5 activation
 status: active
 started: 2026-07-03
 due: TBD
-objectives: [O4]
+objectives: [O4, O5]
 component: "sprint-execution"
 ---
 
