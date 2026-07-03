@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 execution substrate
-status: active
+status: completed
 started: 2026-07-03
 due: TBD
 objectives: [O4]
@@ -26,7 +26,7 @@ Any actor can read execution state through `--json` surfaces and one `backlog-do
 - [x] #213 feat(dev-backlog): backlog-doctor aggregated health check (~2hr) → PR #226 (merged) [run:issue-213-20260703133301458-051de4cc]
 
 ### Batch 4 - E2 recovery gate (after #211 and #212)
-- [ ] #214 test(dev-backlog): fresh-session recovery eval and smoke test (~45min)
+- [x] #214 test(dev-backlog): fresh-session recovery eval and smoke test (~45min) → PR #227 (merged) [run:issue-214-20260703134948518-31b9d6f5]
 
 ## Running Context
 - Source PRD: `docs/prd-2026-07-autonomous-execution.md` (sections 4, 7). Issue AC is authoritative; PRD gives rationale.
@@ -47,3 +47,5 @@ Any actor can read execution state through `--json` surfaces and one `backlog-do
 - 2026-07-03: Epic #218 closed with S6 evidence. #212 → PR #224 → reviewed (LGTM, round 1) → merged; consumption contract now actor-agnostic, JSON schema section lands with #211. #211 dispatched (age heuristic fixed at dispatch: earliest Progress mention of #N, else sprint started date, else null; JSON emission single-sourced in node).
 - 2026-07-03: #211 → PR #225: executor seeded a duplicate active sprint (worktree lacked the then-untracked real one) — removed before merge, real sprint committed to main; gate-check stale false-positives from rebase timestamp ties (filed dev-relay#753, workaround: amend head timestamp) → merged after round-3 LGTM. Batch 2 (E2 contract + JSON surfaces) complete.
 - 2026-07-03: #213 → PR #226 → reviewed (LGTM, round 1) → merged. Live doctor run: 8 checks pass, exit 0. Batch 3 complete; #214 (recovery eval gate) dispatched.
+- 2026-07-03: #214 → PR #227 → round-1 changes_requested (recovery smoke false-failed valid in-flight-only state); orchestrator direct-fix (hasTodo/hasInFlight split + deterministic fixture) → round-2 LGTM → merged. All 7 plan items done; closing sprint.
+- 2026-07-03: Sprint closed. 7/7 tasks completed.
