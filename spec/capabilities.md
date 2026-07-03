@@ -40,6 +40,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 - 2026-07-03 (run #issue-211-20260703130640416-2ac13ba4): relay-merge of PR #225 [PR #225]
 - 2026-07-03 (run #issue-213-20260703133301458-051de4cc): relay-merge of PR #226 [PR #226]
 - 2026-07-03 (run #issue-214-20260703134948518-31b9d6f5): relay-merge of PR #227 [PR #227]
+- 2026-07-03 (run #issue-216-20260703140629614-43632130): relay-merge of PR #229 [PR #229]
 <!-- LEARN:END -->
 
 ### Decisions

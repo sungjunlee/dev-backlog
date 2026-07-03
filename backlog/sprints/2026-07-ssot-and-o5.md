@@ -14,11 +14,11 @@ The SSOT location question has a recorded charter Decision backed by a scored sp
 
 ## Plan
 ### Batch 1 - doctor close wiring (E4, #220)
-- [ ] #228 fix(dev-backlog): backlog-doctor treats zero active sprints as hard fail (~20min, fold into #216 branch)
-- [ ] #216 feat(dev-backlog): run backlog-doctor at sprint close with reassess signal (~45min)
+- [x] #228 fix(dev-backlog): backlog-doctor treats zero active sprints as hard fail (~20min, folded into #216) → PR #229 (merged) [run:issue-216-20260703140629614-43632130]
+- [x] #216 feat(dev-backlog): run backlog-doctor at sprint close with reassess signal (~45min) → PR #229 (merged) [run:issue-216-20260703140629614-43632130]
 
 ### Batch 2 - SSOT spike (E3)
-- [ ] #215 spike(dev-backlog): SSOT location decision - prototype sprint-to-issue mirror (timebox: half day; orchestrator-led analysis, not delegated)
+- [~] #215 spike(dev-backlog): SSOT location decision - prototype sprint-to-issue mirror (timebox: half day; orchestrator-led analysis, not delegated) → findings on #215, Decision row pending human approval
 
 ### Batch 3 - O5 activation (E4, after Batch 1)
 - [ ] #217 docs(spec): amend charter O5 deferred to active with signal-gated wording (~15min, human-gated spec-charter amend)
@@ -34,3 +34,5 @@ The SSOT location question has a recorded charter Decision backed by a scored sp
 
 ## Progress
 - 2026-07-03: Sprint created from milestone #11. Batch order: doctor wiring (#228+#216 delegated) → SSOT spike (#215, orchestrator-led) → O5 charter amend (#217, human-gated).
+- 2026-07-03: #216+#228 → PR #229 → reviewed (LGTM, round 1) → merged. Verified live: zero-active now warns; sprint-close --dry-run emits doctor pre-close block and reassess signal ("2 warnings, 12 sprints since last reassess → recommend spec-charter reassess"). #215 spike executed: mirror issue #230, 3 idempotent syncs, ~0 timeline noise; recommendation (a)+(c), reject (b); findings on #215. Decision row and O5 amend wording pending human approval.
+- 2026-07-03: capabilities-doctor warning noted: sprint-execution has 8 inline Learnings (keep 7) — prune/promote oldest entry at next capability edit.
