@@ -3,7 +3,7 @@ milestone: 2026-07 SSOT decision and O5 activation
 status: active
 started: 2026-07-03
 due: TBD
-objectives: [O4, O5]
+objectives: [O4]
 component: "sprint-execution"
 ---
 
@@ -30,6 +30,7 @@ The SSOT location question has a recorded charter Decision backed by a scored sp
 - #215 outcome lands as a charter Decision row (Tier 3, append via human-approved wording) — prototype uses the progress-issue machinery (managed-body marker + comment upsert keys) against this sprint's own file.
 - #217 waits for #216 evidence (one real doctor-at-close run) so the amend wording can cite it.
 - Milestone 1 lesson applied: this sprint file is committed to main at open time.
+- objectives: starts as [O4] because objectives-check rightly flags referencing deferred O5 as drift; add O5 to this frontmatter as part of #217 once the charter amend activates it.
 
 ## Progress
 - 2026-07-03: Sprint created from milestone #11. Batch order: doctor wiring (#228+#216 delegated) → SSOT spike (#215, orchestrator-led) → O5 charter amend (#217, human-gated).
