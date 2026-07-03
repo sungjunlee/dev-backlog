@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 SSOT decision and O5 activation
-status: active
+status: completed
 started: 2026-07-03
 due: TBD
 objectives: [O4, O5]
@@ -18,10 +18,10 @@ The SSOT location question has a recorded charter Decision backed by a scored sp
 - [x] #216 feat(dev-backlog): run backlog-doctor at sprint close with reassess signal (~45min) → PR #229 (merged) [run:issue-216-20260703140629614-43632130]
 
 ### Batch 2 - SSOT spike (E3)
-- [~] #215 spike(dev-backlog): SSOT location decision - prototype sprint-to-issue mirror (timebox: half day; orchestrator-led analysis, not delegated) → findings on #215, Decision row pending human approval
+- [x] #215 spike(dev-backlog): SSOT location decision - prototype sprint-to-issue mirror (timebox: half day; orchestrator-led analysis, not delegated) → decision recorded (charter rev.4), implementation cut as #231
 
 ### Batch 3 - O5 activation (E4, after Batch 1)
-- [ ] #217 docs(spec): amend charter O5 deferred to active with signal-gated wording (~15min, human-gated spec-charter amend)
+- [x] #217 docs(spec): amend charter O5 deferred to active with signal-gated wording (~15min, human-gated spec-charter amend) → charter revision 4 (user-approved wording)
 
 ## Running Context
 - Source PRD: `docs/prd-2026-07-autonomous-execution.md` (sections 5, 6, 8). Issue AC is authoritative.
@@ -36,3 +36,5 @@ The SSOT location question has a recorded charter Decision backed by a scored sp
 - 2026-07-03: Sprint created from milestone #11. Batch order: doctor wiring (#228+#216 delegated) → SSOT spike (#215, orchestrator-led) → O5 charter amend (#217, human-gated).
 - 2026-07-03: #216+#228 → PR #229 → reviewed (LGTM, round 1) → merged. Verified live: zero-active now warns; sprint-close --dry-run emits doctor pre-close block and reassess signal ("2 warnings, 12 sprints since last reassess → recommend spec-charter reassess"). #215 spike executed: mirror issue #230, 3 idempotent syncs, ~0 timeline noise; recommendation (a)+(c), reject (b); findings on #215. Decision row and O5 amend wording pending human approval.
 - 2026-07-03: capabilities-doctor warning noted: sprint-execution has 8 inline Learnings (keep 7) — prune/promote oldest entry at next capability edit.
+- 2026-07-04: User approved both gated items. Charter revision 4: O5 deferred→active (signal-gated, report-only) + SSOT Decision row ((a)+(c), reject (b)). Sprint objectives updated to [O4, O5]. Implementation issue #231 cut post-decision; #215/#230 closed; epic #220 closed with live S4 evidence. All plan items done; closing sprint.
+- 2026-07-04: Sprint closed. 4/4 tasks completed.

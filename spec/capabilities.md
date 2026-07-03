@@ -33,13 +33,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ### Learnings
 <!-- LEARN:BEGIN -->
-- 2026-07-03 (run #issue-208-20260703090524030-d4bec2a2): relay-merge of PR #221 [PR #221]
-- 2026-07-03 (run #issue-209-20260703090706456-f1713a3a): relay-merge of PR #222 [PR #222]
-- 2026-07-03 (run #issue-210-20260703125556716-d72d883c): relay-merge of PR #223 [PR #223]
-- 2026-07-03 (run #issue-212-20260703125820308-36828a54): relay-merge of PR #224 [PR #224]
-- 2026-07-03 (run #issue-211-20260703130640416-2ac13ba4): relay-merge of PR #225 [PR #225]
-- 2026-07-03 (run #issue-213-20260703133301458-051de4cc): relay-merge of PR #226 [PR #226]
-- 2026-07-03 (run #issue-214-20260703134948518-31b9d6f5): relay-merge of PR #227 [PR #227]
+- 2026-07-03 (milestone 10, PRs #221-#227): execution-substrate sprint delivered via 7 relay runs — JSON read surfaces, actor-agnostic consumption contract, backlog-doctor, recovery gate; key lesson: commit the sprint file at open or dispatch worktrees cannot see it
 - 2026-07-03 (run #issue-216-20260703140629614-43632130): relay-merge of PR #229 [PR #229]
 <!-- LEARN:END -->
 
