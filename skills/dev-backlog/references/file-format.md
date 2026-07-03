@@ -1,6 +1,6 @@
 # File Format Reference
 
-Task file specification following [Backlog.md](https://github.com/MrLesk/Backlog.md) format.
+Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format.
 
 ## Frontmatter Fields
 
@@ -92,15 +92,12 @@ Only AC checkboxes get updated in task files during work. Everything else (notes
 
 ```yaml
 project_name: "my-project"
+task_prefix: "BACK"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
-task_prefix: "BACK"
-labels: []
-milestones: []
-definition_of_done: []        # Default DoD items added to every new task
-date_format: yyyy-mm-dd hh:mm
-auto_commit: false
 ```
+
+dev-backlog reads `task_prefix`, `default_status`, and `statuses`; `project_name` is retained as metadata. Other Backlog.md config fields are not consumed by dev-backlog.
 
 ## Sub-tasks
 
@@ -113,6 +110,6 @@ Sub-tasks get their own files: `BACK-42.1 - Subtask-title.md`
 
 ## Backlog.md CLI Compatibility
 
-The `backlog/tasks/` and `backlog/completed/` directories follow Backlog.md standard — the CLI will recognize them.
+The `backlog/tasks/` and `backlog/completed/` directories use a Backlog.md-compatible task-file format, so the CLI will recognize them.
 
 The `backlog/sprints/` directory is a custom addition for sprint execution tracking. Backlog.md CLI ignores it (only scans `tasks/`, `completed/`, `drafts/`, `decisions/`, `docs/`). This is safe — sprints/ won't interfere with CLI operations.

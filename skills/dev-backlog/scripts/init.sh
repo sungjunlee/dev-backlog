@@ -22,12 +22,9 @@ mkdir -p backlog/{sprints,tasks,completed}
 
 cat > backlog/config.yml << EOF
 project_name: "$PROJECT_NAME"
+task_prefix: "BACK"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
-task_prefix: "BACK"
-labels: []
-milestones: []
-auto_commit: false
 EOF
 
 echo "Created backlog/ structure:"
