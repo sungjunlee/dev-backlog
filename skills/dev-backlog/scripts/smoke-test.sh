@@ -787,6 +787,9 @@ OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" --dry-run 2>&1)
 assert_contains "close dry-run: would set completed" "$OUT" "Would set status: completed"
 assert_contains "close dry-run: would move task" "$OUT" "BACK-1"
 assert_contains "close dry-run: shows context entries" "$OUT" "argon2"
+assert_contains "close dry-run: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
+assert_contains "close dry-run: doctor result appears" "$OUT" "[PASS] active_sprint"
+assert_contains "close dry-run: reassess verdict appears" "$OUT" "Reassess signal:"
 # Verify nothing actually changed
 assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
 assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "3"
@@ -796,6 +799,8 @@ OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "close: set completed" "$OUT" "status: completed"
 assert_contains "close: moved tasks" "$OUT" "BACK-1"
 assert_contains "close: context reminder" "$OUT" "argon2"
+assert_contains "close: doctor result appears" "$OUT" "[PASS] active_sprint"
+assert_contains "close: reassess verdict appears" "$OUT" "Reassess signal:"
 
 # Verify sprint file updated
 assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "completed"

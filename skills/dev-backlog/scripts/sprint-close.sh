@@ -5,10 +5,11 @@ set -uo pipefail
 # Usage: bash scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]
 #
 # Steps:
-#   1. Set sprint status: completed + add Progress entry
-#   2. Move checked-off task files to backlog/completed/
-#   3. Show Running Context entries (remind to promote to _context.md)
-#   4. Optionally close GitHub milestone (--close-milestone)
+#   1. Run backlog-doctor pre-close and compute the text-only reassess signal
+#   2. Set sprint status: completed + add Progress entry
+#   3. Move checked-off task files to backlog/completed/
+#   4. Show Running Context entries (remind to promote to _context.md)
+#   5. Optionally close GitHub milestone (--close-milestone)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
@@ -57,8 +58,15 @@ if [ "$CB_TODO" -gt 0 ] || [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "Warning: $CB_TODO todo, $CB_IN_FLIGHT in-flight items remaining"
 fi
 
-# --- Step 1: Set status: completed ---
+# --- Step 1: Run backlog-doctor and compute the close signal ---
+# The doctor runs before the status flip. Its Node close-summary mode receives
+# the closing sprint path and counts that sprint on today's date, so dry-run
+# output reports the same would-be reassess signal without mutating files.
 TODAY=$(date +%Y-%m-%d)
+DOCTOR_SUMMARY=$(node "$SCRIPT_DIR/backlog-doctor.js" --close-summary --closing-sprint "$ACTIVE" "$BACKLOG_DIR" 2>&1)
+DOCTOR_STATUS=$?
+
+# --- Step 2: Set status: completed ---
 if $DRY_RUN; then
   echo "[dry-run] Would set status: completed in $ACTIVE"
 else
@@ -69,7 +77,7 @@ else
   echo "Set status: completed in $ACTIVE"
 fi
 
-# --- Step 2: Move completed task files ---
+# --- Step 3: Move completed task files ---
 # Collect issue numbers from checked items
 DONE_ISSUES=$(grep "$RE_CB_DONE" "$ACTIVE" | sed "s/${RE_CB_DONE}\([0-9]*\).*/\1/" || true)
 
@@ -93,7 +101,7 @@ if [ -d "$TASKS_DIR" ] && [ -n "$DONE_ISSUES" ]; then
   done
 fi
 
-# --- Step 3: Show Running Context entries ---
+# --- Step 4: Show Running Context entries ---
 CONTEXT=$(extract_section "$ACTIVE" "Running Context")
 if [ -n "$CONTEXT" ]; then
   echo ""
@@ -103,7 +111,7 @@ if [ -n "$CONTEXT" ]; then
   echo "Promote project-level entries to: $SPRINTS_DIR/_context.md"
 fi
 
-# --- Step 4: Optionally close milestone ---
+# --- Step 5: Optionally close milestone ---
 if $CLOSE_MILESTONE; then
   MILESTONE=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -n "$MILESTONE" ]; then
@@ -121,5 +129,10 @@ if $CLOSE_MILESTONE; then
   fi
 fi
 
+echo ""
+printf "%s\n" "$DOCTOR_SUMMARY"
+if [ "$DOCTOR_STATUS" -ne 0 ]; then
+  echo "Doctor exit code: $DOCTOR_STATUS (close flow continues; see doctor failures above)."
+fi
 echo ""
 echo "Done."
