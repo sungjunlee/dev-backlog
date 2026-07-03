@@ -1,0 +1,253 @@
+const { describe, it, beforeEach, afterEach } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const {
+  parseArgs,
+  runDoctor,
+  exitCodeFor,
+  formatHumanSummary,
+} = require("./backlog-doctor.js");
+
+function write(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content);
+}
+
+function charter() {
+  return `# Charter
+
+## Objectives
+- O1 [active]    keep execution state readable · src: test
+`;
+}
+
+function capabilities() {
+  return `# Capabilities
+
+## Capability: sprint-execution
+
+### Learnings
+<!-- LEARN:BEGIN -->
+<!-- LEARN:END -->
+`;
+}
+
+function sprint({
+  status = "active",
+  objectives = "[O1]",
+  component = "sprint-execution",
+  started = "2026-07-03",
+  goal = "Keep the sprint healthy.",
+  plan = "- [ ] #1 Ship the health check",
+  runningContext = "- Follow existing script contracts.",
+  progress = "- 2026-07-03: Started.",
+  omitSections = [],
+} = {}) {
+  const sections = [
+    ["Goal", goal],
+    ["Plan", plan],
+    ["Running Context", runningContext],
+    ["Progress", progress],
+  ]
+    .filter(([name]) => !omitSections.includes(name))
+    .map(([name, body]) => `## ${name}\n${body}`)
+    .join("\n\n");
+
+  return `---
+status: ${status}
+started: ${started}
+objectives: ${objectives}
+component: "${component}"
+---
+
+# Test Sprint
+
+${sections}
+`;
+}
+
+function seedCleanRepo(repoRoot, sprintContent = sprint()) {
+  write(path.join(repoRoot, "spec", "charter.md"), charter());
+  write(path.join(repoRoot, "spec", "capabilities.md"), capabilities());
+  write(path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"), sprintContent);
+}
+
+function check(report, name) {
+  const found = report.checks.find((item) => item.name === name);
+  assert.ok(found, `missing check ${name}`);
+  return found;
+}
+
+describe("parseArgs", () => {
+  it("uses the documented defaults", () => {
+    const parsed = parseArgs([]);
+    assert.equal(parsed.backlogDir, "backlog");
+    assert.equal(parsed.staleDays, 7);
+    assert.equal(parsed.json, false);
+  });
+
+  it("accepts --json, --stale-days, and a backlog directory", () => {
+    const parsed = parseArgs(["--json", "--stale-days", "3", "custom-backlog"]);
+    assert.equal(parsed.json, true);
+    assert.equal(parsed.staleDays, 3);
+    assert.equal(parsed.backlogDir, "custom-backlog");
+  });
+
+  it("rejects invalid stale-day values", () => {
+    assert.match(parseArgs(["--stale-days", "soon"]).error, /Invalid --stale-days/);
+  });
+});
+
+describe("runDoctor", () => {
+  let repoRoot;
+
+  beforeEach(() => {
+    repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "backlog-doctor-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  });
+
+  it("passes a clean fixture and emits stable JSON check families", () => {
+    seedCleanRepo(repoRoot);
+
+    const report = runDoctor({
+      repoRoot,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+
+    assert.equal(report.schema_version, 1);
+    assert.equal(report.exit_hint, "pass");
+    assert.equal(exitCodeFor(report), 0);
+    assert.deepEqual(report.checks.map((item) => item.name), [
+      "active_sprint",
+      "objectives_check",
+      "component_lint",
+      "capabilities_doctor",
+      "sprint_shape",
+      "in_flight_trace",
+      "in_flight_staleness",
+      "context_bloat",
+    ]);
+    assert.ok(formatHumanSummary(report).includes("[PASS] active_sprint"));
+  });
+
+  it("fails on ambiguous active sprint state", () => {
+    seedCleanRepo(repoRoot);
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-second.md"), sprint());
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "active_sprint").status, "fail");
+    assert.match(check(report, "active_sprint").detail.summary, /Multiple active sprint files/);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("fails when existing sprint files contain no active sprint", () => {
+    seedCleanRepo(repoRoot, sprint({ status: "completed" }));
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "active_sprint").status, "fail");
+    assert.match(check(report, "active_sprint").detail.summary, /No active sprint/);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("fails on unknown objective IDs", () => {
+    seedCleanRepo(repoRoot, sprint({ objectives: "[O99]" }));
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "objectives_check").status, "fail");
+    assert.match(check(report, "objectives_check").detail.summary, /objective drift/);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("fails on unknown component handles", () => {
+    seedCleanRepo(repoRoot, sprint({ component: "unknown-component" }));
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "component_lint").status, "fail");
+    assert.match(check(report, "component_lint").detail.summary, /component routing/);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("fails when the active sprint is missing a required section", () => {
+    seedCleanRepo(repoRoot, sprint({ omitSections: ["Running Context"] }));
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "sprint_shape").status, "fail");
+    assert.deepEqual(check(report, "sprint_shape").detail.missing_sections, ["Running Context"]);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("fails when a Plan line cannot be parsed by the checkbox grammar", () => {
+    seedCleanRepo(repoRoot, sprint({ plan: "- [y] #1 Invalid state" }));
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "sprint_shape").status, "fail");
+    assert.deepEqual(
+      check(report, "sprint_shape").detail.unparseable_plan_lines.map((item) => item.line),
+      ["- [y] #1 Invalid state"],
+    );
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("warns on unmoored in-flight work without failing", () => {
+    seedCleanRepo(repoRoot, sprint({ plan: "- [~] #1 Needs a pointer" }));
+
+    const report = runDoctor({
+      repoRoot,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+
+    assert.equal(check(report, "in_flight_trace").status, "warn");
+    assert.match(check(report, "in_flight_trace").detail.summary, /unmoored/);
+    assert.equal(exitCodeFor(report), 0);
+    assert.equal(report.exit_hint, "warn");
+  });
+
+  it("warns on stale in-flight work beyond --stale-days without failing", () => {
+    seedCleanRepo(
+      repoRoot,
+      sprint({
+        started: "2026-07-01",
+        plan: "- [~] #1 Needs follow-up [branch:doctor-test]",
+      }),
+    );
+
+    const report = runDoctor({
+      repoRoot,
+      staleDays: 3,
+      today: new Date("2026-07-05T00:00:00Z"),
+    });
+
+    assert.equal(check(report, "in_flight_staleness").status, "warn");
+    assert.equal(check(report, "in_flight_staleness").detail.stale_days, 3);
+    assert.deepEqual(
+      check(report, "in_flight_staleness").detail.items.map((item) => item.issue_number),
+      [1],
+    );
+    assert.equal(exitCodeFor(report), 0);
+  });
+
+  it("warns when _context.md exceeds the documented line threshold without failing", () => {
+    seedCleanRepo(repoRoot);
+    write(
+      path.join(repoRoot, "backlog", "sprints", "_context.md"),
+      Array.from({ length: 201 }, (_, i) => `line ${i + 1}`).join("\n"),
+    );
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "context_bloat").status, "warn");
+    assert.equal(check(report, "context_bloat").detail.threshold_lines, 200);
+    assert.equal(exitCodeFor(report), 0);
+  });
+});
