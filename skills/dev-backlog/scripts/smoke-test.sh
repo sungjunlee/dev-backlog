@@ -79,11 +79,51 @@ for (const name of [
   "component_lint",
   "capabilities_doctor",
   "sprint_shape",
+  "in_flight_trace",
 ]) {
   if (!names.has(name)) process.exit(1);
 }
 if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail") {
   process.exit(1);
+}
+'
+
+# ============================================================
+# fresh-session recovery live-repo smoke test
+# ============================================================
+
+STATUS_JSON=$(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/status.sh" --json)
+NEXT_JSON=$(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/next.sh" --json)
+RECOVERY_JSON=$(printf '{"status":%s,"next":%s}' "$STATUS_JSON" "$NEXT_JSON")
+assert_json_eval "recovery live: files-only state is orientable" "$RECOVERY_JSON" '
+const recovery = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const { status, next } = recovery;
+const sprintPath = status.active_sprint && status.active_sprint.path;
+if (status.schema_version !== 1 || next.schema_version !== 1 || !sprintPath) {
+  process.exit(1);
+}
+if (!next.active_sprint || next.active_sprint.path !== sprintPath) {
+  process.exit(1);
+}
+const planItems = Array.isArray(status.plan_items) ? status.plan_items : [];
+const hasOpenWork = planItems.some((item) => item.state === "todo" || item.state === "in_flight");
+const sprintComplete = planItems.length > 0 && planItems.every((item) => item.state === "done");
+if (hasOpenWork) {
+  if (!next.next_batch || !Array.isArray(next.next_batch.items) || next.next_batch.items.length === 0) {
+    process.exit(1);
+  }
+} else if (!sprintComplete) {
+  process.exit(1);
+}
+const inFlight = Array.isArray(status.in_flight) ? status.in_flight : null;
+if (!inFlight) process.exit(1);
+const inFlightPlanItems = planItems.filter((item) => item.state === "in_flight");
+if (inFlight.length !== inFlightPlanItems.length) process.exit(1);
+for (const item of inFlight) {
+  const hasPr = item.pr && item.pr.number != null;
+  const hasBranch = item.branch != null && item.branch !== "";
+  const hasRun = item.run_id != null && item.run_id !== "";
+  if (!hasPr && !hasBranch && !hasRun) process.exit(1);
 }
 '
 

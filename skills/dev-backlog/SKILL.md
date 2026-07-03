@@ -165,10 +165,11 @@ Useful scripts:
 - `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 
-## Eval Prompts
+## Eval Prompts (fresh-session recovery)
 
 - "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name latest Progress, and return the first unchecked batch.
 - "Plan a sprint when another sprint is already `status: active`." Expected: refuse or complete the old sprint first; never create a second active sprint.
 - "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
+- "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: use `status.sh --json` and `next.sh --json` to name the active sprint, next actionable batch, and every in-flight `[~]` item with its owner/pointer (PR, branch, or run-id); if `--json` is unavailable, read the sprint file directly.
 - "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.
 - "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.
