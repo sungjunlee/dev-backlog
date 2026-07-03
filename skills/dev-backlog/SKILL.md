@@ -112,10 +112,13 @@ Per issue: all AC checked, implementation merged or committed with `Fixes #N`, P
 
 For a whole sprint:
 
-1. Set `status: completed` and write a final Progress entry.
-2. Move completed task files from `backlog/tasks/` to `backlog/completed/`.
-3. Promote project-level Running Context entries to `_context.md`.
-4. Leave the sprint file in place as the permanent record.
+1. Run `sprint-close.sh`; it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary.
+2. Set `status: completed` and write a final Progress entry.
+3. Move completed task files from `backlog/tasks/` to `backlog/completed/`.
+4. Promote project-level Running Context entries to `_context.md`.
+5. Leave the sprint file in place as the permanent record.
+
+The reassess signal is text-only: recommend `spec-charter reassess` when the doctor warns/fails or when Node counts 3+ completed sprints since the latest `backlog/triage/YYYY-MM-DD-reassess.md`. Counting uses each completed sprint's final `Sprint closed` Progress date, falling back to the filename month; dry-run/pre-close counts the closing sprint as today. Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -151,7 +154,7 @@ Useful scripts:
 - `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — pull open GitHub issues into `backlog/tasks/`.
 - `scripts/sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` — create one active sprint skeleton; refuses a second active sprint.
 - `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — sync monthly progress issue.
-- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — close the single active sprint.
+- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — close the single active sprint and print the doctor/reassess signal summary.
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
