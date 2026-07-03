@@ -288,7 +288,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 | Task files stay thin | Sync cache only; decisions belong in the sprint file |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
-| Builds on Backlog.md | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) format; `sprints/` and `gh` sync are the additions |
+| Task-file format is Backlog.md-compatible | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format; `sprints/` and `gh` sync are dev-backlog additions |
 
 ## Docs
 
