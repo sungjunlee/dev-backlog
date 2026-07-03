@@ -50,6 +50,16 @@ assert_equals() {
   fi
 }
 
+assert_json_eval() {
+  local label="$1" output="$2" script="$3"
+  local status
+  set +e
+  printf "%s" "$output" | node -e "$script"
+  status=$?
+  set -e
+  assert_equals "$label" "$status" "0"
+}
+
 # ============================================================
 # lib.sh unit tests
 # ============================================================
@@ -243,6 +253,36 @@ assert_contains "status: shows next up" "$OUT" "Next up:"
 assert_contains "status: shows sprint name" "$OUT" "2026-03-test"
 assert_contains "status: shows percentage" "$OUT" "40%"
 
+OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/backlog")
+assert_json_eval "status json: structured state" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (
+  j.schema_version !== 1 ||
+  !j.active_sprint ||
+  j.active_sprint.frontmatter.status !== "active" ||
+  j.active_sprint.goal !== "Test the checkbox parsing." ||
+  !Array.isArray(j.plan_items) ||
+  j.plan_items.length !== 5 ||
+  !Array.isArray(j.latest_progress) ||
+  !Array.isArray(j.in_flight) ||
+  j.in_flight[0].issue_number !== 3 ||
+  typeof j.in_flight[0].age_days !== "number"
+) process.exit(1);
+'
+
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog")
+assert_json_eval "next json: next batch" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (
+  j.schema_version !== 1 ||
+  !("next_batch" in j) ||
+  !j.next_batch ||
+  j.next_batch.heading !== "### Batch 3 — Remaining" ||
+  !Array.isArray(j.next_batch.items) ||
+  j.next_batch.items[0].issue_number !== 4
+) process.exit(1);
+'
+
 # --- All done ---
 cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
 ---
@@ -393,6 +433,20 @@ OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "status multiple-active: warning" "$OUT" "Multiple active sprints found"
 assert_contains "status multiple-active: lists first" "$OUT" "2026-03-active-a.md"
 assert_contains "status multiple-active: lists second" "$OUT" "2026-03-active-b.md"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "next json multiple-active: exit code" "$STATUS" "1"
+assert_contains "next json multiple-active: error" "$OUT" "Multiple active sprint files found"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "status json multiple-active: exit code" "$STATUS" "1"
+assert_contains "status json multiple-active: error" "$OUT" "Multiple active sprint files found"
 
 OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "hook multiple-active: warning" "$OUT" "Multiple active sprints found"

@@ -3,13 +3,26 @@ set -uo pipefail
 # Show next actionable work from the active sprint file.
 # Zero LLM cost — pure file parsing.
 #
-# Usage: bash scripts/next.sh [backlog-dir]
+# Usage: bash scripts/next.sh [--json] [backlog-dir]
 #        backlog-dir defaults to ./backlog
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-backlog}"
+BACKLOG_DIR="backlog"
+JSON=0
+for arg in "$@"; do
+  if [ "$arg" = "--json" ]; then
+    JSON=1
+  else
+    BACKLOG_DIR="$arg"
+  fi
+done
+
+if [ "$JSON" -eq 1 ]; then
+  exec node "$SCRIPT_DIR/sprint-state.js" --mode next "$BACKLOG_DIR"
+fi
+
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then
