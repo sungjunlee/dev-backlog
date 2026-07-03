@@ -24,5 +24,5 @@ Use this as the shared boundary reference for `spec-charter`, `spec-system-map`,
 - Sprint files remain the execution hub for batching, context, progress, and handoff.
 - Triage reports are derived artifacts; they may propose spec changes, but they do not mutate specs.
 - Agent harness files can inform workflow and guardrails, but they are not product authority unless they explicitly describe product boundaries.
-- Legacy root `CHARTER.md` is read only as a fallback for older repos; new and migrated charters use `spec/charter.md`.
+- `spec/charter.md` is the canonical charter path. A legacy root `CHARTER.md` may be read only when `spec/charter.md` is absent, as a compatibility fallback for older repos; do not edit or create new root charters. Migrate from root `CHARTER.md` to `spec/charter.md` deliberately, as an explicit accepted change rather than a silent side effect.
 - Spec skills may read task AC, sprint evidence, tests, docs, and commit history to understand reality, but they must not copy issue-specific AC, frozen Done Criteria, or review notes into durable specs.

@@ -45,7 +45,7 @@ When recommending follow-up spec work, do not require users to memorize downstre
 
 `spec/charter.md` lives in the target repo's project spec directory. It records what good looks like: the problem, approach, explicit non-goals, verifiable objectives, and immutable decision history the backlog is measured against.
 
-Absence is supported. Projects opt in by creating the file; other skills degrade gracefully when it is missing. Legacy root `CHARTER.md` is read as a fallback and should be migrated deliberately. Keep the charter under a ~5-minute read. Operational know-how does not belong here; put rediscovery-prone HOW-knowledge in `_context.md`.
+Absence is supported. Projects opt in by creating the file; other skills degrade gracefully when it is missing. See `references/spec-axis.md` for the legacy root `CHARTER.md` fallback policy. Keep the charter under a ~5-minute read. Operational know-how does not belong here; put rediscovery-prone HOW-knowledge in `_context.md`.
 
 Use `references/spec-axis.md` as the shared boundary for charter, system-map, capabilities, sprint context, task mirrors, triage reports, harness files, and README authority.
 
@@ -82,7 +82,7 @@ See `references/objectives.md` for worked examples, rewrite patterns, and a 30-s
 
 Use amend mode when `spec/charter.md` exists, legacy root `CHARTER.md` exists, or when invoked as `spec-charter amend`.
 
-First re-read `spec/charter.md`. If it is absent but root `CHARTER.md` exists, read that legacy file, state that the canonical path is now `spec/charter.md`, and recommend migrating before or during the accepted amendment. Direct hand-edits are allowed because it is the user's file; this skill is the disciplined path for applying the tier gates.
+First re-read `spec/charter.md`. If it is absent but root `CHARTER.md` exists, read that legacy file and follow `references/spec-axis.md` for fallback and migration handling. Direct hand-edits are allowed because it is the user's file; this skill is the disciplined path for applying the tier gates.
 
 Apply the 3-tier discipline:
 
