@@ -125,6 +125,11 @@ function extractSectionLines(content, section) {
   return out;
 }
 
+function hasSection(content, section) {
+  const sectionRe = new RegExp(`^## ${escapeRegExp(section)}[ \\t]*$`);
+  return content.split(/\r?\n/).some((line) => sectionRe.test(line));
+}
+
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -359,6 +364,7 @@ module.exports = {
   findActiveSprintFiles,
   parseFrontmatter,
   extractSectionLines,
+  hasSection,
   parseProgressEntries,
   parsePlanItem,
   parsePlanItems,

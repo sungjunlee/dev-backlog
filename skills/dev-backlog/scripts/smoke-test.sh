@@ -61,6 +61,33 @@ assert_json_eval() {
 }
 
 # ============================================================
+# backlog-doctor live-repo smoke test
+# ============================================================
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+set +e
+OUT=$(cd "$REPO_ROOT" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>&1)
+STATUS=$?
+set -e
+assert_equals "doctor live: exit code" "$STATUS" "0"
+assert_json_eval "doctor live: json check families" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const names = new Set((j.checks || []).map((check) => check.name));
+for (const name of [
+  "active_sprint",
+  "objectives_check",
+  "component_lint",
+  "capabilities_doctor",
+  "sprint_shape",
+]) {
+  if (!names.has(name)) process.exit(1);
+}
+if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail") {
+  process.exit(1);
+}
+'
+
+# ============================================================
 # lib.sh unit tests
 # ============================================================
 

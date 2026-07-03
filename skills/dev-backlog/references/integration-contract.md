@@ -88,6 +88,32 @@ Top-level schema:
 
 Age heuristic: for each `[~]` item, find the earliest dated `## Progress` bullet that mentions the item's issue number as `#N`; if none exists, fall back to sprint frontmatter `started:` when it is a `YYYY-MM-DD` date. `age_days` is the calendar-day distance from that basis date to the command run's local calendar date. Emit `null` for `age_days`, `age_source`, and `age_basis_date` when neither resolves. The basis date is selected only from sprint file content; no GitHub state, relay manifest, file mtime, or markdown prose outside these fields participates.
 
+### Backlog Doctor JSON Surface
+
+Schedulers, CI checks, and close flows that need one deterministic health verdict should use:
+
+```bash
+node skills/dev-backlog/scripts/backlog-doctor.js --json [--stale-days N] [backlog-dir]
+```
+
+Default human output is one line per check. `--json` emits:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `schema_version` | integer | Schema version for the doctor JSON contract; starts at `1`. |
+| `checks` | array | Per-check verdicts in stable order. |
+| `exit_hint` | string | `fail` when any check failed, `warn` when no checks failed but at least one warned, otherwise `pass`. CLI exit is non-zero only for `fail`. |
+
+Each `checks[]` entry has:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `name` | string | Stable identifier: `active_sprint`, `objectives_check`, `component_lint`, `capabilities_doctor`, `sprint_shape`, `in_flight_trace`, `in_flight_staleness`, or `context_bloat`. |
+| `status` | string | `pass`, `warn`, or `fail`. |
+| `detail` | object | Check-specific details. `detail.summary` is always a human-readable one-line summary. |
+
+Hard failures include ambiguous active sprint state, no active sprint while sprint files exist, objective/component drift, capabilities-doctor hard triggers, missing required active-sprint sections, and unparseable Plan checkbox lines. Soft warnings include unmoored `[~]` items, `[~]` items older than `--stale-days` (default `7`), capabilities-doctor warnings, and `_context.md` bloat. `_context.md` bloat warns above `200` lines; the threshold is deliberately generous so this signal means "promote or compact durable context soon," not "rewrite immediately."
+
 ## File Paths
 
 | What | Pattern | Example |
