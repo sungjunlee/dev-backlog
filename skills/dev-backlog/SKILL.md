@@ -1,6 +1,6 @@
 ---
 name: dev-backlog
-argument-hint: "[orient|plan|work|next|sync] [issue-number]"
+argument-hint: "[orient|create|plan|work|next|sync|complete] [issue-number]"
 description: Manage GitHub-Issue-backed sprint execution. Use for issue mirrors, sprint planning or closing, next-work selection, progress sync, milestone-backed backlog work, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
@@ -20,6 +20,7 @@ Related skills: [`spec-charter`](../spec-charter/SKILL.md) for `spec/charter.md`
 | User intent | Mode | Completion boundary |
 | --- | --- | --- |
 | "where are we?", "orient", "status" | `orient` | Active sprint, latest progress, and next unchecked batch are identified. |
+| "create issue", "new issue", "이슈 만들어" | `create` | GitHub issue is created, mirrored locally, and added to the current sprint Plan when in scope. |
 | "plan sprint", "make sprint", "start work" with no active sprint | `plan` | One active sprint file exists with Goal, ordered Plan, `objectives:`, and `component:`. |
 | "work #N", "continue", "do next batch" | `work` | Issue AC is verified, task/sprint state is updated, and GitHub receives a meaningful status signal. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
@@ -79,6 +80,12 @@ Full sprint and task-file examples live in `references/file-format.md`.
 4. Identify the next unchecked Plan item or route to `complete` when all items are done.
 
 Done when you can name the current sprint state and the next actionable batch.
+
+### Create
+
+Follow `references/process.md` → `## Create — New Issues`.
+
+Done when the new issue exists on GitHub, has a local task mirror, and is added to the active sprint Plan when in scope.
 
 ### Plan
 
