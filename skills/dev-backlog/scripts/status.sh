@@ -1,12 +1,25 @@
 #!/bin/bash
 set -uo pipefail
 # Project status from sprint file + GitHub + local files.
-# Usage: bash scripts/status.sh [backlog-dir]
+# Usage: bash scripts/status.sh [--json] [backlog-dir]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-backlog}"
+BACKLOG_DIR="backlog"
+JSON=0
+for arg in "$@"; do
+  if [ "$arg" = "--json" ]; then
+    JSON=1
+  else
+    BACKLOG_DIR="$arg"
+  fi
+done
+
+if [ "$JSON" -eq 1 ]; then
+  exec node "$SCRIPT_DIR/sprint-state.js" --mode status "$BACKLOG_DIR"
+fi
+
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 # --- Active Sprint ---

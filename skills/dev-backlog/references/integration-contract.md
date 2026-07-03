@@ -17,6 +17,77 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
 
+## Structured JSON Read Surface
+
+Actors that need machine-readable sprint state should prefer the opt-in JSON surfaces over parsing markdown directly:
+
+```bash
+bash skills/dev-backlog/scripts/status.sh --json
+bash skills/dev-backlog/scripts/next.sh --json
+```
+
+Both commands emit one JSON document to stdout with `schema_version: 1`. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
+
+Ambiguous active sprint state is fail-loud in JSON mode: the command exits non-zero and writes the error to stderr instead of emitting partial JSON. Missing `## ` sections degrade to empty strings or arrays as shown below.
+
+Top-level schema:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `schema_version` | integer | Schema version for this JSON contract; starts at `1`. |
+| `active_sprint` | object or `null` | Active sprint metadata, or `null` when no active sprint is found. |
+| `plan_items` | array | Parsed `## Plan` checkbox items from the active sprint. |
+| `next_batch` | object or `null` | First batch with `[ ]` items, or flat unchecked items when no batch heading exists. |
+| `latest_progress` | array | Most recent five `## Progress` bullet entries, newest first. |
+| `in_flight` | array | `[~]` plan items plus file-derived age metadata. |
+
+`active_sprint` fields:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `path` | string | Active sprint file path as resolved by the command. |
+| `frontmatter` | object | Parsed sprint frontmatter fields such as `status`, `started`, `due`, `objectives`, and `component`. |
+| `goal` | string | Trimmed text from `## Goal`; empty string when absent. |
+
+`plan_items[]` fields:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `line` | string | Original plan line. |
+| `checkbox_state` | string | Exact marker content: `" "`, `"~"`, or `"x"`. |
+| `state` | string | Normalized state: `todo`, `in_flight`, or `done`. |
+| `issue_number` | integer | GitHub issue number parsed with `/^\- \[.\] #(\d+)/`. |
+| `title` | string | Plan title after removing parsed PR, branch, and run annotations. |
+| `batch_heading` | string or `null` | Current `### Batch...` heading, if any. |
+| `pr` | object or `null` | `{ "number": N, "state": "..." }` from `→ PR #N (state)` when present. |
+| `run_id` | string or `null` | Value from trailing `[run:...]` when present. |
+| `branch` | string or `null` | Value from `[branch:...]` when present. |
+| `unmoored` | boolean | `true` for `[~]` items without PR, branch, or run pointer. |
+
+`next_batch` is either `null` or:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `heading` | string or `null` | The first `### Batch...` heading containing unchecked `[ ]` work, or `null` for flat plans. |
+| `items` | array | The unchecked `plan_items` in that batch. For flat plans, all unchecked items. |
+
+`latest_progress[]` entries are objects with:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `line` | string | Original `## Progress` bullet. |
+| `date` | string or `null` | Leading `YYYY-MM-DD` parsed from the bullet, when present. |
+
+`in_flight[]` entries include every `plan_items[]` field plus:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `age_days` | integer or `null` | Calendar days since the age basis date. |
+| `age_source` | string or `null` | `progress` when based on a progress entry, `started` when falling back to frontmatter. |
+| `age_basis_date` | string or `null` | The `YYYY-MM-DD` date used to compute `age_days`. |
+
+Age heuristic: for each `[~]` item, find the earliest dated `## Progress` bullet that mentions the item's issue number as `#N`; if none exists, fall back to sprint frontmatter `started:` when it is a `YYYY-MM-DD` date. `age_days` is the calendar-day distance from that basis date to the command run's local calendar date. Emit `null` for `age_days`, `age_source`, and `age_basis_date` when neither resolves. The basis date is selected only from sprint file content; no GitHub state, relay manifest, file mtime, or markdown prose outside these fields participates.
+
 ## File Paths
 
 | What | Pattern | Example |

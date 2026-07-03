@@ -246,6 +246,7 @@ function estimateSize(labels) {
 module.exports = {
   slugify,
   escapeYaml,
+  parseSimpleYaml,
   readConfig,
   readTriageConfig,
   estimateSize,
