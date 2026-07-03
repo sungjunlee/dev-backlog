@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-05-31
-revision: 2
+last_amended: 2026-07-03
+revision: 3
 ---
 
 # dev-backlog Charter
@@ -27,6 +27,7 @@ No server, no daemon, no hidden state, no silent sync.
 - Silent background sync — every pull and push is an explicit user action.
 - A knowledge base / wiki replacement — `spec/charter.md` is a yardstick, `_context.md` is rediscovery-prone HOW-knowledge, neither is a long-form doc store.
 - Per-vendor connectors (Jira, Linear, Notion) — out of scope, not the wedge.
+- Backlog.md convention-following — the task-file format stays Backlog.md-compatible, but new features are not constrained by Backlog.md conventions.
 
 ## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status proof-gated) -->
 - O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user
@@ -47,3 +48,4 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-05-29 | `backlog-charter` splits into `spec-charter` and `spec-grill`                         | Existing-repo onboarding needs a discoverable second step from project charter to capability contracts | 2026-05-22 |
 | 2026-05-29 | New charter files live at `spec/charter.md`; root `CHARTER.md` is legacy fallback     | Charter, system map, and capabilities should share one project spec home under `spec/`           | 2026-05-22 |
 | 2026-05-31 | `backlog-triage` adds spec-aware Decision Review as a prompt-driven report layer      | Final issue recommendations need semantic evidence from charter, capabilities, system map, and sprint context; mutations stay explicit | —          |
+| 2026-07-03 | Backlog.md demoted from design ancestor to format-compat surface                      | No script reads its config fields; compat is a task-file format guarantee, not a design constraint | —          |
