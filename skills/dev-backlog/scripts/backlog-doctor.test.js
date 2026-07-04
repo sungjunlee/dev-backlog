@@ -300,6 +300,31 @@ describe("buildReassessSignal", () => {
     assert.match(signal.reason, /3 sprints closed since last reassess \(threshold 3\)/);
   });
 
+  it("stays quiet between sprints: the informational zero-active warn does not fire the signal", () => {
+    write(path.join(repoRoot, "spec", "charter.md"), charter());
+    write(path.join(repoRoot, "spec", "capabilities.md"), capabilities());
+    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
+    write(path.join(repoRoot, "backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
+
+    const doctorReport = runDoctor({ repoRoot });
+    const activeCheck = doctorReport.checks.find((check) => check.name === "active_sprint");
+    assert.equal(activeCheck.status, "warn");
+    assert.equal(activeCheck.informational, true);
+    assert.equal(doctorReport.exit_hint, "warn");
+
+    const signal = buildReassessSignal({
+      repoRoot,
+      backlogDir: "backlog",
+      doctorReport,
+      today: new Date("2026-07-04T00:00:00Z"),
+    });
+
+    assert.equal(signal.fired, false);
+    assert.equal(signal.doctor_warn_count, 0);
+    assert.equal(signal.sprints_since_last_report, 0);
+    assert.match(signal.reason, /doctor clean/);
+  });
+
   it("is quiet when a sprint closes on the same day as the latest reassess report (same-day rule: covered, not counted)", () => {
     seedCleanRepo(repoRoot);
     // Two sprints closed strictly before the report date; they would not be

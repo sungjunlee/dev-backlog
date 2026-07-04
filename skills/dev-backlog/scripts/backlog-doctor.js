@@ -226,12 +226,17 @@ function checkActiveSprint({ repoRoot, sprintsDir }) {
   }
 
   if (activeFiles.length === 0 && sprintFiles.length > 0) {
-    return verdict("active_sprint", "warn", {
-      summary: `No active sprint found among ${sprintFiles.length} sprint file(s); this is normal between sprints.`,
-      active_files: [],
-      sprint_count: sprintFiles.length,
-      active_path: null,
-    });
+    // informational: a normal resting state, surfaced as warn for visibility
+    // but excluded from the reassess-signal warn count.
+    return {
+      ...verdict("active_sprint", "warn", {
+        summary: `No active sprint found among ${sprintFiles.length} sprint file(s); this is normal between sprints.`,
+        active_files: [],
+        sprint_count: sprintFiles.length,
+        active_path: null,
+      }),
+      informational: true,
+    };
   }
 
   if (activeFiles.length === 0) {
@@ -557,7 +562,11 @@ function buildReassessSignal({
     ? records.filter((record) => record.accounting_date > latestReassess.date)
     : records;
 
-  const doctorWarnCount = doctorReport.checks.filter((check) => check.status === "warn").length;
+  // Informational warns (e.g. the between-sprints zero-active state) stay
+  // visible in doctor output but must not recommend a reassess by themselves.
+  const doctorWarnCount = doctorReport.checks.filter(
+    (check) => check.status === "warn" && !check.informational
+  ).length;
   const doctorFailCount = doctorReport.checks.filter((check) => check.status === "fail").length;
   const doctorSignal = doctorWarnCount > 0 || doctorFailCount > 0;
   const sprintCountSignal = countedRecords.length >= threshold;
