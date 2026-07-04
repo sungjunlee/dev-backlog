@@ -118,7 +118,7 @@ For a whole sprint:
 4. Promote project-level Running Context entries to `_context.md`.
 5. Leave the sprint file in place as the permanent record.
 
-The reassess signal is text-only: recommend `spec-charter reassess` when the doctor warns/fails or when Node counts 3+ completed sprints since the latest `backlog/triage/YYYY-MM-DD-reassess.md`. Counting uses each completed sprint's final `Sprint closed` Progress date, falling back to the filename month; dry-run/pre-close counts the closing sprint as today. Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
+The reassess signal recommends `spec-charter reassess` when the doctor warns/fails (informational warns, like the normal between-sprints zero-active state, do not count) or when Node counts 3+ completed sprints since the latest `backlog/triage/YYYY-MM-DD-reassess.md`; it is the same `reassess_signal` field (`fired`, `reason`, `sprints_since_last_report`, `latest_report`) on `backlog-doctor.js --json`, not a separate computation — `sprint-close.sh` just consumes it. Counting uses each completed sprint's final `Sprint closed` Progress date, falling back to the filename month; a sprint closed the same day as (or before) the latest report's own date is covered by that report and does not count, so same-day re-triggers never happen. Dry-run/pre-close counts the closing sprint as today. Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -158,7 +158,7 @@ Useful scripts:
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
-- `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn.
+- `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn. JSON includes top-level `reassess_signal`.
 - `scripts/sprint-mirror.js [backlog-dir] [--dry-run] [--json]` — publish the active sprint to a read-only GitHub issue mirror; explicit sync only.
 
 ## References

@@ -87,6 +87,13 @@ if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail"
   process.exit(1);
 }
 '
+assert_json_eval "doctor live: reassess_signal shape" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const s = j.reassess_signal;
+if (!s || typeof s.fired !== "boolean" || typeof s.reason !== "string") process.exit(1);
+if (typeof s.sprints_since_last_report !== "number") process.exit(1);
+if (s.latest_report !== null && typeof s.latest_report !== "string") process.exit(1);
+'
 
 # ============================================================
 # fresh-session recovery live-repo smoke test
@@ -98,9 +105,17 @@ RECOVERY_JSON=$(printf '{"status":%s,"next":%s}' "$STATUS_JSON" "$NEXT_JSON")
 assert_json_eval "recovery live: files-only state is orientable" "$RECOVERY_JSON" '
 const recovery = JSON.parse(require("fs").readFileSync(0, "utf8"));
 const { status, next } = recovery;
-const sprintPath = status.active_sprint && status.active_sprint.path;
-if (status.schema_version !== 1 || next.schema_version !== 1 || !sprintPath) {
+if (status.schema_version !== 1 || next.schema_version !== 1) {
   process.exit(1);
+}
+const sprintPath = status.active_sprint && status.active_sprint.path;
+if (!sprintPath) {
+  // Between sprints: the orientable answer is "no active sprint" — both
+  // surfaces must agree and report no plan/in-flight state.
+  const restingOk = !next.active_sprint
+    && (!Array.isArray(status.plan_items) || status.plan_items.length === 0)
+    && (!Array.isArray(status.in_flight) || status.in_flight.length === 0);
+  process.exit(restingOk ? 0 : 1);
 }
 if (!next.active_sprint || next.active_sprint.path !== sprintPath) {
   process.exit(1);

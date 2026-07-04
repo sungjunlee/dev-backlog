@@ -18,7 +18,7 @@ Give the unattended session this task, verbatim or adapted:
 | Action | Command | Notes |
 | --- | --- | --- |
 | Orient | `bash skills/dev-backlog/scripts/status.sh --json`, `bash skills/dev-backlog/scripts/next.sh --json` | Single source: `sprint-state.js` JSON (`schema_version: 1`). Do not parse sprint markdown directly. |
-| Health check | `node skills/dev-backlog/scripts/backlog-doctor.js --json` | Hard failures exit non-zero; soft signals warn. Zero active sprints is a warn (normal between sprints), not an error. |
+| Health check | `node skills/dev-backlog/scripts/backlog-doctor.js --json` | Hard failures exit non-zero; soft signals warn. Zero active sprints is a warn (normal between sprints), not an error. The reassess signal is a top-level field: `reassess_signal: { fired, reason, sprints_since_last_report, latest_report }` — no separate computation needed. |
 | Publish mirror | `node skills/dev-backlog/scripts/sprint-mirror.js backlog --json` | Only when an active sprint exists; idempotent marker-body upsert. Skip cleanly when the doctor reports no active sprint. |
 | Spec drift review | `spec-charter reassess` (report-only) | Only when the doctor or close-signal state recommends it; output is a dated report under `backlog/triage/`, never a spec edit. |
 
@@ -39,7 +39,7 @@ Give the unattended session this task, verbatim or adapted:
 - In-flight: <each [~] item with its PR/branch/run pointer and age, or "none">
 ## Health
 - Doctor verdict: <pass|warn|fail> — <one line per non-pass check>
-- Reassess signal: <fired / quiet, with the doctor's stated reason>
+- Reassess signal: <`reassess_signal.fired` -> fired/quiet, plus `reassess_signal.reason`, from the doctor JSON — do not recompute>
 ## Actions taken
 - <mirror synced #N / skipped (no active sprint) / reassess report written>
 ## Anomalies for a human
