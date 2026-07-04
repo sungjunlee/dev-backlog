@@ -20,3 +20,4 @@
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.
 - Relay reviewer routing: `opencode` + `opencode-go/glm-5.2` fails primary review (prose instead of JSON verdict, reproduced twice 2026-07); use the `codex` reviewer until the adapter or model compliance improves.
 - relay-merge `gate-check` mis-picks the latest PR commit when multiple commits share a committedDate (post-rebase ties) — dev-relay#753; workaround: `git commit --amend --no-edit` on the head to re-stamp, then re-review.
+- Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
