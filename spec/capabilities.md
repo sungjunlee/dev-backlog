@@ -45,15 +45,16 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 
 ## Capability: backlog-sync
 
-**Goal:** Open GitHub Issues are mirrored into `backlog/tasks/*.md` without diverging on local AC checkbox state.
+**Goal:** GitHub Issues and local backlog state mirror each other in both directions — issues into `backlog/tasks/*.md`, the active sprint out to a machine-managed mirror issue — without either direction ever diverging human-authored content.
 
 **In-scope:**
 - `sync-pull.js` (with and without `--update`), task-file frontmatter (number, title, labels, milestone, assignees)
 - AC checkbox preservation in task bodies for non-machine-managed issues
-- Idempotent re-runs against unchanged GitHub state
+- `sprint-mirror.js`: explicit publish of the single active sprint to a marker-identified (`<!-- dev-backlog:sprint-mirror sprint=<slug> -->`) read-only mirror issue
+- Idempotent re-runs in both directions against unchanged state
 
 **Out-of-scope:**
-- Writing to GitHub (this capability is read-only; mutations live elsewhere)
+- Writing to human-authored GitHub content (issue bodies without a dev-backlog machine marker, comments, labels, state)
 - Monthly progress-issue lifecycle (`task-progress-reporting` capability)
 - Cross-repo mirroring
 
@@ -61,9 +62,11 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 - `sync-pull` on a fresh checkout produces `backlog/tasks/*.md` with no token prompt beyond `gh auth` already being valid.
 - `sync-pull --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
 - Running `sync-pull` twice against unchanged GitHub state produces byte-identical task files on the second run.
+- Repeated `sprint-mirror` runs resolve to the same marker-identified issue via find-by-marker body upsert — never a duplicate mirror issue; the sprint file stays canonical and untouched.
+- `sprint-mirror` exits non-zero when there is no single unambiguous active sprint (zero or multiple actives); it never guesses, and it renders state only through `sprint-state.js` — no second markdown parser.
 
 ### Hard Constraints
-- Never call any `gh` subcommand that writes to GitHub from this capability — it is structurally read-only.
+- The only GitHub writes this capability may perform are creating, and body-editing, issues that carry its own `dev-backlog:sprint-mirror` marker; human-authored issue bodies, comments, labels, and issue state are untouchable.
 - Never overwrite a non-machine-managed task body during `--update`; only frontmatter is replaced.
 
 ### Learnings
@@ -74,6 +77,7 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |
+| 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
 
 ---
 
