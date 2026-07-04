@@ -159,6 +159,7 @@ Useful scripts:
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
 - `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn.
+- `scripts/sprint-mirror.js [backlog-dir] [--dry-run] [--json]` — publish the active sprint to a read-only GitHub issue mirror; explicit sync only.
 
 ## References
 
