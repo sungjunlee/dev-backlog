@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-07-04
-revision: 5
+last_amended: 2026-07-05
+revision: 6
 ---
 
 # dev-backlog Charter
@@ -15,9 +15,11 @@ sessions is rebuilt from scratch each time.
 ## Approach           <!-- Tier 1 · Direction (human-gated) -->
 Keep GitHub Issues as the canonical task spec; add a thin, explicit,
 markdown-only execution hub (the active sprint file) that humans and agents
-both read and update. Companion skills (`backlog-triage`, `spec-charter`,
-`spec-system-map`, `spec-grill`) groom and orient the same GitHub-anchored state — they never
-replace it.
+both read and update. Companion skill `backlog-triage` grooms the same
+GitHub-anchored state — it never replaces it. The spec axis (`spec/charter.md`,
+`spec/system-map.md`, `spec/capabilities.md`) is authored by craftkit's
+`spec-charter`/`spec-system-map`/`spec-grill` skills and consumed here as
+read-only yardsticks.
 No server, no daemon, no hidden state, no silent sync.
 
 ## Non-Goals          <!-- Tier 1 · Direction (human-gated) -->
@@ -50,3 +52,4 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-05-31 | `backlog-triage` adds spec-aware Decision Review as a prompt-driven report layer      | Final issue recommendations need semantic evidence from charter, capabilities, system map, and sprint context; mutations stay explicit | —          |
 | 2026-07-03 | Backlog.md demoted from design ancestor to format-compat surface                      | No script reads its config fields; compat is a task-file format guarantee, not a design constraint | —          |
 | 2026-07-03 | Sprint SSOT: local sprint file stays canonical and is committed at explicit boundaries; a machine-managed GitHub issue mirror (marker + body upsert) is the optional shared read surface; no separate state repo | Spike #215: mirror reuses progress-issue machinery with ~zero timeline noise; a submodule state repo adds friction without solving worktree visibility; the committed-file convention already proved necessary (#211 incident) | —          |
+| 2026-07-04 | `spec-charter`/`spec-system-map`/`spec-grill` move to craftkit; dev-backlog consumes `spec/*` as read-only yardsticks (0.7.0, PR #242) | The skills author durable repo contracts and stand alone without a backlog; craftkit carries the skill-quality machinery; a two-week silent fork proved dual ownership untenable | —          |
