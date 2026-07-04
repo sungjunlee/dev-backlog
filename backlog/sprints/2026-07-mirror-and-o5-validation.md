@@ -14,7 +14,7 @@ The SSOT decision's mirror half is implemented as an explicit sync command (veri
 
 ## Plan
 ### Batch 1 - sprint-mirror command (delegated)
-- [~] #231 feat(dev-backlog): sprint-mirror explicit sync command (SSOT decision follow-up) (~1.5hr, delegate to sonnet subagent; orchestrator verifies) → branch issue-231 (subagent worktree)
+- [~] #231 feat(dev-backlog): sprint-mirror explicit sync command (SSOT decision follow-up) (~1.5hr, delegate to sonnet subagent; orchestrator verifies) [branch:issue-231]
 
 ### Batch 2 - O5 dogfood cycle (orchestrator-led)
 - [ ] #232 chore(spec): run first signal-driven reassess cycle toward O5 validated (~45min)
