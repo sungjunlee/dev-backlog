@@ -38,6 +38,9 @@ const REASSESS_ACCOUNTING_RULE = [
   "Counts status: completed sprint files by their final 'Sprint closed' Progress date;",
   "legacy completed sprints without that entry use the filename month as YYYY-MM-01.",
   "A closing sprint passed by sprint-close counts on today's close date for dry-run/pre-close summaries.",
+  "Sprints closed on the same day as, or before, the latest reassess report's own date are covered by",
+  "that report; only strictly-later close dates count toward the threshold (close times are not",
+  "recorded, so same-day ordering against a report cannot be determined).",
 ].join(" ");
 
 function usage() {
@@ -145,6 +148,8 @@ function runDoctor({
   staleDays = DEFAULT_STALE_DAYS,
   today = new Date(),
   contextLineThreshold = CONTEXT_BLOAT_LINE_THRESHOLD,
+  reassessThreshold = DEFAULT_REASSESS_THRESHOLD,
+  closingSprintPath = null,
 } = {}) {
   const root = path.resolve(repoRoot);
   const backlogPath = resolvePath(root, backlogDir);
@@ -173,10 +178,24 @@ function runDoctor({
     checkContextBloat({ repoRoot: root, sprintsDir, threshold: contextLineThreshold }),
   ];
 
+  // Single accounting function for the reassess signal: both the plain
+  // `--json` surface and the `--close-summary` path (via runCloseSummary)
+  // flow through this one call, so there is exactly one place that computes
+  // "fired or quiet" and why.
+  const reassessSignal = buildReassessSignal({
+    repoRoot: root,
+    backlogDir,
+    doctorReport: { checks },
+    closingSprintPath,
+    today,
+    threshold: reassessThreshold,
+  });
+
   return {
     schema_version: SCHEMA_VERSION,
     checks,
     exit_hint: exitHintFor(checks),
+    reassess_signal: reassessSignal,
   };
 }
 
@@ -488,24 +507,19 @@ function runCloseSummary({
   reassessThreshold = DEFAULT_REASSESS_THRESHOLD,
   closingSprintPath = null,
 } = {}) {
+  // Thin wrapper: runDoctor already computes reassess_signal via the single
+  // buildReassessSignal accounting function, counting the closing sprint on
+  // today's date when closingSprintPath is supplied.
   const report = runDoctor({
     repoRoot,
     backlogDir,
     staleDays,
     today,
     contextLineThreshold,
+    reassessThreshold,
+    closingSprintPath,
   });
-  return {
-    doctor_report: report,
-    reassess_signal: buildReassessSignal({
-      repoRoot,
-      backlogDir,
-      doctorReport: report,
-      closingSprintPath,
-      today,
-      threshold: reassessThreshold,
-    }),
-  };
+  return { doctor_report: report };
 }
 
 function buildReassessSignal({
@@ -533,43 +547,39 @@ function buildReassessSignal({
     today,
   });
 
+  // Same-day rule: a sprint closed on the same day as (or before) the latest
+  // reassess report's own filename date is treated as covered by that
+  // report. Only strictly-later close dates count toward the threshold --
+  // close timestamps are not recorded (Progress entries are date-only), so
+  // same-day ordering against the report can't be determined; erring quiet
+  // is correct here because doctor warnings still fire independently.
   const countedRecords = latestReassess
-    ? records.filter((record) => record.accounting_date >= latestReassess.date)
+    ? records.filter((record) => record.accounting_date > latestReassess.date)
     : records;
 
   const doctorWarnCount = doctorReport.checks.filter((check) => check.status === "warn").length;
   const doctorFailCount = doctorReport.checks.filter((check) => check.status === "fail").length;
   const doctorSignal = doctorWarnCount > 0 || doctorFailCount > 0;
   const sprintCountSignal = countedRecords.length >= threshold;
-  const reasons = [];
 
-  if (doctorSignal) {
-    reasons.push(
-      `doctor emitted ${doctorWarnCount} ${plural("warning", doctorWarnCount)} and ${doctorFailCount} ${plural("failure", doctorFailCount)}`,
-    );
-  }
-  if (sprintCountSignal) {
-    reasons.push(
-      `${countedRecords.length} ${plural("sprint", countedRecords.length)} closed since last reassess (threshold ${threshold})`,
-    );
-  }
-
-  const recommend = doctorSignal || sprintCountSignal;
-  const summary = recommend
-    ? `Signals: ${reasons.join("; ")} -> recommend: spec-charter reassess`
-    : `Signals: no reassess recommendation (doctor clean; ${countedRecords.length}/${threshold} sprint(s) closed since last reassess)`;
+  const reason = [
+    doctorSignal
+      ? `doctor emitted ${doctorWarnCount} ${plural("warning", doctorWarnCount)} and ${doctorFailCount} ${plural("failure", doctorFailCount)}`
+      : "doctor clean",
+    sprintCountSignal
+      ? `${countedRecords.length} ${plural("sprint", countedRecords.length)} closed since last reassess (threshold ${threshold})`
+      : `${countedRecords.length}/${threshold} sprint(s) closed since last reassess`,
+  ].join("; ");
 
   return {
-    recommend,
-    summary,
-    reasons,
+    fired: doctorSignal || sprintCountSignal,
+    reason,
+    sprints_since_last_report: countedRecords.length,
+    latest_report: latestReassess ? latestReassess.display_path : null,
+    threshold,
     doctor_warn_count: doctorWarnCount,
     doctor_fail_count: doctorFailCount,
-    completed_sprints_since_reassess: countedRecords.length,
-    completed_sprint_paths: countedRecords.map((record) => record.display_path),
-    latest_reassess_date: latestReassess ? latestReassess.date : null,
-    latest_reassess_report: latestReassess ? latestReassess.display_path : null,
-    threshold,
+    sprint_paths: countedRecords.map((record) => record.display_path),
     accounting_rule: REASSESS_ACCOUNTING_RULE,
   };
 }
@@ -699,6 +709,9 @@ function formatHumanSummary(report) {
     `[${labels[check.status]}] ${check.name} - ${check.detail.summary}`
   ));
   lines.push(`Exit hint: ${report.exit_hint}`);
+  lines.push(
+    `Reassess signal: ${report.reassess_signal.fired ? "fired" : "quiet"} - ${report.reassess_signal.reason}`,
+  );
   return lines.join("\n");
 }
 
@@ -706,9 +719,7 @@ function formatCloseSummary(result) {
   return [
     "=== Backlog Doctor (pre-close) ===",
     formatHumanSummary(result.doctor_report),
-    "",
-    `Reassess signal: ${result.reassess_signal.summary}`,
-    `Accounting rule: ${result.reassess_signal.accounting_rule}`,
+    `Accounting rule: ${result.doctor_report.reassess_signal.accounting_rule}`,
   ].join("\n");
 }
 

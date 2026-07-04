@@ -6,6 +6,7 @@ const path = require("path");
 const {
   parseArgs,
   runDoctor,
+  runCloseSummary,
   exitCodeFor,
   formatHumanSummary,
   buildReassessSignal,
@@ -278,7 +279,7 @@ describe("buildReassessSignal", () => {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   });
 
-  it("recommends reassess when the closing sprint reaches three completed sprints with no reassess reports", () => {
+  it("fires when the closing sprint reaches three completed sprints with no reassess reports (no-reports-exist: all completed sprints count)", () => {
     seedCleanRepo(repoRoot);
     write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint());
     write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint());
@@ -293,14 +294,17 @@ describe("buildReassessSignal", () => {
     });
 
     assert.equal(doctorReport.exit_hint, "pass");
-    assert.equal(signal.recommend, true);
-    assert.equal(signal.completed_sprints_since_reassess, 3);
-    assert.equal(signal.latest_reassess_report, null);
-    assert.match(signal.summary, /recommend: spec-charter reassess/);
+    assert.equal(signal.fired, true);
+    assert.equal(signal.sprints_since_last_report, 3);
+    assert.equal(signal.latest_report, null);
+    assert.match(signal.reason, /3 sprints closed since last reassess \(threshold 3\)/);
   });
 
-  it("does not recommend reassess when a fresh reassess report leaves fewer than three closed sprints", () => {
+  it("is quiet when a sprint closes on the same day as the latest reassess report (same-day rule: covered, not counted)", () => {
     seedCleanRepo(repoRoot);
+    // Two sprints closed strictly before the report date; they would not be
+    // enough to fire on their own, but the point under test is the sprint
+    // closing *today*, on the same date as the report itself.
     write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
     write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
     write(path.join(repoRoot, "backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
@@ -310,18 +314,51 @@ describe("buildReassessSignal", () => {
       repoRoot,
       backlogDir: "backlog",
       doctorReport,
+      // Closing sprint's accounting date is "today" == the report's own date.
       closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
     assert.equal(doctorReport.exit_hint, "pass");
-    assert.equal(signal.recommend, false);
-    assert.equal(signal.completed_sprints_since_reassess, 1);
-    assert.equal(signal.latest_reassess_report, "backlog/triage/2026-07-03-reassess.md");
-    assert.match(signal.summary, /no reassess recommendation/);
+    assert.equal(signal.fired, false);
+    assert.equal(signal.sprints_since_last_report, 0);
+    assert.equal(signal.latest_report, "backlog/triage/2026-07-03-reassess.md");
+    assert.match(signal.reason, /doctor clean/);
+    assert.match(signal.reason, /0\/3 sprint\(s\) closed since last reassess/);
   });
 
-  it("recommends reassess when the doctor emits a warning even below the sprint-count threshold", () => {
+  it("accumulates strictly-later closes day by day and fires once three are reached", () => {
+    seedCleanRepo(repoRoot);
+    write(path.join(repoRoot, "backlog", "triage", "2026-07-01-reassess.md"), "# Reassess\n");
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-two.md"), completedSprint({ closed: "2026-07-02" }));
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-three.md"), completedSprint({ closed: "2026-07-03" }));
+
+    const doctorReport = runDoctor({ repoRoot });
+
+    // Two strictly-later closes: below threshold, quiet.
+    const belowThreshold = buildReassessSignal({
+      repoRoot,
+      backlogDir: "backlog",
+      doctorReport,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+    assert.equal(belowThreshold.sprints_since_last_report, 2);
+    assert.equal(belowThreshold.fired, false);
+
+    // A third strictly-later close (the sprint being closed today) tips it to fired.
+    const atThreshold = buildReassessSignal({
+      repoRoot,
+      backlogDir: "backlog",
+      doctorReport,
+      closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
+      today: new Date("2026-07-04T00:00:00Z"),
+    });
+    assert.equal(atThreshold.sprints_since_last_report, 3);
+    assert.equal(atThreshold.fired, true);
+    assert.match(atThreshold.reason, /3 sprints closed since last reassess \(threshold 3\)/);
+  });
+
+  it("fires when the doctor emits a warning even below the sprint-count threshold", () => {
     seedCleanRepo(
       repoRoot,
       sprint({
@@ -343,10 +380,66 @@ describe("buildReassessSignal", () => {
     });
 
     assert.equal(doctorReport.exit_hint, "warn");
-    assert.equal(signal.recommend, true);
+    assert.equal(signal.fired, true);
     assert.equal(signal.doctor_warn_count, 1);
-    assert.equal(signal.completed_sprints_since_reassess, 1);
-    assert.match(signal.summary, /doctor emitted 1 warning/);
-    assert.match(signal.summary, /recommend: spec-charter reassess/);
+    // The closing sprint closes the same day as the report: covered, not counted.
+    assert.equal(signal.sprints_since_last_report, 0);
+    assert.match(signal.reason, /doctor emitted 1 warning/);
+  });
+});
+
+describe("reassess_signal on the doctor JSON surface", () => {
+  let repoRoot;
+
+  beforeEach(() => {
+    repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "backlog-doctor-json-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  });
+
+  it("is a top-level field of runDoctor()'s plain report, with all four documented keys and correct types", () => {
+    seedCleanRepo(repoRoot);
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    assert.ok("reassess_signal" in report, "runDoctor() report is missing reassess_signal");
+    const signal = report.reassess_signal;
+    assert.equal(typeof signal.fired, "boolean");
+    assert.equal(typeof signal.reason, "string");
+    assert.equal(typeof signal.sprints_since_last_report, "number");
+    assert.ok(signal.latest_report === null || typeof signal.latest_report === "string");
+  });
+
+  it("no reports exist: all completed sprints count toward the threshold", () => {
+    seedCleanRepo(repoRoot);
+    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
+    write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    assert.equal(report.reassess_signal.latest_report, null);
+    assert.equal(report.reassess_signal.sprints_since_last_report, 2);
+  });
+
+  it("human summary includes a matching Reassess signal line", () => {
+    seedCleanRepo(repoRoot);
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    const human = formatHumanSummary(report);
+    assert.match(human, /Reassess signal: quiet - doctor clean/);
+  });
+
+  it("the close path consumes the same single accounting function -- runCloseSummary exposes only doctor_report, and its reassess_signal equals an equivalent direct runDoctor() call", () => {
+    seedCleanRepo(repoRoot);
+    const closingSprintPath = path.join(repoRoot, "backlog", "sprints", "2026-07-test.md");
+    const today = new Date("2026-07-03T00:00:00Z");
+
+    const closeResult = runCloseSummary({ repoRoot, closingSprintPath, today });
+    assert.deepEqual(Object.keys(closeResult), ["doctor_report"]);
+
+    const directReport = runDoctor({ repoRoot, closingSprintPath, today });
+    assert.deepEqual(closeResult.doctor_report.reassess_signal, directReport.reassess_signal);
   });
 });

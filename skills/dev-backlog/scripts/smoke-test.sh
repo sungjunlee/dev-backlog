@@ -87,6 +87,13 @@ if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail"
   process.exit(1);
 }
 '
+assert_json_eval "doctor live: reassess_signal shape" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const s = j.reassess_signal;
+if (!s || typeof s.fired !== "boolean" || typeof s.reason !== "string") process.exit(1);
+if (typeof s.sprints_since_last_report !== "number") process.exit(1);
+if (s.latest_report !== null && typeof s.latest_report !== "string") process.exit(1);
+'
 
 # ============================================================
 # fresh-session recovery live-repo smoke test

@@ -103,6 +103,16 @@ Default human output is one line per check. `--json` emits:
 | `schema_version` | integer | Schema version for the doctor JSON contract; starts at `1`. |
 | `checks` | array | Per-check verdicts in stable order. |
 | `exit_hint` | string | `fail` when any check failed, `warn` when no checks failed but at least one warned, otherwise `pass`. CLI exit is non-zero only for `fail`. |
+| `reassess_signal` | object | Whether to recommend `spec-charter reassess`. The single accounting computation; `--close-summary` consumes this same field rather than recomputing it. |
+
+`reassess_signal` has:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `fired` | boolean | `true` when any check above warned/failed, or when `sprints_since_last_report >= 3` (the `--reassess-threshold`, default `3`). |
+| `reason` | string | One-line human explanation combining the doctor state and the sprint count. |
+| `sprints_since_last_report` | integer | Completed sprints closed strictly after the latest `backlog/triage/YYYY-MM-DD-reassess.md` report's own date. A sprint closed on the same day as, or before, that report is treated as already covered by it and is not counted (close times aren't recorded, so same-day ordering can't be determined). With no reassess reports on disk, all completed sprints count. |
+| `latest_report` | string or `null` | Path to the latest reassess report, or `null` if none exists. |
 
 Each `checks[]` entry has:
 
