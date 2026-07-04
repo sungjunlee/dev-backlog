@@ -27,9 +27,7 @@ spec/
 
 - `skills/dev-backlog/` owns sprint execution, task mirrors, and progress helper scripts.
 - `skills/backlog-triage/` owns advisory issue grooming, charter Alignment reports, and spec-aware Decision Review.
-- `skills/spec-charter/` owns `spec/charter.md` lifecycle and charter proof gates.
-- `skills/spec-system-map/` owns this high-level system map.
-- `skills/spec-grill/` owns `spec/capabilities.md` authoring.
+- The `spec-charter`/`spec-system-map`/`spec-grill` authoring skills ship with craftkit (installed as sibling skills, not in this repo); they own the `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` authoring gates.
 - `spec/` holds durable project specs, not active sprint execution memory.
 
 ## Core Flows
@@ -39,7 +37,7 @@ spec/
 3. **Execute:** agents read the active sprint, update Plan state and Progress, and keep task context local.
 4. **Read (machine):** any actor reads execution state through the JSON surfaces (`status.sh --json` / `next.sh --json`) and one `backlog-doctor` verdict instead of parsing markdown; `sprint-mirror.js` explicitly publishes the active sprint to a machine-managed mirror issue.
 5. **Groom:** `backlog-triage` produces advisory reports with classification, relationships, stale signals, Alignment, and Decision Review; mutations require explicit user action.
-6. **Spec evolve:** `spec-charter`, `spec-system-map`, and `spec-grill` update durable project specs through their own gates. Sprint close runs `backlog-doctor` and may recommend `spec-charter reassess` (signal-gated, report-only); reassess reports land as dated files under `backlog/triage/`.
+6. **Spec evolve:** the craftkit-installed `spec-charter`, `spec-system-map`, and `spec-grill` skills update durable project specs through their own gates. Sprint close runs `backlog-doctor` and may recommend `spec-charter reassess` (signal-gated, report-only); reassess reports land as dated files under `backlog/triage/`.
 
 ## Storage And External Systems
 
@@ -67,10 +65,9 @@ Accepted capability contracts live in [`capabilities.md`](capabilities.md). Curr
 - `sprint-execution` - sprint planning, in-flight state, progress context, and active/completed sprint invariants.
 - `backlog-sync` - bidirectional mirroring: GitHub issues into local task cache (AC preservation) and the active sprint out to a machine-managed mirror issue.
 - `triage-grooming` - advisory issue classification, relationships, stale signals, Alignment, Decision Review, and report/apply boundaries.
-- `spec-charter` - project axis lifecycle and proof-gated charter mutation.
-- `spec-system-map` - high-level system structure, runtime boundaries, flows, invariants, and durable pointers.
-- `spec-grill` - capability admission, predicate pressure tests, and compact `spec/capabilities.md` contracts.
 - `task-progress-reporting` - monthly GitHub Progress issue synchronization and finalization.
+
+The former `spec-charter`/`spec-system-map`/`spec-grill` capability contracts moved to craftkit with the skills themselves (0.7.0, charter Decision 2026-07-04).
 
 ## Open Boundary Questions
 

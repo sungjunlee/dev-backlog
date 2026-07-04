@@ -6,6 +6,8 @@ Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-d
 
 Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs. Put secondary touches in sprint prose, not in frontmatter.
 
+The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks were removed on 2026-07-05: those skills moved to craftkit in 0.7.0 (charter Decision 2026-07-04), so their contracts live with the skill definitions there. This file keeps only capabilities this repo owns.
+
 ---
 
 ## Capability: sprint-execution
@@ -78,119 +80,6 @@ Capability headings are strict routing handles. Use one lowercase slug after `##
 | --- | --- | --- | --- |
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |
 | 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
-
----
-
-## Capability: spec-charter
-
-**Goal:** A user creates, amends, or reassesses `spec/charter.md` through tier-gated discipline, and the file stays a 5-minute read.
-
-**In-scope:**
-- `spec-charter` create + amend + reassess modes
-- Three-tier discipline (Direction / Predicates / History) and the proof gate for Objective status advances
-- `check-size.js` budget enforcement after every amend
-- Brownfield handoff guidance to `spec-system-map` and `spec-grill` after initial charter creation
-
-**Out-of-scope:**
-- Authoring per-capability contracts in `spec/capabilities.md` (`spec-grill` capability)
-- Charter deletion — no supported path
-- Reading `spec/charter.md` from sibling skills (each does it directly; this capability does not gate reads)
-
-### Expected Behaviors
-- After `amend` lands a real diff, `revision` increments by exactly 1 and `last_amended` advances to that day; a no-op invocation never bumps either field.
-- Every Objective status advance (`active` → `validated` / `deferred`) is refused unless a cited PR, check, or relay run whose Done Criteria match the predicate is provided in the same invocation.
-- `check-size.js` runs at the end of every successful amend and emits the size summary line; if word or line budgets exceed, the script also emits at least one actionable suggestion.
-
-### Hard Constraints
-- Never edit or delete an existing Decisions row — reversal is a new row with `supersedes`, never a mutation.
-- Never auto-advance an Objective's status without cited evidence, even when explicitly asked. The proof gate is unconditional.
-
-### Learnings
-<!-- LEARN:BEGIN -->
-<!-- LEARN:END -->
-
-### Decisions
-| date | decision | rationale | supersedes |
-| --- | --- | --- | --- |
-| 2026-05-22 | CHARTER is a separate file, not merged into `_context.md` | Yardstick must stay <5-min; HOW-knowledge would dilute it | — |
-| 2026-05-22 | `backlog-charter` is a third sibling skill, not folded into `dev-backlog` | Different concern (axis lifecycle vs. execution) | — |
-| 2026-05-29 | `backlog-charter` is renamed to `spec-charter` for charter lifecycle work | The artifact is a project spec axis, not a backlog-only helper | 2026-05-22 |
-| 2026-05-29 | New charter files live at `spec/charter.md`; root `CHARTER.md` is legacy fallback | Multiple project spec artifacts need one durable home under `spec/` | 2026-05-22 |
-
----
-
-## Capability: spec-system-map
-
-**Goal:** A user captures project-wide system shape in `spec/system-map.md` without letting it become an exhaustive architecture encyclopedia.
-
-**In-scope:**
-- `spec-system-map` create + amend modes
-- `spec/system-map.md` template and dogfood artifact
-- Boundaries between charter, system map, and capability contracts
-- Candidate Capability Boundaries handoff to `spec-grill`
-- Demotion of module details, endpoint lists, and runbook commands into linked docs
-
-**Out-of-scope:**
-- Mutating `spec/charter.md` direction or Objectives (`spec-charter` capability)
-- Authoring per-capability contracts (`spec-grill` capability)
-- Replacing ADRs, runbooks, generated API docs, or implementation notes
-
-### Expected Behaviors
-- Create mode writes `spec/system-map.md` and creates `spec/` when needed.
-- The map includes System Shape, Runtime Boundaries, Core Flows, Storage And External Systems, Project-Wide Invariants, Candidate Capability Boundaries, and Where To Go Next.
-- Brownfield uncertainty is labeled as an assumption instead of filled with invented details.
-
-### Hard Constraints
-- Never include exhaustive module inventories, endpoint lists, deployment commands, or temporary TODOs in `spec/system-map.md`.
-- Never promote a subsystem detail unless it changes a project-wide boundary, flow, storage/external system, or invariant.
-- Never let Candidate Capability Boundaries become accepted capability contracts; `spec-grill` owns admission, merge, split, and refusal.
-
-### Learnings
-<!-- LEARN:BEGIN -->
-<!-- LEARN:END -->
-
-### Decisions
-| date | decision | rationale | supersedes |
-| --- | --- | --- | --- |
-| 2026-05-29 | Use `system-map.md`, not `ARCHITECTURE.md`, for the high-level project map | The name narrows scope away from mixed architecture/runbook/module docs | — |
-
----
-
-## Capability: spec-grill
-
-**Goal:** A user reviews existing repo signals through a report-first grill flow, then turns accepted boundaries into compact `spec/capabilities.md` capability contracts.
-
-**In-scope:**
-- `spec-grill` natural-language intent routing and report-first diagnosis
-- `extract-signals.js` raw evidence grouping from README, charter, system map, source roots, skill files, script surfaces, docs, tests, harness files, and commit scopes
-- Capability admission, Goal/Scope interview, Expected Behaviors, and Hard Constraints
-- Grill Report sections: Evidence Read, Evidence Missing, Raw Candidates, Accepted / Rejected / Merged / Split Candidates, Sharp Questions, 3-Axis Predicate Findings, Proposed Next Capability, and Recommended Edit
-- `templates/capabilities.md` and `references/capabilities.md`
-
-**Out-of-scope:**
-- Mutating `spec/charter.md` direction or Objectives (`spec-charter` capability)
-- Appending runtime Learnings after relay runs (bounded writer contract outside grill)
-- Treating directory names or commit scopes as accepted capabilities without interview admission
-
-### Expected Behaviors
-- Ambiguous or no-argument `spec-grill` requests emit a report and do not edit files.
-- On brownfield repos, `extract-signals.js --repo-root <target> --json` emits deterministic evidence-grouped raw candidates and labels signal authority before any contract is accepted.
-- `spec-grill <capability-slug>` edits only the named capability block and leaves other capability blocks, Learnings, and Decisions untouched.
-- Every accepted Behavior and Hard Constraint passes the authority, distributional, and manipulability axes before it is committed.
-
-### Hard Constraints
-- Never write a capability solely because a same-named directory or commit scope exists; raw signals require admission, merge, split, or refusal.
-- Never require users to memorize `map`, `fill`, or `audit`; those are optional shorthand over natural-language intent routing.
-- Never edit `### Learnings` between magic markers during grill; Learnings cleanup is a separate user-approved Learning Action.
-
-### Learnings
-<!-- LEARN:BEGIN -->
-<!-- LEARN:END -->
-
-### Decisions
-| date | decision | rationale | supersedes |
-| --- | --- | --- | --- |
-| 2026-05-29 | Capability authoring moves from hidden `backlog-charter grill` mode to `spec-grill` | Existing-repo users need a discoverable second step after `spec-charter create` | — |
 
 ---
 

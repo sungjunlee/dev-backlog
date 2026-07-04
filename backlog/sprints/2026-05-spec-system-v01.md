@@ -4,7 +4,7 @@ status: completed
 started: 2026-05-23
 due: TBD
 objectives: [O3, O4]
-component: "spec-grill"
+component: ""
 ---
 
 # spec-system v0.1
@@ -40,6 +40,7 @@ Both pieces of PR-3 are parallelizable but ship together. #104 lives in dev-rela
 - **CHARTER objectives this sprint advances:** O3 (`<5-min reference axis usable`) — capability specs extend the 5-min property *below* CHARTER, not into it. O4 (`drift detectable without manual triage`) — `## Learnings` + `component-lint.js` are direct drift surfaces. Status advance still requires independent-project proof per Tier 2; do **not** advance on this sprint alone.
 - **Research artifact recovery.** Three deep research syntheses from the design session (autonomous-agent failures, spec-language granularity, Goodhart/control-theory) live only in conversation history of the previous session. Recommended: save as `skills/backlog-charter/references/spec-system-research.md` as part of PR-1 (#101) so they survive future `/clear`s. The design doc references this file as a placeholder.
 - **Cross-repo coordination.** PR-3 touches dev-relay. File a mirror issue in `sungjunlee/dev-relay` before implementing #104 so the cross-repo change is visible from both sides.
+- 2026-07-05: `component:` cleared from retired `spec-grill` — the spec-* capabilities moved to craftkit with the skills (0.7.0, charter Decision 2026-07-04).
 
 ## Progress
 [Timestamped log — update at end of each session/batch]
