@@ -6,15 +6,8 @@ GitHub Issues + local sprint execution files for Claude Code / Codex.
 
 ```
 skills/
-  spec-charter/
-    SKILL.md               ← spec/charter.md create/amend + reassess contract
-    references/            ← Detailed specs (on-demand)
-    scripts/               ← Deterministic helpers (node)
-  spec-system-map/
-    SKILL.md               ← spec/system-map.md high-level system map contract
-    templates/             ← Runtime system-map template
-  spec-grill/
-    SKILL.md               ← spec/capabilities.md grill contract
+  backlog-triage/
+    SKILL.md               ← Open-issue grooming contract
     references/            ← Detailed specs (on-demand)
     scripts/               ← Deterministic helpers (node)
   dev-backlog/
@@ -22,6 +15,8 @@ skills/
     references/            ← Detailed specs (on-demand)
     scripts/               ← Deterministic helpers (node + bash)
 ```
+
+The `spec-charter`, `spec-system-map`, and `spec-grill` skills moved to [craftkit](https://github.com/sungjunlee/craftkit); this repo consumes their output files (`spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md`) but no longer ships the skills themselves.
 
 ## Key Design Decisions
 

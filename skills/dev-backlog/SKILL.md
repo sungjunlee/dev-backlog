@@ -13,7 +13,7 @@ Real job: keep GitHub Issues as the task source of truth while using `backlog/sp
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, must-do steps, and completion criteria.
 
-Related skills: [`spec-charter`](../spec-charter/SKILL.md) for `spec/charter.md`, [`spec-system-map`](../spec-system-map/SKILL.md) for `spec/system-map.md`, [`spec-grill`](../spec-grill/SKILL.md) for `spec/capabilities.md`, and [`backlog-triage`](../backlog-triage/SKILL.md) for advisory backlog review before sprint planning.
+Related skills: `spec-charter` for `spec/charter.md`, `spec-system-map` for `spec/system-map.md`, and `spec-grill` for `spec/capabilities.md` — these ship with craftkit (`npx skills add sungjunlee/craftkit`), not this repo. [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning.
 
 ## Mode Router
 
@@ -44,7 +44,7 @@ Local (execution hub — how to do it)
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
 - Keep task files thin. AC checkboxes may update there; decisions, progress, and cross-task context stay in the sprint file.
 - Completed sprints stay as the permanent execution record.
-- Spec-axis boundaries live in `../spec-charter/references/spec-axis.md`; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
+- Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries (the durable `spec/*` contracts) live in the installed `spec-charter` skill's `references/spec-axis.md`, provided by craftkit; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
 
 ## Sprint File Contract
 
@@ -168,6 +168,7 @@ Useful scripts:
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
 - `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
+- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership; points to the installed `spec-charter` skill (craftkit) for spec-axis boundaries.
 
 ## Eval Prompts (fresh-session recovery)
 
