@@ -1,6 +1,6 @@
 ---
 last_amended: 2026-07-04
-revision: 4
+revision: 5
 ---
 
 # dev-backlog Charter
@@ -33,8 +33,8 @@ No server, no daemon, no hidden state, no silent sync.
 - O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user
 - O2 [validated] GitHub Issues remain the canonical task spec; no parallel issue store exists in dev-backlog · src: user
 - O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
-- O4 [active]    Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user
-- O5 [active]    Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (validated requires one full signal→reassess→amend cycle in dogfooding)
+- O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close)
+- O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->
