@@ -94,17 +94,17 @@ Then use the skill during your coding session:
 /dev-backlog sync
 ```
 
-Optional spec-series setup:
+For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
-```text
-/spec-charter create
-/spec-system-map
-/spec-grill
+### Spec axis (charter, system map, capabilities)
+
+The `spec-charter`, `spec-system-map`, and `spec-grill` authoring skills moved to [craftkit](https://github.com/sungjunlee/craftkit) — that repo is their canonical home as of 2026-07.
+
+```bash
+npx skills add sungjunlee/craftkit -g -y
 ```
 
-`spec-charter` creates the project-wide `spec/charter.md` axis. On existing repos, follow it with `spec-system-map` for `spec/system-map.md` and `spec-grill` for `spec/capabilities.md`. The spec index lives at [spec/README.md](spec/README.md).
-
-For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+`dev-backlog` and `backlog-triage` consume `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` as read-only yardsticks (Objective IDs, capability handles, Alignment/Decision Review evidence) and degrade gracefully when those files are absent. Sprint planning and triage keep working against the installed craftkit skills; the spec index lives at [spec/README.md](spec/README.md).
 
 ## Maintainer Verification
 
@@ -114,7 +114,7 @@ After editing this repository's skill bundle, run the discovery smoke check from
 npx --yes skills add . -l
 ```
 
-Expected: the CLI discovers `backlog-triage`, `dev-backlog`, `spec-charter`, `spec-grill`, and `spec-system-map`. This verifies bundle packaging and frontmatter discovery; those sibling skills are not runtime dependencies for every `dev-backlog` invocation.
+Expected: the CLI discovers `backlog-triage` and `dev-backlog`. This verifies bundle packaging and frontmatter discovery.
 
 Important if you use `dev-relay`: sprint files are not fully freeform markdown.
 These details are load-bearing for automation:
