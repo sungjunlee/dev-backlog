@@ -6,6 +6,25 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+Headline: writing-great-skills review batch — reference docs re-synced with the SKILL.md contracts, release metadata aligned, spec-* move aftermath cleaned up, and one live-hit script bug fixed.
+
+### Fixed
+
+- `sprint-close.sh` now parses flags position-independently: `--dry-run` without a positional backlog-dir works, positional/flags accept any order, and unknown `--*` flags fail loud instead of being treated as a directory; smoke-test coverage added. Closes [#247](https://github.com/sungjunlee/dev-backlog/issues/247) / PR [#251](https://github.com/sungjunlee/dev-backlog/pull/251).
+
+### Changed
+
+- `skills/dev-backlog/references/process.md` re-synced with the SKILL.md execution contract: Complete routes through `sprint-close.sh` (doctor + reassess signal), Plan step 0 states the refuse rule instead of an inline `status:` flip, and Plan covers `component:` and `sprint-init.js`. Closes [#243](https://github.com/sungjunlee/dev-backlog/issues/243).
+- `VERSION` and CHANGELOG link definitions aligned with v0.7.0 (`[0.6.0]`/`[0.7.0]` compare links, `[Unreleased]` repointed). Closes [#244](https://github.com/sungjunlee/dev-backlog/issues/244).
+- `skills/backlog-triage/SKILL.md` documents the snapshot v2 collect flags `--with-comments` / `--with-closed-issues` and which report signals need them. Closes [#245](https://github.com/sungjunlee/dev-backlog/issues/245).
+- `skills/dev-backlog/SKILL.md` reassess-signal paragraph compressed to defer accounting details to `references/integration-contract.md`; craftkit provenance stated once per SKILL.md; stale "upcoming backlog-doctor" wording moved to present tense. Closes [#246](https://github.com/sungjunlee/dev-backlog/issues/246).
+- `skills/dev-backlog/references/integration-contract.md` component example swapped to the live `sprint-execution` slug. Closes [#248](https://github.com/sungjunlee/dev-backlog/issues/248).
+- `docs/spec-system-design.md` gains a dated provenance note for the 0.7.0 spec-* move; the dead research-survey link now cites git history (pre-`cd31a2b`) with the restore decision tracked in [craftkit#124](https://github.com/sungjunlee/craftkit/issues/124). Closes [#249](https://github.com/sungjunlee/dev-backlog/issues/249).
+
+### Removed
+
+- The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks in `spec/capabilities.md` (maintainer-approved follow-up to the 0.7.0 move; their contracts live with the craftkit skill definitions). Legacy sprint `component: "spec-grill"` handles cleared with dated notes.
+
 ## [0.7.0] — 2026-07-04
 
 Headline: the `spec-charter`, `spec-grill`, and `spec-system-map` skills moved to [craftkit](https://github.com/sungjunlee/craftkit), which is now their canonical home.
