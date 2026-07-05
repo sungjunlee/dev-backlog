@@ -171,7 +171,7 @@ These rules are observable from files alone and apply to any actor mutating spri
 The optional `component:` field is one primary routing handle into `spec/capabilities.md`.
 
 ```yaml
-component: "spec-charter"
+component: "sprint-execution"
 ```
 
 Rules:
