@@ -187,7 +187,7 @@ When the hard trigger fires, `split-capabilities.js` migrates to `spec/component
 
 ## Research grounding
 
-The full literature survey was retired with the 0.7.0 move and survives only in this repo's git history (pre-`cd31a2b`, at `skills/spec-grill/references/spec-system-research.md`); restoring a canonical copy is tracked in [craftkit#124](https://github.com/sungjunlee/craftkit/issues/124). Three findings load-bear this design:
+The full literature survey lives canonically at [craftkit `docs/spec-system-research.md`](https://github.com/sungjunlee/craftkit/blob/main/docs/spec-system-research.md) (restored per [craftkit#124](https://github.com/sungjunlee/craftkit/issues/124) after the 0.7.0 move retired the in-repo copy). Three findings load-bear this design:
 
 ### 1. The 3-mode failure taxonomy for autonomous-agent specs
 
