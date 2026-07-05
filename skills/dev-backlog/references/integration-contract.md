@@ -223,7 +223,7 @@ Every `[~]` Plan line must carry at least one pointer that lets a later reader f
 - Branch pointer: `[branch:<git-ref>]`, where `<git-ref>` is a Git branch name with no whitespace or `]`.
 - Run pointer: `[run:<run-id>]`, using the existing run-id annotation format.
 
-A `[~]` line with none of those pointers is **unmoored**. Historical unmoored lines should be read conservatively as in-flight but unattributable; the upcoming `backlog-doctor` consumer will flag them for repair.
+A `[~]` line with none of those pointers is **unmoored**. Historical unmoored lines should be read conservatively as in-flight but unattributable; `backlog-doctor` flags them for repair.
 
 Non-human `## Progress` entries must include an actor tag:
 

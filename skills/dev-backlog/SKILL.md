@@ -44,7 +44,7 @@ Local (execution hub — how to do it)
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
 - Keep task files thin. AC checkboxes may update there; decisions, progress, and cross-task context stay in the sprint file.
 - Completed sprints stay as the permanent execution record.
-- Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries (the durable `spec/*` contracts) live in the installed `spec-charter` skill's `references/spec-axis.md`, provided by craftkit; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
+- Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries (the durable `spec/*` contracts) live in the installed `spec-charter` skill's `references/spec-axis.md`; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
 
 ## Sprint File Contract
 
@@ -118,7 +118,7 @@ For a whole sprint:
 4. Promote project-level Running Context entries to `_context.md`.
 5. Leave the sprint file in place as the permanent record.
 
-The reassess signal recommends `spec-charter reassess` when the doctor warns/fails (informational warns, like the normal between-sprints zero-active state, do not count) or when Node counts 3+ completed sprints since the latest `backlog/triage/YYYY-MM-DD-reassess.md`; it is the same `reassess_signal` field (`fired`, `reason`, `sprints_since_last_report`, `latest_report`) on `backlog-doctor.js --json`, not a separate computation — `sprint-close.sh` just consumes it. Counting uses each completed sprint's final `Sprint closed` Progress date, falling back to the filename month; a sprint closed the same day as (or before) the latest report's own date is covered by that report and does not count, so same-day re-triggers never happen. Dry-run/pre-close counts the closing sprint as today. Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
+The reassess signal recommends `spec-charter reassess` when the doctor warns or fails (informational warns, like the normal between-sprints zero-active state, do not count) or when 3+ sprints have completed since the latest `backlog/triage/YYYY-MM-DD-reassess.md`. It is the `reassess_signal` field on `backlog-doctor.js --json`; `sprint-close.sh` just consumes it — see `references/integration-contract.md` § Backlog Doctor JSON Surface for the detailed accounting (same-day coverage, dry-run counting, field schema). Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -168,7 +168,7 @@ Useful scripts:
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
 - `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
-- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership; points to the installed `spec-charter` skill (craftkit) for spec-axis boundaries.
+- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership; points to the installed `spec-charter` skill for spec-axis boundaries.
 
 ## Eval Prompts (fresh-session recovery)
 
