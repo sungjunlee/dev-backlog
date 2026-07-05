@@ -106,7 +106,7 @@ node "$skill_dir/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md
 
 Useful scripts:
 
-- `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run]` — fetch open issues and write `backlog/triage/.cache/<ISO-timestamp>.json`.
+- `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run] [--with-comments] [--with-closed-issues]` — fetch open issues and write `backlog/triage/.cache/<ISO-timestamp>.json`; `--with-comments` enables comment-mention edges and `--with-closed-issues` enables duplicate-of-closed signals, see `references/classification.md`.
 - `scripts/triage-relate.js --snapshot PATH [--json]` — detect mentions, blocks, depends-on, duplicates, and merged PR links.
 - `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — flag stale/obsolete candidates with evidence.
 - `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]` — render report; creates `.bak` on overwrite.
