@@ -24,16 +24,17 @@ Two files at most (`_context.md` + active sprint), full picture.
 
 When starting a new sprint:
 
-0. If an active sprint exists, set its `status: completed` and write a final Progress entry first.
+0. If an active sprint exists, refuse to plan a new one until the previous sprint is closed through the full **Complete** flow (`sprint-close.sh`, archive completed tasks, promote Running Context). Never flip `status:` inline to force a slot open — `sprint-init.js` enforces this refusal.
 1. If `spec/charter.md` exists, read its `active` Objectives first. If it is absent, fall back to legacy root `CHARTER.md`. Derive the sprint as the projection of those objectives onto not-yet-done work, and record the advanced Objective IDs in sprint frontmatter `objectives: [O1, O3]`. If both are absent, plan exactly as before and leave `objectives: []`.
 2. Create GitHub milestone: `gh api repos/{owner}/{repo}/milestones -f title="Sprint W13" -f due_on="2026-03-28"`
 3. Assign issues: `gh issue edit <N> --milestone "Sprint W13"`
 4. Pull issues to `backlog/tasks/`
-5. **Create sprint file** in `backlog/sprints/`:
+5. **Create sprint file** in `backlog/sprints/` — run `scripts/sprint-init.js "topic" [--milestone "Name"]` to generate the skeleton (it refuses a second active sprint), or create it manually as fallback:
    - Set Goal (one sentence)
    - Order issues into Batches — group small tasks that can run in one session
    - Estimate time per task to help decide batching
    - Note any dependencies between tasks
+   - Set `component:` to one primary capability slug from `spec/capabilities.md` when that file exists (empty string when it doesn't, or when no capability fits) — it must match exactly one `## Capability: <slug>` heading; `component-lint.js` validates it
 
 ## Work — Execute a Batch
 
@@ -67,10 +68,11 @@ Per issue:
 3. Check off in sprint Plan + add Progress entry
 
 When the whole sprint closes:
-1. Set sprint `status: completed`, write a final Progress entry
-2. Move completed task files: `backlog/tasks/` → `backlog/completed/`
-3. Review Running Context — promote project-level entries to `_context.md`
-4. The sprint file becomes a permanent record. Don't delete it.
+1. Run `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary
+2. Set sprint `status: completed`, write a final Progress entry
+3. Move completed task files: `backlog/tasks/` → `backlog/completed/`
+4. Review Running Context — promote project-level entries to `_context.md`
+5. The sprint file becomes a permanent record. Don't delete it.
 
 ## Sync — GitHub ↔ Local
 
