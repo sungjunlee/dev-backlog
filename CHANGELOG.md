@@ -84,7 +84,9 @@ Tracked for post-0.4.0 work — not blocking the release.
 
 Initial public release — `dev-backlog` skill with sprint files, task files, progress-sync, sync-pull, and Claude Code + Codex compatibility. See the initial commit (`0df6a1f`) for the baseline scope.
 
-[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sungjunlee/dev-backlog/releases/tag/v0.3.0
