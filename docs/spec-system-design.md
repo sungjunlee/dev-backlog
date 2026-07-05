@@ -3,6 +3,8 @@
 **Status:** Approved (M tier) · **Date:** 2026-05-23 · **Author:** session capture
 **Supersedes:** - · **Related:** [`spec/charter.md`](../spec/charter.md), [`spec/system-map.md`](../spec/system-map.md), [`skills/spec-charter/`](../skills/spec-charter/), [`skills/spec-system-map/`](../skills/spec-system-map/), [`skills/spec-grill/`](../skills/spec-grill/)
 
+> **Note (2026-07-05):** The `spec-charter`, `spec-system-map`, and `spec-grill` skills moved to [craftkit](https://github.com/sungjunlee/craftkit) in 0.7.0. `skills/spec-*` paths in this document are historical in-repo paths from when this design shipped here; the live skill definitions are the craftkit-installed skills.
+
 A layered, brownfield-friendly project spec system that survives multi-day autonomous agent execution without rubber-stamping itself into uselessness. This doc captures the current architecture, durable policy, research grounding, and historical implementation evidence.
 
 ---
@@ -116,6 +118,8 @@ This preserves the existing readability budgets: `spec/charter.md` remains a 5-m
 
 ### Reassess source-of-truth map
 
+These paths are historical; since 0.7.0 the files live in the craftkit-installed skills.
+
 | Artifact | Owns | Does not own |
 |---|---|---|
 | `skills/spec-charter/SKILL.md` | `spec/charter.md` create/amend and report-only reassess dispatch contract | capability authoring details |
@@ -183,7 +187,7 @@ When the hard trigger fires, `split-capabilities.js` migrates to `spec/component
 
 ## Research grounding
 
-Full literature survey lives at [`references/spec-system-research.md`](../skills/spec-grill/references/spec-system-research.md). Three findings load-bear this design:
+The full literature survey was retired with the 0.7.0 move and survives only in this repo's git history (pre-`cd31a2b`, at `skills/spec-grill/references/spec-system-research.md`); restoring a canonical copy is tracked in [craftkit#124](https://github.com/sungjunlee/craftkit/issues/124). Three findings load-bear this design:
 
 ### 1. The 3-mode failure taxonomy for autonomous-agent specs
 
