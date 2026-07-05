@@ -14,14 +14,27 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-backlog}"
+BACKLOG_DIR="backlog"
 DRY_RUN=false
 CLOSE_MILESTONE=false
+BACKLOG_DIR_SET=false
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
     --close-milestone) CLOSE_MILESTONE=true ;;
+    --*)
+      echo "Unknown argument: $arg"
+      exit 1
+      ;;
+    *)
+      if $BACKLOG_DIR_SET; then
+        echo "Unexpected argument: $arg"
+        exit 1
+      fi
+      BACKLOG_DIR="$arg"
+      BACKLOG_DIR_SET=true
+      ;;
   esac
 done
 

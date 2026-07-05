@@ -809,6 +809,42 @@ assert_contains "close dry-run: reassess verdict appears" "$OUT" "Reassess signa
 assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
 assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "3"
 
+# --- dry-run flag/order parsing tests ---
+set +e
+OUT=$(cd "$TEST_DIR" && bash "$SCRIPT_DIR/sprint-close.sh" --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_equals "close dry-run flag-only: exit code" "$STATUS" "0"
+assert_contains "close dry-run flag-only: would set completed" "$OUT" "Would set status: completed"
+assert_contains "close dry-run flag-only: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
+assert_contains "close dry-run flag-only: defaults to backlog" "$OUT" "backlog/sprints/2026-03-auth.md"
+assert_contains "close dry-run flag-only: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --dry-run "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "close dry-run flag-first positional: exit code" "$STATUS" "0"
+assert_contains "close dry-run flag-first positional: would set completed" "$OUT" "Would set status: completed"
+assert_contains "close dry-run flag-first positional: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
+assert_contains "close dry-run flag-first positional: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --bogus "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "close unknown flag: exit code" "$STATUS" "1"
+assert_contains "close unknown flag: message" "$OUT" "Unknown argument: --bogus"
+assert_contains "close unknown flag: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" "$TEST_DIR/other-backlog" --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_equals "close extra positional: exit code" "$STATUS" "1"
+assert_contains "close extra positional: message" "$OUT" "Unexpected argument: $TEST_DIR/other-backlog"
+assert_contains "close extra positional: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+
 # --- actual close ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "close: set completed" "$OUT" "status: completed"
