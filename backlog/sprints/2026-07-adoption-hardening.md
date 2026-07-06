@@ -1,0 +1,42 @@
+---
+milestone: 2026-07 adoption hardening
+status: active
+started: 2026-07-06
+due: TBD
+objectives: [O3]
+component: "sprint-execution"
+---
+
+# adoption-hardening
+
+## Goal
+A cold adopter with no craftkit and no `spec/*` files can finish one full sprint cycle with zero dangling cross-repo pointers and a minimum-path Quick Start — proven by a smoke eval that is RED today and GREEN at sprint close.
+
+## Plan
+
+### Batch 1 — RED gate (E1 #262)
+- [ ] #252 test(dev-backlog): cold-adopter eval prompt and smoke coverage (V1) (~30min) — write the failing cold-adopter smoke so the rest of the sprint has a pass/fail target
+
+### Batch 2a — spec-axis decoupling (E2 #263), ordered
+- [ ] #253 docs(dev-backlog): add spec-fallback.md consumption-side degradation reference (A1) (~30min) — blocks #254/#255
+- [ ] #254 docs(backlog-triage): re-point Report Evidence off required ../spec-charter reads (A2) (~20min) — after #253
+- [ ] #255 docs(dev-backlog): re-point backlog-boundaries and Core Contracts to local fallback (A3) (~20min) — after #253
+
+### Batch 2b — first-run minimum path (E3 #264), parallel with 2a
+- [ ] #256 docs(readme): reorder Quick Start to the no-spec minimum path (B1) (~20min)
+- [ ] #257 docs(dev-backlog): frame related-skills as optional below the Mode Router (B2) (~20min)
+- [ ] #258 feat(dev-backlog): omit objectives/component frontmatter when spec files are absent (B3) (~30min) — coordinate relay frontmatter contract in AC
+
+### Batch 3 — contract hygiene (E4 #265)
+- [ ] #259 docs(dev-backlog): extract script inventory to references/scripts.md (C1) (~20min)
+- [ ] #260 docs(dev-backlog): compress reassess accounting to one sentence + pointer (C2) (~20min)
+- [ ] #261 feat(dev-backlog): checkbox-repair runbook and doctor message link (C3) (~30min)
+
+## Running Context
+- objectives: `[O3]` — spec-axis decoupling (E2) + first-run path (E3) both serve "stable per-project reference axis readable in <5 min"; the PRD §8 candidate objective (cold-adopter portability) is human-gated via `spec-charter amend` and is NOT claimed here.
+- component: `sprint-execution` — the dominant contract being hardened. #254 also touches `triage-grooming`; keep that as prose, not a second `component:`.
+- Anti-goal from PRD top risk: `spec-fallback.md` (#253) is consumption-side only and capped ~1 page — it must NOT drift into a second spec-axis authority (the 2026-06/07 silent-fork failure mode).
+- Rejected in review: pi's `anchors:` merge of objectives/component — breaks the dev-relay frontmatter contract.
+
+## Progress
+- 2026-07-06 — Sprint opened from `docs/prd-2026-07-adoption-hardening.md` (commit 96c9e1a). Milestone #12, epics #262–#265, issues #252–#261 registered. Plan sequenced RED→decouple/first-run→hygiene.
