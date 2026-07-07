@@ -24,7 +24,7 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 
 ### Batch 2b — first-run minimum path (E3 #264), parallel with 2a
 - [x] #256 docs(readme): reorder Quick Start to the no-spec minimum path (B1) (~20min) — Quick Start = 5-command min cycle + session loop, zero spec/relay/triage; extensions behind "## Optional extensions" w/ pricing
-- [ ] #257 docs(dev-backlog): frame related-skills as optional below the Mode Router (B2) (~20min)
+- [x] #257 docs(dev-backlog): frame related-skills as optional below the Mode Router (B2) (~20min) — related-skills moved below Mode Router w/ "none required" framing; contract table + Plan step 1 now state field-omission (B3) not empty-value
 - [ ] #258 feat(dev-backlog): omit objectives/component frontmatter when spec files are absent (B3) (~30min) — coordinate relay frontmatter contract in AC
 
 ### Batch 3 — contract hygiene (E4 #265)
@@ -47,3 +47,4 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 - 2026-07-07 — #254 (A2) landed: backlog-triage Report Evidence + References re-pointed onto the intra-bundle `spec-fallback.md`; craftkit's `spec-charter` demoted to when-installed enhancement; evidence-tier now stated in the report. Also tightened the V1 A2/A3 gate to match only `../spec-charter/references/` in `*.md` (it was over-broad — caught its own source and the negative eval-prompt mention, so it could never have flipped GREEN). Gate now matches only `backlog-boundaries.md` → flips GREEN when #255 lands.
 - 2026-07-07 — **Batch 2a / E2 complete.** #255 (A3) landed: `backlog-boundaries.md` + SKILL.md Core Contracts + References re-pointed to `references/spec-fallback.md`; craftkit is authoring-home-when-installed. Zero `../spec-charter/` reads remain in `skills/`. The A2/A3 gate flipped XPASS → enforced (`GATE_A2A3=1`), now a regression guard. Suite 140/140, 1 xfail (B3 only). doctor pass. Epic #263 closed.
 - 2026-07-07 — Batch 2b started. #256 (B1) landed: README Quick Start is now the 5-command minimum cycle (init→sync-pull→sprint-init→next→close) + `/dev-backlog` session loop with zero spec/relay/triage mentions; spec axis, dev-relay, and backlog-triage moved behind a new `## Optional extensions` boundary with an adds/requires pricing table. No inbound anchor links existed, so no links broke.
+- 2026-07-07 — #257 (B2) landed: related-skills paragraph moved from above the Mode Router to below it, framed "none required for the core cycle"; the Sprint File Contract table and Plan step 1 now state the field-omission rule (omit `objectives:`/`component:` when spec absent, per spec-fallback.md) instead of the old empty-value rule. Doc now leads B3's implementation. Suite 140/140, doctor pass.

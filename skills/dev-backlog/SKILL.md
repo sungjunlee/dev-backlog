@@ -13,8 +13,6 @@ Real job: keep GitHub Issues as the task source of truth while using `backlog/sp
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, must-do steps, and completion criteria.
 
-Related skills: `spec-charter` for `spec/charter.md`, `spec-system-map` for `spec/system-map.md`, and `spec-grill` for `spec/capabilities.md` — these ship with craftkit (`npx skills add sungjunlee/craftkit`), not this repo. [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning.
-
 ## Mode Router
 
 | User intent | Mode | Completion boundary |
@@ -28,6 +26,8 @@ Related skills: `spec-charter` for `spec/charter.md`, `spec-system-map` for `spe
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
 
 If `backlog/` does not exist, bootstrap it with `mkdir -p backlog/{sprints,tasks,completed}` and create `backlog/config.yml`; see `references/file-format.md`.
+
+Related skills (none required for the core cycle above — dev-backlog runs a full sprint from GitHub Issues alone): when installed, `spec-charter` (`spec/charter.md`), `spec-system-map` (`spec/system-map.md`), and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
 ## Core Contracts
 
@@ -53,8 +53,8 @@ One active sprint file in `backlog/sprints/YYYY-MM-<topic>.md` carries:
 | Section / field | Purpose | Completion check |
 | --- | --- | --- |
 | `status: active` | Marks the single active sprint | No other sprint is active. |
-| `objectives: [O1]` | Charter Objective IDs advanced by the sprint | IDs exist and are actionable, or `[]` when no charter exists. |
-| `component: "slug"` | Primary capability and relay-Learnings routing handle | Resolves to one capability whose `## Learnings` block receives relay-merge entries, or empty when no target exists. |
+| `objectives: [O1]` | Charter Objective IDs advanced by the sprint | IDs exist and are actionable; omit the field entirely when no charter exists (see `references/spec-fallback.md`). |
+| `component: "slug"` | Primary capability and relay-Learnings routing handle | Resolves to one capability whose `## Learnings` block receives relay-merge entries; omit the field entirely when no capabilities file exists. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with issue refs and estimates | Every planned task has a checkbox and issue number. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
@@ -89,7 +89,7 @@ Done when the new issue exists on GitHub, has a local task mirror, and is added 
 
 ### Plan
 
-1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; use `objectives: []` when both are absent.
+1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
 2. Pull/inspect open issues and assign the sprint milestone when applicable.
 3. Create one active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:`.
 4. Refuse to create a second active sprint until the previous one is completed.
