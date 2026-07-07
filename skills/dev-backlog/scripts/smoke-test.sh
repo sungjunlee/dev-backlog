@@ -1005,10 +1005,13 @@ process.exit(emitsSpecFields ? 1 : 0);
 '; then B3_RES="pass"; else B3_RES="fail"; fi
 gated_assert "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$GATE_B3" "$B3_RES"
 
-# RED until #254/#255 (A2/A3): no skill file may carry an unconditional
-# required-read of a cross-repo ../spec-charter/ path (dangles for adopters
-# without craftkit). Re-pointing to a local fallback clears this.
-if grep -rlF "../spec-charter/" "$REPO_ROOT/skills/" >/dev/null 2>&1; then
+# RED until #254/#255 (A2/A3): no skill doc may carry an unconditional
+# required-read of a cross-repo ../spec-charter/references/ path (dangles for
+# adopters without craftkit). Re-pointing to the local fallback clears this.
+# Scope to markdown skill docs — this excludes .sh files (so the gate never
+# matches its own source) and matches only the concrete reference-file paths,
+# not name-only mentions or negative "never chase ../spec-charter/..." warnings.
+if grep -rlF "../spec-charter/references/" --include="*.md" "$REPO_ROOT/skills/" >/dev/null 2>&1; then
   A2A3_RES="fail"   # still coupled → RED
 else
   A2A3_RES="pass"

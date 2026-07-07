@@ -19,7 +19,7 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 
 ### Batch 2a — spec-axis decoupling (E2 #263), ordered
 - [x] #253 docs(dev-backlog): add spec-fallback.md consumption-side degradation reference (A1) (~30min) — 452w/33 lines, consumption-side only; unblocks #254/#255
-- [ ] #254 docs(backlog-triage): re-point Report Evidence off required ../spec-charter reads (A2) (~20min) — after #253
+- [x] #254 docs(backlog-triage): re-point Report Evidence off required ../spec-charter reads (A2) (~20min) — re-pointed to intra-bundle fallback; craftkit now when-installed
 - [ ] #255 docs(dev-backlog): re-point backlog-boundaries and Core Contracts to local fallback (A3) (~20min) — after #253
 
 ### Batch 2b — first-run minimum path (E3 #264), parallel with 2a
@@ -44,3 +44,4 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 - 2026-07-06 — Sprint opened from `docs/prd-2026-07-adoption-hardening.md` (commit 96c9e1a). Milestone #12, epics #262–#265, issues #252–#261 registered. Plan sequenced RED→decouple/first-run→hygiene.
 - 2026-07-07 — Batch 1 done. #252 (V1) landed: SKILL.md cold-adopter eval prompt + spec-less smoke section (GREEN degradation asserts) + 2 gated `xfail` targets (B3 #258, A2/A3 #254/#255). Suite 139/139 pass, 2 xfail, 0 xpass. RED baseline recorded on #252.
 - 2026-07-07 — Batch 2a started. #253 (A1) landed: `references/spec-fallback.md` — the consumption-side degradation contract (four-combo matrix, single CHARTER.md fallback rule, explicit triage skip lines, one "authoring lives in craftkit" pointer). No `../spec-charter/` path added, so the A2/A3 gate stays RED until #254/#255 re-point. Unblocks #254/#255.
+- 2026-07-07 — #254 (A2) landed: backlog-triage Report Evidence + References re-pointed onto the intra-bundle `spec-fallback.md`; craftkit's `spec-charter` demoted to when-installed enhancement; evidence-tier now stated in the report. Also tightened the V1 A2/A3 gate to match only `../spec-charter/references/` in `*.md` (it was over-broad — caught its own source and the negative eval-prompt mention, so it could never have flipped GREEN). Gate now matches only `backlog-boundaries.md` → flips GREEN when #255 lands.

@@ -1,7 +1,7 @@
 ---
 id: BACK-254
 title: 'docs(backlog-triage): re-point Report Evidence off required ../spec-charter reads (A2)'
-status: To Do
+status: Done
 labels:
   - documentation
   - enhancement
@@ -18,8 +18,8 @@ Source: docs/prd-2026-07-adoption-hardening.md §5 (A2). Depends on A1 (`spec-fa
 
 ## Acceptance Criteria
 
-- [ ] Report Evidence and References sections no longer require any `../spec-charter/...` read; craftkit references become "when installed" enhancements
-- [ ] Alignment and Decision Review are specified to run from `spec/*` files plus the local `../dev-backlog/references/spec-fallback.md` (intra-bundle sibling path)
-- [ ] The rendered triage report states which evidence tier was used (spec files + fallback vs craftkit references)
-- [ ] Existing triage eval prompts still pass
+- [x] Report Evidence and References sections no longer require any `../spec-charter/...` read; craftkit references become "when installed" enhancements
+- [x] Alignment and Decision Review are specified to run from `spec/*` files plus the local `../dev-backlog/references/spec-fallback.md` (intra-bundle sibling path)
+- [x] The rendered triage report states which evidence tier was used (spec files + fallback vs craftkit references)
+- [x] Existing triage eval prompts still pass
 

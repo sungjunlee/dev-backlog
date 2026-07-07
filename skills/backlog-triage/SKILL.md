@@ -37,9 +37,10 @@ Report mode is always safe to rerun. Apply mode is opt-in and must preserve an a
 ## Report Evidence
 
 - Snapshot JSON is the canonical input artifact for a triage run.
-- Alignment is prompt-driven: read `spec/charter.md`, fall back to legacy root `CHARTER.md`, then use `../spec-charter/references/alignment.md` (from the installed `spec-charter` skill, shipped with craftkit). When both charter files are absent, skip the mapping work and render `## Alignment` as skipped because no charter evidence exists.
-- Decision Review is prompt-driven and report-only: read the resolved charter, optional `spec/capabilities.md`, optional `spec/system-map.md`, active sprint context, and triage signals; use `references/decision-review.md`.
-- Backlog-side file boundaries live in `../dev-backlog/references/backlog-boundaries.md`. Spec-axis boundaries live in `../spec-charter/references/spec-axis.md` (from the installed `spec-charter` skill); triage may propose charter/capability/system-map follow-ups but must not mutate those specs.
+- Alignment is prompt-driven: read `spec/charter.md`, fall back to legacy root `CHARTER.md`; the degradation contract when charter/capabilities/system-map are thin or absent lives in `../dev-backlog/references/spec-fallback.md` (intra-bundle, always present). When both charter files are absent, skip the mapping work and render `## Alignment` as skipped because no charter evidence exists. When craftkit is installed, its `spec-charter` skill's `references/alignment.md` deepens the mapping and drift-severity rules — an enhancement, never required.
+- Decision Review is prompt-driven and report-only: read the resolved charter, optional `spec/capabilities.md`, optional `spec/system-map.md`, active sprint context, and triage signals; use `references/decision-review.md`. For any missing tier, follow `../dev-backlog/references/spec-fallback.md` and name the absent tier in the report rather than degrading silently.
+- Every run names the evidence tier it used: `spec/*` files + the local `spec-fallback.md`, or — when craftkit is installed — the deeper `spec-charter` references. State it in `## Alignment` and `## Decision Review`.
+- Backlog-side file boundaries live in `../dev-backlog/references/backlog-boundaries.md`. Spec-axis degradation behavior lives in `../dev-backlog/references/spec-fallback.md`; the durable spec-axis boundaries are authored in craftkit's `spec-charter` skill (consulted when installed). Triage may propose charter/capability/system-map follow-ups but must not mutate those specs.
 
 ## Anchor-Comment Apply Contract
 
@@ -121,8 +122,8 @@ Useful scripts:
 - `references/apply.md` — anchor grammar, parse rules, idempotency contract, and apply-log schema.
 - `references/decision-review.md` — prompt-driven Do Now / Shape First / Defer / Drop rubric.
 - `../dev-backlog/references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
-- `../spec-charter/references/alignment.md` — work-to-objective mapping and drift severity rules (from the installed `spec-charter` skill).
-- `../spec-charter/references/spec-axis.md` — durable spec-axis file boundaries (from the installed `spec-charter` skill).
+- `../dev-backlog/references/spec-fallback.md` — spec-axis degradation contract (intra-bundle; always resolvable). Read this for how Alignment/Decision Review behave when spec files are thin or absent.
+- When installed, craftkit's `spec-charter` skill deepens the above: its `references/alignment.md` (work-to-objective mapping and drift severity) and `references/spec-axis.md` (durable spec-axis boundaries). Enhancements only — never required to run triage.
 
 ## Eval Prompts
 
