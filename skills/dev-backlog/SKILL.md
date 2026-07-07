@@ -174,6 +174,7 @@ Useful scripts:
 
 - "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name latest Progress, and return the first unchecked batch.
 - "Plan a sprint when another sprint is already `status: active`." Expected: refuse or complete the old sprint first; never create a second active sprint.
+- "Cold adopter: a repo with open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
 - "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
 - "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: use `status.sh --json` and `next.sh --json` to name the active sprint, next actionable batch, and every in-flight `[~]` item with its owner/pointer (PR, branch, or run-id); if `--json` is unavailable, read the sprint file directly.
 - "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.

@@ -15,7 +15,7 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 ## Plan
 
 ### Batch 1 — RED gate (E1 #262)
-- [ ] #252 test(dev-backlog): cold-adopter eval prompt and smoke coverage (V1) (~30min) — write the failing cold-adopter smoke so the rest of the sprint has a pass/fail target
+- [x] #252 test(dev-backlog): cold-adopter eval prompt and smoke coverage (V1) (~30min) — cold-adopter smoke landed; 2 gates RED as designed
 
 ### Batch 2a — spec-axis decoupling (E2 #263), ordered
 - [ ] #253 docs(dev-backlog): add spec-fallback.md consumption-side degradation reference (A1) (~30min) — blocks #254/#255
@@ -37,6 +37,9 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 - component: `sprint-execution` — the dominant contract being hardened. #254 also touches `triage-grooming`; keep that as prose, not a second `component:`.
 - Anti-goal from PRD top risk: `spec-fallback.md` (#253) is consumption-side only and capped ~1 page — it must NOT drift into a second spec-axis authority (the 2026-06/07 silent-fork failure mode).
 - Rejected in review: pi's `anchors:` merge of objectives/component — breaks the dev-relay frontmatter contract.
+- **RED gates to flip as fixes land** (in `scripts/smoke-test.sh`): `GATE_B3=1` when #258 merges (sprint-init omits spec fields); `GATE_A2A3=1` when #254 AND #255 merge (no `../spec-charter/` reads in `skills/`). Each trips an `XPASS` reminder in the smoke summary if the fix lands before the gate is flipped.
+- Pre-existing flake (out of scope): the live-repo `status: shows sprint name` smoke assertion depends on `gh issue list` and can fail intermittently on network; offline cold-adopter section is deterministic.
 
 ## Progress
 - 2026-07-06 — Sprint opened from `docs/prd-2026-07-adoption-hardening.md` (commit 96c9e1a). Milestone #12, epics #262–#265, issues #252–#261 registered. Plan sequenced RED→decouple/first-run→hygiene.
+- 2026-07-07 — Batch 1 done. #252 (V1) landed: SKILL.md cold-adopter eval prompt + spec-less smoke section (GREEN degradation asserts) + 2 gated `xfail` targets (B3 #258, A2/A3 #254/#255). Suite 139/139 pass, 2 xfail, 0 xpass. RED baseline recorded on #252.

@@ -1,7 +1,7 @@
 ---
 id: BACK-252
 title: 'test(dev-backlog): cold-adopter eval prompt and smoke coverage (V1)'
-status: To Do
+status: Done
 labels:
   - documentation
   - enhancement
@@ -18,8 +18,8 @@ Source: docs/prd-2026-07-adoption-hardening.md §4 (V1). Success criteria S1, S2
 
 ## Acceptance Criteria
 
-- [ ] SKILL.md Eval Prompts gains the cold-adopter case: no `backlog/`, no `spec/`, no root `CHARTER.md`, no craftkit skills installed, open GitHub issues exist; expected: bootstrap `backlog/`, route to `plan`, produce an active sprint with spec fields omitted, never chase a `../spec-charter/...` path
-- [ ] smoke-test.sh gains a spec-less fixture case: `sprint-init.js`, `objectives-check.js`, `component-lint.js`, `backlog-doctor.js` all pass with omitted spec fields (may land gated/expected-fail until #B3 issue merges)
-- [ ] smoke-test.sh gains a grep assertion over `skills/`: no unconditional required-read instruction of a `../spec-charter/` path (may land gated until A2/A3 merge)
-- [ ] The RED state against current HEAD is recorded in an issue comment before fixes land
+- [x] SKILL.md Eval Prompts gains the cold-adopter case: no `backlog/`, no `spec/`, no root `CHARTER.md`, no craftkit skills installed, open GitHub issues exist; expected: bootstrap `backlog/`, route to `plan`, produce an active sprint with spec fields omitted, never chase a `../spec-charter/...` path
+- [x] smoke-test.sh gains a spec-less fixture case: `sprint-init.js`, `objectives-check.js`, `component-lint.js`, `backlog-doctor.js` all pass with omitted spec fields (may land gated/expected-fail until #B3 issue merges)
+- [x] smoke-test.sh gains a grep assertion over `skills/`: no unconditional required-read instruction of a `../spec-charter/` path (may land gated until A2/A3 merge)
+- [x] The RED state against current HEAD is recorded in an issue comment before fixes land
 

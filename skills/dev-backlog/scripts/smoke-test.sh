@@ -897,10 +897,131 @@ assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
+# ============================================================
+# cold-adopter portability (adoption-hardening V1, PRD 2026-07)
+# ============================================================
+# A fresh agent in a repo with NO spec/, NO root CHARTER.md, and NO craftkit
+# spec-* skills must still reach a first closed sprint. Some targets are RED at
+# introduction and turn GREEN when their fix lands; those are gated as
+# expected-fail so CI stays green while the baseline is recorded. Flip the gate
+# (env var → 1) when the named issue merges; an XPASS reminder fires if the fix
+# lands before the gate is flipped.
+
+XFAIL=0
+XPASS=0
+GATE_B3="${GATE_B3:-0}"      # #258: sprint-init omits spec fields when no spec files
+GATE_A2A3="${GATE_A2A3:-0}"  # #254/#255: drop required ../spec-charter reads from skills/
+
+# gated_assert LABEL GATE RESULT("pass"|"fail")
+#   GATE=1 → enforced like a normal assertion (feeds PASS/FAIL).
+#   GATE=0 → expected-fail: RESULT=fail is the known-RED baseline (XFAIL, ok);
+#            RESULT=pass means the fix landed early (XPASS) — flip the gate.
+gated_assert() {
+  local label="$1" gate="$2" result="$3"
+  if [ "$gate" = "1" ]; then
+    if [ "$result" = "pass" ]; then
+      PASS=$((PASS + 1))
+    else
+      FAIL=$((FAIL + 1))
+      echo "FAIL: $label"
+    fi
+  else
+    if [ "$result" = "pass" ]; then
+      XPASS=$((XPASS + 1))
+      echo "XPASS: $label — fix appears to have landed; set its gate to 1 to enforce."
+    else
+      XFAIL=$((XFAIL + 1))
+    fi
+  fi
+}
+
+# Build a genuinely spec-less project: run scripts with cwd inside it so spec
+# resolution finds nothing (scripts resolve their own path via SCRIPT_DIR).
+COLD_DIR="$TEST_DIR/cold-adopter"
+mkdir -p "$COLD_DIR/backlog/sprints" "$COLD_DIR/backlog/tasks" "$COLD_DIR/backlog/completed"
+cat > "$COLD_DIR/backlog/sprints/2026-01-cold.md" << 'EOF'
+---
+milestone: cold fixture
+status: active
+started: 2026-01-01
+due: TBD
+---
+
+# Cold Adopter Sprint
+
+## Goal
+Reach a first closed sprint with no spec files present.
+
+## Plan
+- [ ] #1 First task
+
+## Running Context
+- none
+
+## Progress
+- 2026-01-01: opened.
+EOF
+
+# GREEN now: charter/capability checks degrade gracefully, never hard-fail.
+OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/objectives-check.js" --json 2>/dev/null)
+assert_json_eval "cold: objectives-check degrades (no charter, no drift)" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.charterFound !== false) process.exit(1);
+if (!Array.isArray(j.drift) || j.drift.length !== 0) process.exit(1);
+'
+OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/component-lint.js" --json 2>/dev/null)
+assert_json_eval "cold: component-lint degrades (no capabilities, no issues)" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.capabilitiesFound !== false) process.exit(1);
+if (!Array.isArray(j.issues) || j.issues.length !== 0) process.exit(1);
+'
+
+# GREEN now: a valid spec-less sprint is fully healthy (fields simply absent).
+set +e
+OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
+STATUS=$?
+set -e
+assert_equals "cold: doctor exit code on spec-less repo" "$STATUS" "0"
+assert_json_eval "cold: doctor passes on spec-less active sprint" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.exit_hint === "fail") process.exit(1);
+const bad = (j.checks || []).filter((c) => c.status === "fail");
+if (bad.length !== 0) process.exit(1);
+'
+
+# RED until #258 (B3): sprint-init must OMIT objectives:/component: when there
+# is no spec axis, rather than emitting empty `objectives: []` / `component: ""`.
+# Use a fresh spec-less dir with an empty sprints/ so init isn't refused as a
+# second active sprint.
+COLD_INIT_DIR="$TEST_DIR/cold-init"
+mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks"
+set +e
+INIT_JSON=$(cd "$COLD_INIT_DIR" && node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
+set -e
+if printf "%s" "$INIT_JSON" | node -e '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const emitsSpecFields = /^objectives:/m.test(j.content) || /^component:/m.test(j.content);
+process.exit(emitsSpecFields ? 1 : 0);
+'; then B3_RES="pass"; else B3_RES="fail"; fi
+gated_assert "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$GATE_B3" "$B3_RES"
+
+# RED until #254/#255 (A2/A3): no skill file may carry an unconditional
+# required-read of a cross-repo ../spec-charter/ path (dangles for adopters
+# without craftkit). Re-pointing to a local fallback clears this.
+if grep -rlF "../spec-charter/" "$REPO_ROOT/skills/" >/dev/null 2>&1; then
+  A2A3_RES="fail"   # still coupled → RED
+else
+  A2A3_RES="pass"
+fi
+gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$GATE_A2A3" "$A2A3_RES"
+
 # --- Results ---
 echo ""
 TOTAL=$((PASS + FAIL))
 echo "$TOTAL tests: $PASS passed, $FAIL failed"
+if [ "$((XFAIL + XPASS))" -gt 0 ]; then
+  echo "adoption-hardening gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
+fi
 if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
