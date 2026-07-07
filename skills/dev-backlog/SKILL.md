@@ -146,23 +146,18 @@ bash "$skill_dir/scripts/next.sh"
 node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 ```
 
-Useful scripts:
+Core scripts (full flag inventory in `references/scripts.md`):
 
-- `scripts/init.sh [project-name]` — bootstrap `backlog/` with config and directories.
-- `scripts/next.sh` — show the next actionable batch.
-- `scripts/status.sh` — summarize sprint file + GitHub state.
-- `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — pull open GitHub issues into `backlog/tasks/`.
-- `scripts/sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` — create one active sprint skeleton; refuses a second active sprint.
-- `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — sync monthly progress issue.
-- `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]` — close the single active sprint and print the doctor/reassess signal summary.
-- `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
-- `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
-- `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
-- `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn. JSON includes top-level `reassess_signal`.
-- `scripts/sprint-mirror.js [backlog-dir] [--dry-run] [--json]` — publish the active sprint to a read-only GitHub issue mirror; explicit sync only.
+- `scripts/init.sh` — bootstrap `backlog/`.
+- `scripts/sync-pull.js` — pull open GitHub issues into `backlog/tasks/`.
+- `scripts/sprint-init.js` — create the single active sprint skeleton; refuses a second.
+- `scripts/next.sh` / `scripts/status.sh` — next actionable batch; sprint + GitHub summary.
+- `scripts/sprint-close.sh` — close the active sprint; prints the doctor/reassess summary.
+- `scripts/backlog-doctor.js` — aggregate health checks; JSON includes `reassess_signal`.
 
 ## References
 
+- `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
 - `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Sync/Quick Fix/Unplanned Work/Next workflow.
 - `references/file-format.md` — Backlog.md-compatible config/task format and sprint examples.
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.

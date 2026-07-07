@@ -1,7 +1,7 @@
 ---
 id: BACK-259
 title: 'docs(dev-backlog): extract script inventory to references/scripts.md (C1)'
-status: To Do
+status: Done
 labels:
   - documentation
 priority: medium
@@ -17,7 +17,7 @@ Source: docs/prd-2026-07-adoption-hardening.md §7 (C1). Gate: S5 — combined w
 
 ## Acceptance Criteria
 
-- [ ] New `skills/dev-backlog/references/scripts.md` carries the full script/flag table
-- [ ] SKILL.md keeps the script-resolution rule (2-3 lines) plus one-line mentions of the six core scripts (`init.sh`, `sync-pull.js`, `sprint-init.js`, `next.sh`/`status.sh`, `sprint-close.sh`, `backlog-doctor.js`) and a pointer to `references/scripts.md`
-- [ ] Every pre-existing SKILL.md eval prompt still passes
+- [x] New `skills/dev-backlog/references/scripts.md` carries the full script/flag table
+- [x] SKILL.md keeps the script-resolution rule (2-3 lines) plus one-line mentions of the six core scripts (`init.sh`, `sync-pull.js`, `sprint-init.js`, `next.sh`/`status.sh`, `sprint-close.sh`, `backlog-doctor.js`) and a pointer to `references/scripts.md`
+- [x] Every pre-existing SKILL.md eval prompt still passes
 
