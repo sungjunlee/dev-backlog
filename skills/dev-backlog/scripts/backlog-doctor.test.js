@@ -289,6 +289,8 @@ describe("runDoctor", () => {
 
     assert.equal(check(report, "in_flight_trace").status, "warn");
     assert.match(check(report, "in_flight_trace").detail.summary, /unmoored/);
+    // C3: the warn names the repair runbook so "doctor warned — now what?" is answerable.
+    assert.match(check(report, "in_flight_trace").detail.summary, /references\/checkbox-repair\.md/);
     assert.equal(exitCodeFor(report), 0);
     assert.equal(report.exit_hint, "warn");
   });

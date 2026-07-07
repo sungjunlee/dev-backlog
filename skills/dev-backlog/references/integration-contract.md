@@ -122,7 +122,7 @@ Each `checks[]` entry has:
 | `status` | string | `pass`, `warn`, or `fail`. |
 | `detail` | object | Check-specific details. `detail.summary` is always a human-readable one-line summary. |
 
-Hard failures include ambiguous active sprint state, no active sprint while sprint files exist, objective/component drift, capabilities-doctor hard triggers, missing required active-sprint sections, and unparseable Plan checkbox lines. Soft warnings include unmoored `[~]` items, `[~]` items older than `--stale-days` (default `7`), capabilities-doctor warnings, and `_context.md` bloat. `_context.md` bloat warns above `200` lines; the threshold is deliberately generous so this signal means "promote or compact durable context soon," not "rewrite immediately."
+Hard failures include ambiguous active sprint state, no active sprint while sprint files exist, objective/component drift, capabilities-doctor hard triggers, missing required active-sprint sections, and unparseable Plan checkbox lines. Soft warnings include unmoored `[~]` items (repair runbook: [`checkbox-repair.md`](checkbox-repair.md)), `[~]` items older than `--stale-days` (default `7`), capabilities-doctor warnings, and `_context.md` bloat. `_context.md` bloat warns above `200` lines; the threshold is deliberately generous so this signal means "promote or compact durable context soon," not "rewrite immediately."
 
 ## File Paths
 

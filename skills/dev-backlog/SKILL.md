@@ -163,6 +163,7 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
 - `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
+- `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.
 - `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
 

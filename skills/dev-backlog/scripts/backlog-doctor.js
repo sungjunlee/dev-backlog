@@ -452,7 +452,7 @@ function checkInFlightTrace({ sprintState, activeStatus }) {
   const unmoored = sprintState.state.in_flight.filter((item) => item.unmoored);
   if (unmoored.length > 0) {
     return verdict("in_flight_trace", "warn", {
-      summary: `${unmoored.length} unmoored in-flight item(s) lack PR, branch, or run pointers.`,
+      summary: `${unmoored.length} unmoored in-flight item(s) lack PR, branch, or run pointers. Repair: references/checkbox-repair.md.`,
       items: unmoored.map(publicPlanItem),
     });
   }
