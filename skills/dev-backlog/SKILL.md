@@ -44,7 +44,7 @@ Local (execution hub — how to do it)
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
 - Keep task files thin. AC checkboxes may update there; decisions, progress, and cross-task context stay in the sprint file.
 - Completed sprints stay as the permanent execution record.
-- Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries (the durable `spec/*` contracts) live in the installed `spec-charter` skill's `references/spec-axis.md`; sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
+- Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries and how `objectives:`/`component:` degrade when spec files are absent live in `references/spec-fallback.md` (in-bundle, always resolvable); their durable authoring home is craftkit's `spec-charter` skill, consulted when installed. Sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
 
 ## Sprint File Contract
 
@@ -168,7 +168,8 @@ Useful scripts:
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
 - `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
-- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership; points to the installed `spec-charter` skill for spec-axis boundaries.
+- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
+- `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
 
 ## Eval Prompts (fresh-session recovery)
 

@@ -1,7 +1,7 @@
 ---
 id: BACK-255
 title: 'docs(dev-backlog): re-point backlog-boundaries and Core Contracts to local fallback (A3)'
-status: To Do
+status: Done
 labels:
   - documentation
   - enhancement
@@ -18,7 +18,7 @@ Source: docs/prd-2026-07-adoption-hardening.md §5 (A3). Depends on A1 (`spec-fa
 
 ## Acceptance Criteria
 
-- [ ] `backlog-boundaries.md` points spec-axis boundaries at `references/spec-fallback.md`; craftkit is named as the authoring home in "when installed" phrasing
-- [ ] The SKILL.md Core Contracts bullet gets the same demotion (local pointer, craftkit as enhancement)
-- [ ] No remaining unconditional `../spec-charter/` read instruction in `skills/dev-backlog/`
+- [x] `backlog-boundaries.md` points spec-axis boundaries at `references/spec-fallback.md`; craftkit is named as the authoring home in "when installed" phrasing
+- [x] The SKILL.md Core Contracts bullet gets the same demotion (local pointer, craftkit as enhancement)
+- [x] No remaining unconditional `../spec-charter/` read instruction in `skills/dev-backlog/`
 
