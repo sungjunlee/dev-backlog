@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 adoption hardening
-status: active
+status: completed
 started: 2026-07-06
 due: TBD
 objectives: [O3]
@@ -52,3 +52,5 @@ A cold adopter with no craftkit and no `spec/*` files can finish one full sprint
 - 2026-07-07 — Batch 3 / E4 started. #259 (C1) landed: extracted the ~14-line script/flag inventory from the always-loaded SKILL.md into `references/scripts.md`; SKILL.md keeps the 2-3 line resolution rule, 6 core-script one-liners, and a pointer. Eval prompts unchanged; smoke 141/141.
 - 2026-07-07 — #260 (C2) landed: compressed the Complete-mode reassess paragraph from 3 long sentences to 2; the accounting stays single-homed in `references/integration-contract.md` § Backlog Doctor JSON Surface; the "unattended may run reassess, never amend" rule is preserved. **S5 finding:** SKILL.md is 177 lines vs the 180-line pre-sprint baseline — only ~-3 net, NOT the ≥30 S5 projected. C1+C2 physically remove ~19 lines, but this sprint also added the cold-adopter eval prompt (B3-era), B2 framing, and several spec-fallback pointers to SKILL.md. The token-economy *intent* (reference material out of the always-loaded contract) is achieved; S5's 30-line figure was miscalibrated. Not padding/gutting to hit the number — flag for retro.
 - 2026-07-07 — **Batch 3 / E4 complete — all 10 issues done.** #261 (C3) landed: new `references/checkbox-repair.md` runbook (detect via doctor warn / `unmoored: true` → repair: add PR/branch/run pointer, or "no work yet" annotation, or demote+strike with a Progress entry); `backlog-doctor.js` unmoored warn now names the runbook; a doctor test asserts the message links it; integration-contract.md + SKILL.md link it. Node 431 pass/0 fail/1 skip; smoke 141/141; live doctor pass. Sprint ready to close.
+- 2026-07-07 — **Sprint outcome.** All 10 issues + 4 epics done and closed (E1–E4). Cold-adopter Goal met: a craftkit-less, spec-less repo reaches a first closed sprint with zero `../spec-charter/` reads in `skills/` (GATE_A2A3 enforced) and a minimum-path README. Both V1 smoke gates are now hard regression assertions. Node 431 pass/0 fail/1 skip; smoke 141/141; live doctor all-PASS. **S5 not met:** SKILL.md 177 vs 180-line baseline (~-3 net, not ≥30) — estimate was miscalibrated; C1/C2 removed ~19 lines but the sprint also added cold-adopter/spec-fallback content to SKILL.md. Token-economy intent achieved (reference material moved out of always-loaded contract); flagged for retro, not gamed. **Reassess signal FIRED** (doctor clean; 3 sprints since last reassess ≥ threshold) — report-only recommendation to run `spec-charter reassess`; surfaced to maintainer, not auto-run.
+- 2026-07-07: Sprint closed. 10/10 tasks completed.

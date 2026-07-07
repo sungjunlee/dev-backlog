@@ -10,6 +10,8 @@
 - Treat sprint/task markdown shape as a compatibility surface for bash scripts and agent tooling
 - Commit the active sprint file to main when opening it; an untracked sprint is invisible to dispatch worktrees, and a relay executor may seed a duplicate active sprint to satisfy live checks (2026-07, Sprint execution-substrate — direct SSOT evidence for the #215 spike)
 - JSON read surfaces (`status.sh --json`, `next.sh --json` via `sprint-state.js`) and `backlog-doctor.js` are the machine path for orientation and health; extend them instead of adding new markdown parsers
+- No `skills/` file may carry an unconditional required-read of a cross-repo `../spec-charter/references/` path — it dangles for adopters without craftkit. Consumption-side spec degradation lives in the in-bundle `references/spec-fallback.md`; craftkit's `spec-charter` is the when-installed authoring home. `smoke-test.sh` GATE_A2A3 enforces this (2026-07 adoption-hardening, #254/#255)
+- Sprint spec fields are optional: `sprint-init.js` omits `objectives:`/`component:` when the backing spec file is absent; `backlog-doctor` soft-warns only when the ACTIVE sprint drops a field while its spec exists. Existing `objectives: []`/`component: ""` stay valid (no migration) (#258)
 
 ## Known Gotchas
 - Resolve `progress-sync` metric semantics in `#49` before doing structural refactors in `#50`
@@ -23,3 +25,5 @@
 - `opencode run` blocks forever pre-session (zero stdout, ignores SIGTERM) when stdin is an open non-TTY pipe without EOF — the agent-harness background-execution default. Root-caused 2026-07-05: it reads stdin into the message before starting; not a model or permission issue. Always invoke with `< /dev/null` (and `timeout -k` for kills).
 - relay-merge `gate-check` mis-picks the latest PR commit when multiple commits share a committedDate (post-rebase ties) — dev-relay#753; workaround: `git commit --amend --no-edit` on the head to re-stamp, then re-review.
 - Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
+- `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
+- Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in `smoke-test.sh` depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
