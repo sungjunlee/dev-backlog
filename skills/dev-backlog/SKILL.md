@@ -118,7 +118,7 @@ For a whole sprint:
 4. Promote project-level Running Context entries to `_context.md`.
 5. Leave the sprint file in place as the permanent record.
 
-The reassess signal recommends `spec-charter reassess` when the doctor warns or fails (informational warns, like the normal between-sprints zero-active state, do not count) or when 3+ sprints have completed since the latest `backlog/triage/YYYY-MM-DD-reassess.md`. It is the `reassess_signal` field on `backlog-doctor.js --json`; `sprint-close.sh` just consumes it — see `references/integration-contract.md` § Backlog Doctor JSON Surface for the detailed accounting (same-day coverage, dry-run counting, field schema). Unattended sessions may run `reassess` because it is report-only, but must never run `amend`.
+`sprint-close.sh` prints `backlog-doctor.js`'s `reassess_signal`, which recommends `spec-charter reassess` when the doctor warns/fails or 3+ sprints have closed since the last dated reassess report — full accounting in `references/integration-contract.md` § Backlog Doctor JSON Surface. Unattended sessions may run `reassess` (report-only) but must never run `amend`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 

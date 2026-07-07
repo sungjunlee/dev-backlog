@@ -1,7 +1,7 @@
 ---
 id: BACK-260
 title: 'docs(dev-backlog): compress reassess accounting to one sentence + pointer (C2)'
-status: To Do
+status: Done
 labels:
   - documentation
   - enhancement
@@ -18,7 +18,7 @@ Source: docs/prd-2026-07-adoption-hardening.md §7 (C2). Gate: S5 (shared with C
 
 ## Acceptance Criteria
 
-- [ ] The SKILL.md reassess paragraph shrinks to one sentence plus a pointer to the integration-contract section
-- [ ] No accounting semantics are lost from the reference side (integration-contract remains the single detailed home)
-- [ ] The "unattended sessions may run reassess but never amend" rule survives in SKILL.md
+- [x] The SKILL.md reassess paragraph shrinks to one sentence plus a pointer to the integration-contract section
+- [x] No accounting semantics are lost from the reference side (integration-contract remains the single detailed home)
+- [x] The "unattended sessions may run reassess but never amend" rule survives in SKILL.md
 
