@@ -83,6 +83,9 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system
 # 4. See what to do next
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
+
+# 5. Close the sprint when the work is done
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
 
 Then use the skill during your coding session:
@@ -95,16 +98,6 @@ Then use the skill during your coding session:
 ```
 
 For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
-
-### Spec axis (charter, system map, capabilities)
-
-The `spec-charter`, `spec-system-map`, and `spec-grill` authoring skills moved to [craftkit](https://github.com/sungjunlee/craftkit) — that repo is their canonical home as of 2026-07.
-
-```bash
-npx skills add sungjunlee/craftkit -g -y
-```
-
-`dev-backlog` and `backlog-triage` consume `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` as read-only yardsticks (Objective IDs, capability handles, Alignment/Decision Review evidence) and degrade gracefully when those files are absent. Sprint planning and triage keep working against the installed craftkit skills; the spec index lives at [spec/README.md](spec/README.md).
 
 ## Maintainer Verification
 
@@ -173,7 +166,27 @@ Users can log in and access protected API endpoints.
 
 This is simple on purpose. The issue tracker handles collaboration. The sprint file handles execution.
 
-## Solo Or With dev-relay
+## Optional extensions
+
+The core loop above needs none of these. Add one only when you want its capability — each row prices what it adds and what it requires.
+
+| Extension | Adds | Requires |
+|-----------|------|----------|
+| Spec axis (charter / system map / capabilities) | Objective/capability alignment for sprints and triage, plus the reassess signal | craftkit skills installed; degrades gracefully when absent |
+| dev-relay | delegated-work tracking: `[~]` in-flight state and PR handoff in the sprint file | the dev-relay skill |
+| backlog-triage | open-issue grooming into an advisory report (classification, stale flags, Alignment, Decision Review) | nothing — ships in this bundle |
+
+### Spec axis (charter, system map, capabilities)
+
+The `spec-charter`, `spec-system-map`, and `spec-grill` authoring skills moved to [craftkit](https://github.com/sungjunlee/craftkit) — that repo is their canonical home as of 2026-07.
+
+```bash
+npx skills add sungjunlee/craftkit -g -y
+```
+
+`dev-backlog` and `backlog-triage` consume `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` as read-only yardsticks (Objective IDs, capability handles, Alignment/Decision Review evidence) and degrade gracefully when those files are absent. Sprint planning and triage keep working against the installed craftkit skills; the spec index lives at [spec/README.md](spec/README.md).
+
+### Solo or with dev-relay
 
 dev-backlog works fine on its own.
 
@@ -193,7 +206,7 @@ The `[~]` state makes in-flight work visible to everyone, and `Running Context` 
 
 The contract for that integration lives in [references/integration-contract.md](skills/dev-backlog/references/integration-contract.md).
 
-## Backlog Triage (sibling skill)
+### Backlog triage (sibling skill)
 
 `dev-backlog` runs the sprint. [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the open-issue pile that feeds into it — classification, relationships, stale / obsolete flags, priority proposals, Alignment, and spec-aware Decision Review. It produces one markdown report under `backlog/triage/YYYY-MM-DD-report.md` that you review, check accepted proposals on, and apply behind an explicit `--apply`.
 
