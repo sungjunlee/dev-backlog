@@ -176,10 +176,11 @@ component: "sprint-execution"
 
 Rules:
 
+- The field is omitted entirely when `spec/capabilities.md` does not exist (a cold adopter with no spec axis); `sprint-init.js` emits no `component:` key in that case. An omitted key and an empty string both mean "no capability Learnings target" — actors that read `component:` (e.g. `relay-merge`) must treat an absent key as a graceful skip, never an error. See `references/spec-fallback.md`.
 - Empty string means there is no capability Learnings target.
 - Non-empty values must match exactly one `## Capability: <slug>` heading in `spec/capabilities.md`.
 - Comma-separated values are invalid. If a sprint touches secondary areas, write that in `## Running Context` or sprint prose.
-- `component-lint.js` owns validation on the dev-backlog side.
+- `component-lint.js` owns validation on the dev-backlog side; `backlog-doctor.js` warns (soft) only when the active sprint omits `component:` while `spec/capabilities.md` exists.
 
 This is intentionally stricter than normal markdown prose. The field is an address for downstream writers, not a place to explain scope.
 

@@ -165,8 +165,8 @@ function runDoctor({
 
   const checks = [
     active,
-    checkObjectiveDrift({ repoRoot: root, sprintsDir }),
-    checkComponentRouting({ repoRoot: root, sprintsDir, capabilitiesPath }),
+    checkObjectiveDrift({ repoRoot: root, sprintsDir, activePath: active.detail.active_path }),
+    checkComponentRouting({ repoRoot: root, sprintsDir, capabilitiesPath, activePath: active.detail.active_path }),
     checkCapabilities({ repoRoot: root, capabilitiesPath }),
     checkSprintShape({
       repoRoot: root,
@@ -256,7 +256,7 @@ function checkActiveSprint({ repoRoot, sprintsDir }) {
   });
 }
 
-function checkObjectiveDrift({ repoRoot, sprintsDir }) {
+function checkObjectiveDrift({ repoRoot, sprintsDir, activePath = null }) {
   try {
     const result = checkObjectives({ repoRoot, sprintsDir });
     if (!result.charterFound) {
@@ -277,6 +277,17 @@ function checkObjectiveDrift({ repoRoot, sprintsDir }) {
         })),
       });
     }
+    // Soft nudge: a charter exists but the ACTIVE sprint dropped the field
+    // entirely (an explicit `objectives: []` does not trip this). Warn only;
+    // omission is valid for spec-less repos and immutable legacy sprints.
+    if (activePath && (result.omittedObjectiveSprints || []).includes(activePath)) {
+      return verdict("objectives_check", "warn", {
+        summary: "Active sprint omits objectives: while a charter exists; reference an Objective ID or set objectives: [].",
+        charter_found: true,
+        charter_path: displayPath(repoRoot, result.charterPath),
+        active_sprint: displayPath(repoRoot, activePath),
+      });
+    }
     return verdict("objectives_check", "pass", {
       summary: `Checked ${result.sprintCount} sprint file(s) against ${result.charterObjectiveIds.length} charter objective(s).`,
       charter_found: true,
@@ -290,7 +301,7 @@ function checkObjectiveDrift({ repoRoot, sprintsDir }) {
   }
 }
 
-function checkComponentRouting({ repoRoot, sprintsDir, capabilitiesPath }) {
+function checkComponentRouting({ repoRoot, sprintsDir, capabilitiesPath, activePath = null }) {
   try {
     const result = lintComponents({ sprintsDir, capabilitiesPath });
     if (!result.capabilitiesFound) {
@@ -308,6 +319,15 @@ function checkComponentRouting({ repoRoot, sprintsDir, capabilitiesPath }) {
           ...issue,
           sprintFile: displayPath(repoRoot, issue.sprintFile),
         })),
+      });
+    }
+    // Soft nudge: capabilities exist but the ACTIVE sprint dropped the field
+    // entirely (an explicit `component: ""` does not trip this).
+    if (activePath && (result.omittedComponentSprints || []).includes(activePath)) {
+      return verdict("component_lint", "warn", {
+        summary: "Active sprint omits component: while spec/capabilities.md exists; set one capability slug or an explicit empty value.",
+        capabilities_found: true,
+        active_sprint: displayPath(repoRoot, activePath),
       });
     }
     return verdict("component_lint", "pass", {

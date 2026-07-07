@@ -84,6 +84,15 @@ function parseSprintObjectives(content) {
   return extractObjectivesField(parseFrontmatter(content));
 }
 
+// True when the frontmatter carries an `objectives:` key at all (including an
+// empty `objectives: []`). Distinguishes a deliberate empty value from a fully
+// omitted field so the doctor can warn only on real omission when a charter
+// exists (see B3 / references/spec-fallback.md).
+function hasObjectivesField(content) {
+  const frontmatter = parseFrontmatter(content);
+  return Boolean(frontmatter) && /^objectives:/m.test(frontmatter);
+}
+
 function parseCharterObjectives(content) {
   const objectives = new Map();
   const lines = content.split("\n");
@@ -138,6 +147,7 @@ function checkObjectives({
       checkedPaths: resolved.checkedPaths,
       drift: [],
       sprintCount: 0,
+      omittedObjectiveSprints: [],
     };
   }
   const charterContent = readFile(resolved.charterPath, "utf-8");
@@ -145,6 +155,9 @@ function checkObjectives({
 
   const sprintFiles = listSprintFiles(sprintsDir, { readdir, fileExists });
   const drift = findDrift(sprintFiles, charterObjectives, { readFile });
+  const omittedObjectiveSprints = sprintFiles.filter(
+    (file) => !hasObjectivesField(readFile(file, "utf-8")),
+  );
 
   return {
     charterFound: true,
@@ -154,6 +167,7 @@ function checkObjectives({
     charterObjectiveIds: [...charterObjectives.keys()].sort(),
     sprintCount: sprintFiles.length,
     drift,
+    omittedObjectiveSprints,
   };
 }
 
@@ -200,6 +214,7 @@ module.exports = {
   parseFrontmatter,
   extractObjectivesField,
   parseSprintObjectives,
+  hasObjectivesField,
   parseCharterObjectives,
   resolveCharterPath,
   listSprintFiles,

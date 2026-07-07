@@ -15,6 +15,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { slugify, estimateSize, GH_EXEC_DEFAULTS } = require("./lib");
+const { resolveCharterPath } = require("./spec-paths.js");
 
 function parseArgs(args) {
   const dryRun = args.includes("--dry-run");
@@ -50,17 +51,36 @@ function buildIssueLines(issues) {
   });
 }
 
-function buildSprintContent({ milestone, started, due, topic, issues }) {
+// Spec-axis frontmatter is emitted only when the backing spec file exists.
+// A cold adopter with no spec/ gets a clean sprint with no empty ceremony; the
+// omission semantics live in references/spec-fallback.md. Existing sprints that
+// still carry `objectives: []` / `component: ""` remain valid — this is
+// omission-on-generate, not a migration.
+function buildSpecFrontmatterBlock({ hasCharter, hasCapabilities }) {
+  const lines = [];
+  if (hasCharter) lines.push("objectives: []");
+  if (hasCapabilities) lines.push('component: ""');
+  return lines.length ? `${lines.join("\n")}\n` : "";
+}
+
+function buildSprintContent({
+  milestone,
+  started,
+  due,
+  topic,
+  issues,
+  hasCharter = false,
+  hasCapabilities = false,
+}) {
   const issueLines = buildIssueLines(issues);
+  const specBlock = buildSpecFrontmatterBlock({ hasCharter, hasCapabilities });
 
   return `---
 milestone: ${milestone}
 status: active
 started: ${started}
 due: ${due}
-objectives: []
-component: ""
----
+${specBlock}---
 
 # ${topic}
 
@@ -143,17 +163,32 @@ function getMilestoneIssues(milestone) {
   }
 }
 
+// Detect whether the spec axis backs each field. Charter resolves canonical
+// spec/charter.md or legacy root CHARTER.md; capabilities is spec/capabilities.md.
+function detectSpecPresence({ repoRoot = process.cwd(), fileExists = fs.existsSync } = {}) {
+  const charter = resolveCharterPath({ repoRoot, fileExists });
+  const capabilitiesPath = path.join(repoRoot, "spec", "capabilities.md");
+  return {
+    hasCharter: charter.found,
+    hasCapabilities: fileExists(capabilitiesPath),
+  };
+}
+
 function createSprintFile({
   topic,
   milestone,
   dryRun,
   sprintsDir = path.join("backlog", "sprints"),
   today = new Date(),
+  repoRoot = process.cwd(),
   fileExists = fs.existsSync,
   mkdir = (dir) => fs.mkdirSync(dir, { recursive: true }),
   writeFile = fs.writeFileSync,
   getDue = getMilestoneDue,
   getIssues = getMilestoneIssues,
+  // Optional overrides; when omitted, detected from repoRoot's spec/ files.
+  hasCharter,
+  hasCapabilities,
 }) {
   if (!dryRun) mkdir(sprintsDir);
 
@@ -174,11 +209,23 @@ function createSprintFile({
     );
   }
 
+  const detected = detectSpecPresence({ repoRoot, fileExists });
+  const charterPresent = hasCharter ?? detected.hasCharter;
+  const capabilitiesPresent = hasCapabilities ?? detected.hasCapabilities;
+
   const due = existingFile ? "TBD" : getDue(milestone);
   const issues = existingFile ? [] : getIssues(milestone);
   const content = existingFile
     ? null
-    : buildSprintContent({ milestone, started, due, topic, issues });
+    : buildSprintContent({
+        milestone,
+        started,
+        due,
+        topic,
+        issues,
+        hasCharter: charterPresent,
+        hasCapabilities: capabilitiesPresent,
+      });
 
   if (!dryRun && !existingFile) {
     writeFile(sprintFile, content);
@@ -246,7 +293,9 @@ if (require.main === module) main();
 module.exports = {
   parseArgs,
   buildIssueLines,
+  buildSpecFrontmatterBlock,
   buildSprintContent,
+  detectSpecPresence,
   listActiveSprintFiles,
   createSprintFile,
   printResult,

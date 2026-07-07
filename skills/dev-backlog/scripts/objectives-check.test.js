@@ -8,6 +8,7 @@ const {
   parseFrontmatter,
   extractObjectivesField,
   parseSprintObjectives,
+  hasObjectivesField,
   parseCharterObjectives,
   listSprintFiles,
   findDrift,
@@ -234,6 +235,39 @@ describe("checkObjectives", () => {
     assert.equal(result.charterSource, "explicit");
     assert.equal(result.checkedPaths.length, 1);
     assert.equal(result.checkedPaths[0], path.join("/repo", "custom.md"));
+  });
+
+  it("lists only truly-omitted (not empty) objectives sprints; omission is not drift (B3)", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-omit-"));
+    try {
+      const sprintsDir = path.join(dir, "backlog", "sprints");
+      fs.mkdirSync(sprintsDir, { recursive: true });
+      fs.mkdirSync(path.join(dir, "spec"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "spec", "charter.md"), SAMPLE_CHARTER);
+      const omit = path.join(sprintsDir, "2026-05-omit.md");
+      const empty = path.join(sprintsDir, "2026-05-empty.md");
+      fs.writeFileSync(omit, "---\nmilestone: x\nstatus: active\n---\n");
+      fs.writeFileSync(empty, "---\nmilestone: y\nobjectives: []\n---\n");
+      const result = checkObjectives({ sprintsDir, repoRoot: dir });
+      assert.deepEqual(result.omittedObjectiveSprints, [omit]);
+      assert.equal(result.drift.length, 0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("charter-absent result carries an empty omittedObjectiveSprints array", () => {
+    const result = checkObjectives({ repoRoot: "/no/such", fileExists: () => false });
+    assert.deepEqual(result.omittedObjectiveSprints, []);
+  });
+});
+
+describe("hasObjectivesField", () => {
+  it("is true for a present key (including empty) and false when omitted", () => {
+    assert.equal(hasObjectivesField("---\nobjectives: [O1]\n---\n"), true);
+    assert.equal(hasObjectivesField("---\nobjectives: []\n---\n"), true);
+    assert.equal(hasObjectivesField("---\nstatus: active\n---\n"), false);
+    assert.equal(hasObjectivesField("no frontmatter here"), false);
   });
 });
 

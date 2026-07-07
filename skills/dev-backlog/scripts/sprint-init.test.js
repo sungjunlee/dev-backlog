@@ -6,7 +6,9 @@ const path = require("path");
 const {
   parseArgs,
   buildIssueLines,
+  buildSpecFrontmatterBlock,
   buildSprintContent,
+  detectSpecPresence,
   listActiveSprintFiles,
   createSprintFile,
 } = require("./sprint-init.js");
@@ -60,13 +62,15 @@ describe("buildIssueLines", () => {
 });
 
 describe("buildSprintContent", () => {
-  it("renders sprint markdown with issues", () => {
+  it("renders sprint markdown with issues and spec fields when both spec files exist", () => {
     const content = buildSprintContent({
       milestone: "Sprint W13",
       started: "2026-04-05",
       due: "2026-04-12",
       topic: "auth-system",
       issues: [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
+      hasCharter: true,
+      hasCapabilities: true,
     });
 
     assert.match(content, /^---\n/);
@@ -76,6 +80,43 @@ describe("buildSprintContent", () => {
     assert.match(content, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
     assert.match(content, /# auth-system/);
     assert.match(content, /- \[ \] #42 OAuth2 flow \(~1hr\)/);
+  });
+
+  it("omits both spec fields when no spec files exist (B3)", () => {
+    const content = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "cold", issues: [],
+    });
+    assert.match(content, /due: TBD\n---/);
+    assert.doesNotMatch(content, /^objectives:/m);
+    assert.doesNotMatch(content, /^component:/m);
+  });
+
+  it("emits objectives only when charter present, component only when capabilities present", () => {
+    const charterOnly = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      hasCharter: true, hasCapabilities: false,
+    });
+    assert.match(charterOnly, /^objectives: \[\]$/m);
+    assert.doesNotMatch(charterOnly, /^component:/m);
+
+    const capsOnly = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      hasCharter: false, hasCapabilities: true,
+    });
+    assert.doesNotMatch(capsOnly, /^objectives:/m);
+    assert.match(capsOnly, /^component: ""$/m);
+  });
+});
+
+describe("buildSpecFrontmatterBlock", () => {
+  it("returns empty string when neither spec file exists", () => {
+    assert.equal(buildSpecFrontmatterBlock({ hasCharter: false, hasCapabilities: false }), "");
+  });
+  it("returns both keys trailing-newline-terminated when both exist", () => {
+    assert.equal(
+      buildSpecFrontmatterBlock({ hasCharter: true, hasCapabilities: true }),
+      'objectives: []\ncomponent: ""\n',
+    );
   });
 });
 
@@ -99,6 +140,9 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
+      // Explicit overrides keep this deterministic regardless of the test cwd's spec/.
+      hasCharter: true,
+      hasCapabilities: true,
     });
 
     assert.equal(result.action, "sprint-init");
@@ -113,6 +157,37 @@ describe("createSprintFile", () => {
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
     assert.match(written, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
+  });
+
+  it("omits spec fields in the written file when no spec files exist (B3)", () => {
+    const result = createSprintFile({
+      topic: "cold-adopter",
+      milestone: "M",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "TBD",
+      getIssues: () => [],
+      hasCharter: false,
+      hasCapabilities: false,
+    });
+
+    const written = fs.readFileSync(result.sprintFile, "utf-8");
+    assert.match(written, /due: TBD\n---/);
+    assert.doesNotMatch(written, /^objectives:/m);
+    assert.doesNotMatch(written, /^component:/m);
+  });
+
+  it("detectSpecPresence reflects injected spec-file existence", () => {
+    const present = detectSpecPresence({
+      repoRoot: "/repo",
+      fileExists: (p) => p.endsWith(path.join("spec", "charter.md"))
+        || p.endsWith(path.join("spec", "capabilities.md")),
+    });
+    assert.deepEqual(present, { hasCharter: true, hasCapabilities: true });
+
+    const absent = detectSpecPresence({ repoRoot: "/repo", fileExists: () => false });
+    assert.deepEqual(absent, { hasCharter: false, hasCapabilities: false });
   });
 
   it("lists active sprint files sorted and excludes _context.md", () => {

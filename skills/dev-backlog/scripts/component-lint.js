@@ -89,6 +89,15 @@ function parseSprintComponents(content) {
   return parseComponentField(parseFrontmatter(content));
 }
 
+// True when the frontmatter carries a `component:` key at all (including an
+// empty `component: ""`). Distinguishes a deliberate empty value from a fully
+// omitted field so the doctor can warn only on real omission when
+// spec/capabilities.md exists (see B3 / references/spec-fallback.md).
+function hasComponentField(content) {
+  const frontmatter = parseFrontmatter(content);
+  return Boolean(frontmatter) && /^component:/m.test(frontmatter);
+}
+
 function parseCapabilityNames(content) {
   const names = new Set();
   const lines = content.split("\n");
@@ -186,6 +195,7 @@ function lintComponents({
       unroutedSprintCount: 0,
       activeSprintCount: 0,
       legacySprintCount: 0,
+      omittedComponentSprints: [],
     };
   }
   const capsContent = readFile(capabilitiesPath, "utf-8");
@@ -194,6 +204,9 @@ function lintComponents({
   const sprintFiles = listSprintFiles(sprintsDir, { readdir, fileExists });
   const routingStats = countSprintRouting(sprintFiles, { readFile });
   const issues = findIssues(sprintFiles, declared, { readFile });
+  const omittedComponentSprints = sprintFiles.filter(
+    (file) => !hasComponentField(readFile(file, "utf-8")),
+  );
 
   return {
     capabilitiesFound: true,
@@ -204,6 +217,7 @@ function lintComponents({
     sprintCount: sprintFiles.length,
     ...routingStats,
     issues,
+    omittedComponentSprints,
   };
 }
 
@@ -264,6 +278,7 @@ module.exports = {
   parseFrontmatter,
   parseComponentField,
   parseSprintComponents,
+  hasComponentField,
   parseCapabilityNames,
   listSprintFiles,
   parseSprintStatus,

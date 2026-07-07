@@ -909,7 +909,7 @@ assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
 XFAIL=0
 XPASS=0
-GATE_B3="${GATE_B3:-0}"      # #258: sprint-init omits spec fields when no spec files
+GATE_B3="${GATE_B3:-1}"      # #258 landed: enforced — sprint-init omits spec fields when no spec files
 GATE_A2A3="${GATE_A2A3:-1}"  # #254/#255 landed: enforced regression guard against re-adding ../spec-charter reads
 
 # gated_assert LABEL GATE RESULT("pass"|"fail")

@@ -8,6 +8,7 @@ const {
   parseFrontmatter,
   parseComponentField,
   parseSprintComponents,
+  hasComponentField,
   parseCapabilityNames,
   listSprintFiles,
   classifyComponents,
@@ -273,6 +274,44 @@ describe("lintComponents", () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("lists only truly-omitted (not empty) component sprints; omission is not an error (B3)", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "comp-lint-omit-"));
+    try {
+      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const capPath = path.join(dir, "spec", "capabilities.md");
+      fs.mkdirSync(sprintsDir, { recursive: true });
+      fs.mkdirSync(path.dirname(capPath), { recursive: true });
+      fs.writeFileSync(capPath, SAMPLE_CAPABILITIES);
+      const omit = path.join(sprintsDir, "2026-05-omit.md");
+      const empty = path.join(sprintsDir, "2026-05-empty.md");
+      fs.writeFileSync(omit, "---\nstatus: active\n---\nbody");
+      fs.writeFileSync(empty, '---\ncomponent: ""\n---\nbody');
+      const result = lintComponents({ sprintsDir, capabilitiesPath: capPath });
+      assert.deepEqual(result.omittedComponentSprints, [omit]);
+      assert.deepEqual(result.issues, []);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("capabilities-absent result carries an empty omittedComponentSprints array", () => {
+    const result = lintComponents({
+      sprintsDir: "/no/such",
+      capabilitiesPath: "/no/such/capabilities.md",
+    });
+    assert.equal(result.capabilitiesFound, false);
+    assert.deepEqual(result.omittedComponentSprints, []);
+  });
+});
+
+describe("hasComponentField", () => {
+  it("is true for a present key (including empty) and false when omitted", () => {
+    assert.equal(hasComponentField('---\ncomponent: "sprint-execution"\n---\n'), true);
+    assert.equal(hasComponentField('---\ncomponent: ""\n---\n'), true);
+    assert.equal(hasComponentField("---\nstatus: active\n---\n"), false);
+    assert.equal(hasComponentField("no frontmatter here"), false);
   });
 });
 
