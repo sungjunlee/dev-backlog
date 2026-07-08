@@ -91,7 +91,7 @@ Done when the new issue exists on GitHub, has a local task mirror, and is added 
 
 1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
 2. Pull/inspect open issues and assign the sprint milestone when applicable.
-3. Create one active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:`.
+3. Create one active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:`. Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
 4. Refuse to create a second active sprint until the previous one is completed.
 
 Done when the sprint file is the single active execution hub and each planned issue has a clear batch position.

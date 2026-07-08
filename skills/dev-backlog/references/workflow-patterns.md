@@ -11,7 +11,7 @@ Common patterns for GitHub Issues + sprint file workflow.
 5. **Pull to local** — sync milestone issues to `backlog/tasks/`
 6. **Create sprint file** — run `./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"` or write manually:
    - Set Goal (one sentence)
-   - Order issues into Batches (group small tasks for one session)
+   - Order issues into Batches (parallel-safe waves sized for one session)
    - Estimate time per task
    - Note dependencies
 
@@ -42,7 +42,7 @@ Two files at most, full picture. No need to query GitHub unless you suspect chan
 
 ## Working a Batch
 
-Small tasks grouped in one session:
+Each batch is one execution wave. Group by parallel-safety first, then session size: items in the same batch have disjoint files and no ordering dependency, while dependent work belongs in a later batch. Batch-heading prose suffixes such as `(after #211 and #212)` remain permitted as human documentation, not machine-readable grammar.
 
 1. Read sprint file → find the batch
 2. Start first task → update GitHub label → read task file AC → do the work

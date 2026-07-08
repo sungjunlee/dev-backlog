@@ -71,6 +71,10 @@ Top-level schema:
 | `heading` | string or `null` | The first `### Batch...` heading containing unchecked `[ ]` work, or `null` for flat plans. |
 | `items` | array | The unchecked `plan_items` in that batch. For flat plans, all unchecked items. |
 
+### `next_batch` Batch Semantics
+
+Plan mode guarantees batch-as-wave semantics: items in one batch MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST appear in a later batch, and batch order is execution order. A machine consumer, such as relay-fleet fan-out, MAY treat all `state:todo` items in `next_batch.items` as concurrently dispatchable under that guarantee.
+
 `latest_progress[]` entries are objects with:
 
 | Field | Type | Meaning |
