@@ -1150,6 +1150,93 @@ describe("local allocation lock is never auto-reclaimed and release is identity-
     assert.equal(fs.readFileSync(lockPath, "utf-8"), replacementBytes, "the replacement holder's lock is byte-for-byte untouched");
   });
 
+  it("captures and restores a replacement installed after release validation without unlinking its inode", (t) => {
+    const { backlogDir } = makeStore(t);
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    const replacementBytes = `${process.pid}:post-validation-replacement`;
+    let replacementIdentity;
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        afterReleaseLockValidation(lp) {
+          // This is the old check->unlink window: preliminary fd/token/inode
+          // validation has passed, then a new owner replaces the pathname just
+          // before release would have unlinked it.
+          fs.unlinkSync(lp);
+          fs.writeFileSync(lp, replacementBytes);
+          replacementIdentity = fs.statSync(lp);
+        },
+      },
+    });
+
+    assert.throws(
+      () => adapter.create({ title: "Post validation race" }),
+      (error) =>
+        error instanceof LocalStoreError &&
+        /changed owner during release|foreign lock was preserved|reconcile/i.test(error.message)
+    );
+    assert.deepEqual(
+      listNames(backlogDir, "tasks"),
+      ["BACK-1 - post-validation-race.md"],
+      "the critical section commits before the fail-closed release"
+    );
+
+    const captures = fs
+      .readdirSync(backlogDir)
+      .filter((name) => name.startsWith(".local-tracker.lock.release."));
+    assert.equal(captures.length, 1, "the foreign capture remains available for reconciliation");
+    const capturePath = path.join(backlogDir, captures[0]);
+    const restoredIdentity = fs.statSync(lockPath);
+    const capturedIdentity = fs.statSync(capturePath);
+    assert.equal(fs.readFileSync(lockPath, "utf-8"), replacementBytes, "canonical replacement bytes survive");
+    assert.equal(fs.readFileSync(capturePath, "utf-8"), replacementBytes, "captured replacement bytes survive");
+    assert.equal(restoredIdentity.dev, replacementIdentity.dev);
+    assert.equal(restoredIdentity.ino, replacementIdentity.ino, "canonical path retains the replacement inode");
+    assert.equal(capturedIdentity.dev, replacementIdentity.dev);
+    assert.equal(capturedIdentity.ino, replacementIdentity.ino, "capture retains the same replacement inode");
+  });
+
+  it("preserves both a foreign capture and a newer canonical owner during no-overwrite restoration", (t) => {
+    const { backlogDir } = makeStore(t);
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    const capturedBytes = `${process.pid}:captured-foreign-owner`;
+    const newerBytes = `${process.pid}:newer-canonical-owner`;
+    let capturedIdentity;
+    let newerIdentity;
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        afterReleaseLockValidation(lp) {
+          fs.unlinkSync(lp);
+          fs.writeFileSync(lp, capturedBytes);
+          capturedIdentity = fs.statSync(lp);
+        },
+        beforeForeignLockRestore(_capturePath, canonicalPath) {
+          // The atomic capture made canonical free, and a still-newer allocator
+          // acquired it before restoration. Restoration must not overwrite it.
+          fs.writeFileSync(canonicalPath, newerBytes, { flag: "wx" });
+          newerIdentity = fs.statSync(canonicalPath);
+        },
+      },
+    });
+
+    assert.throws(
+      () => adapter.create({ title: "Two owners" }),
+      (error) => error instanceof LocalStoreError && /newer owner|both locks were preserved/i.test(error.message)
+    );
+    const captures = fs
+      .readdirSync(backlogDir)
+      .filter((name) => name.startsWith(".local-tracker.lock.release."));
+    assert.equal(captures.length, 1);
+    const capturePath = path.join(backlogDir, captures[0]);
+    assert.equal(fs.readFileSync(lockPath, "utf-8"), newerBytes);
+    assert.equal(fs.statSync(lockPath).ino, newerIdentity.ino, "no-overwrite keeps the newer canonical inode");
+    assert.equal(fs.readFileSync(capturePath, "utf-8"), capturedBytes);
+    assert.equal(fs.statSync(capturePath).ino, capturedIdentity.ino, "the captured foreign inode is retained separately");
+  });
+
   it("never reclaims a dead-PID lock: two contenders both fail closed and the lock is untouched", (t) => {
     const { backlogDir } = makeStore(t);
     const lockPath = path.join(backlogDir, ".local-tracker.lock");

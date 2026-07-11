@@ -696,36 +696,117 @@ function createLocalAdapter(options = {}) {
     }
     const atPath = lstatSafe(lockPath);
     const stamp = readLockStamp(lockPath);
-    try {
-      fs.closeSync(handle.fd);
-    } catch {
-      /* fd already closed */
+    if (atPath === null) {
+      try {
+        fs.closeSync(handle.fd);
+      } catch {
+        /* fd already closed */
+      }
+      return; // lock already gone: nothing of ours to release
     }
-    if (atPath === null) return; // lock already gone: nothing of ours to release
     // File identity is definitive while our fd is open: the inode we created
     // cannot be recycled under the path, so a matching dev/ino proves it is our
-    // instance. The token is the second binding — a present stamp must be ours
-    // (it catches an inode-number reuse after our fd closes), but a stamp lost to
-    // a failed write does not veto an identity we can still prove by the fd.
+    // instance. The token is the second binding and must also match; a missing or
+    // malformed stamp cannot be treated as authority to remove a lock.
     const identityMatch =
       held !== null &&
       atPath.isFile() &&
       atPath.dev === held.dev &&
       atPath.ino === held.ino;
-    const tokenOk = stamp === null || stamp.token === handle.token;
+    const tokenOk = stamp !== null && stamp.token === handle.token;
     const stillOurs = identityMatch && tokenOk;
     if (!stillOurs) {
+      try {
+        fs.closeSync(handle.fd);
+      } catch {
+        /* fd already closed */
+      }
       throw new LocalStoreError(
         `local allocation lock ${lockPath} changed owner before release and was left ` +
           "untouched to protect the replacement holder; a concurrent allocator may be running. " +
           "Resolve the contention and remove the lock manually only if you are certain none is."
       );
     }
+
+    // A check followed by unlink(lockPath) is still racy: another owner can
+    // replace the canonical pathname after the check and before the unlink. Move
+    // exactly what is at the pathname to an unguessable private capture first.
+    // The rename is the atomic ownership boundary; we only unlink the capture
+    // after proving that the captured inode/token are the lock represented by our
+    // still-open fd.
+    if (testHooks.afterReleaseLockValidation) testHooks.afterReleaseLockValidation(lockPath);
+    const capturePath = path.join(
+      backlogDir,
+      `${LOCK_FILE}.release.${process.pid}.${crypto.randomBytes(12).toString("hex")}`
+    );
     try {
-      fs.unlinkSync(lockPath);
-    } catch {
-      /* lock already gone */
+      fs.renameSync(lockPath, capturePath);
+    } catch (error) {
+      try {
+        fs.closeSync(handle.fd);
+      } catch {
+        /* fd already closed */
+      }
+      if (error.code === "ENOENT") return; // removed by someone else; never chase a replacement
+      throw new LocalStoreError(`cannot capture local allocation lock for safe release: ${error.message}`, {
+        cause: error,
+      });
     }
+
+    const captured = lstatSafe(capturePath);
+    const capturedStamp = readLockStamp(capturePath);
+    const capturedIdentityMatch =
+      held !== null &&
+      captured !== null &&
+      captured.isFile() &&
+      captured.dev === held.dev &&
+      captured.ino === held.ino;
+    const capturedTokenOk = capturedStamp !== null && capturedStamp.token === handle.token;
+    const capturedOurs = capturedIdentityMatch && capturedTokenOk;
+    try {
+      fs.closeSync(handle.fd);
+    } catch {
+      /* fd already closed */
+    }
+
+    if (capturedOurs) {
+      try {
+        fs.unlinkSync(capturePath);
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          throw new LocalStoreError(
+            `captured local allocation lock could not be removed safely: ${error.message}`,
+            { cause: error }
+          );
+        }
+      }
+      return;
+    }
+
+    // The pathname was replaced after validation, so the capture belongs to a
+    // foreign owner. Restore it without overwriting a newer canonical owner:
+    // link() is atomic and fails with EEXIST. Deliberately retain the capture in
+    // every outcome, including successful restoration, so release never deletes
+    // the foreign inode and an operator can inspect/reconcile both authorities.
+    let restoration;
+    if (testHooks.beforeForeignLockRestore) {
+      testHooks.beforeForeignLockRestore(capturePath, lockPath);
+    }
+    try {
+      fs.linkSync(capturePath, lockPath);
+      restoration = `restored without overwrite at ${lockPath}`;
+    } catch (error) {
+      if (error.code === "EEXIST") {
+        restoration = `a newer owner already occupies ${lockPath}; both locks were preserved`;
+      } else {
+        restoration = `could not restore ${lockPath} without overwrite (${error.message})`;
+      }
+    }
+    throw new LocalStoreError(
+      `local allocation lock changed owner during release; the foreign lock was preserved at ` +
+        `${capturePath} and ${restoration}. Stop concurrent allocators and reconcile these lock ` +
+        "files manually before retrying."
+    );
   }
 
   // --- crash-recoverable close journal ---
