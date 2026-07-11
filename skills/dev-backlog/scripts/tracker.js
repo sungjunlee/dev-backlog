@@ -5,6 +5,8 @@
  * adapter, but it can never choose a different one.
  */
 
+const { createGithubAdapter } = require("./github-tracker.js");
+
 const TRACKER_KEYS = Object.freeze(["github", "local"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
   "availability",
@@ -26,8 +28,6 @@ const CAPABILITY_NAMES = Object.freeze([
 
 const LOCAL_UNAVAILABLE_REASON =
   "local tracker persistence is not implemented; issue #276 adds it";
-const GITHUB_LIFECYCLE_REASON =
-  "GitHub lifecycle transport remains on compatibility callers until issue #275";
 
 class TrackerConfigurationError extends Error {
   constructor(value) {
@@ -171,6 +171,13 @@ function resolveTracker(config, { adapters = TRACKER_ADAPTERS } = {}) {
   return Object.freeze({ tracker, adapter, availability });
 }
 
+function resolveConfiguredTracker(config, { execFile, adapters } = {}) {
+  const registered = adapters || (execFile
+    ? { ...TRACKER_ADAPTERS, github: createGithubAdapter({ execFile }) }
+    : TRACKER_ADAPTERS);
+  return resolveTracker(config, { adapters: registered });
+}
+
 function validateIdentity(identity) {
   if (
     identity === null ||
@@ -268,20 +275,8 @@ function unavailableLocalOperation() {
   throw new TrackerUnavailableError("local", LOCAL_UNAVAILABLE_REASON);
 }
 
-function githubCompatibilityBoundary() {
-  throw new TrackerContractError(GITHUB_LIFECYCLE_REASON);
-}
-
 const TRACKER_ADAPTERS = Object.freeze({
-  github: Object.freeze({
-    availability: () => ({ available: true }),
-    capabilities: () => [...CAPABILITY_NAMES],
-    list: githubCompatibilityBoundary,
-    read: githubCompatibilityBoundary,
-    create: githubCompatibilityBoundary,
-    update: githubCompatibilityBoundary,
-    close: githubCompatibilityBoundary,
-  }),
+  github: createGithubAdapter(),
   local: Object.freeze({
     availability: () => ({ available: false, reason: LOCAL_UNAVAILABLE_REASON }),
     capabilities: () => [],
@@ -308,5 +303,7 @@ module.exports = {
   validateIdentity,
   readCapabilities,
   resolveTracker,
+  resolveConfiguredTracker,
   invokeCapability,
+  createGithubAdapter,
 };

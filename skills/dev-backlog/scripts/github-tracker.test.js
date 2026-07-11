@@ -207,4 +207,12 @@ describe("GitHub required lifecycle adapter", () => {
     );
     assert.equal(mutations, 0);
   });
+
+  it("rejects malformed provider identities instead of leaking them to core callers", () => {
+    const { execFile } = recordingExec([
+      JSON.stringify([{ number: 7, title: "bad URL", url: "not-a-url" }]),
+    ]);
+    const adapter = createGithubAdapter({ execFile });
+    assert.throws(() => adapter.list({ limit: 1 }), /Invalid GitHub issue URL/);
+  });
 });

@@ -19,8 +19,14 @@
 
 const { execFileSync } = require("child_process");
 const path = require("path");
-const { GH_EXEC_DEFAULTS } = require("./lib.js");
+const { readConfig } = require("./lib.js");
 const { parseTaskRef, renderTaskRef } = require("./task-ref.js");
+const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  findMirrorIssue,
+  createMirrorIssue,
+  updateMirrorIssue,
+} = require("./github-mirrors.js");
 
 const MARKER_PREFIX = "<!-- dev-backlog:sprint-mirror sprint=";
 const MARKER_SUFFIX = " -->";
@@ -166,39 +172,6 @@ function renderMirrorBody({ state, slug, now = new Date() }) {
   return lines.join("\n");
 }
 
-// --- GitHub I/O ---
-
-function findMirrorIssue(marker, execFile) {
-  const out = execFile(
-    "gh",
-    [
-      "issue", "list", "--state", "all",
-      "--search", "dev-backlog:sprint-mirror in:body",
-      "--json", "number,body", "--limit", "50",
-    ],
-    GH_EXEC_DEFAULTS
-  );
-  const issues = JSON.parse(out);
-  return issues.find((issue) => issue.body && issue.body.includes(marker)) || null;
-}
-
-function createMirrorIssue(title, body, execFile) {
-  const out = execFile(
-    "gh",
-    ["issue", "create", "--title", title, "--body", body],
-    GH_EXEC_DEFAULTS
-  );
-  const match = String(out).trim().match(/\/issues\/(\d+)\s*$/);
-  if (!match) {
-    throw new Error(`Failed to parse issue number from gh output: ${String(out).trim()}`);
-  }
-  return { number: Number(match[1]) };
-}
-
-function updateMirrorIssue(number, body, execFile) {
-  execFile("gh", ["issue", "edit", String(number), "--body", body], GH_EXEC_DEFAULTS);
-}
-
 // --- Core sync ---
 
 function sync({
@@ -208,6 +181,8 @@ function sync({
   execFile = execFileSync,
   sprintStatePath = SPRINT_STATE_PATH,
 } = {}) {
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  invokeCapability(resolved, "mirrors", () => undefined);
   const state = resolveSprintState({ backlogDir, execFile, sprintStatePath });
   const slug = path.basename(state.active_sprint.path, ".md");
   const marker = makeMarker(slug);

@@ -76,9 +76,7 @@ fi
 # --- GitHub Issues ---
 echo ""
 echo "=== GitHub Issues ==="
-gh issue list --state open --limit 20 --json number,title,labels,milestone --jq '
-  .[] | "\(.number)\t\(.milestone.title // "-")\t\(.title)\t\([.labels[].name] | join(","))"
-' 2>/dev/null | column -t -s $'\t' || echo "(gh not available)"
+node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t'
 
 # --- Local Files ---
 echo ""
