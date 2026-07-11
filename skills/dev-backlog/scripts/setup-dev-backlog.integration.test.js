@@ -35,22 +35,70 @@ function runCli(root, args, env = process.env) {
 function snapshot(root) {
   const result = {};
   function walk(current, relative = "") {
-    if (!fs.existsSync(current)) return;
+    let currentStat;
+    try {
+      currentStat = fs.lstatSync(current);
+    } catch (error) {
+      if (error.code === "ENOENT") return;
+      throw error;
+    }
+    if (!currentStat.isDirectory() || currentStat.isSymbolicLink()) {
+      result[relative || "."] = {
+        type: currentStat.isSymbolicLink() ? "symlink" : "file",
+        bytes: currentStat.isFile() ? fs.readFileSync(current).toString("base64") : null,
+        target: currentStat.isSymbolicLink() ? fs.readlinkSync(current) : null,
+        ino: currentStat.ino,
+        mtimeMs: currentStat.mtimeMs,
+      };
+      return;
+    }
     for (const name of fs.readdirSync(current).sort()) {
       const full = path.join(current, name);
       const key = path.join(relative, name);
       const stat = fs.lstatSync(full);
       result[key] = {
-        type: stat.isDirectory() ? "directory" : "file",
+        type: stat.isSymbolicLink() ? "symlink" : stat.isDirectory() ? "directory" : "file",
         bytes: stat.isFile() ? fs.readFileSync(full).toString("base64") : null,
+        target: stat.isSymbolicLink() ? fs.readlinkSync(full) : null,
         ino: stat.ino,
         mtimeMs: stat.mtimeMs,
       };
-      if (stat.isDirectory()) walk(full, key);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) walk(full, key);
     }
   }
   walk(root);
   return result;
+}
+
+function withoutDirectoryTimes(tree) {
+  return Object.fromEntries(Object.entries(tree).map(([key, value]) => [
+    key,
+    value.type === "directory" ? { ...value, mtimeMs: undefined } : value,
+  ]));
+}
+
+function faultPreload(t, source) {
+  const root = makeRoot(t, "setup-preload-");
+  const preload = path.join(root, "fault.cjs");
+  fs.writeFileSync(preload, source);
+  return preload;
+}
+
+function providerStubs(t, { remote, ghStatus }) {
+  const bin = makeRoot(t, "setup-provider-stubs-");
+  fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' '${remote}'\n`);
+  fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nexit ${ghStatus}\n`);
+  fs.chmodSync(path.join(bin, "git"), 0o755);
+  fs.chmodSync(path.join(bin, "gh"), 0o755);
+  const preload = faultPreload(t, [
+    'Object.defineProperty(process.stdin, "isTTY", { value: true });',
+    'Object.defineProperty(process.stdout, "isTTY", { value: true });',
+  ].join("\n"));
+  return {
+    ...process.env,
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    NODE_OPTIONS: `--require=${preload}`,
+  };
 }
 
 describe("setup-dev-backlog real process integration", () => {
@@ -155,6 +203,128 @@ describe("setup-dev-backlog real process integration", () => {
     assert.match(run.stderr, /Invalid tracker configuration/);
     assert.match(run.stderr, /setup-dev-backlog\.js/);
     assert.deepEqual(snapshot(root), before);
+  });
+
+  it("rejects every dangling canonical symlink before any mutation", (t) => {
+    for (const relative of [
+      "backlog",
+      "backlog/config.yml",
+      "backlog/sprints",
+      "backlog/tasks",
+      "backlog/completed",
+    ]) {
+      const root = makeRoot(t, "setup-dangling-");
+      const link = path.join(root, relative);
+      fs.mkdirSync(path.dirname(link), { recursive: true });
+      fs.symlinkSync(path.join(root, "missing-target"), link);
+      const before = snapshot(root);
+      const run = runCli(root, ["--tracker", "local", "--non-interactive"]);
+      assert.notEqual(run.status, 0, `${relative}: ${run.stderr}`);
+      assert.match(run.stderr, /unsafe (?:backlog|config) path/, relative);
+      assert.deepEqual(snapshot(root), before, relative);
+    }
+  });
+
+  it("rolls back real-process setup on mkdir, write, and rename failures", (t) => {
+    const failures = {
+      mkdir: [
+        'const fs = require("node:fs");',
+        'const original = fs.mkdirSync;',
+        'fs.mkdirSync = function (target, options) {',
+        '  if (String(target).endsWith("/backlog/tasks")) throw new Error("injected mkdir failure");',
+        '  return original.call(this, target, options);',
+        '};',
+      ].join("\n"),
+      write: [
+        'const fs = require("node:fs");',
+        'const original = fs.writeFileSync;',
+        'fs.writeFileSync = function (target, content, options) {',
+        '  if (String(target).includes(".config.yml.") && String(target).endsWith(".tmp")) {',
+        '    original.call(this, target, "partial", options);',
+        '    throw new Error("injected write failure");',
+        '  }',
+        '  return original.call(this, target, content, options);',
+        '};',
+      ].join("\n"),
+      rename: [
+        'const fs = require("node:fs");',
+        'const original = fs.renameSync;',
+        'fs.renameSync = function (from, to) {',
+        '  if (String(to).endsWith("/backlog/config.yml")) throw new Error("injected rename failure");',
+        '  return original.call(this, from, to);',
+        '};',
+      ].join("\n"),
+    };
+
+    for (const [failure, source] of Object.entries(failures)) {
+      const root = makeRoot(t, `setup-failure-${failure}-`);
+      const preload = faultPreload(t, source);
+      if (failure !== "mkdir") {
+        fs.mkdirSync(path.join(root, "backlog"));
+        for (const name of ["sprints", "tasks", "completed"]) {
+          fs.mkdirSync(path.join(root, "backlog", name));
+        }
+        fs.writeFileSync(
+          path.join(root, "backlog/config.yml"),
+          "project_name: preserved\r\ntracker: local\r\n# exact bytes"
+        );
+      }
+      const before = snapshot(root);
+      const run = runCli(root, ["--tracker", failure === "mkdir" ? "local" : "github", "--non-interactive"], {
+        ...process.env,
+        NODE_OPTIONS: `--require=${preload}`,
+      });
+      assert.notEqual(run.status, 0, failure);
+      assert.match(run.stderr, new RegExp(`injected ${failure} failure`));
+      assert.deepEqual(withoutDirectoryTimes(snapshot(root)), withoutDirectoryTimes(before), failure);
+    }
+  });
+
+  it("changes only the tracker bytes around complex preserved YAML lexical contexts", (t) => {
+    const root = makeRoot(t, "setup-lexical-preservation-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const original = [
+      '"note:with:colons": &copy !text |-2',
+      "    tracker: text in block",
+      "single: 'first line",
+      "  tracker: text in single quote",
+      "  last line'",
+      'double: "first line',
+      "  tracker: text in double quote",
+      '  last line"',
+      "tracker: github # selected",
+      "tail: preserved",
+    ].join("\r\n");
+    fs.writeFileSync(path.join(root, "backlog/config.yml"), original);
+
+    const run = runCli(root, ["--tracker", "local", "--non-interactive"]);
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(
+      fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"),
+      original.replace("tracker: github # selected", "tracker: local # selected")
+    );
+  });
+
+  it("uses stubbed origin and gh evidence for fresh interactive recommendations", (t) => {
+    for (const row of [
+      { remote: "https://github.com/owner/repo.git", ghStatus: 0, expected: "github" },
+      { remote: "https://github.com/owner/repo/issues", ghStatus: 0, expected: "local" },
+      { remote: "https://github.com/owner/repo.git", ghStatus: 1, expected: "local" },
+    ]) {
+      const root = makeRoot(t, `setup-interactive-${row.expected}-`);
+      const run = spawnSync(process.execPath, [SCRIPT, "--json"], {
+        cwd: root,
+        env: providerStubs(t, row),
+        encoding: "utf8",
+        input: "\n",
+      });
+      assert.equal(run.status, 0, run.stderr);
+      const jsonStart = run.stdout.indexOf("{");
+      const result = JSON.parse(run.stdout.slice(jsonStart));
+      assert.equal(result.selection, row.expected);
+      assert.equal(result.selectionSource, "recommended");
+      assert.equal(result.evidence.remote, row.remote.includes("/issues") ? "non-github" : "github");
+    }
   });
 
   it("keeps init.sh fresh-GitHub compatibility and preserves an existing local choice", (t) => {

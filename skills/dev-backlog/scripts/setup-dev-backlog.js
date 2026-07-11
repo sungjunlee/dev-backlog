@@ -140,19 +140,85 @@ function lineRecords(raw) {
   return records;
 }
 
-function looksLikeTrackerDeclaration(line) {
-  if (!line.trim() || line.trimStart().startsWith("#")) return false;
+function scanYamlLine(line, carriedQuote = null) {
+  const visible = [...line];
+  let quote = carriedQuote;
+  let quotedTrackerKey = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    if (quote) {
+      visible[index] = " ";
+      if (quote === "'" && line[index] === "'" && line[index + 1] === "'") {
+        visible[index + 1] = " ";
+        index += 1;
+      } else if (quote === '"' && line[index] === "\\") {
+        if (index + 1 < line.length) {
+          visible[index + 1] = " ";
+          index += 1;
+        }
+      } else if (line[index] === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (line[index] === "#") {
+      visible.fill(" ", index);
+      break;
+    }
+    if (line[index] !== "'" && line[index] !== '"') continue;
+
+    const opening = line[index];
+    const start = index;
+    let content = "";
+    visible[index] = " ";
+    quote = opening;
+    for (index += 1; index < line.length; index += 1) {
+      visible[index] = " ";
+      if (opening === "'" && line[index] === "'" && line[index + 1] === "'") {
+        content += "'";
+        visible[index + 1] = " ";
+        index += 1;
+      } else if (opening === '"' && line[index] === "\\") {
+        if (index + 1 < line.length) {
+          content += line[index + 1];
+          visible[index + 1] = " ";
+          index += 1;
+        }
+      } else if (line[index] === opening) {
+        quote = null;
+        break;
+      } else {
+        content += line[index];
+      }
+    }
+
+    if (!quote && content === "tracker") {
+      let after = index + 1;
+      while (after < line.length && /[ \t]/.test(line[after])) after += 1;
+      const prefix = visible.slice(0, start).join("").replace(/^\uFEFF/, "");
+      const mappingBoundary = /^\s*(?:-\s*)?$/.test(prefix) || /(?:^|[{,])\s*$/.test(prefix);
+      if (line[after] === ":" && mappingBoundary) quotedTrackerKey = true;
+    }
+  }
+
+  return { visible: visible.join(""), carriedQuote: quote, quotedTrackerKey };
+}
+
+function looksLikeTrackerDeclaration(visible, quotedTrackerKey) {
+  if (quotedTrackerKey) return true;
+  if (!visible.trim()) return false;
   return (
-    /^\uFEFF?\s*tracker\s*:/.test(line) ||
-    /^\s*["']tracker["']\s*:/.test(line) ||
-    /^\s*-\s*tracker\s*:/.test(line) ||
-    /[{,]\s*tracker\s*:/.test(line)
+    /^\uFEFF?\s*tracker\s*:/.test(visible) ||
+    /^\s*-\s*tracker\s*:/.test(visible) ||
+    /(?:^|[{,])\s*tracker\s*:/.test(visible)
   );
 }
 
 function trackerCandidates(raw) {
   const candidates = [];
   let blockScalarParentIndent = null;
+  let carriedQuote = null;
 
   for (const record of lineRecords(raw)) {
     const withoutBom = record.text.replace(/^\uFEFF/, "");
@@ -162,8 +228,13 @@ function trackerCandidates(raw) {
       if (!trimmed || indent > blockScalarParentIndent) continue;
       blockScalarParentIndent = null;
     }
-    if (looksLikeTrackerDeclaration(record.text)) candidates.push(record);
-    if (/^\s*(?:[^#][^:]*):[ \t]*[>|](?:[1-9][+-]?|[+-][1-9]?)?\s*(?:#.*)?$/.test(withoutBom)) {
+    const scanned = scanYamlLine(record.text, carriedQuote);
+    carriedQuote = scanned.carriedQuote;
+    if (looksLikeTrackerDeclaration(scanned.visible, scanned.quotedTrackerKey)) candidates.push(record);
+    if (
+      !carriedQuote &&
+      /:\s*(?:(?:[&!][^\s,\[\]{}]+)\s+)*(?:[>|](?:[1-9][+-]?|[+-][1-9]?)?)\s*$/.test(scanned.visible.replace(/^\uFEFF/, ""))
+    ) {
       blockScalarParentIndent = indent;
     }
   }
@@ -243,14 +314,20 @@ function mutateTrackerText(raw, state, selection) {
 function isGithubRemote(remote) {
   const value = String(remote || "").trim();
   if (!value) return false;
-  if (/^(?:[^@\s]+@)?github\.com:[^/\s]+\/[^/\s]+(?:\.git)?\/?$/i.test(value)) {
+  const component = "[A-Za-z0-9_.-]+";
+  if (new RegExp(`^[^@\\s]+@github\\.com:${component}/${component}(?:\\.git)?$`, "i").test(value)) {
     return true;
   }
   try {
     const parsed = new URL(value);
+    const allowedProtocol = new Set(["http:", "https:", "ssh:", "git:"]);
     return (
+      allowedProtocol.has(parsed.protocol) &&
       parsed.hostname.toLowerCase() === "github.com" &&
-      parsed.pathname.split("/").filter(Boolean).length >= 2
+      parsed.port === "" &&
+      parsed.search === "" &&
+      parsed.hash === "" &&
+      new RegExp(`^/${component}/${component}(?:\\.git)?$`).test(parsed.pathname)
     );
   } catch {
     return false;
@@ -353,7 +430,11 @@ function tempPathFor(targetPath) {
 }
 
 function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
-  const targetExists = fsApi.existsSync(targetPath);
+  const targetStat = lstatIfPresent(targetPath, fsApi);
+  if (targetStat && (targetStat.isSymbolicLink() || !targetStat.isFile())) {
+    throw new SetupError(`Refusing unsafe config path: ${targetPath} must be a regular file.`);
+  }
+  const targetExists = Boolean(targetStat);
   if (targetExists) {
     const current = fsApi.readFileSync(targetPath, "utf8");
     if (current === content) return Object.freeze({ changed: false, created: false });
@@ -378,40 +459,57 @@ function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
 }
 
 function ensureMinimumDirectories(backlogDir, fsApi) {
-  const backlogCreated = !fsApi.existsSync(backlogDir);
-  const created = [];
-  fsApi.mkdirSync(backlogDir, { recursive: true });
-  for (const name of MINIMUM_DIRECTORIES) {
-    const directory = path.join(backlogDir, name);
-    if (!fsApi.existsSync(directory)) {
-      fsApi.mkdirSync(directory);
-      created.push(name);
+  const structure = { backlogCreated: false, created: [] };
+  try {
+    if (!lstatIfPresent(backlogDir, fsApi)) {
+      fsApi.mkdirSync(backlogDir);
+      structure.backlogCreated = true;
     }
+    for (const name of MINIMUM_DIRECTORIES) {
+      const directory = path.join(backlogDir, name);
+      if (!lstatIfPresent(directory, fsApi)) {
+        fsApi.mkdirSync(directory);
+        structure.created.push(name);
+      }
+    }
+    return structure;
+  } catch (error) {
+    rollbackCreatedDirectories(backlogDir, structure, fsApi);
+    throw error;
   }
-  return { backlogCreated, created };
+}
+
+function lstatIfPresent(targetPath, fsApi) {
+  try {
+    return fsApi.lstatSync(targetPath);
+  } catch (error) {
+    if (error && error.code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 function validateExistingStructure(backlogDir, configPath, fsApi) {
-  if (fsApi.existsSync(backlogDir)) {
-    const backlogStat = fsApi.lstatSync(backlogDir);
+  const backlogStat = lstatIfPresent(backlogDir, fsApi);
+  if (backlogStat) {
     if (backlogStat.isSymbolicLink() || !backlogStat.isDirectory()) {
       throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
     }
   }
-  if (fsApi.existsSync(configPath)) {
-    const configStat = fsApi.lstatSync(configPath);
+  const configStat = lstatIfPresent(configPath, fsApi);
+  if (configStat) {
     if (configStat.isSymbolicLink() || !configStat.isFile()) {
       throw new SetupError(`Refusing unsafe config path: ${configPath} must be a regular file.`);
     }
   }
   for (const name of MINIMUM_DIRECTORIES) {
     const directory = path.join(backlogDir, name);
-    if (!fsApi.existsSync(directory)) continue;
-    const stat = fsApi.lstatSync(directory);
+    const stat = lstatIfPresent(directory, fsApi);
+    if (!stat) continue;
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
       throw new SetupError(`Refusing unsafe backlog path: ${directory} must be a real directory.`);
     }
   }
+  return { configExists: Boolean(configStat) };
 }
 
 function rollbackCreatedDirectories(backlogDir, structure, fsApi) {
@@ -457,8 +555,8 @@ async function runSetup(options = {}, dependencies = {}) {
   const cwd = path.resolve(options.cwd || process.cwd());
   const backlogDir = path.join(cwd, "backlog");
   const configPath = path.join(backlogDir, "config.yml");
-  validateExistingStructure(backlogDir, configPath, fsApi);
-  const configExists = fsApi.existsSync(configPath);
+  const structureState = validateExistingStructure(backlogDir, configPath, fsApi);
+  const configExists = structureState.configExists;
   let raw;
   let configState;
 

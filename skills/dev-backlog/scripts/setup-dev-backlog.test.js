@@ -160,6 +160,51 @@ describe("tracker config state machine", () => {
     assert.equal(mutateTrackerText(raw, state, "local"), raw.replace("tracker: github", "tracker: local"));
   });
 
+  it("preserves tracker text inside quoted-key block scalars and multiline quoted scalars", () => {
+    const fixtures = [
+      [
+        '"note:with:colons": &copy !text |-2',
+        "    tracker: local",
+        "    literal text",
+        "tracker: github",
+        "",
+      ].join("\n"),
+      [
+        "note: 'first line",
+        "  tracker: local",
+        "  still quoted'",
+        "tracker: github",
+        "",
+      ].join("\n"),
+      [
+        'note: "first line',
+        "  tracker: local",
+        '  still quoted"',
+        "tracker: github",
+        "",
+      ].join("\n"),
+    ];
+
+    for (const raw of fixtures) {
+      const state = inspectConfig(raw, "/repo/backlog/config.yml");
+      assert.equal(state.tracker, "github");
+      assert.equal(mutateTrackerText(raw, state, "local"), raw.replace(/tracker: github/, "tracker: local"));
+    }
+  });
+
+  it("fails closed on actual top-level, nested, sequence, and flow tracker declarations", () => {
+    for (const declaration of [
+      "tracker: github",
+      "  tracker: github",
+      "- tracker: github",
+      "mapping: {tracker: github}",
+      "mapping: {'tracker': github}",
+    ]) {
+      const raw = `${declaration}\ntracker: local\n`;
+      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), ConfigValidationError);
+    }
+  });
+
   it("recognizes a BOM-prefixed top-level tracker without disturbing the BOM", () => {
     const raw = "\uFEFFtracker: github\r\nother: yes";
     const state = inspectConfig(raw, "/repo/backlog/config.yml");
@@ -183,11 +228,27 @@ describe("CLI argument boundary", () => {
 
 describe("provider evidence", () => {
   it("accepts only exact github.com remote hosts", () => {
-    assert.equal(isGithubRemote("https://github.com/owner/repo.git"), true);
-    assert.equal(isGithubRemote("git@github.com:owner/repo.git"), true);
-    assert.equal(isGithubRemote("https://user:secret@github.com/owner/repo.git"), true);
-    assert.equal(isGithubRemote("https://github.com.evil.test/owner/repo.git"), false);
-    assert.equal(isGithubRemote("git@github.com.evil.test:owner/repo.git"), false);
+    for (const remote of [
+      "https://github.com/owner/repo.git",
+      "http://github.com/owner/repo",
+      "ssh://git@github.com/owner/repo.git",
+      "git@github.com:owner/repo.git",
+      "git://github.com/owner/repo.git",
+      "https://user:secret@github.com/owner/repo.git",
+    ]) assert.equal(isGithubRemote(remote), true, remote);
+
+    for (const remote of [
+      "https://github.com.evil.test/owner/repo.git",
+      "git@github.com.evil.test:owner/repo.git",
+      "https://github.com/owner",
+      "https://github.com/owner/repo/issues",
+      "https://github.com/owner/repo.git/extra",
+      "https://github.com/owner/repo.git?tab=readme",
+      "https://github.com/owner/repo#readme",
+      "ftp://github.com/owner/repo.git",
+      "github.com/owner/repo",
+      "git@github.com:owner/repo/issues",
+    ]) assert.equal(isGithubRemote(remote), false, remote);
   });
 
   it("recommends github only for the usable-origin/authenticated matrix cell", () => {
@@ -503,6 +564,27 @@ describe("setup filesystem behavior", () => {
       /unsafe backlog path/
     );
     assert.deepEqual(fs.readdirSync(outside), []);
+  });
+
+  it("rolls back directories created before an intermediate mkdir failure", async (t) => {
+    const root = makeRoot(t);
+    const fsApi = {
+      ...fs,
+      mkdirSync(directory, options) {
+        if (directory === path.join(root, "backlog", "tasks")) {
+          throw new Error("injected mkdir failure");
+        }
+        return fs.mkdirSync(directory, options);
+      },
+    };
+    await assert.rejects(
+      runSetup(
+        { cwd: root, tracker: "local", nonInteractive: true },
+        { fs: fsApi, execFileSync: noProviderCalls() }
+      ),
+      /injected mkdir failure/
+    );
+    assert.equal(fs.existsSync(path.join(root, "backlog")), false);
   });
 });
 
