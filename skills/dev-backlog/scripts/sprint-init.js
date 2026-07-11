@@ -14,6 +14,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { renderTaskRef } = require("./task-ref.js");
 const { slugify, estimateSize, GH_EXEC_DEFAULTS } = require("./lib");
 const { resolveCharterPath } = require("./spec-paths.js");
 
@@ -47,7 +48,8 @@ function buildIssueLines(issues) {
     const labels = (issue.labels || []).map((l) => l.name);
     const est = estimateSize(labels);
     const suffix = est ? ` (${est})` : "";
-    return `- [ ] #${issue.number} ${issue.title}${suffix}`;
+    const ref = renderTaskRef({ tracker: "github", id: String(issue.number) });
+    return `- [ ] ${ref} ${issue.title}${suffix}`;
   });
 }
 

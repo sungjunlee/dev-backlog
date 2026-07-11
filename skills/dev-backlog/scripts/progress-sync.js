@@ -17,6 +17,12 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { readConfig } = require("./lib.js");
+const {
+  githubIssueNumber,
+  parsePlanCheckbox,
+  parseTaskFileName,
+} = require("./task-ref.js");
 const {
   makeMarker,
   parseMarkerMonth,
@@ -133,16 +139,25 @@ function parseArgs(args) {
 
 function readTaskFiles(tasksDir) {
   if (!fs.existsSync(tasksDir)) return [];
+  const config = readConfig(path.dirname(tasksDir));
+  const refOptions = { taskPrefix: config.task_prefix, tracker: config.tracker };
   return fs.readdirSync(tasksDir)
     .filter((f) => f.endsWith(".md"))
     .map((f) => {
       const content = fs.readFileSync(path.join(tasksDir, f), "utf-8");
+      const identity = parseTaskFileName(f, refOptions);
       const fm = content.match(/^---\n([\s\S]*?)\n---/);
-      if (!fm) return { file: f, issueNumber: parseTaskIssueNumber(f), status: "unknown" };
+      const task = {
+        file: f,
+        tracker: identity?.tracker ?? null,
+        id: identity?.id ?? null,
+        ref: identity?.ref ?? null,
+        issueNumber: githubIssueNumber(identity),
+      };
+      if (!fm) return { ...task, status: "unknown" };
       const statusMatch = fm[1].match(/^status:\s*(.+)$/m);
       return {
-        file: f,
-        issueNumber: parseTaskIssueNumber(f),
+        ...task,
         status: statusMatch ? statusMatch[1].trim() : "unknown",
       };
     });
@@ -150,15 +165,19 @@ function readTaskFiles(tasksDir) {
 
 function readActiveSprintSummary(sprintsDir) {
   if (!fs.existsSync(sprintsDir)) return null;
+  const config = readConfig(path.dirname(sprintsDir));
   const files = fs.readdirSync(sprintsDir).filter(
     (f) => f.endsWith(".md") && !f.startsWith("_")
   );
   for (const f of files) {
     const content = fs.readFileSync(path.join(sprintsDir, f), "utf-8");
     if (/^status:\s*active$/m.test(content)) {
-      const done = (content.match(/^- \[x\] #/gm) || []).length;
-      const inflight = (content.match(/^- \[~\] #/gm) || []).length;
-      const todo = (content.match(/^- \[ \] #/gm) || []).length;
+      const items = content.split(/\r?\n/)
+        .map((line) => parsePlanCheckbox(line, { taskPrefix: config.task_prefix }))
+        .filter(Boolean);
+      const done = items.filter((item) => item.checkboxState === "x").length;
+      const inflight = items.filter((item) => item.checkboxState === "~").length;
+      const todo = items.filter((item) => item.checkboxState === " ").length;
       const total = done + inflight + todo;
       return { file: f, done, inflight, todo, total };
     }

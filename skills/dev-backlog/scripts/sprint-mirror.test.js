@@ -16,11 +16,17 @@ const {
 // --- Test fixtures ---
 
 function planItem(overrides = {}) {
+  const tracker = overrides.tracker || "github";
+  const id = overrides.id || String(overrides.issue_number || 1);
+  const ref = overrides.ref || (tracker === "github" ? `#${id}` : `BACK-${id}`);
   return {
     line: "- [ ] #1 Do the thing",
     checkbox_state: " ",
     state: "todo",
-    issue_number: 1,
+    tracker,
+    id,
+    ref,
+    issue_number: tracker === "github" ? Number(id) : null,
     title: "Do the thing",
     batch_heading: null,
     pr: null,
@@ -192,6 +198,20 @@ describe("formatPlanItem", () => {
     const item = planItem({ pr: { number: 7, state: "open" } });
     assert.equal(formatPlanItem(item), "- [ ] #1 Do the thing — PR #7 (open)");
   });
+
+  it("keeps the exported formatter compatible with legacy GitHub item input", () => {
+    const item = planItem();
+    delete item.tracker;
+    delete item.id;
+    delete item.ref;
+    assert.equal(formatPlanItem(item), "- [ ] #1 Do the thing");
+  });
+
+  it("renders local normalized refs without fabricating a GitHub issue number", () => {
+    const item = planItem({ tracker: "local", id: "11.2", ref: "BACK-11.2" });
+    assert.equal(item.issue_number, null);
+    assert.equal(formatPlanItem(item), "- [ ] BACK-11.2 Do the thing");
+  });
 });
 
 // --- renderPlanSection / renderProgressSection / renderMirrorBody ---
@@ -255,11 +275,26 @@ describe("renderMirrorBody", () => {
     });
     const body = renderMirrorBody({ state, slug: "2026-07-sample-sprint", now: new Date("2026-07-04T12:00:00Z") });
 
-    assert.ok(body.startsWith("<!-- dev-backlog:sprint-mirror sprint=2026-07-sample-sprint -->"));
-    assert.match(body, /read-only/);
-    assert.match(body, /Ship the thing\./);
-    assert.match(body, /No progress recorded yet\./);
-    assert.match(body, /Last explicit sync: 2026-07-04T12:00:00\.000Z/);
+    assert.equal(body, `<!-- dev-backlog:sprint-mirror sprint=2026-07-sample-sprint -->
+
+> The local sprint file is canonical. This mirror is read-only — it is
+> not edited by hand — and sync is always explicit; there is no daemon.
+
+## Goal
+
+Ship the thing.
+
+## Plan
+
+- [ ] #1 PR item — PR #7 (merged)
+- [ ] #2 Run item — run:run-1
+- [~] #3 Unmoored — (unmoored)
+
+## Latest Progress
+
+_No progress recorded yet._
+
+Last explicit sync: 2026-07-04T12:00:00.000Z`);
   });
 });
 

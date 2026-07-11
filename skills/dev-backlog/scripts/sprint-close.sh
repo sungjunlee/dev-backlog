@@ -91,17 +91,23 @@ else
 fi
 
 # --- Step 3: Move completed task files ---
-# Collect issue numbers from checked items
-DONE_ISSUES=$(grep "$RE_CB_DONE" "$ACTIVE" | sed "s/${RE_CB_DONE}\([0-9]*\).*/\1/" || true)
+# Collect exact task-file refs from checked items through the shared parser.
+DONE_FILE_REFS=$(node "$SCRIPT_DIR/task-ref.js" completed-file-refs "$ACTIVE" "$BACKLOG_DIR")
 
-if [ -d "$TASKS_DIR" ] && [ -n "$DONE_ISSUES" ]; then
+if [ -d "$TASKS_DIR" ] && [ -n "$DONE_FILE_REFS" ]; then
   if ! $DRY_RUN; then
     mkdir -p "$COMPLETED_DIR"
   fi
-  echo "$DONE_ISSUES" | while IFS= read -r num; do
-    # Find task file matching this issue number (exact match: PREFIX-NUM space)
+  echo "$DONE_FILE_REFS" | while IFS= read -r file_ref; do
+    # Match the complete storage ref, never a numeric prefix (1 vs 11).
     TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null \
-      | grep -E "/[A-Z]+-${num} - " | head -1)
+      | while IFS= read -r candidate; do
+          basename=$(basename "$candidate")
+          if [ "$basename" = "${file_ref}.md" ] || [[ "$basename" == "${file_ref} - "* ]]; then
+            printf '%s\n' "$candidate"
+            break
+          fi
+        done)
     if [ -n "$TASK_FILE" ]; then
       BASENAME=$(basename "$TASK_FILE")
       if $DRY_RUN; then

@@ -328,6 +328,46 @@ describe("run (integration)", () => {
     assert.equal(files[2], "BACK-3 - third.md");
   });
 
+  it("uses normalized identity for exact #1/#11 task-file lookup", () => {
+    const longerTask = "---\nid: BACK-11\n---\nLonger task body";
+    fs.writeFileSync(path.join(tasksDir, "BACK-11 - longer.md"), longerTask);
+
+    const result = run({
+      issues: [makeIssue({ number: 1, title: "Short" })],
+      tasksDir,
+      prefix: "BACK",
+      update: false,
+      dryRun: false,
+    });
+
+    assert.deepEqual(fs.readdirSync(tasksDir).sort(), [
+      "BACK-1 - short.md",
+      "BACK-11 - longer.md",
+    ]);
+    assert.equal(
+      fs.readFileSync(path.join(tasksDir, "BACK-11 - longer.md"), "utf-8"),
+      longerTask,
+    );
+    assert.deepEqual(result.createdFiles, ["BACK-1 - short.md"]);
+    assert.deepEqual(result.skippedFiles, []);
+  });
+
+  it("preserves the existing GitHub task filename and frontmatter id byte shape", () => {
+    run({
+      issues: [makeIssue({ number: 11, title: "Existing GitHub Shape" })],
+      tasksDir,
+      prefix: "TASK",
+      update: false,
+      dryRun: false,
+    });
+
+    const file = "TASK-11 - existing-github-shape.md";
+    assert.deepEqual(fs.readdirSync(tasksDir), [file]);
+    const content = fs.readFileSync(path.join(tasksDir, file), "utf-8");
+    assert.match(content, /^---\nid: TASK-11\ntitle: Existing GitHub Shape\n/);
+    assert.match(content, /\n---\n## Description\nImplement OAuth2\n$/);
+  });
+
   it("skips existing files without --update", () => {
     // Pre-create a file
     fs.writeFileSync(

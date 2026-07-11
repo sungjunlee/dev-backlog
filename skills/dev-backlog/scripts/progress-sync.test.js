@@ -181,6 +181,40 @@ describe("readTaskFiles", () => {
     assert.ok(tasks.some((t) => t.status === "To Do"));
     assert.ok(tasks.some((t) => t.issueNumber === 1));
     assert.ok(tasks.some((t) => t.issueNumber === 2));
+    assert.deepEqual(tasks.find((t) => t.issueNumber === 1), {
+      file: "BACK-1 - foo.md",
+      tracker: "github",
+      id: "1",
+      ref: "#1",
+      issueNumber: 1,
+      status: "In Progress",
+    });
+  });
+
+  it("matches complete task filenames without BACK-1/BACK-11 collisions", () => {
+    fs.writeFileSync(path.join(tmpDir, "BACK-1 - short.md"), "---\nstatus: In Progress\n---\n");
+    fs.writeFileSync(path.join(tmpDir, "BACK-11 - long.md"), "---\nstatus: To Do\n---\n");
+    assert.deepEqual(readTaskFiles(tmpDir).map((task) => [task.ref, task.issueNumber]), [
+      ["#1", 1],
+      ["#11", 11],
+    ]);
+  });
+
+  it("reads configured local decimal task identities without issueNumber aliases", () => {
+    const backlogDir = path.join(tmpDir, "backlog");
+    const tasksDir = path.join(backlogDir, "tasks");
+    fs.mkdirSync(tasksDir, { recursive: true });
+    fs.writeFileSync(path.join(backlogDir, "config.yml"), "tracker: local\ntask_prefix: BACK\n");
+    fs.writeFileSync(path.join(tasksDir, "BACK-1.2 - child.md"), "---\nstatus: In Progress\n---\n");
+
+    assert.deepEqual(readTaskFiles(tasksDir), [{
+      file: "BACK-1.2 - child.md",
+      tracker: "local",
+      id: "1.2",
+      ref: "BACK-1.2",
+      issueNumber: null,
+      status: "In Progress",
+    }]);
   });
 
   it("returns empty array for missing dir", () => {
@@ -203,6 +237,7 @@ describe("parseTaskIssueNumber", () => {
 
   it("returns null when filename does not follow task naming", () => {
     assert.equal(parseTaskIssueNumber("notes.md"), null);
+    assert.equal(parseTaskIssueNumber("BACK-1.2 - local.md"), null);
   });
 });
 
@@ -227,6 +262,25 @@ describe("readActiveSprintSummary", () => {
     assert.equal(s.todo, 2);
     assert.equal(s.total, 4);
     assert.equal(s.file, "2026-04-auth.md");
+  });
+
+  it("counts mixed GitHub and configured-prefix Plan refs", () => {
+    fs.writeFileSync(path.join(tmpDir, "2026-04-mixed.md"), [
+      "---", "status: active", "---",
+      "## Plan",
+      "- [x] #1 Done task",
+      "- [~] BACK-11 In-flight local task",
+      "- [ ] BACK-11.2 Local subtask",
+      "- [ ] BACK-0 Invalid task",
+      "- [ ] OTHER-1 Foreign prefix",
+    ].join("\n"));
+    const s = readActiveSprintSummary(tmpDir);
+    assert.deepEqual({ done: s.done, inflight: s.inflight, todo: s.todo, total: s.total }, {
+      done: 1,
+      inflight: 1,
+      todo: 1,
+      total: 3,
+    });
   });
 
   it("returns null when no active sprint", () => {
@@ -294,16 +348,30 @@ describe("renderBody", () => {
       nextIssueNumber: 44,
     });
 
-    assert.ok(body.includes("<!-- dev-backlog:progress-issue month=2026-04 -->"));
-    assert.ok(body.includes("# Progress: April 2026"));
-    assert.ok(body.includes("| Merged PRs (month) | 5 |"));
-    assert.ok(body.includes("| In-flight (open PRs) | 2 |"));
-    assert.ok(body.includes("| Stuck candidates | 1 |"));
-    assert.ok(body.includes("2026-04-auth.md"));
-    assert.ok(body.includes("3/6 done"));
-    assert.ok(body.includes("#42"));
-    assert.ok(body.includes("## Next"));
-    assert.ok(body.includes("#44"));
+    assert.equal(body, `<!-- dev-backlog:progress-issue month=2026-04 -->
+
+# Progress: April 2026
+
+## Summary
+
+| Metric | Count |
+| --- | --- |
+| Merged PRs (month) | 5 |
+| In-flight (open PRs) | 2 |
+| Stuck candidates | 1 |
+
+## Active Sprint
+
+**2026-04-auth.md** — 3/6 done, 1 in-flight, 2 remaining
+
+## Previous
+
+- #42
+
+## Next
+
+- #44
+`);
   });
 
   it("renders no-sprint and no-prev gracefully", () => {
@@ -916,9 +984,10 @@ describe("renderMergeComment", () => {
         { number: 53, url: "https://github.com/sungjunlee/dev-backlog/issues/53" },
       ],
     });
-    assert.ok(body.includes("**Merged:** [#54](https://github.com/sungjunlee/dev-backlog/pull/54) — Refresh root contract docs"));
-    assert.ok(body.includes("- Task: [#53](https://github.com/sungjunlee/dev-backlog/issues/53)"));
-    assert.ok(body.includes("- Landed: 2026-04-16 22:54 UTC"));
+    assert.equal(body, `<!-- dev-backlog:progress-comment id=2026-04/merge/pr-54 -->
+**Merged:** [#54](https://github.com/sungjunlee/dev-backlog/pull/54) — Refresh root contract docs
+- Task: [#53](https://github.com/sungjunlee/dev-backlog/issues/53)
+- Landed: 2026-04-16 22:54 UTC`);
   });
 
   it("marker is parseable back to entry id", () => {

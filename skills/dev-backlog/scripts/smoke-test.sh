@@ -269,6 +269,45 @@ assert_equals "count: done" "$CB_DONE" "2"
 assert_equals "count: in-flight" "$CB_IN_FLIGHT" "1"
 assert_equals "count: todo" "$CB_TODO" "2"
 
+# Configured local refs use the same shell parser, including decimal subtasks.
+mkdir -p "$TEST_DIR/local-backlog/sprints"
+cat > "$TEST_DIR/local-backlog/config.yml" << 'EOF'
+tracker: local
+task_prefix: BACK
+EOF
+cat > "$TEST_DIR/local-backlog/sprints/active.md" << 'EOF'
+---
+status: active
+---
+
+## Goal
+Exercise local refs.
+
+## Plan
+- [x] BACK-1 Done
+- [~] BACK-11 In flight [branch:local-11]
+- [ ] BACK-11.2 Next subtask
+- [ ] BACK-0 Invalid and ignored
+
+## Running Context
+
+## Progress
+EOF
+
+count_checkboxes "$TEST_DIR/local-backlog/sprints/active.md"
+assert_equals "count local: total" "$CB_TOTAL" "3"
+assert_equals "count local: done" "$CB_DONE" "1"
+assert_equals "count local: in-flight" "$CB_IN_FLIGHT" "1"
+assert_equals "count local: todo" "$CB_TODO" "1"
+
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/local-backlog")
+assert_contains "next local: displays in-flight ref" "$OUT" "BACK-11 In flight"
+assert_contains "next local: displays decimal todo ref" "$OUT" "BACK-11.2 Next subtask"
+
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/local-backlog")
+assert_contains "status local: counts all valid refs" "$OUT" "1/3 tasks (33%)"
+assert_contains "status local: displays decimal next ref" "$OUT" "BACK-11.2 Next subtask"
+
 # Empty file
 cat > "$TEST_DIR/empty.md" << 'EOF'
 No checkboxes here.
@@ -892,6 +931,43 @@ EOF
 bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" >/dev/null 2>&1
 assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
 assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
+
+# --- local decimal closeout (BACK-1.2 must not match BACK-1.20) ---
+rm -rf "$TEST_DIR/backlog"
+mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+cat > "$TEST_DIR/backlog/config.yml" << 'EOF'
+tracker: local
+task_prefix: BACK
+EOF
+cat > "$TEST_DIR/backlog/sprints/2026-03-local.md" << 'EOF'
+---
+status: active
+---
+
+## Goal
+Close one local subtask.
+
+## Plan
+- [x] BACK-1.2 Short subtask
+
+## Running Context
+
+## Progress
+EOF
+cat > "$TEST_DIR/backlog/tasks/BACK-1.2 - short-subtask.md" << 'EOF'
+---
+id: BACK-1.2
+---
+EOF
+cat > "$TEST_DIR/backlog/tasks/BACK-1.20 - longer-subtask.md" << 'EOF'
+---
+id: BACK-1.20
+---
+EOF
+
+bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" >/dev/null 2>&1
+assert_equals "local close: BACK-1.2 moved" "$(ls "$TEST_DIR/backlog/completed/" | grep -c 'BACK-1.2 ')" "1"
+assert_equals "local close: BACK-1.20 stayed" "$(ls "$TEST_DIR/backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
 
 # --- no active sprint ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)

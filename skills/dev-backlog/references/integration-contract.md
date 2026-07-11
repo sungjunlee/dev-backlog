@@ -26,7 +26,7 @@ bash skills/dev-backlog/scripts/status.sh --json
 bash skills/dev-backlog/scripts/next.sh --json
 ```
 
-Both commands emit one JSON document to stdout with `schema_version: 1`. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
+Both commands emit one JSON document to stdout with `schema_version: 1`. Tracker-neutral identity is an additive schema-v1 extension: existing consumers may ignore the new fields, and no existing field or GitHub value changes. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
 
 Ambiguous active sprint state is fail-loud in JSON mode: the command exits non-zero and writes the error to stderr instead of emitting partial JSON. Missing `## ` sections degrade to empty strings or arrays as shown below.
 
@@ -56,7 +56,10 @@ Top-level schema:
 | `line` | string | Original plan line. |
 | `checkbox_state` | string | Exact marker content: `" "`, `"~"`, or `"x"`. |
 | `state` | string | Normalized state: `todo`, `in_flight`, or `done`. |
-| `issue_number` | integer | GitHub issue number parsed with `/^\- \[.\] #(\d+)/`. |
+| `tracker` | string | Identity owner: `github` for `#N`, or `local` for a configured-prefix ref. |
+| `id` | string | Stable tracker-owned ID. GitHub uses the decimal issue number as a string; local decimal subtask IDs such as `42.1` stay lossless. Treat this field as opaque. |
+| `ref` | string | Complete display ref, byte-compatible `#N` for GitHub or `{PREFIX}-N[.M]` for local. |
+| `issue_number` | integer or `null` | Compatibility alias. It remains the exact integer for GitHub items and is `null` for local items; a local numeric suffix is never coerced into a GitHub issue number. |
 | `title` | string | Plan title after removing parsed PR, branch, and run annotations. |
 | `batch_heading` | string or `null` | Current `### Batch...` heading, if any. |
 | `pr` | object or `null` | `{ "number": N, "state": "..." }` from `→ PR #N (state)` when present. |
@@ -90,7 +93,7 @@ Plan mode guarantees batch-as-wave semantics: items in one batch MUST be mutuall
 | `age_source` | string or `null` | `progress` when based on a progress entry, `started` when falling back to frontmatter. |
 | `age_basis_date` | string or `null` | The `YYYY-MM-DD` date used to compute `age_days`. |
 
-Age heuristic: for each `[~]` item, find the earliest dated `## Progress` bullet that mentions the item's issue number as `#N`; if none exists, fall back to sprint frontmatter `started:` when it is a `YYYY-MM-DD` date. `age_days` is the calendar-day distance from that basis date to the command run's local calendar date. Emit `null` for `age_days`, `age_source`, and `age_basis_date` when neither resolves. The basis date is selected only from sprint file content; no GitHub state, relay manifest, file mtime, or markdown prose outside these fields participates.
+Age heuristic: for each `[~]` item, find the earliest dated `## Progress` bullet containing that complete normalized `ref`; if none exists, fall back to sprint frontmatter `started:` when it is a `YYYY-MM-DD` date. Matching is boundary-exact (`#1` does not match `#11`; `BACK-1` does not match `BACK-11` or `BACK-1.1`) and a `PR #N` annotation is provider metadata, not a task-ref match. `age_days` is the calendar-day distance from that basis date to the command run's local calendar date. Emit `null` for `age_days`, `age_source`, and `age_basis_date` when neither resolves. The basis date is selected only from sprint file content; no GitHub state, relay manifest, file mtime, or markdown prose outside these fields participates.
 
 ### Backlog Doctor JSON Surface
 
@@ -132,10 +135,10 @@ Hard failures include ambiguous active sprint state, no active sprint while spri
 
 | What | Pattern | Example |
 |------|---------|---------|
-| Task files | `backlog/tasks/{PREFIX}-{N} - {slug}.md` | `backlog/tasks/BACK-42 - oauth-flow.md` |
+| Task files | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
 | Active sprint | `backlog/sprints/*.md` with `status: active` | `backlog/sprints/2026-03-auth-system.md` |
 | Cross-sprint context | `backlog/sprints/_context.md` | (always this exact name) |
-| Completed tasks | `backlog/completed/{PREFIX}-{N} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
+| Completed tasks | `backlog/completed/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
 
 **PREFIX** defaults to `BACK` and is configurable via `backlog/config.yml` → `task_prefix`.
 
@@ -196,21 +199,26 @@ Sprint plan items use this format:
 - [ ] #42 OAuth2 flow (~2hr)
 - [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
 - [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)
+- [ ] BACK-42 Local task
+- [~] BACK-42.1 Local subtask [branch:local-42.1]
 ```
 
 | Marker | Meaning | Regex | Set by |
 |--------|---------|-------|--------|
-| `[ ]` | Not started | `^\- \[ \] #` | sprint-init.js, manual |
-| `[~]` | In-flight (PR open/reviewing) | `^\- \[~\] #` | dev-relay dispatch |
-| `[x]` | Done (merged/completed) | `^\- \[x\] #` | dev-relay merge, manual |
+| `[ ]` | Not started | complete `#N` or `{PREFIX}-N[.M]` after the marker | sprint-init.js, manual |
+| `[~]` | In-flight (PR open/reviewing) | complete `#N` or `{PREFIX}-N[.M]` after the marker | dev-relay dispatch |
+| `[x]` | Done (merged/completed) | complete `#N` or `{PREFIX}-N[.M]` after the marker | dev-relay merge, manual |
 
-### Issue number extraction
+### Task reference and compatibility aliases
 
-```
-/^\- \[.\] #(\d+)/
-```
+`skills/dev-backlog/scripts/task-ref.js` is the grammar owner. It accepts only complete positive refs:
 
-Captures the GitHub issue number from any checkbox state.
+- GitHub: `#N`, where `N` is a positive decimal integer. Identity is `{ tracker: "github", id: "N", ref: "#N" }`.
+- Local: `{PREFIX}-N` or `{PREFIX}-N.M`, where `PREFIX` is the exact `backlog/config.yml` `task_prefix` and both numeric components are positive integers. Identity is `{ tracker: "local", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`.
+
+Zero, negative, partial, foreign-prefix, whitespace-suffixed, and malformed refs are rejected. Decimal notation is supported for local Backlog.md subtasks, not GitHub issue refs. GitHub Plan lines and mirror Markdown continue to render byte-for-byte as `#N`.
+
+The shell `RE_CB_*` variables remain GitHub-only compatibility aliases for external consumers. Core `status.sh`, `next.sh`, checkbox counting, and closeout delegate task-ref recognition to the shared module. Machine actors should consume `tracker`/`id`/`ref`; `issue_number` remains an unchanged GitHub alias and is `null` for local entries in `plan_items`, `next_batch.items`, `in_flight`, and doctor projections.
 
 ### PR annotation (appended by dev-relay)
 
@@ -219,6 +227,7 @@ Captures the GitHub issue number from any checkbox state.
 ```
 
 Appended when dispatching: `→ PR #87 (reviewing)`. Updated on merge: `→ PR #87 (merged)`.
+This provider annotation is parsed separately and never passed through task-ref parsing.
 
 ## Trace Grammar
 
@@ -419,7 +428,7 @@ These patterns are also validated by `scripts/smoke-test.sh` (checkbox counting 
 
 ## Versioning
 
-This contract is unversioned, but its checkbox and annotation grammar is compatibility-sensitive. Any change to grammar parsed by `dev-relay` regexes must be coordinated with `dev-relay` before landing; prefer strictly additive grammar that preserves existing matches.
+This document is unversioned, while the actor JSON surface remains `schema_version: 1`. The normalized `tracker`, `id`, and `ref` fields and nullable non-GitHub `issue_number` semantics are additive schema-v1 behavior. Its checkbox and annotation grammar is compatibility-sensitive. Any change to grammar parsed by `dev-relay` regexes must be coordinated with `dev-relay` before landing; prefer strictly additive grammar that preserves existing GitHub matches and bytes.
 
 Breaking changes require:
 1. Update this document
