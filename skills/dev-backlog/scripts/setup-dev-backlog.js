@@ -162,6 +162,7 @@ function decodeDoubleQuotedScalar(raw) {
   const simpleEscapes = Object.freeze({
     "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f",
     r: "\r", e: "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    N: "\u0085", _: "\u00a0", L: "\u2028", P: "\u2029",
   });
   let decoded = "";
   for (let index = 0; index < raw.length; index += 1) {
@@ -195,9 +196,9 @@ function tokenizeYamlLine(line, state = {}) {
   const tokens = [];
   let index = 0;
   let carriedQuote = state.quote || null;
-  let flowDepth = state.flowDepth || 0;
-  let nodeBoundary = flowDepth > 0 ? Boolean(state.nodeBoundary) : true;
-  let keyAllowed = flowDepth > 0 ? Boolean(state.keyAllowed) : true;
+  const flowStack = [...(state.flowStack || [])];
+  let nodeBoundary = flowStack.length > 0 ? Boolean(state.nodeBoundary) : true;
+  let keyAllowed = flowStack.length > 0 ? Boolean(state.keyAllowed) : true;
 
   if (carriedQuote) {
     let continuationStart = -1;
@@ -214,7 +215,7 @@ function tokenizeYamlLine(line, state = {}) {
         tokens,
         state: {
           quote: { char: carriedQuote.char, raw: continuation.raw },
-          flowDepth,
+          flowStack,
           nodeBoundary: false,
           keyAllowed: false,
         },
@@ -223,6 +224,9 @@ function tokenizeYamlLine(line, state = {}) {
     const value = carriedQuote.char === "'"
       ? continuation.raw.replaceAll("''", "'")
       : decodeDoubleQuotedScalar(continuation.raw);
+    if (value === null) {
+      return { tokens, state: { quote: null, flowStack, error: "invalid double-quoted escape" } };
+    }
     tokens.push({ type: "scalar", value, quoted: true });
     index = continuation.end;
     carriedQuote = null;
@@ -241,11 +245,17 @@ function tokenizeYamlLine(line, state = {}) {
     if (nodeBoundary && (char === "'" || char === '"')) {
       const quoted = consumeQuotedToken(line, index, char);
       if (!quoted.closed) {
-        return { tokens, state: { quote: { char, raw: quoted.raw }, flowDepth, nodeBoundary: false } };
+        return {
+          tokens,
+          state: { quote: { char, raw: quoted.raw }, flowStack, nodeBoundary: false, keyAllowed: false },
+        };
       }
       const value = char === "'"
         ? quoted.raw.replaceAll("''", "'")
         : decodeDoubleQuotedScalar(quoted.raw);
+      if (value === null) {
+        return { tokens, state: { quote: null, flowStack, error: "invalid double-quoted escape" } };
+      }
       tokens.push({ type: "scalar", value, quoted: true });
       index = quoted.end;
       nodeBoundary = false;
@@ -257,7 +267,10 @@ function tokenizeYamlLine(line, state = {}) {
       const start = index;
       if (char === "!" && line[index + 1] === "<") {
         const close = line.indexOf(">", index + 2);
-        index = close === -1 ? line.length : close + 1;
+        if (close === -1) {
+          return { tokens, state: { quote: null, flowStack, error: "unterminated verbatim tag" } };
+        }
+        index = close + 1;
       } else {
         while (index < line.length && !/[ \t,\[\]{}]/.test(line[index])) index += 1;
       }
@@ -280,21 +293,25 @@ function tokenizeYamlLine(line, state = {}) {
 
     if (nodeBoundary && (char === "{" || char === "[")) {
       tokens.push({ type: char });
-      flowDepth += 1;
+      flowStack.push(char);
       nodeBoundary = true;
       keyAllowed = true;
       index += 1;
       continue;
     }
-    if (flowDepth > 0 && (char === "}" || char === "]")) {
+    if (char === "}" || char === "]") {
+      const expected = char === "}" ? "{" : "[";
+      if (flowStack[flowStack.length - 1] !== expected) {
+        return { tokens, state: { quote: null, flowStack, error: "stray or mismatched flow delimiter" } };
+      }
       tokens.push({ type: char });
-      flowDepth = Math.max(0, flowDepth - 1);
+      flowStack.pop();
       nodeBoundary = false;
       keyAllowed = false;
       index += 1;
       continue;
     }
-    if (flowDepth > 0 && char === ",") {
+    if (flowStack.length > 0 && char === ",") {
       tokens.push({ type: "," });
       nodeBoundary = true;
       keyAllowed = true;
@@ -324,8 +341,8 @@ function tokenizeYamlLine(line, state = {}) {
     const start = index;
     while (index < line.length) {
       const current = line[index];
-      if (current === "#" || (flowDepth > 0 && /[{}\[\]]/.test(current))) break;
-      if (flowDepth > 0 && current === ",") break;
+      if (current === "#" || (flowStack.length > 0 && /[{}\[\]]/.test(current))) break;
+      if (flowStack.length > 0 && current === ",") break;
       if (current === ":" && isColonIndicator(line, index)) break;
       index += 1;
     }
@@ -336,7 +353,7 @@ function tokenizeYamlLine(line, state = {}) {
     if (index === start) index += 1;
   }
 
-  return { tokens, state: { quote: null, flowDepth, nodeBoundary, keyAllowed } };
+  return { tokens, state: { quote: null, flowStack, nodeBoundary, keyAllowed } };
 }
 
 function trackerKeyCount(tokens) {
@@ -360,7 +377,7 @@ function isBlockScalarHeader(tokens) {
 function trackerCandidates(raw, configPath) {
   const candidates = [];
   let blockScalarParentIndent = null;
-  let lexicalState = { quote: null, flowDepth: 0, nodeBoundary: true, keyAllowed: true };
+  let lexicalState = { quote: null, flowStack: [], nodeBoundary: true, keyAllowed: true };
   let contentSeen = false;
   let leadingDocumentMarkerSeen = false;
 
@@ -372,20 +389,23 @@ function trackerCandidates(raw, configPath) {
       if (!trimmed || indent > blockScalarParentIndent) continue;
       blockScalarParentIndent = null;
     }
-    const scanned = tokenizeYamlLine(record.text, lexicalState);
-    lexicalState = scanned.state;
-    const marker = scanned.tokens.length === 1 && scanned.tokens[0].type === "scalar" &&
-      !scanned.tokens[0].quoted ? scanned.tokens[0].value : null;
-    if (marker === "---") {
-      if (contentSeen || leadingDocumentMarkerSeen) {
-        throw new ConfigValidationError(configPath, "multiple YAML documents are unsupported");
+    const atDocumentBoundary = !lexicalState.quote && lexicalState.flowStack.length === 0;
+    const documentMarker = atDocumentBoundary
+      ? record.text.match(/^\uFEFF?(---|\.\.\.)(?:[ \t]*(?:#.*)?)?$/)
+      : null;
+    if (documentMarker) {
+      if (documentMarker[1] === "..." || contentSeen || leadingDocumentMarkerSeen) {
+        throw new ConfigValidationError(configPath, "multiple or ended YAML documents are unsupported");
       }
       leadingDocumentMarkerSeen = true;
       continue;
     }
-    if (marker === "...") {
-      throw new ConfigValidationError(configPath, "YAML document end markers are unsupported");
+    if (atDocumentBoundary && /^\uFEFF?%YAML(?:[ \t]|$)/.test(record.text)) {
+      throw new ConfigValidationError(configPath, "YAML directives are unsupported");
     }
+    const scanned = tokenizeYamlLine(record.text, lexicalState);
+    lexicalState = scanned.state;
+    if (lexicalState.error) throw new ConfigValidationError(configPath, lexicalState.error);
     if (scanned.tokens.length > 0) contentSeen = true;
 
     if (scanned.tokens.some((token) => token.type === "?")) {
@@ -403,7 +423,7 @@ function trackerCandidates(raw, configPath) {
           "alias mapping keys are authority-obscuring and unsupported"
         );
       }
-      if (token.type === "scalar" && token.value === "<<" && next && next.type === ":") {
+      if (token.type === "scalar" && !token.quoted && token.value === "<<" && next && next.type === ":") {
         throw new ConfigValidationError(
           configPath,
           "YAML merge keys are authority-obscuring and unsupported"
@@ -411,11 +431,11 @@ function trackerCandidates(raw, configPath) {
       }
     }
     for (let count = trackerKeyCount(scanned.tokens); count > 0; count -= 1) candidates.push(record);
-    if (!lexicalState.quote && lexicalState.flowDepth === 0 && isBlockScalarHeader(scanned.tokens)) {
+    if (!lexicalState.quote && lexicalState.flowStack.length === 0 && isBlockScalarHeader(scanned.tokens)) {
       blockScalarParentIndent = indent;
     }
   }
-  if (lexicalState.quote || lexicalState.flowDepth !== 0) {
+  if (lexicalState.quote || lexicalState.flowStack.length !== 0) {
     throw new ConfigValidationError(configPath, "the YAML lexical structure is incomplete at end of file");
   }
   return candidates;

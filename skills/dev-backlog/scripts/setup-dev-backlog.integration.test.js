@@ -348,6 +348,12 @@ describe("setup-dev-backlog real process integration", () => {
       "tracker: local\n---\n",
       "---\n---\ntracker: local\n",
       "---\ntracker: local\n...\n",
+      "mapping: ]\ntracker: local\n",
+      "mapping: {items: [one}}\ntracker: local\n",
+      "mapping: {items: [one]\ntracker: local\n",
+      "note: !<unterminated\ntracker: local\n",
+      'note: "bad\\q"\ntracker: local\n',
+      "%YAML 1.2\n---\ntracker: local\n",
     ]) {
       const root = makeRoot(t, "setup-document-state-");
       fs.mkdirSync(path.join(root, "backlog"));
@@ -372,11 +378,29 @@ describe("setup-dev-backlog real process integration", () => {
       "  ...",
       'quoted: "--- and ..."',
       "tracker: local",
+      "plain: continued",
+      "  ---",
+      "  ...",
+      "'<<': *empty",
+      "flow: {'<<': *empty}",
       "",
     ].join("\n");
     fs.writeFileSync(path.join(root, "backlog/config.yml"), raw);
     const run = runCli(root, ["--non-interactive"]);
     assert.equal(run.status, 0, run.stderr);
+    assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), raw);
+  });
+
+  it("preserves matching multiline flow state without changing config bytes", (t) => {
+    const root = makeRoot(t, "setup-flow-stack-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const raw = "mapping: {items: [one,\n  two]}\ntracker: local\n";
+    fs.writeFileSync(path.join(root, "backlog/config.yml"), raw);
+    const before = snapshot(root);
+    const run = runCli(root, ["--non-interactive"]);
+    assert.equal(run.status, 0, run.stderr);
+    const after = snapshot(root);
+    assert.deepEqual(after["backlog/config.yml"], before["backlog/config.yml"]);
     assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), raw);
   });
 

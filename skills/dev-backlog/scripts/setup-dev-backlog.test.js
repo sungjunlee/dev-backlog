@@ -262,13 +262,17 @@ describe("tracker config state machine", () => {
       "<<: [*one, *two]",
       "mapping: {<<: *unknown}",
       "base: &base {other: value}\n<<: *base",
-      "!!merge '<<': *unknown",
     ]) {
       assert.throws(
         () => inspectConfig(`${merge}\ntracker: local\n`, "/repo/backlog/config.yml"),
         /merge keys/
       );
     }
+    for (const raw of [
+      "'<<': *unknown\ntracker: local\n",
+      '"<<": *unknown\ntracker: local\n',
+      "mapping: {'<<': *unknown}\ntracker: local\n",
+    ]) assert.equal(inspectConfig(raw, "/repo/backlog/config.yml").tracker, "local");
   });
 
   it("allows only one optional leading YAML document marker", () => {
@@ -282,7 +286,30 @@ describe("tracker config state machine", () => {
     for (const raw of [
       "note: |\n  ---\n  ...\ntracker: local\n",
       'note: "---\n  ..."\ntracker: local\n',
+      "note: continued\n  ---\ntracker: local\n",
+      "note: continued\n  ...\ntracker: local\n",
     ]) assert.equal(inspectConfig(raw, "/repo/backlog/config.yml").tracker, "local");
+  });
+
+  it("requires exact matching flow delimiters across lines", () => {
+    assert.equal(
+      inspectConfig("mapping: {items: [one,\n  two]}\ntracker: local\n", "/repo/backlog/config.yml").tracker,
+      "local"
+    );
+    for (const raw of [
+      "mapping: ]\ntracker: local\n",
+      "mapping: {items: [one}}\ntracker: local\n",
+      "mapping: {items: one]\ntracker: local\n",
+      "mapping: {items: [one]\ntracker: local\n",
+    ]) assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /flow delimiter|incomplete/);
+  });
+
+  it("rejects incomplete tags, invalid quoted escapes, and YAML directives", () => {
+    for (const raw of [
+      "note: !<unterminated\ntracker: local\n",
+      'note: "bad\\q"\ntracker: local\n',
+      "%YAML 1.2\n---\ntracker: local\n",
+    ]) assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), ConfigValidationError);
   });
 
   it("rejects incomplete quoted, flow, and explicit-key lexical state at EOF", () => {
