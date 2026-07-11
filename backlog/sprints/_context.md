@@ -6,6 +6,8 @@
 - Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
 - Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` and local `{PREFIX}-N[.M]` share one exact parser, while legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
 - Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, mirrors, progress issues, comments, and closing semantics remain explicit capabilities or narrowly named provider transports.
+- Local mode owns the canonical `tasks/` → `completed/` core lifecycle; unsupported provider capabilities fail before effects instead of changing tracker authority.
+- Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
 
 ## Conventions
 - Prefer minimal-diff refactors over repo-wide rewrites
