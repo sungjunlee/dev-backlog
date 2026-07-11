@@ -28,6 +28,14 @@ const TASKS_DIR = "tasks";
 const COMPLETED_DIR = "completed";
 const LOCK_FILE = ".local-tracker.lock";
 const DONE_STATUS = "Done";
+
+// The only accepted list scopes. Any other `state` fails closed rather than
+// silently narrowing to the open store.
+const LIST_STATE_KINDS = Object.freeze({
+  open: [TASKS_DIR],
+  closed: [COMPLETED_DIR],
+  all: [TASKS_DIR, COMPLETED_DIR],
+});
 const DEFAULT_LOCK = Object.freeze({ retries: 100, delayMs: 20 });
 
 // Only provider-neutral fields are accepted; every other option (milestone,
@@ -217,6 +225,112 @@ function taskPrefixIssue(prefix) {
   return null;
 }
 
+// --- required-field and injection validation (fail closed) ---
+
+const REQUIRED_FRONTMATTER_KEYS = ["id", "title", "status"];
+const NEUTRAL_FIELDS = ["title", "status", "priority"];
+const NEUTRAL_LIST_FIELDS = ["labels", "dependencies"];
+
+// Control characters (the C0 set plus DEL) cannot survive the simple YAML
+// renderer: a raw newline in a scalar or list item re-parses as a fresh `key:`
+// line and injects arbitrary frontmatter. Reject them before any mutation.
+const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/;
+
+function assertNoControlChars(field, value) {
+  if (CONTROL_CHAR_RE.test(value)) {
+    throw new LocalStoreError(
+      `local ${field} must not contain newlines or control characters; ` +
+        "they would inject frontmatter keys and break the task round trip"
+    );
+  }
+}
+
+function cleanScalar(field, value) {
+  const text = String(value);
+  assertNoControlChars(field, text);
+  return text;
+}
+
+/**
+ * Require exactly one non-empty scalar `id`, `title`, and `status`, with the id
+ * equal to the filename ref. Runs before every list/read/update/close so
+ * missing, duplicate, wrong-typed, or empty required fields fail closed rather
+ * than flowing into a normalized task or a mutation.
+ */
+function requireValidFrontmatter(entries, ref) {
+  for (const key of REQUIRED_FRONTMATTER_KEYS) {
+    const matches = entries.filter((entry) => entry.key === key);
+    if (matches.length !== 1) {
+      const problem = matches.length === 0 ? "missing" : "duplicate";
+      throw new LocalStoreError(`local task ${ref} is malformed: ${problem} required '${key}' frontmatter`);
+    }
+    const value = entryValue(matches[0]);
+    // Arrays and mappings both report as objects; a required field must be scalar.
+    if (value !== null && typeof value === "object") {
+      throw new LocalStoreError(`local task ${ref} is malformed: '${key}' must be a single scalar value`);
+    }
+    const text = value === undefined || value === null ? "" : String(value).trim();
+    if (!text) {
+      throw new LocalStoreError(`local task ${ref} is malformed: '${key}' must be a non-empty scalar`);
+    }
+    if (key === "id" && String(value) !== ref) {
+      throw new LocalStoreError(
+        `local task ${ref} is corrupt: frontmatter id ${JSON.stringify(String(value))} does not match its filename`
+      );
+    }
+  }
+}
+
+function buildUpdateFieldChanges(changes) {
+  const fieldChanges = {};
+  for (const field of NEUTRAL_FIELDS) {
+    if (changes[field] !== undefined) fieldChanges[field] = cleanScalar(field, changes[field]);
+  }
+  for (const field of NEUTRAL_LIST_FIELDS) {
+    if (changes[field] === undefined) continue;
+    if (!Array.isArray(changes[field])) {
+      throw new LocalStoreError(`local update ${field} must be an array`);
+    }
+    fieldChanges[field] = changes[field].map((item) => cleanScalar(`${field} item`, item));
+  }
+  if (changes.updated_date !== undefined) {
+    fieldChanges.updated_date = cleanScalar("updated_date", changes.updated_date);
+  }
+  return fieldChanges;
+}
+
+// --- close compensation: identity-checked rollback of a published copy ---
+
+function fileIdentity(target) {
+  const stat = fs.statSync(target);
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+function sameFileIdentity(a, b) {
+  return a.dev === b.dev && a.ino === b.ino;
+}
+
+function closeSourceRetained(identity, src, cause) {
+  return new LocalStoreError(
+    `local close of ${identity.ref} could not remove the active source ${src}, so the ` +
+      "completed copy was rolled back; the task is unchanged and still open. " +
+      `Retry once the source is writable. Cause: ${cause.message}`,
+    { cause }
+  );
+}
+
+function closeSplitStore(identity, src, dest, unlinkError, rollbackError) {
+  const note = rollbackError
+    ? `rolling the completed copy back also failed (${rollbackError.message})`
+    : "the completed copy was replaced by another writer and was left untouched";
+  return new LocalStoreError(
+    `local close of ${identity.ref} could not remove the active source ${src} ` +
+      `(${unlinkError.message}) and ${note}; both ${src} and ${dest} remain. ` +
+      "Resolve the duplicate manually before continuing.",
+    { cause: unlinkError }
+  );
+}
+
 // --- normalized task shape ---
 
 function normalizeTask({ identity, object, body, state }) {
@@ -356,14 +470,14 @@ function createLocalAdapter(options = {}) {
     const full = path.join(dirPath(kind), entry.file);
     const content = fs.readFileSync(full, "utf-8");
     const split = splitDocument(content);
-    if (!split) return null;
-    const object = frontmatterObject(parseFrontmatterEntries(split.frontmatter));
-    if (object.id !== undefined && String(object.id) !== entry.identity.ref) {
+    if (!split) {
       throw new LocalStoreError(
-        `local task ${entry.identity.ref} is corrupt: frontmatter id ` +
-          `${JSON.stringify(String(object.id))} does not match its filename`
+        `local task ${entry.identity.ref} is malformed: missing Backlog.md frontmatter`
       );
     }
+    const entries = parseFrontmatterEntries(split.frontmatter);
+    requireValidFrontmatter(entries, entry.identity.ref);
+    const object = frontmatterObject(entries);
     const state = kind === COMPLETED_DIR ? "closed" : "open";
     return normalizeTask({ identity: entry.identity, object, body: split.body, state });
   }
@@ -481,6 +595,42 @@ function createLocalAdapter(options = {}) {
     return dest;
   }
 
+  // After the completed copy is published, remove the active source to finish the
+  // move. A failed unlink means both stores momentarily claim the id, so roll the
+  // publication back — leaving the active source as the single authoritative task.
+  function retireSourceAfterPublish(identity, src, dest) {
+    const published = fileIdentity(dest);
+    try {
+      if (testHooks.beforeUnlinkSource) testHooks.beforeUnlinkSource(src);
+      fs.unlinkSync(src);
+    } catch (unlinkError) {
+      rollbackPublishedCopy(identity, src, dest, published, unlinkError);
+    }
+  }
+
+  // Undo exactly the copy this close created. Re-stat the destination first: if
+  // it vanished the source already survives alone; if its inode no longer matches
+  // our publication an external writer replaced it and we must not erase it.
+  function rollbackPublishedCopy(identity, src, dest, published, unlinkError) {
+    let live;
+    try {
+      live = fileIdentity(dest);
+    } catch (statError) {
+      if (statError.code === "ENOENT") throw closeSourceRetained(identity, src, unlinkError);
+      throw closeSplitStore(identity, src, dest, unlinkError, statError);
+    }
+    if (!sameFileIdentity(live, published)) {
+      throw closeSplitStore(identity, src, dest, unlinkError, null);
+    }
+    try {
+      if (testHooks.beforeRollback) testHooks.beforeRollback(dest);
+      fs.unlinkSync(dest);
+    } catch (rollbackError) {
+      throw closeSplitStore(identity, src, dest, unlinkError, rollbackError);
+    }
+    throw closeSourceRetained(identity, src, unlinkError);
+  }
+
   // --- rendered content builders ---
 
   function buildFilename(identity, title) {
@@ -530,11 +680,12 @@ function createLocalAdapter(options = {}) {
   }
 
   function list({ state = "open" } = {}) {
-    const kinds = state === "all"
-      ? [TASKS_DIR, COMPLETED_DIR]
-      : state === "closed"
-        ? [COMPLETED_DIR]
-        : [TASKS_DIR];
+    if (!Object.prototype.hasOwnProperty.call(LIST_STATE_KINDS, state)) {
+      throw new LocalStoreError(
+        `invalid local list state ${JSON.stringify(state)}; expected one of open, closed, all`
+      );
+    }
+    const kinds = LIST_STATE_KINDS[state];
     const tasks = [];
     const seen = new Map();
     for (const kind of kinds) {
@@ -547,8 +698,7 @@ function createLocalAdapter(options = {}) {
           );
         }
         seen.set(entry.identity.id, kind);
-        const task = readTask(kind, entry);
-        if (task) tasks.push(task);
+        tasks.push(readTask(kind, entry));
       }
     }
     return tasks.sort(compareByParentThenSub);
@@ -560,9 +710,7 @@ function createLocalAdapter(options = {}) {
     const kind = active ? TASKS_DIR : COMPLETED_DIR;
     const entry = active || completed;
     if (!entry) throw new LocalStoreError(`local task not found: ${identity.ref}`);
-    const task = readTask(kind, entry);
-    if (!task) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
-    return task;
+    return readTask(kind, entry);
   }
 
   function create(input = {}) {
@@ -571,6 +719,15 @@ function createLocalAdapter(options = {}) {
     const title = input.title;
     if (typeof title !== "string" || !title.trim()) {
       throw new LocalStoreError("local task creation requires a non-empty title");
+    }
+    // Reject injection before the lock so no mkdir/temp/mtime mutation occurs.
+    assertNoControlChars("title", title);
+    if (input.status != null) assertNoControlChars("status", String(input.status));
+    if (input.priority != null) assertNoControlChars("priority", String(input.priority));
+    for (const field of NEUTRAL_LIST_FIELDS) {
+      if (Array.isArray(input[field])) {
+        for (const item of input[field]) assertNoControlChars(`${field} item`, String(item));
+      }
     }
     let requestedId = null;
     if (input.id !== undefined && input.id !== null) {
@@ -600,13 +757,13 @@ function createLocalAdapter(options = {}) {
     });
   }
 
-  const NEUTRAL_FIELDS = ["title", "status", "priority"];
-  const NEUTRAL_LIST_FIELDS = ["labels", "dependencies"];
-
   function update(selector, changes = {}) {
     rejectUnsupportedOptions("update", changes, UPDATE_OPTIONS);
     assertUsablePrefix();
     const identity = resolveIdentity(selector);
+    // Validate and coerce every field before the lock so a rejected injection or
+    // wrong-typed list never triggers an mkdir/lock/temp/mtime mutation.
+    const fieldChanges = buildUpdateFieldChanges(changes);
 
     return withStoreLock(() => {
       const { active: entry } = locateEntry(identity);
@@ -617,25 +774,17 @@ function createLocalAdapter(options = {}) {
       const content = fs.readFileSync(full, "utf-8");
       const split = splitDocument(content);
       if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
+      const currentEntries = parseFrontmatterEntries(split.frontmatter);
+      requireValidFrontmatter(currentEntries, identity.ref);
 
-      const fieldChanges = {};
-      for (const field of NEUTRAL_FIELDS) {
-        if (changes[field] !== undefined) fieldChanges[field] = String(changes[field]);
-      }
-      for (const field of NEUTRAL_LIST_FIELDS) {
-        if (changes[field] !== undefined) {
-          if (!Array.isArray(changes[field])) {
-            throw new LocalStoreError(`local update ${field} must be an array`);
-          }
-          fieldChanges[field] = changes[field].map(String);
-        }
-      }
-      if (changes.updated_date !== undefined) fieldChanges.updated_date = String(changes.updated_date);
-
-      const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), fieldChanges);
+      const entries = applyFrontmatterChanges(currentEntries, fieldChanges);
       const body = changes.body !== undefined ? normalizeBody(String(changes.body)) : split.body;
       const nextContent = `${stringifyFrontmatter(entries)}${body}`;
-      replaceFileAtomic(dirPath(TASKS_DIR), entry.file, nextContent);
+      // A change-free update (or one that resolves to identical bytes) must not
+      // rewrite the file, so the mtime and inode stay stable.
+      if (nextContent !== content) {
+        replaceFileAtomic(dirPath(TASKS_DIR), entry.file, nextContent);
+      }
       return { tracker: "local", id: identity.id, ref: identity.ref };
     });
   }
@@ -661,13 +810,13 @@ function createLocalAdapter(options = {}) {
       const content = fs.readFileSync(src, "utf-8");
       const split = splitDocument(content);
       if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
+      const currentEntries = parseFrontmatterEntries(split.frontmatter);
+      requireValidFrontmatter(currentEntries, identity.ref);
 
-      const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), {
-        status: DONE_STATUS,
-      });
+      const entries = applyFrontmatterChanges(currentEntries, { status: DONE_STATUS });
       const doneContent = `${stringifyFrontmatter(entries)}${split.body}`;
-      publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
-      fs.unlinkSync(src);
+      const dest = publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
+      retireSourceAfterPublish(identity, src, dest);
       return { tracker: "local", id: identity.id, ref: identity.ref };
     });
   }

@@ -508,3 +508,252 @@ describe("local pre-mutation unsupported-option failures", () => {
     assert.deepEqual(listNames(backlogDir, "completed"), []);
   });
 });
+
+function strays(backlogDir, dir) {
+  return fs.readdirSync(path.join(backlogDir, dir)).filter((name) => name.includes(".tmp"));
+}
+
+describe("local close — unlink failure compensation and recovery", () => {
+  it("rolls back the completed publication when the source unlink fails", (t) => {
+    const { backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", body: "\n## Description\nkeep\n" })]],
+    });
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        beforeUnlinkSource() {
+          throw new Error("injected source unlink failure");
+        },
+      },
+    });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+
+    // Exactly one intact authoritative copy remains: the byte-identical active source.
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), before);
+    assert.deepEqual(listNames(backlogDir, "tasks"), ["BACK-1 - one.md"]);
+    assert.deepEqual(listNames(backlogDir, "completed"), []);
+    // Lock and temp state are cleaned on the failure path.
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+    assert.deepEqual(strays(backlogDir, "tasks"), []);
+    assert.deepEqual(strays(backlogDir, "completed"), []);
+
+    // Recovery: once the fault clears, a fresh close archives cleanly.
+    const healthy = createLocalAdapter({ backlogDir, now: FIXED_NOW });
+    healthy.close("BACK-1");
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - one.md"]);
+    assert.match(read(backlogDir, "completed", "BACK-1 - one.md"), /^status: Done$/m);
+  });
+
+  it("does not erase an externally replaced completed destination during rollback", (t) => {
+    const { backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", body: "\n## Description\nactive\n" })]],
+    });
+    const completedPath = path.join(backlogDir, "completed", "BACK-1 - one.md");
+    const external = taskFile({ id: 1, title: "External owner", status: "Done", body: "\n## Description\nexternal\n" });
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        beforeUnlinkSource() {
+          // Simulate another writer swapping our fresh publication for their own inode.
+          fs.rmSync(completedPath);
+          fs.writeFileSync(completedPath, external);
+          throw new Error("injected source unlink failure");
+        },
+      },
+    });
+    assert.throws(() => adapter.close("BACK-1"), (error) => error instanceof LocalStoreError && /both/.test(error.message));
+
+    // The externally owned destination is preserved byte-for-byte, and the active source survives.
+    assert.equal(fs.readFileSync(completedPath, "utf-8"), external);
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")));
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+    assert.deepEqual(strays(backlogDir, "completed"), []);
+  });
+
+  it("preserves both copies and reports a split store when rollback also fails", (t) => {
+    const { backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", body: "\n## Description\nkeep\n" })]],
+    });
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        beforeUnlinkSource() {
+          throw new Error("injected source unlink failure");
+        },
+        beforeRollback() {
+          throw new Error("injected rollback failure");
+        },
+      },
+    });
+    assert.throws(() => adapter.close("BACK-1"), (error) => error instanceof LocalStoreError && /both/.test(error.message));
+
+    // No data loss: both the active source and the completed copy stay intact.
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")));
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - one.md"]);
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+    assert.deepEqual(strays(backlogDir, "completed"), []);
+
+    // The store now fails closed on the duplicate id until an operator resolves it.
+    const healthy = createLocalAdapter({ backlogDir, now: FIXED_NOW });
+    assert.throws(() => healthy.read("BACK-1"), LocalStoreError);
+    assert.throws(() => healthy.list({ state: "all" }), LocalStoreError);
+
+    // Recovery: removing the duplicate completed copy restores a clean close.
+    fs.rmSync(path.join(backlogDir, "completed", "BACK-1 - one.md"));
+    healthy.close("BACK-1");
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - one.md"]);
+  });
+});
+
+describe("local required frontmatter validation", () => {
+  const INVALID = {
+    "missing id": "---\ntitle: One\nstatus: To Do\n---\n## Description\nx\n",
+    "missing title": "---\nid: BACK-1\nstatus: To Do\n---\n## Description\nx\n",
+    "missing status": "---\nid: BACK-1\ntitle: One\n---\n## Description\nx\n",
+    "duplicate id": "---\nid: BACK-1\nid: BACK-1\ntitle: One\nstatus: To Do\n---\n## Description\nx\n",
+    "wrong-type title": "---\nid: BACK-1\ntitle:\n  - a\n  - b\nstatus: To Do\n---\n## Description\nx\n",
+    "empty status": "---\nid: BACK-1\ntitle: One\nstatus: ''\n---\n## Description\nx\n",
+    "no frontmatter": "just a body, no frontmatter fence\n",
+  };
+  for (const [label, content] of Object.entries(INVALID)) {
+    it(`rejects ${label} on read and list before returning a task`, (t) => {
+      const { adapter } = makeStore(t, { seedTasks: [["BACK-1 - one.md", content]] });
+      assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+      assert.throws(() => adapter.list(), LocalStoreError);
+      assert.throws(() => adapter.list({ state: "all" }), LocalStoreError);
+    });
+  }
+
+  it("requires the frontmatter id to equal the filename ref", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 2, title: "Mismatch" })]],
+    });
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list(), LocalStoreError);
+  });
+
+  it("rejects invalid required frontmatter on update and close before mutating", (t) => {
+    const missingStatus = "---\nid: BACK-1\ntitle: One\n---\n## Description\nx\n";
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", missingStatus]],
+    });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+    assert.throws(() => adapter.update("BACK-1", { status: "In Progress" }), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), before, "no mutation touched bytes");
+    assert.deepEqual(listNames(backlogDir, "completed"), []);
+  });
+
+  it("accepts a well-formed task the way create renders it", (t) => {
+    const { adapter } = makeStore(t);
+    adapter.create({ title: "Well formed", labels: ["a"], dependencies: ["BACK-9"] });
+    assert.equal(adapter.read("BACK-1").title, "Well formed");
+    assert.deepEqual(adapter.list().map((task) => task.ref), ["BACK-1"]);
+  });
+});
+
+describe("local metadata injection is rejected fail-closed", () => {
+  const CREATE_INJECTIONS = {
+    status: "In Progress\ninjected: true",
+    title: "Title\nid: BACK-999",
+    priority: "high\nmalicious: 1",
+  };
+  for (const [field, value] of Object.entries(CREATE_INJECTIONS)) {
+    it(`rejects a newline-injecting ${field} on create without writing`, (t) => {
+      const { adapter, backlogDir } = makeStore(t);
+      const input = { title: field === "title" ? value : "Safe", [field]: value };
+      assert.throws(() => adapter.create(input), LocalStoreError);
+      assert.deepEqual(listNames(backlogDir, "tasks"), []);
+      assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+      assert.deepEqual(strays(backlogDir, "tasks"), []);
+    });
+  }
+
+  it("rejects newline-injecting labels and dependencies on create", (t) => {
+    const { adapter, backlogDir } = makeStore(t);
+    assert.throws(() => adapter.create({ title: "Safe", labels: ["ok", "bad\nid: BACK-999"] }), LocalStoreError);
+    assert.throws(() => adapter.create({ title: "Safe", dependencies: ["BACK-2\ninjected: true"] }), LocalStoreError);
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+  });
+
+  it("also rejects carriage returns, NUL, and tabs in scalar metadata", (t) => {
+    const { adapter, backlogDir } = makeStore(t);
+    for (const bad of ["A\rB", "A B", "A\tB"]) {
+      assert.throws(() => adapter.create({ title: "Safe", status: bad }), LocalStoreError);
+    }
+    assert.throws(() => adapter.create({ title: "Tab\tinject" }), LocalStoreError);
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+  });
+
+  it("rejects injection on update and leaves bytes and mtime unchanged", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    const filePath = path.join(backlogDir, "tasks", "BACK-1 - one.md");
+    const before = fs.readFileSync(filePath, "utf-8");
+    const mtimeBefore = fs.statSync(filePath).mtimeMs;
+    const injections = [
+      { status: "Done\ninjected: true" },
+      { title: "New\nid: BACK-9" },
+      { priority: "high\nx: 1" },
+      { labels: ["ok", "bad\nkey: v"] },
+      { dependencies: ["BACK-2\nkey: v"] },
+      { updated_date: "2026-07-11\ninjected: true" },
+    ];
+    for (const change of injections) {
+      assert.throws(() => adapter.update("BACK-1", change), LocalStoreError);
+    }
+    assert.equal(fs.readFileSync(filePath, "utf-8"), before, "bytes unchanged");
+    assert.equal(fs.statSync(filePath).mtimeMs, mtimeBefore, "mtime unchanged (no temp/mtime mutation)");
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+    assert.deepEqual(strays(backlogDir, "tasks"), []);
+  });
+});
+
+describe("local update no-op and list-state validation edges", () => {
+  it("treats update with no changes as a byte and mtime no-op", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    const filePath = path.join(backlogDir, "tasks", "BACK-1 - one.md");
+    const before = fs.readFileSync(filePath, "utf-8");
+    const mtimeBefore = fs.statSync(filePath).mtimeMs;
+    const result = adapter.update("BACK-1", {});
+    assert.deepEqual(result, { tracker: "local", id: "1", ref: "BACK-1" });
+    assert.equal(fs.readFileSync(filePath, "utf-8"), before, "bytes unchanged");
+    assert.equal(fs.statSync(filePath).mtimeMs, mtimeBefore, "mtime unchanged");
+    assert.deepEqual(strays(backlogDir, "tasks"), []);
+  });
+
+  it("no-ops when every requested field already holds its current value", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", status: "To Do" })]],
+    });
+    const filePath = path.join(backlogDir, "tasks", "BACK-1 - one.md");
+    const before = fs.readFileSync(filePath, "utf-8");
+    const mtimeBefore = fs.statSync(filePath).mtimeMs;
+    adapter.update("BACK-1", { status: "To Do" });
+    assert.equal(fs.readFileSync(filePath, "utf-8"), before, "value-preserving update keeps bytes");
+    assert.equal(fs.statSync(filePath).mtimeMs, mtimeBefore, "value-preserving update keeps mtime");
+  });
+
+  it("rejects an invalid list state instead of silently defaulting to open", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+      seedCompleted: [["BACK-5 - five.md", taskFile({ id: 5, title: "Five", status: "Done" })]],
+    });
+    for (const bad of ["opened", "OPEN", "active", "Open", "", null, 1, "toString", "__proto__"]) {
+      assert.throws(() => adapter.list({ state: bad }), LocalStoreError);
+    }
+    assert.deepEqual(adapter.list({ state: "open" }).map((task) => task.ref), ["BACK-1"]);
+    assert.deepEqual(adapter.list({ state: "closed" }).map((task) => task.ref), ["BACK-5"]);
+    assert.deepEqual(adapter.list({ state: "all" }).map((task) => task.ref), ["BACK-1", "BACK-5"]);
+    assert.deepEqual(adapter.list().map((task) => task.ref), ["BACK-1"]);
+  });
+});
