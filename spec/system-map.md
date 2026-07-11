@@ -2,16 +2,14 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus deterministic helper scripts. Exactly one
-configured tracker adapter is the canonical task source for a repository;
-local Markdown files provide execution context for humans and coding agents.
-GitHub is the current compatibility baseline, and `local` is the accepted
-alternative to be proven before additional forge adapters are considered.
+dev-backlog is a skill suite plus deterministic helper scripts. The current
+runtime uses GitHub Issues as the canonical task source; local Markdown files
+provide execution context for humans and coding agents.
 
 ```text
-Configured tracker (`github` or `local`)
-  -> tracker task interface + capability report
-  -> canonical or derived backlog/tasks/ files
+GitHub Issues
+  -> gh CLI explicit sync
+  -> backlog/tasks/ thin mirror
   -> backlog/sprints/ active execution hub
   -> humans / Claude Code / Codex
 
@@ -19,7 +17,7 @@ backlog/sprints/ (canonical, committed at explicit boundaries)
   -> sprint-state.js JSON  (status.sh --json / next.sh --json)
   -> backlog-doctor verdict (aggregated health, hard/soft severity)
   -> any actor: human, relay executor, external loop, analyzer
-  -> optional publisher capability -> machine-managed mirror (read-only surface)
+  -> sprint-mirror.js -> machine-managed GitHub mirror issue (read-only surface)
 
 spec/
   charter.md       project yardstick
@@ -27,45 +25,70 @@ spec/
   capabilities.md  capability contracts
 ```
 
+### Accepted Target
+
+Issue #270 accepts exactly one explicitly configured canonical tracker per
+repository, initially `github` or `local`. The target seam normalizes only the
+core task lifecycle and stable identity; capability-gated provider features
+remain outside that small interface. This target is not yet the runtime:
+
+```text
+Configured tracker (`github` or `local`)
+  -> tracker task interface + capability report
+  -> canonical or derived backlog/tasks/ files
+  -> unchanged sprint execution hub
+```
+
 ## Runtime Boundaries
 
-- `skills/dev-backlog/` owns tracker selection, the normalized task lifecycle, sprint execution, task-file materialization, and progress helper scripts.
-- Tracker adapters own provider/local mechanics and capability discovery; core sprint code consumes their small task interface instead of invoking a provider CLI directly.
-- `skills/backlog-triage/` owns advisory task grooming, charter Alignment reports, and spec-aware Decision Review when the selected tracker exposes the required capabilities.
+- `skills/dev-backlog/` currently owns GitHub-backed sprint execution, task mirrors, and progress helper scripts.
+- Current helper scripts call `gh` directly or through GitHub-specific helper modules; no configured tracker seam exists yet.
+- `skills/backlog-triage/` owns advisory GitHub Issue grooming, charter Alignment reports, and spec-aware Decision Review.
 - The `spec-charter`/`spec-system-map`/`spec-grill` authoring skills ship with craftkit (installed as sibling skills, not in this repo); they own the `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` authoring gates.
 - `spec/` holds durable project specs, not active sprint execution memory.
 
+The accepted target moves tracker selection, normalized task lifecycle, and
+capability discovery into `skills/dev-backlog/`. Tracker adapters will own
+provider/local mechanics, while sprint execution continues to own only the
+execution hub.
+
 ## Core Flows
 
-1. **Select/probe:** setup persists exactly one tracker choice; runtime loads that choice, probes availability, and reports capabilities without silently selecting a different tracker.
-2. **Materialize:** the selected tracker lists canonical tasks; GitHub mode explicitly mirrors them into `backlog/tasks/`, while local mode reads and writes canonical task files directly.
-3. **Plan:** sprint planning reads charter Objectives when present, then writes one active file under `backlog/sprints/` using stable tracker-neutral task references.
-4. **Execute:** agents read the active sprint, update Plan state and Progress, and keep task context local.
-5. **Read (machine):** any actor reads execution state through the JSON surfaces (`status.sh --json` / `next.sh --json`) and one `backlog-doctor` verdict instead of parsing markdown; provider-specific publishers run only when their capability is available.
-6. **Groom:** `backlog-triage` produces advisory reports with classification, relationships, stale signals, Alignment, and Decision Review from supported tracker evidence; mutations require explicit user action.
-7. **Spec evolve:** the craftkit-installed `spec-charter`, `spec-system-map`, and `spec-grill` skills update durable project specs through their own gates. Sprint close runs `backlog-doctor` and may recommend `spec-charter reassess` (signal-gated, report-only); reassess reports land as dated files under `backlog/triage/`.
+1. **Sync:** `sync-pull.js` mirrors open GitHub Issues into `backlog/tasks/`.
+2. **Plan:** sprint planning reads charter Objectives when present, then writes one active file under `backlog/sprints/`.
+3. **Execute:** agents read the active sprint, update Plan state and Progress, and keep task context local.
+4. **Read (machine):** any actor reads execution state through the JSON surfaces (`status.sh --json` / `next.sh --json`) and one `backlog-doctor` verdict instead of parsing markdown; `sprint-mirror.js` explicitly publishes the active sprint to a machine-managed mirror issue.
+5. **Groom:** `backlog-triage` produces advisory reports with classification, relationships, stale signals, Alignment, and Decision Review; mutations require explicit user action.
+6. **Spec evolve:** the craftkit-installed `spec-charter`, `spec-system-map`, and `spec-grill` skills update durable project specs through their own gates. Sprint close runs `backlog-doctor` and may recommend `spec-charter reassess` (signal-gated, report-only); reassess reports land as dated files under `backlog/triage/`.
+
+The accepted target adds explicit select/probe before sync, changes sync into
+adapter-specific materialization, and capability-gates provider publication.
+Those flows become current only after the dual-mode implementation is merged.
 
 ## Storage And External Systems
 
-- Configured tracker (`github` or `local`): exactly one task source of truth.
-- `backlog/config.yml`: persisted tracker selection and local task-file configuration.
+- GitHub Issues: current task source of truth.
+- `backlog/config.yml`: current Backlog.md-compatible task-file configuration; it does not yet persist a tracker selection.
 - Git: versioned local Markdown artifacts and scripts.
-- `gh` CLI: explicit GitHub-adapter read/write bridge; never required by local mode.
+- `gh` CLI: current explicit GitHub read/write bridge.
 - Node.js scripts: deterministic checks and sync helpers.
 - Bash scripts: local workflow wrappers.
 
 ## Project-Wide Invariants
 
 - No hidden server, database, daemon, or background sync.
-- Exactly one configured adapter defines task intent; sprint files define execution context.
-- Tracker selection is explicit and persistent. Detection may suggest an initial value during setup, but runtime never falls back to another adapter.
-- The local sprint file is canonical and committed at explicit boundaries; tracker-side mirrors and publications are derived surfaces.
-- Optional capabilities fail clearly when unsupported; the core interface never invents milestone, PR-link, mirror, or close-keyword semantics.
+- GitHub Issues currently define task intent; sprint files define execution context.
+- The local sprint file is canonical and committed at explicit boundaries; GitHub-side mirrors are derived surfaces.
 - `sprint-state.js` is the single parser of sprint markdown for machine consumers; new tools consume its JSON (see the consumption contract) instead of re-parsing.
 - Automation is report-only toward `spec/*`: doctor and reassess signals recommend; only human-gated `spec-charter amend` / `spec-grill` mutate specs.
 - `spec/charter.md` is canonical; root `CHARTER.md` is legacy fallback only.
 - `spec/capabilities.md` remains compact enough to read at session start.
 - Completed sprint files are immutable history.
+
+Accepted target invariants add exactly one explicit and persistent tracker
+selection, no runtime fallback to another adapter, and clear failure for
+unsupported optional capabilities. The target core interface never invents
+milestone, PR-link, mirror, or close-keyword semantics.
 
 ## Accepted Capability Contracts
 

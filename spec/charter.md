@@ -35,13 +35,14 @@ No server, no daemon, no hidden state, no silent sync.
 
 ## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status proof-gated) -->
 - O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user
-- O2 [active]    Exactly one configured tracker adapter owns canonical task truth per repository; runtime never silently changes the selected tracker · src: user
+- O2 [superseded] GitHub Issues remain the canonical task spec; no parallel issue store exists in dev-backlog · src: user · superseded by O9
 - O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
 - O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close)
 - O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
 - O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates)
 - O8 [active]    The same core sprint cycle is proven on both `github` and `local`, while GitHub's existing task, milestone, mirror, progress, and closing-link behavior remains backward compatible · src: user
+- O9 [active]    Exactly one configured tracker adapter owns canonical task truth per repository; runtime never silently changes the selected tracker · src: user
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->
 | date       | decision                                                                              | rationale                                                                                        | supersedes |
