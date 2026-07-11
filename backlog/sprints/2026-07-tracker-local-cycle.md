@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 tracker adapter foundation
-status: active
+status: completed
 started: 2026-07-11
 due: 2026-07-15
 objectives: [O8, O9]
@@ -21,7 +21,7 @@ The same core sprint cycle is executable and documented in backward-compatible G
 - [x] #277 Add idempotent tracker-aware setup-dev-backlog (~2hr) → PR #301 (merged)
 
 ### Batch 3 - Prove both modes and align docs (after #276 and #277)
-- [ ] #278 Prove GitHub and local core sprint cycles end to end (~2hr)
+- [x] #278 Prove GitHub and local core sprint cycles end to end (~2hr) → PR #303 (merged)
 
 ## Running Context
 - Sprint A closed after PRs #280, #282, #284, and #286. GitHub is now the frozen compatibility baseline behind the configured adapter seam.
@@ -35,3 +35,5 @@ The same core sprint cycle is executable and documented in backward-compatible G
 - 2026-07-11: Sprint B opened as three serial batches after Sprint A and GitHub regression baseline completed; live issues #276-#278 remain the task source of truth.
 - 2026-07-11: #276 merged via PR #298 after TDD, offline lifecycle proof, real multi-process allocation, crash-recovery and fail-closed filesystem review. Final gates: Node 576 pass plus one pre-existing skip, smoke 155/155, GitHub Actions green, and all review threads resolved.
 - 2026-07-12: #277 merged via PR #301 after explicit tracker-state, byte-idempotence, provider-isolation, atomic filesystem, and setup-to-runtime scalar seam review. Final gates: Node 639 pass plus one pre-existing opt-in skip, smoke 155/155, GitHub Actions and CodeRabbit green, and zero review threads.
+- 2026-07-12: #278 merged via PR #303 with a table-driven GitHub/local acceptance matrix, exact provider argv and persisted-state proof, decimal local refs, path-aware capability errors, and configured custom-local status. Final gates: Node 652 pass plus one pre-existing opt-in skip, smoke 157/157, all spec/backlog validators and two-skill discovery green, GitHub Actions and CodeRabbit green, and zero unresolved review threads.
+- 2026-07-12: Sprint closed. 3/3 tasks completed.
