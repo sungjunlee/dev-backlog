@@ -1122,12 +1122,91 @@ else
 fi
 gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$GATE_A2A3" "$A2A3_RES"
 
+# ============================================================
+# multi-track sprints RED gate (PRD 2026-07-multi-track-sprints, #290)
+# ============================================================
+# Two disjoint-scope sprints may be active at once (a portfolio); overlapping
+# scopes fail with a NEW message. RED against HEAD (single-active only). Flip
+# each gate when its fix lands. NOTE: exit-fail alone is not a valid RED signal
+# for the overlap case — HEAD already fails on ANY two actives with a DIFFERENT
+# message ("Multiple active sprint files found"), so the overlap fixture keys on
+# the new "Active tracks overlap on scope" message, not the exit code (#290 B2).
+GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-0}"  # flip when #291+#293 land: doctor passes on disjoint-scope tracks
+GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-0}"    # flip when #293 lands: doctor emits the scope-overlap message
+
+# helper: write a minimal, shape-valid active sprint with a given scope
+mt_write_sprint() { # dir file title issue scope_yaml
+  local file="$1" title="$2" issue="$3" scope="$4"
+  cat > "$file" << EOF
+---
+milestone: mt
+status: active
+started: 2026-07-01
+scope: ${scope}
+---
+
+# ${title}
+
+## Goal
+${title} done.
+
+## Plan
+- [ ] #${issue} ${title} task
+
+## Running Context
+- none
+
+## Progress
+- 2026-07-01: opened.
+EOF
+}
+
+# (1) Disjoint portfolio. HEAD: doctor active_sprint FAILS (any 2 actives).
+#     Target (#291+#293): disjoint scopes → active_sprint PASS.
+MT_DISJOINT_DIR="$TEST_DIR/mt-disjoint"
+mkdir -p "$MT_DISJOINT_DIR/backlog/sprints"
+mt_write_sprint "$MT_DISJOINT_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+mt_write_sprint "$MT_DISJOINT_DIR/backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
+set +e
+OUT=$(cd "$MT_DISJOINT_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
+set -e
+if printf "%s" "$OUT" | node -e '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const c = (j.checks || []).find((x) => x.name === "active_sprint");
+process.exit(c && c.status === "pass" ? 0 : 1);
+' 2>/dev/null; then MT_DISJOINT_RES="pass"; else MT_DISJOINT_RES="fail"; fi
+gated_assert "multi-track: doctor passes on two disjoint-scope active tracks (#291/#293)" "$GATE_MT_DISJOINT" "$MT_DISJOINT_RES"
+
+# (2) Overlap. Two active tracks share a scope. HEAD emits the generic
+#     "Multiple active sprint files found"; target (#293) emits the specific
+#     "Active tracks overlap on scope". Key on the message, not exit code.
+MT_OVERLAP_DIR="$TEST_DIR/mt-overlap"
+mkdir -p "$MT_OVERLAP_DIR/backlog/sprints"
+mt_write_sprint "$MT_OVERLAP_DIR/backlog/sprints/2026-07-auth-a.md" "AuthA" 3 '["src/auth/**"]'
+mt_write_sprint "$MT_OVERLAP_DIR/backlog/sprints/2026-07-auth-b.md" "AuthB" 4 '["src/auth/**"]'
+set +e
+OUT=$(cd "$MT_OVERLAP_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
+set -e
+if printf "%s" "$OUT" | grep -qF "Active tracks overlap on scope"; then MT_OVERLAP_RES="pass"; else MT_OVERLAP_RES="fail"; fi
+gated_assert "multi-track: doctor emits scope-overlap message, not generic multi-active (#293 B2)" "$GATE_MT_OVERLAP" "$MT_OVERLAP_RES"
+
+# (3) Back-compat (ENFORCED, GATE=1 — must stay GREEN on HEAD and after Phase 1).
+#     A single active track behaves exactly as today; this is the G4 text anchor
+#     (text output only — never snapshot --json, which changes by design).
+MT_SINGLE_DIR="$TEST_DIR/mt-single"
+mkdir -p "$MT_SINGLE_DIR/backlog/sprints"
+mt_write_sprint "$MT_SINGLE_DIR/backlog/sprints/2026-07-solo.md" "Solo" 5 '["src/solo/**"]'
+OUT=$(cd "$MT_SINGLE_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" 2>/dev/null || true)
+assert_contains "multi-track G4: single active track still reports 'Exactly one active sprint' (text)" "$OUT" "Exactly one active sprint"
+OUT=$(cd "$MT_SINGLE_DIR" && bash "$SCRIPT_DIR/next.sh" 2>/dev/null || true)
+assert_contains "multi-track G4: single-track next.sh still names the sprint (text)" "$OUT" "2026-07-solo"
+
 # --- Results ---
 echo ""
 TOTAL=$((PASS + FAIL))
 echo "$TOTAL tests: $PASS passed, $FAIL failed"
 if [ "$((XFAIL + XPASS))" -gt 0 ]; then
-  echo "adoption-hardening gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
+  echo "known-RED gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
 fi
 if [ "$FAIL" -gt 0 ]; then
   exit 1
