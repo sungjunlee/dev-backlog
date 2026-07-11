@@ -8,7 +8,7 @@ Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlo
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | string | Yes | Unique ID matching GitHub issue: `{PREFIX}-{N}` (e.g., `BACK-42`) |
+| `id` | string | Yes | Storage ref `{PREFIX}-{N[.M]}`; a GitHub mirror derives `N` from the issue number, while local owns the ref directly |
 | `title` | string | Yes | Brief, action-oriented description |
 | `status` | string | Yes | Current state (see Status Values below) |
 
@@ -16,7 +16,7 @@ Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlo
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `labels` | string[] | Categorization labels (maps to GitHub labels) |
+| `labels` | string[] | Categorization labels (maps to GitHub labels only in GitHub mode) |
 | `priority` | string | `low`, `medium`, `high`, `critical` |
 | `assignee` | string[] | Assigned people (`@username`) |
 
@@ -37,7 +37,7 @@ Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlo
 
 Default set (configurable in `config.yml`):
 
-| Status | GitHub Label | Meaning |
+| Status | GitHub mapping | Meaning |
 |--------|-------------|---------|
 | `To Do` | `status:todo` | Not started |
 | `In Progress` | `status:in-progress` | Active work |
@@ -45,15 +45,15 @@ Default set (configurable in `config.yml`):
 
 Extended set (if using more granular tracking):
 
-| Status | GitHub Label | Meaning |
+| Status | GitHub mapping | Meaning |
 |--------|-------------|---------|
 | `Blocked` | `status:blocked` | Waiting on external dependency |
 | `In Review` | `status:in-review` | PR under review |
 
 ## Filename Convention
 
-```
-{PREFIX}-{N} - {Title-Slug}.md
+```text
+{PREFIX}-{N[.M]} - {Title-Slug}.md
 ```
 
 Examples:
@@ -61,18 +61,24 @@ Examples:
 - `PROJ-7 - Fix-login-timeout.md`
 - `BACK-100.2 - Create-HTTP-server-module.md` (sub-task)
 
-The prefix and number come from `config.yml` (`task_prefix`) and the GitHub issue number.
+The prefix comes from `config.yml` (`task_prefix`). In GitHub mode, the numeric
+part is the issue number and the file is a mirror. In local mode, the configured
+adapter allocates the canonical local ID.
 
 ## Body Structure
 
-Task files are thin GitHub mirrors. Notes, decisions, and context go in the **sprint file** (`backlog/sprints/`), not here.
+Task files are thin GitHub mirrors when `tracker: github` and canonical task
+records when `tracker: local`. Notes, decisions, and cross-task context still go
+in the **sprint file** (`backlog/sprints/`), not here.
 
 ```markdown
 ## Description
 [Synced from GitHub issue body — includes any checkboxes from the issue]
 ```
 
-`sync-pull.js` wraps the raw GitHub issue body in `## Description`. Acceptance criteria checkboxes from the issue body appear here as-is. dev-relay and other tools read AC from whatever structure the issue body provides.
+`sync-pull.js` wraps a GitHub issue body in `## Description`. Local create stores
+the supplied body directly. Acceptance criteria checkboxes remain human-authored
+bytes in either mode; metadata-only refresh/update preserves them.
 
 For manual task files or Backlog.md CLI compatibility, you can optionally add structured AC markers:
 
@@ -86,7 +92,11 @@ For manual task files or Backlog.md CLI compatibility, you can optionally add st
 
 The `<!-- AC:BEGIN/END -->` markers enable machine parsing by the Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
 
-Only AC checkboxes get updated in task files during work. Everything else (notes, technical decisions, running context) lives in the sprint file.
+Configured-adapter operations may update supported frontmatter fields, and an
+explicit body update may change task-body content. Metadata-only updates
+preserve body and AC bytes. During normal execution, keep human task-body edits
+to AC checkboxes; notes, technical decisions, and running context belong in the
+sprint file.
 
 ## Sprint Frontmatter (spec-axis fields)
 
@@ -111,40 +121,23 @@ statuses: ["To Do", "In Progress", "Done"]
 
 `tracker` accepts only `github` or `local`. A missing key deterministically
 defaults to `github`; runtime availability never changes that selection or
-falls back to the other adapter.
+falls back to the other adapter. This is a zero-migration upgrade rule: existing
+tracker-less repositories keep GitHub authority and all legacy files unchanged.
+`setup-dev-backlog.js` pins that authority or creates an explicit fresh choice;
+it never migrates task files.
 
 ## Local Canonical Storage (`tracker: local`)
 
-In local mode the `backlog/tasks/` and `backlog/completed/` files are the
-**canonical** task store, not GitHub mirrors. `local-tracker.js` owns every
-filesystem rule behind the seven required operations; callers only ever see the
-normalized identity `{ tracker: "local", id, ref: "{PREFIX}-{N}[.M]" }` — there
-is no fabricated `url`.
+In local mode `backlog/tasks/` and `backlog/completed/` are the **canonical**
+task store. Required list/read/create/update/close operations return normalized
+identity `{ tracker: "local", id, ref: "{PREFIX}-{N[.M]}" }` without fabricating
+a URL. Metadata-only updates preserve body/AC bytes; close writes `status: Done`
+and archives the same file. Local reports no optional provider capabilities, so
+milestones, PR relationships, mirrors, progress issues, comments, and closing
+semantics fail before filesystem or provider effects and never invoke `gh`.
 
-- **Allocation.** `create` allocates the next positive **parent** integer by
-  scanning the exact configured-prefix IDs across both `tasks/` and
-  `completed/` (so a closed `BACK-7` still reserves `7`). `BACK-1` and `BACK-11`
-  are kept distinct by exact-match parsing. An explicit decimal `id` (e.g.
-  `1.2`) creates a subtask only when that exact ID is free; decimals never
-  shift parent allocation and are not auto-created.
-- **Atomic publication.** Allocation runs inside an exclusive lock
-  (`backlog/.local-tracker.lock`); the new file is written to a same-directory
-  temp and hard-linked into place, so a colliding destination fails instead of
-  overwriting. The lock and temp are always released, including on error.
-- **Body preservation.** A metadata/state-only `update` rewrites only the
-  requested frontmatter keys and leaves the human-authored description,
-  headings, and `AC:BEGIN/END` checkbox bytes untouched. Filenames stay stable
-  even when the frontmatter `title` changes. The body is replaced only when the
-  caller supplies one explicitly.
-- **Archive on close.** `close` moves exactly one active task into
-  `backlog/completed/`, writes `status: Done`, and refuses an existing
-  destination rather than overwriting; a task that is already archived returns a
-  clear already-closed result without data loss.
-- **No provider features.** Local reports **no** optional capabilities. Any
-  milestone, PR relationship, mirror, progress-issue, comment, or
-  closing-semantics attempt fails with the existing tracker+capability error
-  before any filesystem mutation, and the runtime never invokes `gh` or falls
-  back to GitHub for explicit local.
+Filesystem allocation, publication, collision, and recovery details have one
+implementation owner: [Tracker Adapter Design Contract](../../../docs/tracker-adapter-design.md).
 
 dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;
 `project_name` is retained as metadata. Other Backlog.md config fields are not

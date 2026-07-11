@@ -340,6 +340,21 @@ describe("local adapter and optional capabilities", () => {
     assert.equal(mutations, 0);
   });
 
+  it("names the selected custom backlog config in unsupported remediation", (t) => {
+    const backlogDir = makeLocalBacklog(t);
+    const resolved = resolveConfiguredTracker({ tracker: "local" }, { backlogDir });
+
+    assert.throws(
+      () => invokeCapability(resolved, "mirrors", () => undefined),
+      (error) => {
+        assert.ok(error instanceof UnsupportedTrackerCapabilityError);
+        assert.ok(error.remediation.includes(path.join(backlogDir, "config.yml")));
+        assert.equal(error.remediation.includes("change backlog/config.yml"), false);
+        return true;
+      }
+    );
+  });
+
   it("invokes a supported capability only after the gate succeeds", () => {
     const resolved = {
       tracker: "github",

@@ -21,7 +21,11 @@ const { execFileSync } = require("child_process");
 const path = require("path");
 const { readConfig } = require("./lib.js");
 const { parseTaskRef, renderTaskRef } = require("./task-ref.js");
-const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+  writeTrackerCliError,
+} = require("./tracker.js");
 const {
   findMirrorIssue,
   createMirrorIssue,
@@ -181,7 +185,7 @@ function sync({
   execFile = execFileSync,
   sprintStatePath = SPRINT_STATE_PATH,
 } = {}) {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   invokeCapability(resolved, "mirrors", () => undefined);
   const state = resolveSprintState({ backlogDir, execFile, sprintStatePath });
   const slug = path.basename(state.active_sprint.path, ".md");
@@ -257,6 +261,9 @@ function main() {
 
     printResult(result);
   } catch (error) {
+    if (writeTrackerCliError(error, { json: parsed.json })) {
+      process.exit(1);
+    }
     console.error(`Error: ${error.message}`);
     process.exit(1);
   }

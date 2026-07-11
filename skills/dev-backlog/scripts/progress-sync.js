@@ -18,7 +18,11 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { readConfig } = require("./lib.js");
-const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+  writeTrackerCliError,
+} = require("./tracker.js");
 const {
   githubIssueNumber,
   parsePlanCheckbox,
@@ -213,7 +217,7 @@ function sync({
   readFs = { readTaskFiles, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
 }) {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   const requiredCapabilities = [
     "progress-issues",
     "pull-request-relationships",
@@ -418,6 +422,9 @@ function main() {
 
     printResult(result);
   } catch (e) {
+    if (writeTrackerCliError(e, { json: options.json })) {
+      process.exit(1);
+    }
     console.error(`Error: ${e.message}`);
     process.exit(1);
   }

@@ -16,7 +16,11 @@ const path = require("path");
 const { renderTaskRef } = require("./task-ref.js");
 const { slugify, estimateSize, readConfig } = require("./lib");
 const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
-const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+  writeTrackerCliError,
+} = require("./tracker.js");
 const { resolveCharterPath } = require("./spec-paths.js");
 
 function parseArgs(args) {
@@ -170,7 +174,8 @@ function createSprintFile({
   hasCapabilities,
 }) {
   if (!getDue || !getIssues) {
-    const resolved = resolveConfiguredTracker(readConfig(path.dirname(sprintsDir)));
+    const backlogDir = path.dirname(sprintsDir);
+    const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
     invokeCapability(resolved, "milestones", () => undefined);
     getDue = getDue || getMilestoneDue;
     getIssues = getIssues || getMilestoneIssues;
@@ -268,6 +273,9 @@ function main() {
 
     printResult(result);
   } catch (error) {
+    if (writeTrackerCliError(error, { json: parsed.json })) {
+      process.exit(1);
+    }
     console.error(error.message);
     process.exit(1);
   }

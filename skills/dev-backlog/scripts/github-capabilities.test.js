@@ -101,6 +101,41 @@ describe("GitHub optional capability transports", () => {
       "--json", "number,title,labels,milestone",
     ]);
   });
+
+  it("renders normalized refs from a configured custom local store in human status", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-status-list-"));
+    const backlogDir = path.join(root, "custom-store");
+    const binDir = path.join(root, "bin");
+    fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
+    fs.mkdirSync(path.join(backlogDir, "completed"));
+    fs.mkdirSync(binDir);
+    fs.writeFileSync(
+      path.join(backlogDir, "config.yml"),
+      "tracker: local\ntask_prefix: BACK\n"
+    );
+    fs.writeFileSync(
+      path.join(backlogDir, "tasks", "BACK-7.2 - custom-store-task.md"),
+      [
+        "---", "id: BACK-7.2", "title: Custom store task", "status: To Do",
+        "labels: [offline]", "priority: medium", "created_date: '2026-07-12'", "---",
+        "## Description", "Custom local task", "",
+      ].join("\n")
+    );
+    const columnPath = path.join(binDir, "column");
+    fs.writeFileSync(columnPath, "#!/bin/sh\ncat\n");
+    fs.chmodSync(columnPath, 0o755);
+
+    const result = spawnSync("bash", [path.join(__dirname, "status.sh"), backlogDir], {
+      cwd: root,
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}` },
+      encoding: "utf8",
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /=== Tracker Tasks ===/);
+    assert.match(result.stdout, /^BACK-7\.2\t-\tCustom store task\toffline$/m);
+    assert.doesNotMatch(result.stdout, /=== GitHub Issues ===/);
+  });
 });
 
 describe("configured-only failure before effects", () => {

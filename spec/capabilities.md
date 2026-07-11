@@ -39,6 +39,9 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 - 2026-07-11 (Sprint tracker-seam, PRs #271/#280/#282/#284/#286): Configured tracker resolution must never use availability failure to choose another store; missing configuration is a stable GitHub compatibility rule, while explicit local remains unavailable until persistence lands.
 - 2026-07-11 (PR #284): Exact task-ref matching needs tests for numeric collisions, decimal descendants, punctuation, alphanumeric suffixes, hyphenated foreign prefixes, and numeric slugs; visual regex review missed several of these boundaries.
 - 2026-07-11 (PR #286): Moving GitHub calls behind a provider seam must preserve marker ownership in dry-run as well as apply mode, keep injection/argv/output compatibility, and confine direct `gh` calls to the lifecycle adapter or explicit capability transports.
+- 2026-07-11 (PR #298): A canonical local Markdown store needs exact-ID allocation across active and completed tasks, fail-closed filesystem boundaries, metadata-only body preservation, and crash-recoverable archive semantics; merely replacing `gh` commands is not sufficient.
+- 2026-07-12 (PR #301): Setup must treat tracker-less repositories as legacy GitHub authority, pin before an explicit switch, preserve user YAML bytes, and never use provider evidence as runtime selection or migration authority.
+- 2026-07-12 (#278 implementation proof): One table-driven subprocess matrix can freeze the legacy GitHub cycle and prove the offline local cycle; optional-feature failures need one typed serializer so JSON and human boundaries carry identical remediation before effects.
 <!-- LEARN:END -->
 
 ### Decisions

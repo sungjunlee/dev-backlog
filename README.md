@@ -3,23 +3,25 @@
 [![CI](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml/badge.svg)](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-GitHub Issues stay the source of truth. Sprint files become the execution hub that both you and your AI agent read during a coding session.
+Choose one canonical task tracker per repository: GitHub Issues or an offline
+local Markdown store. Sprint files remain the execution hub that both you and
+your AI agent read during a coding session.
 
 dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
 
-No new server. No hidden state. No need to abandon GitHub Issues.
+No new server. No hidden state. Existing GitHub repositories keep their current
+behavior without migration.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
 ```text
-GitHub Issues (source of truth)
+backlog/config.yml: tracker: github | local
         |
-        | gh CLI (explicit sync)
-        v
-backlog/
-  tasks/       thin issue mirror (AI reads without API)
-  sprints/     execution hub: plan, context, progress
-  completed/   archived done tasks
+        +-- github -> GitHub Issues (canonical) -> tasks/ mirrors
+        |
+        `-- local  -> tasks/ + completed/ (canonical, no gh)
+
+backlog/sprints/     execution hub: plan, context, progress
         ^
         |
   Claude Code / Codex / Human
@@ -31,9 +33,9 @@ backlog/
 
 | Capability | What changes |
 |------------|--------------|
-| GitHub stays the source of truth | Collaborators keep using issues, milestones, labels, and PR links |
+| One canonical tracker | Explicit `github` or fully offline `local`; runtime never switches it |
 | One active sprint file | The human and the agent read the same execution plan |
-| Thin local task mirror | AI can read issue details without another API round trip |
+| Mode-aware task files | GitHub mirrors in `github`; canonical tasks in `local` |
 | Explicit sync | Pull and refresh when you choose, not behind your back |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
@@ -51,7 +53,7 @@ npx skills add sungjunlee/dev-backlog -g -y
 ### Prerequisites
 
 - [Claude Code](https://claude.ai/code) or [Codex](https://chatgpt.com/codex)
-- [`gh` CLI](https://cli.github.com/) authenticated with `gh auth login`
+- [`gh` CLI](https://cli.github.com/) authenticated with `gh auth login` (GitHub mode only)
 - Git
 - Node.js 18+
 
@@ -67,8 +69,9 @@ Run these commands from the project you want to manage, not from the `dev-backlo
 The examples below assume you have this repo available at `/path/to/dev-backlog`. If you installed the skill with `npx skills add`, use the installed skill path instead.
 
 ```bash
-# 1. Bootstrap backlog/
-bash /path/to/dev-backlog/skills/dev-backlog/scripts/init.sh
+# 1. Choose the canonical tracker and bootstrap backlog/
+node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
+  --tracker github --non-interactive
 
 # 2. Pull open GitHub issues into backlog/tasks/
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --dry-run
@@ -87,6 +90,31 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
 # 5. Close the sprint when the work is done
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
+
+For a fully offline repository, choose `--tracker local` instead. Create and
+update canonical tasks through the configured tracker lifecycle, use normalized
+refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
+`sprint-close` commands. Local mode deliberately does not invent milestones,
+PR relationships, sprint/progress mirrors, comments, or closing-keyword links.
+Those requests fail before side effects with actionable remediation; JSON-capable
+commands return the same structured error contract.
+
+For task `list`, `read`, `create`, `update`, and `close`, the stable invocation
+boundary is the configured adapter exported by `scripts/tracker.js`. Operators
+and agents resolve it with the target `backlogDir` and call those methods in
+either mode; the exact procedure and signatures are documented in
+[the process guide](skills/dev-backlog/references/process.md#required-core-lifecycle-invocation-boundary).
+
+### Upgrade behavior
+
+There is zero automatic migration. A repository whose existing
+`backlog/config.yml` has no `tracker:` key continues in GitHub mode with its
+existing `#N`, numeric `issue_number`, task-mirror, milestone, mirror, progress,
+comment, and closing behavior. Run `setup-dev-backlog.js` to pin that legacy
+GitHub authority before making any later explicit switch. Setup never migrates
+task files and runtime never chooses a tracker from availability or failure.
+The implementation-level contract and proof map live in
+[docs/tracker-adapter-design.md](docs/tracker-adapter-design.md).
 
 Then use the skill during your coding session:
 
@@ -157,14 +185,14 @@ Users can log in and access protected API endpoints.
 
 ## Daily Workflow
 
-1. Pull GitHub issues into `backlog/tasks/`.
-2. Generate or update the active sprint file.
+1. Read the configured tracker; in GitHub mode, explicitly pull issues into `backlog/tasks/`.
+2. Create or read canonical tasks and generate the active sprint file.
 3. Read the sprint before you code.
 4. Work batch by batch, not issue by issue across ten tabs.
 5. Update `Running Context` and `Progress` as you learn things.
 6. Close the sprint explicitly when the work is really done.
 
-This is simple on purpose. The issue tracker handles collaboration. The sprint file handles execution.
+The configured tracker handles task truth. The sprint file handles execution.
 
 ## Optional extensions
 
@@ -296,9 +324,9 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 
 | Decision | Why |
 |----------|-----|
-| GitHub Issues are the source of truth | Collaborators already live there |
+| Exactly one tracker owns task truth | GitHub collaboration and offline local work share one core lifecycle without becoming co-authoritative |
 | Sprint files are the execution hub | One file carries plan, context, and progress across sessions |
-| Task files stay thin | Sync cache only; decisions belong in the sprint file |
+| Task-file authority is mode-specific | Thin mirrors in GitHub mode; canonical active/completed files in local mode |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
 | Task-file format is Backlog.md-compatible | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format; `sprints/` and `gh` sync are dev-backlog additions |

@@ -1,10 +1,10 @@
 # Tracker Adapter Design Contract
 
-Status: accepted target design for issue #272. Runtime evidence was inventoried
-at commit `019a6ec`. Issues #273-#275 now implement configured selection,
-tracker-neutral references, and the GitHub adapter wiring described below.
-Local persistence (#276) remains future work. GitHub remains the compatibility
-baseline.
+Status: implemented foundation with dual-mode acceptance proof on issue #278's
+implementation branch. Runtime evidence was originally inventoried at commit
+`019a6ec`; merged issues #273-#277 provide selection, identity, GitHub wiring,
+local persistence, and setup. GitHub remains the compatibility baseline. O8/O9
+stay active until the proof branch is merged and recorded.
 
 This document froze the smallest tracker boundary that can support another
 canonical task store without weakening existing GitHub behavior. The #272
@@ -13,7 +13,7 @@ foundation state is recorded separately below. These changes do not persist
 local tasks, alter setup, or rewrite command, Markdown, JSON, sprint, or
 task-mirror compatibility surfaces.
 
-## Runtime Adapter State (#273-#275)
+## Runtime Adapter State (#273-#278)
 
 `backlog/config.yml` selects one `tracker`, initially `github` or `local`.
 Repositories without that key use `github` as a deterministic compatibility
@@ -35,15 +35,40 @@ task store, allocates collision-safe parent IDs under an exclusive lock with
 atomic same-filesystem publication, preserves human body/AC bytes on
 metadata-only updates, archives on close without overwrite, reports no optional
 capabilities, and never invokes `gh` or falls back. In local mode these task
-files are canonical; GitHub mode continues to treat them as mirrors. Wiring the
-existing GitHub-oriented orchestration flows (sync, mirror, progress, triage,
-setup) onto local and the dual-mode documentation sweep remain #277/#278 work.
+files are canonical; GitHub mode continues to treat them as mirrors.
+`setup-dev-backlog.js` (#277) persists a deliberate choice without reserializing
+user YAML or migrating tasks. Issue #278 adds the offline dual-mode executable
+proof and aligns the public documentation with this runtime.
 
-## Current Runtime Evidence
+### Shared unsupported-capability boundary
 
-Everything in this section describes the runtime at `019a6ec`, before the
-tracker seam exists. The current runtime has no configured tracker resolver:
-GitHub Issues are task truth, production callers either execute `gh` directly
+`tracker.js` owns `UnsupportedTrackerCapabilityError` and its serializer. The
+stable code is `TRACKER_CAPABILITY_UNSUPPORTED`; serialized errors contain
+exactly `code`, `tracker`, `capability`, `message`, and `remediation`. A public
+JSON command wraps that shape once as `{ "error": ... }`, writes it to stdout,
+and exits non-zero. Human commands write the same message and remediation to
+stderr. Capability gates run before provider/filesystem effects and never
+change `backlog/config.yml` or resolve another tracker.
+
+### Dual-mode executable proof (#278)
+
+`skills/dev-backlog/scripts/tracker-cycle.acceptance.test.js` is the release
+proof. Its table-driven `github` and `local` rows cross real temporary-file and
+CLI/subprocess boundaries without network access. The GitHub row starts with a
+tracker-less legacy config, records fake-`gh` argv, and freezes `#N`, numeric
+`issue_number`, task mirror bytes/body preservation, milestone, sprint mirror,
+progress/PR/comment, close, and final read/list behavior without rewriting the
+config. The local row performs explicit setup, canonical create, normalized
+Plan orientation, read/update/body preservation, Done archive, sprint close,
+and final read/list with an execution-trap `gh` that records zero calls. A
+capability table covers all six optional features plus representative JSON and
+human public boundaries.
+
+## Pre-Seam Baseline Inventory
+
+Everything in this historical inventory describes the runtime at `019a6ec`, before the
+tracker seam existed. That baseline had no configured tracker resolver:
+GitHub Issues were task truth, production callers either executed `gh` directly
 or call GitHub-specific helpers, sprint Plan items use numeric `#N` references,
 and task mirrors encode the same number in `BACK-N`-style names and IDs.
 
@@ -252,25 +277,30 @@ removing or silently changing an existing field is not.
 
 ## Verification Map
 
-This map is the handoff contract for the three later foundation issues. It
-does not authorize local persistence (#276) or setup automation (#277).
+This map records the implemented foundation leaves and their proof ownership.
 
 | Later issue | Frozen sections it must satisfy | Required verification evidence |
 | --- | --- | --- |
 | #273 — configured selection and core seam | “Accepted Target Design”, “Required Tracker Interface”, exact “Failure and authority semantics”, and the exported-helper row of the Compatibility Matrix. | Unit tests for `github`/`local`/invalid/absent selection, unavailable configured adapter, capability report, unsupported capability error, no transient fallback, and compatibility exports. Assert the required operation set contains only availability, capabilities, list/read/create/update/close and identity exactly includes `{ tracker, id, ref, url? }`. Do not implement local storage or setup. |
 | #274 — tracker-neutral task references | “Numeric reference, renderer, and storage inventory”, normalized identity in “Required Tracker Interface”, and the task-file/Plan/status/next/sprint-state/close/mirror/progress rows of the Compatibility Matrix. | Parser/renderer golden tests for legacy `#N`, additive local `{PREFIX}-N`, exact-match collisions, invalid/mixed fixtures, byte-compatible GitHub Plan/mirror output, additive JSON identity, and retained GitHub `issue_number`. No historical rewrite and no local persistence. |
 | #275 — GitHub behavior behind the seam | “Direct `gh` invocation inventory”, “GitHub-specific helpers and injection seams”, “Optional Capabilities”, failure rules, and every GitHub behavior row of the Compatibility Matrix. | A source scan proving core callers no longer own direct GitHub task lifecycle calls; mocked golden argv/results for every inventoried call family; existing marker/content safety tests; triage/progress/mirror regression tests; full Node and smoke suites. Explicitly GitHub-scoped optional modules may still execute `gh`; capability absence must fail clearly. |
+| #276 — local canonical persistence | Required lifecycle, identity, and authority/failure semantics. | Offline lifecycle, exact identity, collision-safe allocation, body preservation, fail-closed storage, recovery, and archive tests with no GitHub calls. |
+| #277 — explicit setup | Persisted selection and zero-migration authority rules. | Fresh/legacy setup process tests, byte-idempotent config mutation, provider isolation, atomic publication, and explicit-switch refusal/repair evidence. |
+| #278 — dual-mode release proof | Compatibility Matrix, shared unsupported-capability boundary, and documentation/runtime alignment. | `tracker-cycle.acceptance.test.js` table rows, fake/trapped `gh`, exact GitHub argv/bytes/aliases, offline local lifecycle, all-capability typed errors, representative public JSON/human errors, plus repository-wide gates. |
 
-For all three issues, the repository-wide regression gate remains:
+The repository-wide regression gate is:
 
 ```bash
 git diff --check
 node --test skills/*/scripts/*.test.js
+node --test skills/dev-backlog/scripts/tracker-cycle.acceptance.test.js
+bash skills/dev-backlog/scripts/smoke-test.sh
+node skills/dev-backlog/scripts/objectives-check.js --json
 node skills/dev-backlog/scripts/component-lint.js --json
 node skills/dev-backlog/scripts/capabilities-doctor.js --json
+node skills/dev-backlog/scripts/backlog-doctor.js --json
+npx --yes skills add . -l
 ```
 
-Issue #275 additionally owns the existing smoke and mocked CLI coverage named
-in its acceptance criteria. None of #273-#275 may claim proof by adding local
-task persistence, tracker-aware setup, or a second canonical store; those are
-separate later leaves with their own acceptance criteria.
+The phase boundaries remain historical ownership boundaries; no leaf makes two
+task stores co-authoritative or retroactively rewrites GitHub repositories.

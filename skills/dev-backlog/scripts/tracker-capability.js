@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
 const { readConfig } = require("./lib.js");
-const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+  writeTrackerCliError,
+} = require("./tracker.js");
 const { closeMilestone } = require("./github-milestones.js");
 
 function requireCapability(capability, backlogDir = "backlog") {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir));
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
   return invokeCapability(resolved, capability, () => resolved);
 }
 
@@ -25,6 +29,10 @@ function main() {
     }
     throw new Error(`Unknown tracker capability operation: ${operation}`);
   } catch (error) {
+    if (writeTrackerCliError(error)) {
+      process.exitCode = 1;
+      return;
+    }
     console.error(error.message);
     process.exitCode = 1;
   }

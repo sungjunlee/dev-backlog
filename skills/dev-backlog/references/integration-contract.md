@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `backlog/sprints/*.md` with `status: active` is the active execution hub: frontmatter identifies lifecycle and routing state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are GitHub issue mirrors. Task files carry issue bodies and local Acceptance Criteria checkboxes; sprint files remain the execution log.
+- `backlog/tasks/` and `backlog/completed/` have mode-specific authority. With `tracker: github` they are derived issue mirrors; with `tracker: local` they are the canonical active/completed task store. Task files carry bodies and Acceptance Criteria checkboxes; sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -29,6 +29,37 @@ bash skills/dev-backlog/scripts/next.sh --json
 Both commands emit one JSON document to stdout with `schema_version: 1`. Tracker-neutral identity is an additive schema-v1 extension: existing consumers may ignore the new fields, and no existing field or GitHub value changes. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
 
 Ambiguous active sprint state is fail-loud in JSON mode: the command exits non-zero and writes the error to stderr instead of emitting partial JSON. Missing `## ` sections degrade to empty strings or arrays as shown below.
+
+## Tracker Selection and Capability Error Surface
+
+`backlog/config.yml` selects exactly one canonical tracker. A missing key is the
+zero-migration GitHub compatibility default; availability probes and operation
+failures never select another adapter. Existing GitHub `#N`, numeric
+`issue_number`, filenames, Markdown, argv, and provider behavior remain aliases
+with unchanged values. Local Plan items use `{PREFIX}-N[.M]`, and their
+`issue_number` is `null`.
+
+Optional provider capabilities are `milestones`, `pull-request-relationships`,
+`mirrors`, `progress-issues`, `comments`, and `closing-semantics`. A configured
+tracker that does not report one must fail before effects with this serialized
+shape:
+
+```json
+{
+  "error": {
+    "code": "TRACKER_CAPABILITY_UNSUPPORTED",
+    "tracker": "local",
+    "capability": "milestones",
+    "message": "Tracker \"local\" does not support capability \"milestones\".",
+    "remediation": "Use tracker \"local\" without \"milestones\", or explicitly change backlog/config.yml to a tracker that supports it before retrying. No tracker switch was attempted."
+  }
+}
+```
+
+JSON-capable public commands emit exactly that one document to stdout and exit
+non-zero. Human boundaries emit the same `message` and `remediation` to stderr.
+`tracker.js` is the single implementation owner for the typed error and
+serializer; command entry points must not copy or reshape it.
 
 Top-level schema:
 
@@ -399,7 +430,8 @@ This allows comment upserts to stay idempotent and prevents duplicate machine co
 - **No sprint file**: actors skip sprint tracking entirely. Tasks still work standalone.
 - **No `_context.md`**: ignored silently.
 - **Missing section in sprint**: treated as empty.
-- **No task file for an issue**: actors that can access GitHub may read directly via `gh`; `dev-relay` does this today.
+- **No GitHub mirror file**: GitHub-capable actors may read the canonical issue through the configured adapter; local mode must fail a missing canonical file rather than call `gh`.
+- **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate local state, or switch trackers.
 - **No relay manifest path**: progress reporting stays backlog-only.
 
 ## Cross-Project Smoke Test
