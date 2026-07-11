@@ -364,4 +364,147 @@ describe("local allocation critical section", () => {
     const strays = fs.readdirSync(path.join(backlogDir, "tasks")).filter((f) => f.includes(".tmp"));
     assert.deepEqual(strays, []);
   });
+
+  it("serializes update and close on the same store lock as create", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    const contended = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      lock: { retries: 0, delayMs: 1 },
+    });
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    fs.writeFileSync(lockPath, String(process.pid));
+
+    // A held store lock blocks update and close, not just create.
+    assert.throws(() => contended.update("BACK-1", { status: "In Progress" }), LocalStoreError);
+    assert.throws(() => contended.close("BACK-1"), LocalStoreError);
+    assert.match(read(backlogDir, "tasks", "BACK-1 - one.md"), /^status: To Do$/m);
+
+    fs.unlinkSync(lockPath);
+    adapter.update("BACK-1", { status: "In Progress" });
+    assert.ok(!fs.existsSync(lockPath), "update releases the store lock");
+    adapter.close("BACK-1");
+    assert.ok(!fs.existsSync(lockPath), "close releases the store lock");
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - one.md"]);
+  });
+});
+
+describe("local canonical identity — fail closed on corruption", () => {
+  it("treats duplicate same-id files in one store as corruption", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [
+        ["BACK-1 - one.md", taskFile({ id: 1, title: "One" })],
+        ["BACK-1 - dup.md", taskFile({ id: 1, title: "Dup" })],
+      ],
+    });
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list(), LocalStoreError);
+  });
+
+  it("rejects a filename/frontmatter id mismatch rather than trusting the filename", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 2, title: "Mismatch" })]],
+    });
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list(), LocalStoreError);
+  });
+
+  it("rejects the same id living in both active and completed stores", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - active.md", taskFile({ id: 1, title: "Active" })]],
+      seedCompleted: [["BACK-1 - archived.md", taskFile({ id: 1, title: "Archived", status: "Done" })]],
+    });
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list({ state: "all" }), LocalStoreError);
+  });
+});
+
+describe("local store-wide exact-id uniqueness on close", () => {
+  it("refuses to archive over a completed twin with a different slug and preserves bytes", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - active-slug.md", taskFile({ id: 1, title: "Active", body: "\n## Description\nactive\n" })]],
+      seedCompleted: [["BACK-1 - other-slug.md", taskFile({ id: 1, title: "Other", status: "Done", body: "\n## Description\narchived\n" })]],
+    });
+    const activeBefore = read(backlogDir, "tasks", "BACK-1 - active-slug.md");
+    const completedBefore = read(backlogDir, "completed", "BACK-1 - other-slug.md");
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - active-slug.md"), activeBefore);
+    assert.equal(read(backlogDir, "completed", "BACK-1 - other-slug.md"), completedBefore);
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - other-slug.md"]);
+  });
+});
+
+describe("local rendered metadata round-trips through read", () => {
+  it("reads back non-empty labels and dependencies as arrays, not malformed objects", (t) => {
+    const { adapter } = makeStore(t);
+    adapter.create({
+      title: "Meta",
+      labels: ["infra", "urgent"],
+      dependencies: ["BACK-9", "BACK-8"],
+    });
+    const task = adapter.read("BACK-1");
+    assert.deepEqual(task.labels, ["infra", "urgent"]);
+    assert.deepEqual(task.dependencies, ["BACK-9", "BACK-8"]);
+    const listed = adapter.list().find((entry) => entry.ref === "BACK-1");
+    assert.deepEqual(listed.labels, ["infra", "urgent"]);
+    assert.deepEqual(listed.dependencies, ["BACK-9", "BACK-8"]);
+  });
+});
+
+describe("local body normalization", () => {
+  it("normalizes a create body without a leading newline into a readable task", (t) => {
+    const { adapter } = makeStore(t);
+    adapter.create({ title: "Plain", body: "just plain text without a leading newline" });
+    const task = adapter.read("BACK-1");
+    assert.match(task.body, /just plain text without a leading newline/);
+    assert.ok(task.body.startsWith("\n"), "body is separated from the frontmatter fence");
+  });
+
+  it("normalizes an update body without a leading newline", (t) => {
+    const { adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    adapter.update("BACK-1", { body: "replacement without a leading newline" });
+    const task = adapter.read("BACK-1");
+    assert.match(task.body, /replacement without a leading newline/);
+  });
+});
+
+describe("local canonical directory containment", () => {
+  it("rejects a task_prefix that could escape tasks/completed and reports unavailable", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-esc-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const backlogDir = path.join(root, "backlog");
+    fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
+    fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
+
+    for (const bad of ["../ESC", "a/b", "a\\b", "..", "with space"]) {
+      const adapter = createLocalAdapter({ backlogDir, config: { task_prefix: bad }, now: FIXED_NOW });
+      assert.equal(adapter.availability().available, false, `prefix ${JSON.stringify(bad)} must be unavailable`);
+      assert.throws(() => adapter.create({ title: "Escape" }), LocalStoreError);
+    }
+
+    // Nothing escaped the canonical directories.
+    assert.deepEqual(fs.readdirSync(backlogDir).filter((name) => name.includes("ESC")), []);
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+  });
+});
+
+describe("local pre-mutation unsupported-option failures", () => {
+  it("rejects provider-specific options on create, update, and close before mutating", (t) => {
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+
+    assert.throws(() => adapter.create({ title: "Milestoned", milestone: "v1" }), LocalStoreError);
+    assert.throws(() => adapter.update("BACK-1", { status: "Done", milestone: "v1" }), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1", { reason: "done enough" }), LocalStoreError);
+
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), before, "no option-rejected mutation touched bytes");
+    assert.deepEqual(listNames(backlogDir, "tasks"), ["BACK-1 - one.md"]);
+    assert.deepEqual(listNames(backlogDir, "completed"), []);
+  });
 });

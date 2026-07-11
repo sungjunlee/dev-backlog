@@ -30,6 +30,42 @@ const LOCK_FILE = ".local-tracker.lock";
 const DONE_STATUS = "Done";
 const DEFAULT_LOCK = Object.freeze({ retries: 100, delayMs: 20 });
 
+// Only provider-neutral fields are accepted; every other option (milestone,
+// pull-request relationship, mirror, progress issue, comment, closing reason,
+// …) maps to an optional capability the local store does not have and must be
+// rejected before any mutation rather than silently ignored.
+const CREATE_OPTIONS = Object.freeze([
+  "title",
+  "id",
+  "body",
+  "status",
+  "labels",
+  "priority",
+  "dependencies",
+]);
+const UPDATE_OPTIONS = Object.freeze([
+  "title",
+  "status",
+  "priority",
+  "labels",
+  "dependencies",
+  "body",
+  "updated_date",
+]);
+const CLOSE_OPTIONS = Object.freeze([]);
+
+function rejectUnsupportedOptions(operation, options, allowed) {
+  if (options === null || typeof options !== "object") return;
+  const extra = Object.keys(options).filter((key) => !allowed.includes(key));
+  if (extra.length) {
+    throw new LocalStoreError(
+      `local ${operation} does not support option${extra.length === 1 ? "" : "s"}: ` +
+        `${extra.join(", ")}. The local tracker reports no optional capabilities, so ` +
+        "provider-specific fields must be handled before dispatch."
+    );
+  }
+}
+
 /** Every recoverable local-store failure surfaces as this actionable type. */
 class LocalStoreError extends Error {
   constructor(message, options) {
@@ -76,8 +112,36 @@ function parseFrontmatterEntries(frontmatter) {
   return entries;
 }
 
+/**
+ * Resolve one entry to its value. Block sequences (`key:` followed by `  - x`
+ * lines) are decoded here because the shared simple YAML parser only consumes
+ * `key: value` lines and would otherwise return a malformed object for the
+ * exact block syntax we render on create/update.
+ */
 function entryValue(entry) {
+  const head = entry.lines[0] || "";
+  const colon = head.indexOf(":");
+  const inline = colon === -1 ? "" : head.slice(colon + 1).trim();
+  if (!inline) {
+    const items = [];
+    for (const line of entry.lines.slice(1)) {
+      const item = line.match(/^\s*-\s+(.*)$/);
+      if (item) items.push(unquoteBlockItem(item[1].trim()));
+    }
+    if (items.length) return items;
+  }
   return parseSimpleYaml(entry.lines.join("\n"))[entry.key];
+}
+
+function unquoteBlockItem(text) {
+  if (
+    text.length >= 2 &&
+    ((text.startsWith('"') && text.endsWith('"')) ||
+      (text.startsWith("'") && text.endsWith("'")))
+  ) {
+    return text.slice(1, -1).replace(/''/g, "'");
+  }
+  return text;
 }
 
 function frontmatterObject(entries) {
@@ -124,6 +188,35 @@ function stringifyFrontmatter(entries) {
   return `---\n${inner}\n---`;
 }
 
+/**
+ * A task body must be separated from the closing `---` by a newline; otherwise
+ * `---body` collapses into the frontmatter fence and the file reads back as
+ * malformed. Callers may pass a body without the leading newline, so normalize
+ * it here rather than trusting the caller's byte layout.
+ */
+function normalizeBody(body) {
+  return body.startsWith("\n") ? body : `\n${body}`;
+}
+
+/**
+ * The configured task prefix flows into filenames and identity refs, so it must
+ * never carry path separators, traversal, NUL, or whitespace that could steer a
+ * write outside the canonical `tasks/` and `completed/` directories. Returns an
+ * actionable reason string when the prefix is unusable, or null when it is safe.
+ */
+function taskPrefixIssue(prefix) {
+  if (typeof prefix !== "string" || !prefix.length) {
+    return "task_prefix must be a non-empty string";
+  }
+  if (/[\s/\\\0]/.test(prefix)) {
+    return `task_prefix ${JSON.stringify(prefix)} must not contain whitespace, path separators, or NUL`;
+  }
+  if (prefix.includes("..")) {
+    return `task_prefix ${JSON.stringify(prefix)} must not contain traversal segments`;
+  }
+  return null;
+}
+
 // --- normalized task shape ---
 
 function normalizeTask({ identity, object, body, state }) {
@@ -162,9 +255,23 @@ function createLocalAdapter(options = {}) {
   const lockConfig = { ...DEFAULT_LOCK, ...(options.lock || {}) };
   const testHooks = options.testHooks || {};
   const refOptions = { taskPrefix };
+  const prefixIssue = taskPrefixIssue(taskPrefix);
+
+  function assertUsablePrefix() {
+    if (prefixIssue) throw new LocalStoreError(`local tracker ${prefixIssue}`);
+  }
 
   function dirPath(kind) {
     return path.join(backlogDir, kind);
+  }
+
+  /** Refuse any write whose resolved parent is not exactly the target dir. */
+  function assertWithin(dir, dest) {
+    if (path.resolve(path.dirname(dest)) !== path.resolve(dir)) {
+      throw new LocalStoreError(
+        `refusing to write a local task outside its canonical directory: ${dest}`
+      );
+    }
   }
 
   function today() {
@@ -206,10 +313,20 @@ function createLocalAdapter(options = {}) {
       throw new LocalStoreError(`cannot read local ${kind} directory: ${error.message}`, { cause: error });
     }
     const found = [];
+    const byId = new Map();
     for (const name of names) {
       if (!name.endsWith(".md")) continue;
       const identity = parseTaskFileName(name, { taskPrefix, tracker: "local" });
-      if (identity) found.push({ identity, file: name });
+      if (!identity) continue;
+      const seen = byId.get(identity.id);
+      if (seen) {
+        throw new LocalStoreError(
+          `local ${kind} store is corrupt: ${identity.ref} is claimed by multiple files ` +
+            `(${seen}, ${name}); resolve the duplicate before continuing`
+        );
+      }
+      byId.set(identity.id, name);
+      found.push({ identity, file: name });
     }
     return found;
   }
@@ -218,12 +335,35 @@ function createLocalAdapter(options = {}) {
     return listDir(kind).find((entry) => entry.identity.id === identity.id);
   }
 
+  /**
+   * Locate one identity across both stores. Presence in both stores is
+   * canonical-store corruption (an exact id must be unique store-wide), so the
+   * caller decides how to fail rather than silently first-matching.
+   */
+  function locateEntry(identity) {
+    const active = findEntry(TASKS_DIR, identity);
+    const completed = findEntry(COMPLETED_DIR, identity);
+    if (active && completed) {
+      throw new LocalStoreError(
+        `local task ${identity.ref} exists in both active and completed stores; ` +
+          "an exact id must be unique across the canonical stores"
+      );
+    }
+    return { active, completed };
+  }
+
   function readTask(kind, entry) {
     const full = path.join(dirPath(kind), entry.file);
     const content = fs.readFileSync(full, "utf-8");
     const split = splitDocument(content);
     if (!split) return null;
     const object = frontmatterObject(parseFrontmatterEntries(split.frontmatter));
+    if (object.id !== undefined && String(object.id) !== entry.identity.ref) {
+      throw new LocalStoreError(
+        `local task ${entry.identity.ref} is corrupt: frontmatter id ` +
+          `${JSON.stringify(String(object.id))} does not match its filename`
+      );
+    }
     const state = kind === COMPLETED_DIR ? "closed" : "open";
     return normalizeTask({ identity: entry.identity, object, body: split.body, state });
   }
@@ -268,7 +408,10 @@ function createLocalAdapter(options = {}) {
     }
   }
 
-  function withAllocationLock(fn) {
+  // Every create/update/close mutation runs inside this single exclusive
+  // section so reads and writes across the two stores are serializable; a close
+  // can never race an update into archiving stale bytes.
+  function withStoreLock(fn) {
     const fd = acquireLock();
     try {
       return fn();
@@ -297,8 +440,9 @@ function createLocalAdapter(options = {}) {
   // --- atomic publication: temp on same fs, hard-link (no overwrite), unlink ---
 
   function publishNewFile(dir, fileName, content) {
-    fs.mkdirSync(dir, { recursive: true });
     const dest = path.join(dir, fileName);
+    assertWithin(dir, dest);
+    fs.mkdirSync(dir, { recursive: true });
     const tmp = tempPath(dir, path.basename(fileName));
     fs.writeFileSync(tmp, content);
     try {
@@ -321,6 +465,7 @@ function createLocalAdapter(options = {}) {
 
   function replaceFileAtomic(dir, fileName, content) {
     const dest = path.join(dir, fileName);
+    assertWithin(dir, dest);
     const tmp = tempPath(dir, path.basename(fileName));
     fs.writeFileSync(tmp, content);
     try {
@@ -353,7 +498,7 @@ function createLocalAdapter(options = {}) {
     ];
     if (dependencies.length) entries.push({ key: "dependencies", lines: renderFieldLines("dependencies", dependencies) });
     entries.push({ key: "created_date", lines: [renderScalar("created_date", today())] });
-    return `${stringifyFrontmatter(entries)}${body}`;
+    return `${stringifyFrontmatter(entries)}${normalizeBody(body)}`;
   }
 
   // --- the seven required operations ---
@@ -361,6 +506,9 @@ function createLocalAdapter(options = {}) {
   function availability() {
     if (typeof backlogDir !== "string" || !backlogDir.trim()) {
       return { available: false, reason: "local tracker backlogDir is not configured" };
+    }
+    if (prefixIssue) {
+      return { available: false, reason: `local tracker ${prefixIssue}` };
     }
     for (const probe of [backlogDir, dirPath(TASKS_DIR), dirPath(COMPLETED_DIR)]) {
       let stat;
@@ -388,8 +536,17 @@ function createLocalAdapter(options = {}) {
         ? [COMPLETED_DIR]
         : [TASKS_DIR];
     const tasks = [];
+    const seen = new Map();
     for (const kind of kinds) {
       for (const entry of listDir(kind)) {
+        const prior = seen.get(entry.identity.id);
+        if (prior && prior !== kind) {
+          throw new LocalStoreError(
+            `local task ${entry.identity.ref} exists in both active and completed stores; ` +
+              "an exact id must be unique across the canonical stores"
+          );
+        }
+        seen.set(entry.identity.id, kind);
         const task = readTask(kind, entry);
         if (task) tasks.push(task);
       }
@@ -399,18 +556,18 @@ function createLocalAdapter(options = {}) {
 
   function read(selector) {
     const identity = resolveIdentity(selector);
-    for (const kind of [TASKS_DIR, COMPLETED_DIR]) {
-      const entry = findEntry(kind, identity);
-      if (entry) {
-        const task = readTask(kind, entry);
-        if (task) return task;
-        throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
-      }
-    }
-    throw new LocalStoreError(`local task not found: ${identity.ref}`);
+    const { active, completed } = locateEntry(identity);
+    const kind = active ? TASKS_DIR : COMPLETED_DIR;
+    const entry = active || completed;
+    if (!entry) throw new LocalStoreError(`local task not found: ${identity.ref}`);
+    const task = readTask(kind, entry);
+    if (!task) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
+    return task;
   }
 
   function create(input = {}) {
+    rejectUnsupportedOptions("create", input, CREATE_OPTIONS);
+    assertUsablePrefix();
     const title = input.title;
     if (typeof title !== "string" || !title.trim()) {
       throw new LocalStoreError("local task creation requires a non-empty title");
@@ -422,7 +579,7 @@ function createLocalAdapter(options = {}) {
       requestedId = parsed.id;
     }
 
-    return withAllocationLock(() => {
+    return withStoreLock(() => {
       const id = requestedId ?? allocateParentId();
       if (idExists(id)) {
         throw new LocalStoreError(`local task ${taskPrefix}-${id} already exists`);
@@ -447,59 +604,72 @@ function createLocalAdapter(options = {}) {
   const NEUTRAL_LIST_FIELDS = ["labels", "dependencies"];
 
   function update(selector, changes = {}) {
+    rejectUnsupportedOptions("update", changes, UPDATE_OPTIONS);
+    assertUsablePrefix();
     const identity = resolveIdentity(selector);
-    const entry = findEntry(TASKS_DIR, identity);
-    if (!entry) {
-      throw new LocalStoreError(`no active local task to update: ${identity.ref}`);
-    }
-    const full = path.join(dirPath(TASKS_DIR), entry.file);
-    const content = fs.readFileSync(full, "utf-8");
-    const split = splitDocument(content);
-    if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
 
-    const fieldChanges = {};
-    for (const field of NEUTRAL_FIELDS) {
-      if (changes[field] !== undefined) fieldChanges[field] = String(changes[field]);
-    }
-    for (const field of NEUTRAL_LIST_FIELDS) {
-      if (changes[field] !== undefined) {
-        if (!Array.isArray(changes[field])) {
-          throw new LocalStoreError(`local update ${field} must be an array`);
-        }
-        fieldChanges[field] = changes[field].map(String);
+    return withStoreLock(() => {
+      const { active: entry } = locateEntry(identity);
+      if (!entry) {
+        throw new LocalStoreError(`no active local task to update: ${identity.ref}`);
       }
-    }
-    if (changes.updated_date !== undefined) fieldChanges.updated_date = String(changes.updated_date);
+      const full = path.join(dirPath(TASKS_DIR), entry.file);
+      const content = fs.readFileSync(full, "utf-8");
+      const split = splitDocument(content);
+      if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
 
-    const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), fieldChanges);
-    const body = changes.body !== undefined ? String(changes.body) : split.body;
-    const nextContent = `${stringifyFrontmatter(entries)}${body}`;
-    replaceFileAtomic(dirPath(TASKS_DIR), entry.file, nextContent);
-    return { tracker: "local", id: identity.id, ref: identity.ref };
+      const fieldChanges = {};
+      for (const field of NEUTRAL_FIELDS) {
+        if (changes[field] !== undefined) fieldChanges[field] = String(changes[field]);
+      }
+      for (const field of NEUTRAL_LIST_FIELDS) {
+        if (changes[field] !== undefined) {
+          if (!Array.isArray(changes[field])) {
+            throw new LocalStoreError(`local update ${field} must be an array`);
+          }
+          fieldChanges[field] = changes[field].map(String);
+        }
+      }
+      if (changes.updated_date !== undefined) fieldChanges.updated_date = String(changes.updated_date);
+
+      const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), fieldChanges);
+      const body = changes.body !== undefined ? normalizeBody(String(changes.body)) : split.body;
+      const nextContent = `${stringifyFrontmatter(entries)}${body}`;
+      replaceFileAtomic(dirPath(TASKS_DIR), entry.file, nextContent);
+      return { tracker: "local", id: identity.id, ref: identity.ref };
+    });
   }
 
-  function close(selector) {
+  function close(selector, options = {}) {
+    rejectUnsupportedOptions("close", options, CLOSE_OPTIONS);
+    assertUsablePrefix();
     const identity = resolveIdentity(selector);
-    const activeEntry = findEntry(TASKS_DIR, identity);
-    if (!activeEntry) {
-      if (findEntry(COMPLETED_DIR, identity)) {
-        return { tracker: "local", id: identity.id, ref: identity.ref };
+
+    return withStoreLock(() => {
+      // locateEntry rejects the store-wide exact-id collision (active + a
+      // completed twin under a different slug) before any bytes are touched, so
+      // close can never publish a second completed twin over a duplicate id.
+      const { active: activeEntry, completed: completedEntry } = locateEntry(identity);
+      if (!activeEntry) {
+        if (completedEntry) {
+          return { tracker: "local", id: identity.id, ref: identity.ref };
+        }
+        throw new LocalStoreError(`local task not found: ${identity.ref}`);
       }
-      throw new LocalStoreError(`local task not found: ${identity.ref}`);
-    }
 
-    const src = path.join(dirPath(TASKS_DIR), activeEntry.file);
-    const content = fs.readFileSync(src, "utf-8");
-    const split = splitDocument(content);
-    if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
+      const src = path.join(dirPath(TASKS_DIR), activeEntry.file);
+      const content = fs.readFileSync(src, "utf-8");
+      const split = splitDocument(content);
+      if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
 
-    const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), {
-      status: DONE_STATUS,
+      const entries = applyFrontmatterChanges(parseFrontmatterEntries(split.frontmatter), {
+        status: DONE_STATUS,
+      });
+      const doneContent = `${stringifyFrontmatter(entries)}${split.body}`;
+      publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
+      fs.unlinkSync(src);
+      return { tracker: "local", id: identity.id, ref: identity.ref };
     });
-    const doneContent = `${stringifyFrontmatter(entries)}${split.body}`;
-    publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
-    fs.unlinkSync(src);
-    return { tracker: "local", id: identity.id, ref: identity.ref };
   }
 
   return Object.freeze({ availability, capabilities, list, read, create, update, close });
