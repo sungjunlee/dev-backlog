@@ -29,9 +29,15 @@ configured-only resolution. Milestone, mirror, progress/PR/comment, and triage
 GitHub transports live in explicitly named provider modules and are reached only
 after their declared capability gates. Legacy helper exports remain compatibility
 shims over those owners, including their injected execution seams. The local slot
-still reports one implementation-pending reason and fails all lifecycle calls
-consistently until #276 adds persistence. This runtime does not make local task
-files canonical.
+is now implemented by `local-tracker.js` (#276): it owns the seven required
+operations over `backlog/tasks/` and `backlog/completed/` as the canonical local
+task store, allocates collision-safe parent IDs under an exclusive lock with
+atomic same-filesystem publication, preserves human body/AC bytes on
+metadata-only updates, archives on close without overwrite, reports no optional
+capabilities, and never invokes `gh` or falls back. In local mode these task
+files are canonical; GitHub mode continues to treat them as mirrors. Wiring the
+existing GitHub-oriented orchestration flows (sync, mirror, progress, triage,
+setup) onto local and the dual-mode documentation sweep remain #277/#278 work.
 
 ## Current Runtime Evidence
 

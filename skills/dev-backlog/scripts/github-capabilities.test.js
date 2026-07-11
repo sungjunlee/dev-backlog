@@ -115,7 +115,8 @@ describe("configured-only failure before effects", () => {
       throw new Error("must not execute");
     };
 
-    assert.throws(() => loadOpenIssues({ config: { tracker: "local" }, execFile }), /local/);
+    // Optional-capability GitHub flows stay fail-closed for explicit local:
+    // they raise the tracker+capability error before any GitHub execution.
     assert.throws(() => syncMirror({ backlogDir, execFile }), /local/);
     assert.throws(() => syncProgress({ month: "2026-07", backlogDir, execFile }), /local/);
     assert.throws(() => createSprintFile({
@@ -128,6 +129,10 @@ describe("configured-only failure before effects", () => {
       collectSnapshot({ repo: "acme/widgets", trackerConfig: { tracker: "local" }, execFile }),
       /local/
     );
+
+    // Required-op flows resolve the local adapter (post-#276) rather than
+    // GitHub. They must never execute gh or fall back to the GitHub transport.
+    loadOpenIssues({ config: { tracker: "local" }, execFile });
 
     const report = path.join(root, "report.md");
     fs.writeFileSync(report, [
@@ -143,8 +148,7 @@ describe("configured-only failure before effects", () => {
         return { status: 0, stdout: "", stderr: "" };
       },
     });
-    assert.equal(applied.exitCode, 1);
-    assert.match(applied.error, /local/);
+    assert.equal(applied.exitCode, 0);
     assert.equal(executions, 0);
     assert.equal(fs.existsSync(path.join(backlogDir, "sprints")), false);
     assert.equal(fs.existsSync(path.join(backlogDir, "triage", "2026-07-11-apply.log")), false);

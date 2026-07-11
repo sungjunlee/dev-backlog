@@ -111,9 +111,40 @@ statuses: ["To Do", "In Progress", "Done"]
 
 `tracker` accepts only `github` or `local`. A missing key deterministically
 defaults to `github`; runtime availability never changes that selection or
-falls back to the other adapter. The `local` adapter is intentionally
-unavailable until #276 implements persistence, and existing GitHub callers are
-not moved behind the seam until #275.
+falls back to the other adapter.
+
+## Local Canonical Storage (`tracker: local`)
+
+In local mode the `backlog/tasks/` and `backlog/completed/` files are the
+**canonical** task store, not GitHub mirrors. `local-tracker.js` owns every
+filesystem rule behind the seven required operations; callers only ever see the
+normalized identity `{ tracker: "local", id, ref: "{PREFIX}-{N}[.M]" }` — there
+is no fabricated `url`.
+
+- **Allocation.** `create` allocates the next positive **parent** integer by
+  scanning the exact configured-prefix IDs across both `tasks/` and
+  `completed/` (so a closed `BACK-7` still reserves `7`). `BACK-1` and `BACK-11`
+  are kept distinct by exact-match parsing. An explicit decimal `id` (e.g.
+  `1.2`) creates a subtask only when that exact ID is free; decimals never
+  shift parent allocation and are not auto-created.
+- **Atomic publication.** Allocation runs inside an exclusive lock
+  (`backlog/.local-tracker.lock`); the new file is written to a same-directory
+  temp and hard-linked into place, so a colliding destination fails instead of
+  overwriting. The lock and temp are always released, including on error.
+- **Body preservation.** A metadata/state-only `update` rewrites only the
+  requested frontmatter keys and leaves the human-authored description,
+  headings, and `AC:BEGIN/END` checkbox bytes untouched. Filenames stay stable
+  even when the frontmatter `title` changes. The body is replaced only when the
+  caller supplies one explicitly.
+- **Archive on close.** `close` moves exactly one active task into
+  `backlog/completed/`, writes `status: Done`, and refuses an existing
+  destination rather than overwriting; a task that is already archived returns a
+  clear already-closed result without data loss.
+- **No provider features.** Local reports **no** optional capabilities. Any
+  milestone, PR relationship, mirror, progress-issue, comment, or
+  closing-semantics attempt fails with the existing tracker+capability error
+  before any filesystem mutation, and the runtime never invokes `gh` or falls
+  back to GitHub for explicit local.
 
 dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;
 `project_name` is retained as metadata. Other Backlog.md config fields are not

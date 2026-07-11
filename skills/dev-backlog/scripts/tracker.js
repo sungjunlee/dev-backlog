@@ -6,6 +6,7 @@
  */
 
 const { createGithubAdapter } = require("./github-tracker.js");
+const { createLocalAdapter } = require("./local-tracker.js");
 
 const TRACKER_KEYS = Object.freeze(["github", "local"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
@@ -26,8 +27,7 @@ const CAPABILITY_NAMES = Object.freeze([
   "closing-semantics",
 ]);
 
-const LOCAL_UNAVAILABLE_REASON =
-  "local tracker persistence is not implemented; issue #276 adds it";
+const DEFAULT_BACKLOG_DIR = "backlog";
 
 class TrackerConfigurationError extends Error {
   constructor(value) {
@@ -171,10 +171,12 @@ function resolveTracker(config, { adapters = TRACKER_ADAPTERS } = {}) {
   return Object.freeze({ tracker, adapter, availability });
 }
 
-function resolveConfiguredTracker(config, { execFile, adapters } = {}) {
-  const registered = adapters || (execFile
-    ? { ...TRACKER_ADAPTERS, github: createGithubAdapter({ execFile }) }
-    : TRACKER_ADAPTERS);
+function resolveConfiguredTracker(config, { execFile, adapters, backlogDir } = {}) {
+  const registered = adapters || {
+    ...TRACKER_ADAPTERS,
+    github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
+    local: backlogDir ? createLocalAdapter({ backlogDir }) : TRACKER_ADAPTERS.local,
+  };
   return resolveTracker(config, { adapters: registered });
 }
 
@@ -271,21 +273,9 @@ function invokeCapability(resolved, capability, operation, ...args) {
   return operation(...args);
 }
 
-function unavailableLocalOperation() {
-  throw new TrackerUnavailableError("local", LOCAL_UNAVAILABLE_REASON);
-}
-
 const TRACKER_ADAPTERS = Object.freeze({
   github: createGithubAdapter(),
-  local: Object.freeze({
-    availability: () => ({ available: false, reason: LOCAL_UNAVAILABLE_REASON }),
-    capabilities: () => [],
-    list: unavailableLocalOperation,
-    read: unavailableLocalOperation,
-    create: unavailableLocalOperation,
-    update: unavailableLocalOperation,
-    close: unavailableLocalOperation,
-  }),
+  local: createLocalAdapter({ backlogDir: DEFAULT_BACKLOG_DIR }),
 });
 
 module.exports = {
@@ -306,4 +296,5 @@ module.exports = {
   resolveConfiguredTracker,
   invokeCapability,
   createGithubAdapter,
+  createLocalAdapter,
 };

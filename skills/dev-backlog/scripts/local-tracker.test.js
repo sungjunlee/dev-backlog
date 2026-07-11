@@ -83,8 +83,8 @@ describe("local create — allocation, atomic publish, identity", () => {
     const second = adapter.create({ title: "Second task" });
     assert.equal(second.id, "2");
     assert.deepEqual(listNames(backlogDir, "tasks"), [
-      "BACK-1 - First-task.md",
-      "BACK-2 - Second-task.md",
+      "BACK-1 - first-task.md",
+      "BACK-2 - second-task.md",
     ]);
   });
 
@@ -114,7 +114,7 @@ describe("local create — allocation, atomic publish, identity", () => {
     });
     const sub = adapter.create({ title: "Child", id: "1.2" });
     assert.deepEqual(sub, { tracker: "local", id: "1.2", ref: "BACK-1.2" });
-    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1.2 - Child.md")));
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1.2 - child.md")));
     // parent allocation still counts only integer parents
     assert.equal(adapter.create({ title: "Sibling" }).id, "2");
   });
@@ -319,7 +319,7 @@ describe("local authority — no capabilities and no gh", () => {
     adapter.close(id);
 
     assert.equal(fs.existsSync(marker), false, "gh must never be invoked by the local adapter");
-    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - Cycle.md"]);
+    assert.deepEqual(listNames(backlogDir, "completed"), ["BACK-1 - cycle.md"]);
   });
 
   it("reports no optional capabilities", (t) => {
