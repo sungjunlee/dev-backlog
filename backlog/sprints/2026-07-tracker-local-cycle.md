@@ -18,7 +18,7 @@ The same core sprint cycle is executable and documented in backward-compatible G
 - [x] #276 Add offline local canonical task adapter (~3hr) → PR #298 (merged)
 
 ### Batch 2 - Persist a deliberate setup choice (after #276)
-- [ ] #277 Add idempotent tracker-aware setup-dev-backlog (~2hr)
+- [x] #277 Add idempotent tracker-aware setup-dev-backlog (~2hr) → PR #301 (merged)
 
 ### Batch 3 - Prove both modes and align docs (after #276 and #277)
 - [ ] #278 Prove GitHub and local core sprint cycles end to end (~2hr)
@@ -34,3 +34,4 @@ The same core sprint cycle is executable and documented in backward-compatible G
 ## Progress
 - 2026-07-11: Sprint B opened as three serial batches after Sprint A and GitHub regression baseline completed; live issues #276-#278 remain the task source of truth.
 - 2026-07-11: #276 merged via PR #298 after TDD, offline lifecycle proof, real multi-process allocation, crash-recovery and fail-closed filesystem review. Final gates: Node 576 pass plus one pre-existing skip, smoke 155/155, GitHub Actions green, and all review threads resolved.
+- 2026-07-12: #277 merged via PR #301 after explicit tracker-state, byte-idempotence, provider-isolation, atomic filesystem, and setup-to-runtime scalar seam review. Final gates: Node 639 pass plus one pre-existing opt-in skip, smoke 155/155, GitHub Actions and CodeRabbit green, and zero review threads.
