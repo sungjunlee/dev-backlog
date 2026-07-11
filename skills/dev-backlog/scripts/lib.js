@@ -62,8 +62,36 @@ function parseInlineArray(raw) {
   return inner.split(",").map((part) => stripQuotes(part.trim()));
 }
 
+function stripYamlSeparationComment(raw) {
+  let quote = null;
+  const firstNonSpace = raw.search(/\S/);
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (quote === "'") {
+      if (char === "'" && raw[index + 1] === "'") index += 1;
+      else if (char === "'") quote = null;
+      continue;
+    }
+    if (quote === '"') {
+      if (char === "\\" && index + 1 < raw.length) index += 1;
+      else if (char === '"') quote = null;
+      continue;
+    }
+    const previousNonSpace = raw.slice(0, index).trimEnd().at(-1);
+    if ((char === "'" || char === '"') &&
+        (index === firstNonSpace || previousNonSpace === "[" || previousNonSpace === ",")) {
+      quote = char;
+      continue;
+    }
+    if (char === "#" && index > 0 && /[ \t]/.test(raw[index - 1])) {
+      return raw.slice(0, index);
+    }
+  }
+  return raw;
+}
+
 function parseYamlScalar(raw) {
-  const value = raw.trim();
+  const value = stripYamlSeparationComment(raw).trim();
   if (!value) return "";
   if (
     (value.startsWith('"') && value.endsWith('"')) ||
@@ -82,14 +110,42 @@ function parseYamlScalar(raw) {
   return value;
 }
 
+function isBlockScalarValue(raw) {
+  const value = stripYamlSeparationComment(raw).trim();
+  return /^(?:(?:[&!]\S+)\s+)*(?:[>|](?:[1-9][+-]?|[+-][1-9]?)?)$/.test(value);
+}
+
+function quotedScalarCloses(text, quote, start = 0) {
+  for (let index = start; index < text.length; index += 1) {
+    if (quote === "'" && text[index] === "'" && text[index + 1] === "'") {
+      index += 1;
+    } else if (quote === '"' && text[index] === "\\" && index + 1 < text.length) {
+      index += 1;
+    } else if (text[index] === quote) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseSimpleYaml(raw) {
   const root = {};
   const stack = [{ indent: -1, value: root }];
+  let physicalScalar = null;
 
   for (const line of raw.split(/\r?\n/)) {
+    if (physicalScalar && physicalScalar.kind === "block") {
+      if (!line.trim()) continue;
+      const indent = line.match(/^\s*/)[0].length;
+      if (indent > physicalScalar.indent) continue;
+      physicalScalar = null;
+    } else if (physicalScalar && physicalScalar.kind === "quoted") {
+      if (quotedScalarCloses(line, physicalScalar.quote)) physicalScalar = null;
+      continue;
+    }
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
 
-    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
     if (!match) continue;
 
     const indent = match[1].length;
@@ -108,6 +164,15 @@ function parseSimpleYaml(raw) {
     }
 
     parent[key] = parseYamlScalar(rawValue);
+    if (isBlockScalarValue(rawValue)) {
+      physicalScalar = { kind: "block", indent };
+    } else {
+      const scalar = stripYamlSeparationComment(rawValue).trimStart();
+      const quote = scalar[0];
+      if ((quote === "'" || quote === '"') && !quotedScalarCloses(scalar, quote, 1)) {
+        physicalScalar = { kind: "quoted", quote };
+      }
+    }
   }
 
   return root;

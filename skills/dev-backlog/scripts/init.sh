@@ -1,39 +1,19 @@
 #!/bin/bash
-set -uo pipefail
-# Bootstrap backlog/ directory for a new project.
+set -euo pipefail
+# Compatibility wrapper for the tracker-aware Node setup entrypoint.
 #
 # Usage: bash scripts/init.sh [project-name]
 #        project-name defaults to the current directory name.
 #
-# Creates:
-#   backlog/sprints/
-#   backlog/tasks/
-#   backlog/completed/
-#   backlog/config.yml
-
 PROJECT_NAME="${1:-$(basename "$(pwd)")}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARGS=(--project-name "$PROJECT_NAME" --non-interactive)
 
-if [ -d "backlog" ]; then
-  echo "backlog/ already exists. Nothing to do."
-  exit 0
+# The historical init.sh entrypoint created a GitHub-backed fresh config.
+# Existing configs are passed without explicit intent so their valid tracker is
+# preserved and legacy configs receive the one-time GitHub compatibility pin.
+if [ ! -f "backlog/config.yml" ]; then
+  ARGS+=(--tracker github)
 fi
 
-mkdir -p backlog/{sprints,tasks,completed}
-
-cat > backlog/config.yml << EOF
-project_name: "$PROJECT_NAME"
-task_prefix: "BACK"
-default_status: "To Do"
-statuses: ["To Do", "In Progress", "Done"]
-EOF
-
-echo "Created backlog/ structure:"
-echo "  backlog/sprints/     ← Sprint execution files"
-echo "  backlog/tasks/       ← GitHub issue mirror"
-echo "  backlog/completed/   ← Archived done tasks"
-echo "  backlog/config.yml   ← Project config (prefix: BACK)"
-echo ""
-echo "Next steps:"
-echo "  1. Set up GitHub labels: see references/github-sync.md"
-echo "  2. Pull issues: node scripts/sync-pull.js"
-echo "  3. Plan a sprint: node scripts/sprint-init.js \"topic\""
+exec node "$SCRIPT_DIR/setup-dev-backlog.js" "${ARGS[@]}"

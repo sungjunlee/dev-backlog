@@ -7,6 +7,7 @@ const {
   escapeYaml,
   readConfig,
   readTriageConfig,
+  parseSimpleYaml,
   estimateSize,
   fetchOpenIssues,
   CONFIG_DEFAULTS,
@@ -150,6 +151,73 @@ describe("readConfig", () => {
     const compatibilityConfig = readConfig(tmpDir);
     assert.equal(compatibilityConfig.tracker, "github");
     assert.equal(compatibilityConfig.task_prefix, "PROJ");
+  });
+
+  it("strips only quote-aware YAML separation comments", () => {
+    assert.deepEqual(
+      parseSimpleYaml([
+        "tracker: local # keep",
+        "plain: value#suffix",
+        "single: 'it''s # inside' # outside",
+        'double: "say \\"#\\" here" # outside',
+        "count: 75 # outside",
+        'items: ["one # inside", two] # outside',
+        "",
+      ].join("\n")),
+      {
+        tracker: "local",
+        plain: "value#suffix",
+        single: "it's # inside",
+        double: 'say \\"#\\" here',
+        count: 75,
+        items: ["one # inside", "two"],
+      }
+    );
+  });
+
+  it("reads quoted and unquoted tracker values with separated comments", () => {
+    for (const [line, expected] of [
+      ["tracker: local # keep\n", "local"],
+      ["tracker: 'local'\t# keep\n", "local"],
+      ['tracker: "github"  # keep\n', "github"],
+      ["tracker: local#suffix\n", "local#suffix"],
+    ]) {
+      fs.writeFileSync(path.join(tmpDir, "config.yml"), line);
+      assert.equal(readConfig(tmpDir).tracker, expected);
+    }
+  });
+
+  it("does not parse block scalar physical content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "literal: |",
+      "  tracker: github",
+      "  task_prefix: HIDDEN",
+      "folded: &copy !text >-2 # keep",
+      "  tracker: github",
+      "  task_prefix: ALSO-HIDDEN",
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
+  });
+
+  it("does not parse multiline quoted scalar content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "single: 'first line",
+      "  tracker: github",
+      "  it''s still quoted",
+      "  last line'",
+      'double: "first \\"still quoted',
+      "  tracker: github",
+      '  last line"',
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
   });
 
   it("reads task_prefix from valid config", () => {
