@@ -168,7 +168,7 @@ describe("offline local core sprint cycle", () => {
 });
 
 describe("offline local close survives a process crash", () => {
-  it("recovers duplicate copies and a stale lock left by a crash mid-close", (t) => {
+  it("fails closed on the stale lock, then heals to one authority once it is cleared", (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
     fs.writeFileSync(
       path.join(backlogDir, "tasks", "BACK-1 - one.md"),
@@ -176,8 +176,8 @@ describe("offline local close survives a process crash", () => {
     );
 
     // A worker that dies after the completed copy is published but before the
-    // active source is unlinked — the exact window that used to strand the store
-    // with duplicate canonical copies and a held lock.
+    // active source is unlinked — the exact window that strands the store with
+    // duplicate canonical copies and a held lock.
     const workerPath = path.join(root, "crash-worker.js");
     fs.writeFileSync(
       workerPath,
@@ -193,16 +193,32 @@ describe("offline local close survives a process crash", () => {
     assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), "active source survived the crash");
     assert.ok(fs.existsSync(path.join(backlogDir, "completed", "BACK-1 - one.md")), "completed copy was published before the crash");
     assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), "recovery marker remains");
-    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), "the crashed process left a stale lock");
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    assert.ok(fs.existsSync(lockPath), "the crashed process left a stale lock");
+    const staleLockBytes = fs.readFileSync(lockPath, "utf-8");
 
-    // Next open reclaims the stale lock, heals to a single authority, clears the marker.
+    // Next open must NOT auto-reclaim the dead-PID lock: a path-based reclaim
+    // cannot avoid racing a replacement holder. It fails closed with an actionable
+    // manual-cleanup error and leaves the stale lock byte-for-byte untouched.
     const { adapter } = localAdapter(backlogDir);
+    assert.throws(
+      () => adapter.close("BACK-1"),
+      (error) => error instanceof LocalStoreError && /stale lock|no longer running|manually/i.test(error.message)
+    );
+    assert.equal(fs.readFileSync(lockPath, "utf-8"), staleLockBytes, "the stale lock is never auto-reclaimed");
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), "no roll-forward while the lock is held");
+    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), "the marker survives the fail-closed attempt");
+
+    // The operator confirms no allocator is running and removes the stale lock.
+    // Recovery then derives the exact Done bytes from the active source, sees the
+    // published copy match, retires the source, and clears the marker.
+    fs.unlinkSync(lockPath);
     const result = adapter.close("BACK-1");
     assert.deepEqual(result, { tracker: "local", id: "1", ref: "BACK-1" });
     assert.equal(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), false, "duplicate active source retired");
     assert.deepEqual(adapter.list().map((task) => task.ref), []);
     assert.deepEqual(adapter.list({ state: "closed" }).map((task) => task.ref), ["BACK-1"]);
-    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), false, "stale lock reclaimed and released");
+    assert.equal(fs.existsSync(lockPath), false, "the healing close releases its own lock");
     assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), false, "marker cleared after recovery");
 
     const archived = fs.readFileSync(path.join(backlogDir, "completed", "BACK-1 - one.md"), "utf-8");

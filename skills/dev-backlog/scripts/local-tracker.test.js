@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 const {
   createLocalAdapter,
@@ -981,5 +982,263 @@ describe("local recovery treats the close journal as untrusted", () => {
 
     assert.ok(fs.existsSync(victim), "an untyped legacy marker cannot drive an arbitrary unlink");
     assert.ok(!fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "the legacy marker is cleared");
+  });
+
+  it("refuses roll-forward when a self-consistent marker names a different authoritative body", (t) => {
+    // Active source authoritative bytes (body X). A crash-safe close of THESE
+    // bytes would publish Done(X); anything else is not this source's publication.
+    const activeBytes =
+      "---\nid: BACK-1\ntitle: One\nstatus: To Do\nlabels: []\npriority: medium\ncreated_date: '2026-07-01'\n---\n## Description\nauthoritative alpha\n";
+    // A valid, self-consistent Done publication for the SAME ref BACK-1, but
+    // derived from a DIFFERENT body (Y). The marker below names its real hash, so
+    // marker and destination agree with each other — the trap the old code fell
+    // into, deleting the active source because it trusted marker.destHash alone.
+    const unrelatedDone =
+      "---\nid: BACK-1\ntitle: One\nstatus: Done\nlabels: []\npriority: medium\ncreated_date: '2026-07-01'\n---\n## Description\nunrelated beta\n";
+    const { backlogDir, adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", activeBytes]],
+      seedCompleted: [["BACK-1 - one.md", unrelatedDone]],
+    });
+    writeMarker(backlogDir, {
+      v: 1,
+      phase: "publish",
+      id: "1",
+      ref: "BACK-1",
+      file: "BACK-1 - one.md",
+      destHash: crypto.createHash("sha256").update(unrelatedDone, "utf-8").digest("hex"),
+    });
+
+    // Recovery derives Done(activeBytes) independently, sees it differ from both
+    // the marker and the destination, and refuses to roll forward. The close then
+    // fails closed on the surviving duplicate id.
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+
+    // The authoritative active source is never deleted; the completed copy and the
+    // marker are handled without touching either file's bytes.
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), activeBytes, "authoritative active source preserved");
+    assert.equal(read(backlogDir, "completed", "BACK-1 - one.md"), unrelatedDone, "completed copy never altered");
+    assert.ok(!fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "the untrusted marker is discarded");
+
+    // Every read path continues to fail closed on the duplicate until an operator resolves it.
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list({ state: "all" }), LocalStoreError);
+  });
+});
+
+describe("local enforces canonical directory integrity at every lifecycle op", () => {
+  const LOCAL_CONFIG = { task_prefix: "BACK", default_status: "To Do" };
+
+  function names(dir) {
+    return fs.readdirSync(dir).sort();
+  }
+
+  it("refuses every op when tasks/ is a symlink and never touches the target", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-symtasks-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    if (!symlinkSupported(root)) return;
+    const backlogDir = path.join(root, "backlog");
+    fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(outside, { recursive: true });
+    const outsideTask = taskFile({ id: 1, title: "Outside" });
+    fs.writeFileSync(path.join(outside, "BACK-1 - one.md"), outsideTask);
+    fs.symlinkSync(outside, path.join(backlogDir, "tasks")); // tasks/ -> outside
+    const before = names(outside);
+    const adapter = createLocalAdapter({ backlogDir, config: LOCAL_CONFIG, now: FIXED_NOW });
+
+    assert.throws(() => adapter.list(), LocalStoreError);
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.create({ title: "Nope" }), LocalStoreError);
+    assert.throws(() => adapter.update("BACK-1", { status: "Done" }), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+
+    assert.deepEqual(names(outside), before, "no file created/read outside the store");
+    assert.equal(fs.readFileSync(path.join(outside, "BACK-1 - one.md"), "utf-8"), outsideTask, "the external task is never followed or rewritten");
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), "no lock is taken through the symlink");
+  });
+
+  it("refuses every op when completed/ is a symlink and never touches the target", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-symdone-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    if (!symlinkSupported(root)) return;
+    const backlogDir = path.join(root, "backlog");
+    fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
+    const activeBytes = taskFile({ id: 1, title: "One" });
+    fs.writeFileSync(path.join(backlogDir, "tasks", "BACK-1 - one.md"), activeBytes);
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(outside, { recursive: true });
+    fs.symlinkSync(outside, path.join(backlogDir, "completed")); // completed/ -> outside
+    const adapter = createLocalAdapter({ backlogDir, config: LOCAL_CONFIG, now: FIXED_NOW });
+
+    assert.throws(() => adapter.list(), LocalStoreError);
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.create({ title: "Nope" }), LocalStoreError);
+    assert.throws(() => adapter.update("BACK-1", { status: "Done" }), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+
+    assert.deepEqual(names(outside), [], "close never publishes into the symlinked completed target");
+    assert.equal(fs.readFileSync(path.join(backlogDir, "tasks", "BACK-1 - one.md"), "utf-8"), activeBytes, "the active source is untouched");
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), "no lock is left behind");
+  });
+
+  it("refuses every op when the backlog root is a symlink and never touches the target", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-symroot-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    if (!symlinkSupported(root)) return;
+    const realStore = path.join(root, "real-store");
+    fs.mkdirSync(path.join(realStore, "tasks"), { recursive: true });
+    fs.mkdirSync(path.join(realStore, "completed"), { recursive: true });
+    fs.writeFileSync(path.join(realStore, "tasks", "BACK-1 - one.md"), taskFile({ id: 1, title: "One" }));
+    const backlogDir = path.join(root, "backlog");
+    fs.symlinkSync(realStore, backlogDir); // the configured root is itself a symlink
+    const adapter = createLocalAdapter({ backlogDir, config: LOCAL_CONFIG, now: FIXED_NOW });
+
+    assert.equal(adapter.availability().available, false, "a symlinked root reports unavailable");
+    assert.throws(() => adapter.list(), LocalStoreError);
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.create({ title: "Nope" }), LocalStoreError);
+    assert.throws(() => adapter.update("BACK-1", { status: "Done" }), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+
+    assert.deepEqual(names(path.join(realStore, "tasks")), ["BACK-1 - one.md"], "no task created through the symlinked root");
+    assert.deepEqual(names(path.join(realStore, "completed")), [], "close never archived through the symlinked root");
+    assert.ok(!fs.existsSync(path.join(realStore, ".local-tracker.lock")), "no lock created through the symlinked root");
+  });
+});
+
+describe("local allocation lock is never auto-reclaimed and release is identity-bound", () => {
+  function findDeadPid() {
+    for (const candidate of [999001, 999002, 999003, 4194303, 4194301]) {
+      try {
+        process.kill(candidate, 0);
+      } catch (error) {
+        if (error.code === "ESRCH") return candidate;
+      }
+    }
+    throw new Error("could not find a provably-dead pid for the test");
+  }
+
+  it("preserves a replacement lock installed between the critical section and release", (t) => {
+    const { backlogDir } = makeStore(t);
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    let replacementBytes = null;
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        beforeReleaseLock(lp) {
+          // A replacement owner takes the lock after our critical section but
+          // before our release. Reuse OUR exact stamp bytes (same pid:token) yet
+          // give it a brand-new inode: token binding alone would still delete it,
+          // so only the file-identity binding protects the replacement holder.
+          replacementBytes = fs.readFileSync(lp, "utf-8");
+          fs.rmSync(lp);
+          fs.writeFileSync(lp, replacementBytes);
+        },
+      },
+    });
+
+    // The critical section itself completes, but release sees the file identity at
+    // the path no longer matches the instance we opened and fails clearly instead
+    // of unlinking a lock that is no longer ours.
+    assert.throws(
+      () => adapter.create({ title: "Raced" }),
+      (error) => error instanceof LocalStoreError && /changed owner|replacement/i.test(error.message)
+    );
+    assert.deepEqual(listNames(backlogDir, "tasks"), ["BACK-1 - raced.md"], "the critical section still ran; only release refused");
+    assert.ok(fs.existsSync(lockPath), "the replacement lock is not evicted even though its token matches");
+    assert.equal(fs.readFileSync(lockPath, "utf-8"), replacementBytes, "the replacement holder's lock is byte-for-byte untouched");
+  });
+
+  it("never reclaims a dead-PID lock: two contenders both fail closed and the lock is untouched", (t) => {
+    const { backlogDir } = makeStore(t);
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    const staleBytes = `${findDeadPid()}:stale-token`;
+    fs.writeFileSync(lockPath, staleBytes);
+
+    const contenders = [0, 1].map(() =>
+      createLocalAdapter({ backlogDir, now: FIXED_NOW, lock: { retries: 1, delayMs: 1 } })
+    );
+    for (const contender of contenders) {
+      assert.throws(
+        () => contender.create({ title: "Blocked by stale" }),
+        (error) => error instanceof LocalStoreError && /stale lock|no longer running|manually/i.test(error.message)
+      );
+    }
+
+    // Neither contender reclaimed or deleted the stale lock, and neither entered
+    // the critical section — so no concurrent critical sections could occur.
+    assert.equal(fs.readFileSync(lockPath, "utf-8"), staleBytes, "the stale lock is never reclaimed or deleted");
+    assert.deepEqual(listNames(backlogDir, "tasks"), [], "no contender entered the critical section");
+  });
+});
+
+function snapshotTree(root) {
+  const out = {};
+  const walk = (rel) => {
+    const abs = rel === "" ? root : path.join(root, rel);
+    const st = fs.lstatSync(abs, { bigint: true });
+    const type = st.isDirectory()
+      ? "dir"
+      : st.isSymbolicLink()
+        ? "symlink"
+        : st.isFile()
+          ? "file"
+          : "other";
+    const rec = { type, size: st.size, mtimeNs: st.mtimeNs, ino: st.ino };
+    if (type === "file") rec.content = fs.readFileSync(abs).toString("hex");
+    if (type === "symlink") rec.target = fs.readlinkSync(abs);
+    out[rel === "" ? "." : rel] = rec;
+    if (type === "dir") {
+      for (const name of fs.readdirSync(abs).sort()) {
+        walk(rel === "" ? name : path.join(rel, name));
+      }
+    }
+  };
+  walk("");
+  return out;
+}
+
+describe("local read paths never mutate the store (deep recursive before/after snapshot)", () => {
+  function seedRecoveryStore(t) {
+    const store = makeStore(t, {
+      seedTasks: [
+        ["BACK-1 - one.md", taskFile({ id: 1, title: "One" })],
+        // Malformed: a valid filename whose content fails validation (missing status).
+        ["BACK-2 - bad.md", "---\nid: BACK-2\ntitle: Two\n---\n## Description\nno status\n"],
+        // A stray temp left by a prior crash — reads must not sweep it.
+        [".local-tracker.99.2.deadbeef.tmp", "partial temp bytes"],
+      ],
+      seedCompleted: [["BACK-3 - three.md", taskFile({ id: 3, title: "Three", status: "Done" })]],
+    });
+    // Stale recovery metadata: a durable but stale close marker.
+    fs.writeFileSync(
+      path.join(store.backlogDir, CLOSE_MARKER),
+      JSON.stringify({ v: 1, phase: "publish", id: "1", ref: "BACK-1", file: "BACK-1 - one.md", destHash: "0".repeat(64) })
+    );
+    return store;
+  }
+
+  it("list() over valid + malformed + stale-marker state mutates nothing and takes no lock", (t) => {
+    const { backlogDir, adapter } = seedRecoveryStore(t);
+    const before = snapshotTree(backlogDir);
+    // A malformed task makes list fail closed — but it must still not mutate.
+    assert.throws(() => adapter.list({ state: "all" }), LocalStoreError);
+    const after = snapshotTree(backlogDir);
+    assert.deepEqual(after, before, "list() preserves every name, type, content, size, mtime, and inode");
+    assert.ok(!Object.prototype.hasOwnProperty.call(after, ".local-tracker.lock"), "list() never creates a lock");
+    assert.ok(Object.prototype.hasOwnProperty.call(after, CLOSE_MARKER), "list() never touches the recovery marker");
+  });
+
+  it("read() of valid, closed, and malformed tasks mutates nothing and takes no lock", (t) => {
+    const { backlogDir, adapter } = seedRecoveryStore(t);
+    const before = snapshotTree(backlogDir);
+    assert.equal(adapter.read("BACK-1").id, "1"); // valid open task
+    assert.equal(adapter.read("BACK-3").state, "closed"); // valid closed task
+    assert.throws(() => adapter.read("BACK-2"), LocalStoreError); // malformed content
+    const after = snapshotTree(backlogDir);
+    assert.deepEqual(after, before, "read() preserves every name, type, content, size, mtime, and inode");
+    assert.ok(!Object.prototype.hasOwnProperty.call(after, ".local-tracker.lock"), "read() never creates a lock");
+    assert.ok(Object.prototype.hasOwnProperty.call(after, CLOSE_MARKER), "read() never mutates recovery artifacts");
   });
 });

@@ -94,13 +94,19 @@ function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-// --- stale-lock reclamation (crash recovery) ---
+// --- lock stamp inspection (crash detection, no reclamation) ---
 
-// The lock file stamps `${pid}:${token}`: the pid decides staleness, while the
-// token is a per-acquisition nonce so reclaim and release can bind their unlink
-// to the exact file instance they inspected and never evict a different live
-// holder that replaced the one they saw.
+// The lock file stamps `${pid}:${token}`: the pid lets a later process tell a
+// crashed holder from a live one, while the token is a per-acquisition nonce so
+// release can bind its unlink to the exact file instance it created. Reclamation
+// is intentionally NOT automatic: a path-based rename/unlink cannot reclaim a
+// stale lock without racing a replacement holder, so a dead-PID lock is surfaced
+// as an actionable manual-cleanup error and left untouched.
 function readLockStamp(lockPath) {
+  // The lock must be a regular, non-symlink file; never follow a symlink planted
+  // at the lock path when judging ownership.
+  const stat = lstatSafe(lockPath);
+  if (!stat || !stat.isFile()) return null;
   let raw;
   try {
     raw = fs.readFileSync(lockPath, "utf-8").trim();
@@ -113,11 +119,6 @@ function readLockStamp(lockPath) {
   return { pid, token: colon === -1 ? "" : raw.slice(colon + 1) };
 }
 
-function readLockOwner(lockPath) {
-  const stamp = readLockStamp(lockPath);
-  return stamp ? stamp.pid : null;
-}
-
 function processAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -125,42 +126,6 @@ function processAlive(pid) {
   } catch (error) {
     return error.code === "EPERM"; // exists but not signalable by us
   }
-}
-
-// Reclaim a lock whose stamped owner is provably gone. Two reclaimers must never
-// both remove "the same" stale lock and then race each other's fresh lock, so
-// removal is bound to a specific file instance: capture the lock by an atomic
-// rename (only one racer wins it; the loser gets ENOENT and retries), then judge
-// the captured file. If a live owner had replaced the stale lock between our read
-// and the capture, restore it and bow out rather than evict a running holder.
-function reclaimStaleLock(lockPath, stagePath) {
-  const owner = readLockOwner(lockPath);
-  if (owner === null || owner === process.pid || processAlive(owner)) return false;
-  try {
-    fs.renameSync(lockPath, stagePath);
-  } catch {
-    return false; // vanished or another reclaimer captured it first
-  }
-  const captured = readLockOwner(stagePath);
-  if (captured !== null && captured !== process.pid && !processAlive(captured)) {
-    try {
-      fs.unlinkSync(stagePath); // provably dead: drop it so the acquire loop recreates
-    } catch {
-      /* already gone */
-    }
-    return true;
-  }
-  // Captured a live/ambiguous lock — restore it so its owner keeps exclusivity.
-  try {
-    fs.renameSync(stagePath, lockPath);
-  } catch {
-    try {
-      fs.unlinkSync(stagePath);
-    } catch {
-      /* nothing to restore */
-    }
-  }
-  return false;
 }
 
 // --- frontmatter / body split, preserving human bytes verbatim ---
@@ -428,6 +393,24 @@ function withinDir(dir, dest) {
   return path.resolve(path.dirname(dest)) === path.resolve(dir);
 }
 
+// A canonical store directory is sound only when the path is absent (created
+// lazily on first write) or a real, non-symlink directory. A symlink or plain
+// file here would let a lifecycle operation read or write outside the backlog,
+// so it is refused. Returns an actionable reason, or null when the path is safe.
+function realDirIssue(dir) {
+  let stat;
+  try {
+    // lstat, not stat: a symlinked directory must be refused, not resolved.
+    stat = fs.lstatSync(dir);
+  } catch (error) {
+    if (error.code === "ENOENT") return null; // created lazily on first write
+    return `local store path ${dir} is unusable: ${error.message}`;
+  }
+  if (stat.isSymbolicLink()) return `local store path ${dir} must not be a symlink`;
+  if (!stat.isDirectory()) return `local store path ${dir} is not a directory`;
+  return null;
+}
+
 // --- close compensation: identity-checked rollback of a published copy ---
 
 function fileIdentity(target) {
@@ -515,6 +498,34 @@ function createLocalAdapter(options = {}) {
         `refusing to write a local task outside its canonical directory: ${dest}`
       );
     }
+  }
+
+  // Report the first canonical directory (backlog root, tasks/, completed/) that
+  // is not a real non-symlink directory. Powers both the structured availability
+  // probe and the per-operation integrity guards below.
+  function canonicalDirIssue() {
+    for (const probe of [backlogDir, dirPath(TASKS_DIR), dirPath(COMPLETED_DIR)]) {
+      const issue = realDirIssue(probe);
+      if (issue) return issue;
+    }
+    return null;
+  }
+
+  // Enforce canonical-directory integrity at every lifecycle boundary — not just
+  // in availability(). Called at the entry of list/read/create/update/close and
+  // again under the store lock, so a directory swapped for a symlink or a plain
+  // file after the initial probe can never route a read or write outside the
+  // backlog. Absent directories are allowed (create materializes them).
+  function assertCanonicalDirs() {
+    const issue = canonicalDirIssue();
+    if (issue) throw new LocalStoreError(issue);
+  }
+
+  // The tightest boundary check: a single directory must be absent or a real
+  // non-symlink directory immediately before we mkdir/link/rename into it.
+  function assertRealDir(dir) {
+    const issue = realDirIssue(dir);
+    if (issue) throw new LocalStoreError(issue);
   }
 
   function today() {
@@ -620,16 +631,16 @@ function createLocalAdapter(options = {}) {
   }
 
   function acquireLock() {
+    assertRealDir(backlogDir); // never create the lock through a symlinked root
     fs.mkdirSync(backlogDir, { recursive: true });
     const lockPath = path.join(backlogDir, LOCK_FILE);
     const token = crypto.randomBytes(12).toString("hex");
-    let reclaimed = false;
     for (let attempt = 0; attempt <= lockConfig.retries; attempt += 1) {
       try {
         const fd = fs.openSync(lockPath, "wx");
         // Stamp `${pid}:${token}` so a later process can tell a crashed holder
-        // from a live one (pid) and bind reclaim/release to this exact lock
-        // instance (token) rather than to the path alone.
+        // from a live one (pid) and bind release to this exact lock instance
+        // (token + file identity) rather than to the path alone.
         try {
           fs.writeSync(fd, `${process.pid}:${token}`);
         } catch {
@@ -640,40 +651,80 @@ function createLocalAdapter(options = {}) {
         if (error.code !== "EEXIST") {
           throw new LocalStoreError(`cannot acquire local allocation lock: ${error.message}`, { cause: error });
         }
-        // Reclaim a crashed holder's lock exactly once, and only when its owner
-        // is provably gone, so a live allocator is never evicted. The stage path
-        // is unique to us so concurrent reclaimers cannot collide on it.
-        const stagePath = `${lockPath}.${process.pid}.${token}.reclaiming`;
-        if (!reclaimed && reclaimStaleLock(lockPath, stagePath)) {
-          reclaimed = true;
-          continue;
-        }
         if (attempt < lockConfig.retries) sleepSync(lockConfig.delayMs);
       }
     }
-    throw new LocalStoreError(
-      "another local allocation holds the store lock; retry once it releases " +
-        `(remove ${path.join(backlogDir, LOCK_FILE)} only if you are certain no allocator is running)`
+    // Exhausted: never reclaim automatically. A path-based rename/unlink cannot
+    // evict a stale lock without racing a replacement holder, so a dead-PID lock
+    // is surfaced as an actionable manual-cleanup error and left untouched.
+    throw lockContentionError(path.join(backlogDir, LOCK_FILE));
+  }
+
+  // Distinguish a provably-dead holder (stale lock, needs manual cleanup) from
+  // live contention. Neither case touches the lock: reclamation is deliberately
+  // manual because there is no race-free path-based way to reclaim it.
+  function lockContentionError(lockPath) {
+    const stamp = readLockStamp(lockPath);
+    if (stamp && !processAlive(stamp.pid)) {
+      return new LocalStoreError(
+        `the local allocation lock ${lockPath} is held by pid ${stamp.pid}, which is no longer ` +
+          "running (stale lock). It is not reclaimed automatically because a path-based reclaim " +
+          "cannot avoid racing a replacement holder. After confirming no allocator is running, " +
+          "remove the lock file manually to proceed."
+      );
+    }
+    return new LocalStoreError(
+      `another local allocation holds the store lock ${lockPath}; retry once it releases ` +
+        "(remove it manually only if you are certain no allocator is running)."
     );
   }
 
   function releaseLock(handle) {
     const lockPath = path.join(backlogDir, LOCK_FILE);
+    if (testHooks.beforeReleaseLock) testHooks.beforeReleaseLock(lockPath);
+    // Bind release to BOTH the token we stamped and the exact file instance we
+    // opened. Our fd keeps pointing at the file we created even after the path is
+    // unlinked or replaced, so comparing the fd's identity to whatever now sits
+    // at the path reveals a replacement owner. If ownership or file identity
+    // changed, preserve the replacement and fail clearly rather than evict a live
+    // holder — a normal release only removes the lock still proven to be ours.
+    let held = null;
+    try {
+      held = fs.fstatSync(handle.fd);
+    } catch {
+      /* fd already invalid */
+    }
+    const atPath = lstatSafe(lockPath);
+    const stamp = readLockStamp(lockPath);
     try {
       fs.closeSync(handle.fd);
     } catch {
       /* fd already closed */
     }
-    // Only unlink the lock if it is still ours: a token mismatch means another
-    // process already reclaimed it (having judged us dead) and may now hold it,
-    // so unlinking would evict a live holder. Bind the removal to our token.
-    const stamp = readLockStamp(lockPath);
-    if (stamp && stamp.token === handle.token) {
-      try {
-        fs.unlinkSync(lockPath);
-      } catch {
-        /* lock already gone */
-      }
+    if (atPath === null) return; // lock already gone: nothing of ours to release
+    // File identity is definitive while our fd is open: the inode we created
+    // cannot be recycled under the path, so a matching dev/ino proves it is our
+    // instance. The token is the second binding — a present stamp must be ours
+    // (it catches an inode-number reuse after our fd closes), but a stamp lost to
+    // a failed write does not veto an identity we can still prove by the fd.
+    const identityMatch =
+      held !== null &&
+      atPath.isFile() &&
+      atPath.dev === held.dev &&
+      atPath.ino === held.ino;
+    const tokenOk = stamp === null || stamp.token === handle.token;
+    const stillOurs = identityMatch && tokenOk;
+    if (!stillOurs) {
+      throw new LocalStoreError(
+        `local allocation lock ${lockPath} changed owner before release and was left ` +
+          "untouched to protect the replacement holder; a concurrent allocator may be running. " +
+          "Resolve the contention and remove the lock manually only if you are certain none is."
+      );
+    }
+    try {
+      fs.unlinkSync(lockPath);
+    } catch {
+      /* lock already gone */
     }
   }
 
@@ -748,25 +799,58 @@ function createLocalAdapter(options = {}) {
     return !!info && info.hash === destHash && info.id === ref;
   }
 
-  function activeSourceMatches(src, ref) {
-    const info = readIdentityAndHash(src);
-    return !!info && info.id === ref;
+  // Independently recompute the exact Done bytes a faithful close of the active
+  // source would publish, so roll-forward is verified against the real
+  // authoritative content instead of the untrusted marker hash. The source is
+  // fully validated first (regular file, well-formed frontmatter, id === ref);
+  // returns the derived bytes and their hash, or null when it cannot be derived.
+  function deriveExpectedDone(src, ref) {
+    const stat = lstatSafe(src);
+    if (!stat || !stat.isFile()) return null;
+    let content;
+    try {
+      content = fs.readFileSync(src, "utf-8");
+    } catch {
+      return null;
+    }
+    const split = splitDocument(content);
+    if (!split) return null;
+    const entries = parseFrontmatterEntries(split.frontmatter);
+    try {
+      requireValidFrontmatter(entries, ref);
+    } catch {
+      return null; // an unvalidatable source is not authoritative to derive from
+    }
+    const doneEntries = applyFrontmatterChanges(entries, { status: DONE_STATUS });
+    const doneContent = `${stringifyFrontmatter(doneEntries, split.eol)}${split.body}`;
+    return { content: doneContent, hash: contentHash(doneContent) };
   }
 
   // Finish or discard a close a previous process left half-applied. MUST run
-  // under the store lock. The journal records only the intent to publish;
-  // recovery derives the actual phase from evidence on disk rather than trusting
-  // the marker:
-  //   dest proves it is our publication (bytes + id) -> retire a matching active
-  //                                                     source (roll the move forward)
-  //   dest absent / unverified (external, partial)   -> publish never landed; the
-  //                                                     active source stays authority
-  // Nothing outside the canonical stores, and nothing whose identity we cannot
-  // confirm, is ever deleted or promoted; the marker is then cleared.
+  // under the store lock. The journal records only the intent to publish; every
+  // field — including destHash — is untrusted. Recovery derives the exact Done
+  // bytes independently from the fully validated active source and rolls the move
+  // forward ONLY when the derived hash, the journaled hash, and the destination's
+  // actual bytes+id ALL agree:
+  //   - all three agree -> the destination is a faithful publication of this
+  //     source; retire the active source (roll the move forward).
+  //   - any disagreement (including a valid, self-consistent marker/destination
+  //     pair whose bytes differ from the active body) -> roll-forward is refused
+  //     and every file is preserved (fail closed). A surviving duplicate then
+  //     fails closed on the next read/list via the exact-id guard.
+  // Nothing outside the canonical stores, and nothing whose derived identity we
+  // cannot confirm, is ever deleted or promoted; the spent marker is then cleared.
   function recover() {
+    const markerPath = closeMarkerPath();
+    const markerStat = lstatSafe(markerPath);
+    if (markerStat === null) return; // no interrupted close to reconcile
+    if (!markerStat.isFile()) {
+      removeCloseMarker(); // a symlink/dir at the marker path is untrusted
+      return;
+    }
     let raw;
     try {
-      raw = fs.readFileSync(closeMarkerPath(), "utf-8");
+      raw = fs.readFileSync(markerPath, "utf-8");
     } catch (error) {
       if (error.code === "ENOENT") return;
       throw new LocalStoreError(`cannot read local recovery marker: ${error.message}`, { cause: error });
@@ -791,13 +875,27 @@ function createLocalAdapter(options = {}) {
       removeCloseMarker();
       return;
     }
-    if (publishedMatches(dest, plan.ref, plan.destHash) && activeSourceMatches(src, plan.ref)) {
+    // Derive the expected Done bytes from the active source itself, then require
+    // derived === journaled === destination (bytes and id). A marker that merely
+    // matches the destination is not enough: without this the destination could
+    // be self-consistent completed bytes for the same ref that were never the
+    // publication of THIS active body, and rolling forward would delete
+    // authoritative content.
+    const derived = deriveExpectedDone(src, plan.ref);
+    const rollForward =
+      derived !== null &&
+      derived.hash === plan.destHash &&
+      publishedMatches(dest, plan.ref, derived.hash);
+    if (rollForward) {
       try {
         fs.unlinkSync(src);
       } catch {
-        return; // keep the marker; retry once the stale source is writable
+        return; // roll-forward proven but the source is not yet writable; retry later
       }
     }
+    // Proven-and-completed, or refused-and-every-file-preserved: the untrusted
+    // intent is spent either way, so clear it. A refused roll-forward leaves the
+    // active source intact and any duplicate to the exact-id guard.
     removeCloseMarker();
   }
 
@@ -809,6 +907,10 @@ function createLocalAdapter(options = {}) {
   function withStoreLock(fn) {
     const handle = acquireLock();
     try {
+      // Re-verify canonical-directory integrity under the lock (the mutation
+      // boundary) so a directory swapped for a symlink between the entry probe and
+      // now cannot route recovery or the mutation outside the backlog.
+      assertCanonicalDirs();
       recover();
       return fn();
     } finally {
@@ -839,15 +941,18 @@ function createLocalAdapter(options = {}) {
   // --- atomic publication: temp on same fs, hard-link (no overwrite), unlink ---
 
   // Route temp writes through an injectable writer so a test can reproduce a
-  // partial-write ENOSPC that leaves bytes on disk.
+  // partial-write ENOSPC that leaves bytes on disk. The `wx` flag makes the temp
+  // a fresh regular file: a symlink (or any entry) pre-planted at the temp path
+  // fails the create instead of being followed or overwritten.
   function writeTemp(tmp, content) {
     if (testHooks.writeFile) return testHooks.writeFile(tmp, content);
-    return fs.writeFileSync(tmp, content);
+    return fs.writeFileSync(tmp, content, { flag: "wx" });
   }
 
   function publishNewFile(dir, fileName, content) {
     const dest = path.join(dir, fileName);
     assertWithin(dir, dest);
+    assertRealDir(dir); // final boundary: never link into a symlinked target dir
     fs.mkdirSync(dir, { recursive: true });
     const tmp = tempPath(dir, path.basename(fileName));
     // The temp write is inside the try so a partial write (e.g. ENOSPC) is
@@ -874,6 +979,7 @@ function createLocalAdapter(options = {}) {
   function replaceFileAtomic(dir, fileName, content) {
     const dest = path.join(dir, fileName);
     assertWithin(dir, dest);
+    assertRealDir(dir); // final boundary: never rename into a symlinked target dir
     const tmp = tempPath(dir, path.basename(fileName));
     // A successful rename consumes the temp; any earlier failure (partial write
     // or failed rename) is cleaned here so no stray `.tmp` survives.
@@ -956,23 +1062,11 @@ function createLocalAdapter(options = {}) {
     if (prefixIssue) {
       return { available: false, reason: `local tracker ${prefixIssue}` };
     }
-    for (const probe of [backlogDir, dirPath(TASKS_DIR), dirPath(COMPLETED_DIR)]) {
-      let stat;
-      try {
-        // lstat, not stat: a symlinked canonical directory must be refused, not
-        // resolved, or create/read/close could escape the backlog through it.
-        stat = fs.lstatSync(probe);
-      } catch (error) {
-        if (error.code === "ENOENT") continue; // created lazily on first write
-        return { available: false, reason: `local store path ${probe} is unusable: ${error.message}` };
-      }
-      if (stat.isSymbolicLink()) {
-        return { available: false, reason: `local store path ${probe} must not be a symlink` };
-      }
-      if (!stat.isDirectory()) {
-        return { available: false, reason: `local store path ${probe} is not a directory` };
-      }
-    }
+    // The same canonical-directory integrity the lifecycle operations enforce on
+    // every call: a symlinked or non-directory backlog root, tasks/, or completed/
+    // is refused (an absent one is created lazily on first write).
+    const issue = canonicalDirIssue();
+    if (issue) return { available: false, reason: issue };
     return { available: true };
   }
 
@@ -986,6 +1080,7 @@ function createLocalAdapter(options = {}) {
         `invalid local list state ${JSON.stringify(state)}; expected one of open, closed, all`
       );
     }
+    assertCanonicalDirs(); // refuse a symlinked/foreign store before reading it
     // list never mutates: an interrupted close is healed on the next mutation,
     // not here. Duplicate copies from a crash surface as a fail-closed error.
     const kinds = LIST_STATE_KINDS[state];
@@ -1008,6 +1103,7 @@ function createLocalAdapter(options = {}) {
   }
 
   function read(selector) {
+    assertCanonicalDirs(); // refuse a symlinked/foreign store before reading it
     const identity = resolveIdentity(selector);
     // read never mutates; recovery of an interrupted close is deferred to the
     // next create/update/close under the store lock.
@@ -1021,6 +1117,7 @@ function createLocalAdapter(options = {}) {
   function create(input = {}) {
     rejectUnsupportedOptions("create", input, CREATE_OPTIONS);
     assertUsablePrefix();
+    assertCanonicalDirs(); // refuse a symlinked/foreign store before any mutation
     const title = input.title;
     if (typeof title !== "string" || !title.trim()) {
       throw new LocalStoreError("local task creation requires a non-empty title");
@@ -1065,6 +1162,7 @@ function createLocalAdapter(options = {}) {
   function update(selector, changes = {}) {
     rejectUnsupportedOptions("update", changes, UPDATE_OPTIONS);
     assertUsablePrefix();
+    assertCanonicalDirs(); // refuse a symlinked/foreign store before any mutation
     const identity = resolveIdentity(selector);
     // Validate and coerce every field before the lock so a rejected injection or
     // wrong-typed list never triggers an mkdir/lock/temp/mtime mutation.
@@ -1098,6 +1196,7 @@ function createLocalAdapter(options = {}) {
   function close(selector, options = {}) {
     rejectUnsupportedOptions("close", options, CLOSE_OPTIONS);
     assertUsablePrefix();
+    assertCanonicalDirs(); // refuse a symlinked/foreign store before any mutation
     const identity = resolveIdentity(selector);
 
     return withStoreLock(() => {
