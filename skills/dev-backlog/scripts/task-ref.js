@@ -89,7 +89,9 @@ function containsTaskRef(text, identity) {
   const ref = renderTaskRef(identity);
   const escaped = escapeRegExp(ref);
   const left = identity.tracker === "github" ? "[^A-Za-z0-9_#]" : "[^A-Za-z0-9_]";
-  const right = identity.tracker === "github" ? "(?![\\d.])" : "(?![A-Za-z0-9_.-])";
+  const right = identity.tracker === "github"
+    ? "(?![A-Za-z0-9_]|\\.\\d)"
+    : "(?![A-Za-z0-9_-]|\\.\\d)";
   const matcher = new RegExp(`(^|${left})(${escaped})${right}`, "g");
 
   for (const match of text.matchAll(matcher)) {
@@ -128,12 +130,17 @@ function taskFileRef(identity, options = {}) {
 
 function parseTaskFileName(fileName, options = {}) {
   const base = path.basename(String(fileName || ""));
-  const inferred = base.match(/^(.+)-[1-9]\d*(?:\.[1-9]\d*)?(?: - .+)?\.md$/);
+  if (!base.endsWith(".md")) return null;
+  const stem = base.slice(0, -3);
+  const slugSeparator = stem.indexOf(" - ");
+  if (slugSeparator !== -1 && slugSeparator === stem.length - 3) return null;
+  const taskStem = slugSeparator === -1 ? stem : stem.slice(0, slugSeparator);
+  const inferred = taskStem.match(/^(.+)-([1-9]\d*(?:\.[1-9]\d*)?)$/);
   const prefix = options.taskPrefix === undefined && inferred
     ? inferred[1]
     : taskPrefix(options);
-  const match = base.match(
-    new RegExp(`^(${escapeRegExp(prefix)}-([1-9]\\d*(?:\\.[1-9]\\d*)?))(?: - .+)?\\.md$`)
+  const match = taskStem.match(
+    new RegExp(`^(${escapeRegExp(prefix)}-([1-9]\\d*(?:\\.[1-9]\\d*)?))$`)
   );
   if (!match) return null;
 

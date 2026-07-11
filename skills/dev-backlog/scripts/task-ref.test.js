@@ -76,12 +76,30 @@ describe("containsTaskRef", () => {
     assert.equal(containsTaskRef("- 2026-07-01: review → PR #1", one), false);
   });
 
+  it("accepts sentence punctuation but rejects GitHub token suffixes and decimals", () => {
+    const task = parseTaskRef("#42", OPTIONS);
+    assert.equal(containsTaskRef("- 2026-07-01: completed #42.", task), true);
+    assert.equal(containsTaskRef("- 2026-07-01: completed (#42),", task), true);
+    assert.equal(containsTaskRef("- 2026-07-01: #42abc is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: #42_suffix is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: #42.1 is not an issue ref", task), false);
+  });
+
   it("keeps BACK-1 distinct from BACK-11 and decimal descendants", () => {
     const one = parseTaskRef("BACK-1", OPTIONS);
     assert.equal(containsTaskRef("- 2026-07-01: BACK-1 started", one), true);
     assert.equal(containsTaskRef("- 2026-07-01: BACK-11 started", one), false);
     assert.equal(containsTaskRef("- 2026-07-01: BACK-1.1 started", one), false);
     assert.equal(containsTaskRef("- 2026-07-01: XBACK-1 started", one), false);
+  });
+
+  it("accepts local sentence punctuation but rejects token suffixes and descendants", () => {
+    const task = parseTaskRef("BACK-42", OPTIONS);
+    assert.equal(containsTaskRef("- 2026-07-01: completed BACK-42.", task), true);
+    assert.equal(containsTaskRef("- 2026-07-01: completed (BACK-42),", task), true);
+    assert.equal(containsTaskRef("- 2026-07-01: BACK-42abc is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: BACK-42_suffix is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: BACK-42.1 is a descendant", task), false);
   });
 });
 
@@ -106,5 +124,14 @@ describe("Plan and task-file boundaries", () => {
     }), { tracker: "local", id: "11.2", ref: "BACK-11.2" });
     assert.equal(parseTaskFileName("BACK-1x - partial.md", OPTIONS), null);
     assert.equal(parseTaskFileName("OTHER-1 - foreign.md", OPTIONS), null);
+  });
+
+  it("infers identity before a numeric slug instead of treating the slug as the id", () => {
+    assert.deepEqual(parseTaskFileName("BACK-1 - phase-2.md", {
+      tracker: "github",
+    }), { tracker: "github", id: "1", ref: "#1" });
+    assert.deepEqual(parseTaskFileName("BACK-11.2 - phase-3.md", {
+      tracker: "local",
+    }), { tracker: "local", id: "11.2", ref: "BACK-11.2" });
   });
 });
