@@ -27,6 +27,10 @@ const {
 const TASKS_DIR = "tasks";
 const COMPLETED_DIR = "completed";
 const LOCK_FILE = ".local-tracker.lock";
+// Durable intent journal for close: written after the completed copy lands and
+// before the active source is removed, so a process that dies in that window is
+// finished (or discarded) on the next open instead of leaving two authorities.
+const CLOSE_MARKER_FILE = ".local-tracker.close";
 const DONE_STATUS = "Done";
 
 // The only accepted list scopes. Any other `state` fails closed rather than
@@ -90,14 +94,55 @@ function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// --- stale-lock reclamation (crash recovery) ---
+
+function readLockOwner(lockPath) {
+  try {
+    const pid = Number.parseInt(fs.readFileSync(lockPath, "utf-8").trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM"; // exists but not signalable by us
+  }
+}
+
+// Reclaim a lock whose stamped owner is provably gone. Returns false (leaving
+// the lock untouched) for a live owner, our own pid, or an unstamped/racing
+// lock, so a running allocator is never evicted.
+function reclaimStaleLock(lockPath) {
+  const owner = readLockOwner(lockPath);
+  if (owner === null || owner === process.pid || processAlive(owner)) return false;
+  try {
+    fs.unlinkSync(lockPath);
+  } catch {
+    /* another process reclaimed it first */
+  }
+  return true;
+}
+
 // --- frontmatter / body split, preserving human bytes verbatim ---
 
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n[\s\S]*|$)/;
+const FRONTMATTER_RE = /^---(\r?\n)([\s\S]*?)\r?\n---(\r?\n[\s\S]*|$)/;
 
 function splitDocument(content) {
   const match = content.match(FRONTMATTER_RE);
   if (!match) return null;
-  return { frontmatter: match[1], body: match[2] };
+  // `eol` is the stored newline style, taken from the opening fence. The
+  // frontmatter is normalized to LF so value parsing sees clean logical lines
+  // (a trailing CR would otherwise make `id` read back as missing), while `eol`
+  // lets re-emission restore the original CRLF byte-for-byte. The body is kept
+  // verbatim so its own newline style is never rewritten.
+  const eol = match[1];
+  const frontmatter = match[2].replace(/\r\n/g, "\n");
+  return { frontmatter, body: match[3], eol };
 }
 
 /**
@@ -166,10 +211,27 @@ function renderScalar(key, value) {
   return `${key}: ${escapeYaml(text)}`;
 }
 
+// A block-sequence item is left bare only when it is unambiguously a plain
+// string. Anything else — indicators (`#`, `[`, `{`, `-`, …), a mapping colon,
+// leading/trailing space, an empty value, or a token a YAML tool would resolve
+// to a boolean/null/number — is single-quoted so it round-trips as the exact
+// string it was given and never changes meaning for Backlog.md or any reader.
+const SAFE_PLAIN_ITEM_RE = /^[A-Za-z0-9_][A-Za-z0-9_./-]*$/;
+const YAML_RESERVED_RE = /^(?:true|false|yes|no|on|off|null|none|~)$/i;
+const NUMBERLIKE_RE = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
+
+function encodeListItem(value) {
+  const text = String(value);
+  if (SAFE_PLAIN_ITEM_RE.test(text) && !YAML_RESERVED_RE.test(text) && !NUMBERLIKE_RE.test(text)) {
+    return text;
+  }
+  return `'${text.replace(/'/g, "''")}'`;
+}
+
 function renderFieldLines(key, value) {
   if (Array.isArray(value)) {
     if (value.length === 0) return [`${key}: []`];
-    return [`${key}:`, ...value.map((item) => `  - ${item}`)];
+    return [`${key}:`, ...value.map((item) => `  - ${encodeListItem(item)}`)];
   }
   return [renderScalar(key, value)];
 }
@@ -191,9 +253,9 @@ function applyFrontmatterChanges(entries, changes) {
   return next;
 }
 
-function stringifyFrontmatter(entries) {
-  const inner = entries.flatMap((entry) => entry.lines).join("\n");
-  return `---\n${inner}\n---`;
+function stringifyFrontmatter(entries, eol = "\n") {
+  const inner = entries.flatMap((entry) => entry.lines).join(eol);
+  return `---${eol}${inner}${eol}---`;
 }
 
 /**
@@ -492,12 +554,27 @@ function createLocalAdapter(options = {}) {
   function acquireLock() {
     fs.mkdirSync(backlogDir, { recursive: true });
     const lockPath = path.join(backlogDir, LOCK_FILE);
+    let reclaimed = false;
     for (let attempt = 0; attempt <= lockConfig.retries; attempt += 1) {
       try {
-        return fs.openSync(lockPath, "wx");
+        const fd = fs.openSync(lockPath, "wx");
+        // Stamp the owner pid so a later process can tell a crashed holder from
+        // a live one and reclaim only a provably dead lock.
+        try {
+          fs.writeSync(fd, String(process.pid));
+        } catch {
+          /* the lock is held regardless of whether the stamp lands */
+        }
+        return fd;
       } catch (error) {
         if (error.code !== "EEXIST") {
           throw new LocalStoreError(`cannot acquire local allocation lock: ${error.message}`, { cause: error });
+        }
+        // Reclaim a crashed holder's lock exactly once, and only when its owner
+        // is provably gone, so a live allocator is never evicted.
+        if (!reclaimed && reclaimStaleLock(lockPath)) {
+          reclaimed = true;
+          continue;
         }
         if (attempt < lockConfig.retries) sleepSync(lockConfig.delayMs);
       }
@@ -522,27 +599,98 @@ function createLocalAdapter(options = {}) {
     }
   }
 
+  // --- crash-recoverable close journal ---
+
+  function closeMarkerPath() {
+    return path.join(backlogDir, CLOSE_MARKER_FILE);
+  }
+
+  function writeCloseMarker(marker) {
+    const fd = fs.openSync(closeMarkerPath(), "w");
+    try {
+      fs.writeSync(fd, JSON.stringify(marker));
+      fs.fsyncSync(fd); // durable so the intent survives a power loss / crash
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  function removeCloseMarker() {
+    try {
+      fs.unlinkSync(closeMarkerPath());
+    } catch {
+      /* already gone */
+    }
+  }
+
+  // Finish or discard a close a previous process left half-applied. MUST run
+  // under the store lock. A durable marker means the completed copy was (about
+  // to be) published; reconcile so exactly one authoritative file remains:
+  //   dest present + source present -> roll the move forward (retire source)
+  //   dest absent                   -> publish never landed; source is authority
+  function recover() {
+    let raw;
+    try {
+      raw = fs.readFileSync(closeMarkerPath(), "utf-8");
+    } catch (error) {
+      if (error.code === "ENOENT") return;
+      throw new LocalStoreError(`cannot read local recovery marker: ${error.message}`, { cause: error });
+    }
+    let marker;
+    try {
+      marker = JSON.parse(raw);
+    } catch {
+      removeCloseMarker(); // an unreadable marker cannot be acted on
+      return;
+    }
+    const { src, dest } = marker;
+    if (typeof src !== "string" || typeof dest !== "string") {
+      removeCloseMarker();
+      return;
+    }
+    if (fs.existsSync(dest) && fs.existsSync(src)) {
+      try {
+        fs.unlinkSync(src);
+      } catch {
+        return; // keep the marker; retry once the stale source is writable
+      }
+    }
+    removeCloseMarker();
+  }
+
   // Every create/update/close mutation runs inside this single exclusive
   // section so reads and writes across the two stores are serializable; a close
-  // can never race an update into archiving stale bytes.
+  // can never race an update into archiving stale bytes. Recovery runs first so
+  // any interrupted close is healed before the next mutation observes the store.
   function withStoreLock(fn) {
     const fd = acquireLock();
     try {
+      recover();
       return fn();
     } finally {
       releaseLock(fd);
     }
   }
 
+  // Lock-free read paths (list/read) take the lock only when a marker exists, so
+  // a crashed close is healed before its duplicate copies would fail them closed.
+  function recoverIfNeeded() {
+    if (!fs.existsSync(closeMarkerPath())) return;
+    withStoreLock(() => {});
+  }
+
   function allocateParentId() {
-    let max = 0;
+    // Compare and increment as BigInt so an existing parent beyond
+    // Number.MAX_SAFE_INTEGER (e.g. BACK-9007199254740993) is not silently
+    // rounded down, which would allocate a colliding/backwards id.
+    let max = 0n;
     for (const kind of [TASKS_DIR, COMPLETED_DIR]) {
       for (const { identity } of listDir(kind)) {
-        const parent = Number.parseInt(identity.id.split(".")[0], 10);
-        if (Number.isInteger(parent) && parent > max) max = parent;
+        const parent = BigInt(identity.id.split(".")[0]);
+        if (parent > max) max = parent;
       }
     }
-    return String(max + 1);
+    return String(max + 1n);
   }
 
   function idExists(id) {
@@ -553,13 +701,22 @@ function createLocalAdapter(options = {}) {
 
   // --- atomic publication: temp on same fs, hard-link (no overwrite), unlink ---
 
+  // Route temp writes through an injectable writer so a test can reproduce a
+  // partial-write ENOSPC that leaves bytes on disk.
+  function writeTemp(tmp, content) {
+    if (testHooks.writeFile) return testHooks.writeFile(tmp, content);
+    return fs.writeFileSync(tmp, content);
+  }
+
   function publishNewFile(dir, fileName, content) {
     const dest = path.join(dir, fileName);
     assertWithin(dir, dest);
     fs.mkdirSync(dir, { recursive: true });
     const tmp = tempPath(dir, path.basename(fileName));
-    fs.writeFileSync(tmp, content);
+    // The temp write is inside the try so a partial write (e.g. ENOSPC) is
+    // cleaned by the finally instead of leaking a stray `.tmp`.
     try {
+      writeTemp(tmp, content);
       if (testHooks.beforePublish) testHooks.beforePublish(dest);
       fs.linkSync(tmp, dest);
     } catch (error) {
@@ -571,7 +728,7 @@ function createLocalAdapter(options = {}) {
       try {
         fs.unlinkSync(tmp);
       } catch {
-        /* temp already gone */
+        /* temp already gone or never created */
       }
     }
     return dest;
@@ -581,14 +738,16 @@ function createLocalAdapter(options = {}) {
     const dest = path.join(dir, fileName);
     assertWithin(dir, dest);
     const tmp = tempPath(dir, path.basename(fileName));
-    fs.writeFileSync(tmp, content);
+    // A successful rename consumes the temp; any earlier failure (partial write
+    // or failed rename) is cleaned here so no stray `.tmp` survives.
     try {
+      writeTemp(tmp, content);
       fs.renameSync(tmp, dest);
     } catch (error) {
       try {
         fs.unlinkSync(tmp);
       } catch {
-        /* temp already gone */
+        /* temp already gone or never created */
       }
       throw error;
     }
@@ -685,6 +844,7 @@ function createLocalAdapter(options = {}) {
         `invalid local list state ${JSON.stringify(state)}; expected one of open, closed, all`
       );
     }
+    recoverIfNeeded();
     const kinds = LIST_STATE_KINDS[state];
     const tasks = [];
     const seen = new Map();
@@ -706,6 +866,7 @@ function createLocalAdapter(options = {}) {
 
   function read(selector) {
     const identity = resolveIdentity(selector);
+    recoverIfNeeded();
     const { active, completed } = locateEntry(identity);
     const kind = active ? TASKS_DIR : COMPLETED_DIR;
     const entry = active || completed;
@@ -779,7 +940,7 @@ function createLocalAdapter(options = {}) {
 
       const entries = applyFrontmatterChanges(currentEntries, fieldChanges);
       const body = changes.body !== undefined ? normalizeBody(String(changes.body)) : split.body;
-      const nextContent = `${stringifyFrontmatter(entries)}${body}`;
+      const nextContent = `${stringifyFrontmatter(entries, split.eol)}${body}`;
       // A change-free update (or one that resolves to identical bytes) must not
       // rewrite the file, so the mtime and inode stay stable.
       if (nextContent !== content) {
@@ -814,9 +975,20 @@ function createLocalAdapter(options = {}) {
       requireValidFrontmatter(currentEntries, identity.ref);
 
       const entries = applyFrontmatterChanges(currentEntries, { status: DONE_STATUS });
-      const doneContent = `${stringifyFrontmatter(entries)}${split.body}`;
-      const dest = publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
-      retireSourceAfterPublish(identity, src, dest);
+      const doneContent = `${stringifyFrontmatter(entries, split.eol)}${split.body}`;
+      const dest = path.join(dirPath(COMPLETED_DIR), activeEntry.file);
+      // Journal the intent before publishing so a crash anywhere between here and
+      // the source unlink is reconciled to a single authority on the next open:
+      // no marker survives a fully successful move or a completed rollback.
+      writeCloseMarker({ id: identity.id, ref: identity.ref, src, dest });
+      try {
+        publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
+        retireSourceAfterPublish(identity, src, dest);
+      } catch (error) {
+        removeCloseMarker();
+        throw error;
+      }
+      removeCloseMarker();
       return { tracker: "local", id: identity.id, ref: identity.ref };
     });
   }
@@ -825,9 +997,17 @@ function createLocalAdapter(options = {}) {
 }
 
 function compareByParentThenSub(left, right) {
-  const [lp, ls = -1] = left.id.split(".").map(Number);
-  const [rp, rs = -1] = right.id.split(".").map(Number);
-  return lp === rp ? ls - rs : lp - rp;
+  // BigInt keys so large ids (past Number's safe range) still order correctly;
+  // a bare parent sorts before its decimal subtasks via the -1 sentinel.
+  const key = (id) => {
+    const [parent, sub] = id.split(".");
+    return [BigInt(parent), sub === undefined ? -1n : BigInt(sub)];
+  };
+  const [lp, ls] = key(left.id);
+  const [rp, rs] = key(right.id);
+  if (lp !== rp) return lp < rp ? -1 : 1;
+  if (ls !== rs) return ls < rs ? -1 : 1;
+  return 0;
 }
 
 module.exports = {

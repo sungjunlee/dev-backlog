@@ -167,6 +167,50 @@ describe("offline local core sprint cycle", () => {
   });
 });
 
+describe("offline local close survives a process crash", () => {
+  it("recovers duplicate copies and a stale lock left by a crash mid-close", (t) => {
+    const { root, backlogDir } = makeOfflineStore(t);
+    fs.writeFileSync(
+      path.join(backlogDir, "tasks", "BACK-1 - one.md"),
+      "---\nid: BACK-1\ntitle: One\nstatus: To Do\nlabels: []\npriority: medium\ncreated_date: '2026-07-01'\n---\n## Description\nkeep me\n"
+    );
+
+    // A worker that dies after the completed copy is published but before the
+    // active source is unlinked — the exact window that used to strand the store
+    // with duplicate canonical copies and a held lock.
+    const workerPath = path.join(root, "crash-worker.js");
+    fs.writeFileSync(
+      workerPath,
+      `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});\n` +
+        "const [backlogDir] = process.argv.slice(2);\n" +
+        "const adapter = createLocalAdapter({ backlogDir, testHooks: { beforeUnlinkSource() { process.exit(99); } } });\n" +
+        "adapter.close('BACK-1');\n"
+    );
+    const crashed = spawnSync(process.execPath, [workerPath, backlogDir], { encoding: "utf8" });
+    assert.equal(crashed.status, 99, "worker crashed mid-close after publishing the completed copy");
+
+    // The crash left both canonical copies, a durable marker, and a stale lock.
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), "active source survived the crash");
+    assert.ok(fs.existsSync(path.join(backlogDir, "completed", "BACK-1 - one.md")), "completed copy was published before the crash");
+    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), "recovery marker remains");
+    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), "the crashed process left a stale lock");
+
+    // Next open reclaims the stale lock, heals to a single authority, clears the marker.
+    const { adapter } = localAdapter(backlogDir);
+    const result = adapter.close("BACK-1");
+    assert.deepEqual(result, { tracker: "local", id: "1", ref: "BACK-1" });
+    assert.equal(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), false, "duplicate active source retired");
+    assert.deepEqual(adapter.list().map((task) => task.ref), []);
+    assert.deepEqual(adapter.list({ state: "closed" }).map((task) => task.ref), ["BACK-1"]);
+    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), false, "stale lock reclaimed and released");
+    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), false, "marker cleared after recovery");
+
+    const archived = fs.readFileSync(path.join(backlogDir, "completed", "BACK-1 - one.md"), "utf-8");
+    assert.match(archived, /^status: Done$/m);
+    assert.ok(archived.includes("keep me"), "the archived body is preserved");
+  });
+});
+
 describe("offline concurrent allocation is atomic", () => {
   it("assigns distinct ids to parallel allocators with no overwrite or leaked lock/temp", async (t) => {
     const { root, backlogDir } = makeOfflineStore(t);

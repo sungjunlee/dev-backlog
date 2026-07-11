@@ -757,3 +757,125 @@ describe("local update no-op and list-state validation edges", () => {
     assert.deepEqual(adapter.list().map((task) => task.ref), ["BACK-1"]);
   });
 });
+
+describe("local CRLF task files parse and preserve their newline style", () => {
+  const crlf = (id, status = "To Do") =>
+    [
+      "---",
+      `id: BACK-${id}`,
+      "title: Windows Task",
+      `status: ${status}`,
+      "labels:",
+      "  - infra",
+      "priority: medium",
+      "created_date: '2026-07-01'",
+      "---",
+      "## Description",
+      "line one",
+      "line two",
+      "",
+    ].join("\r\n");
+
+  const noBareLf = (content) => !/[^\r]\n/.test(content);
+
+  it("reads a valid CRLF file instead of treating id as missing", (t) => {
+    const { adapter } = makeStore(t, { seedTasks: [["BACK-1 - one.md", crlf(1)]] });
+    const task = adapter.read("BACK-1");
+    assert.equal(task.id, "1");
+    assert.equal(task.title, "Windows Task");
+    assert.equal(task.status, "To Do");
+    assert.deepEqual(task.labels, ["infra"]);
+    assert.deepEqual(adapter.list().map((x) => x.ref), ["BACK-1"]);
+  });
+
+  it("keeps CRLF newlines when updating a field", (t) => {
+    const { adapter, backlogDir } = makeStore(t, { seedTasks: [["BACK-1 - one.md", crlf(1)]] });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+    adapter.update("BACK-1", { status: "In Progress" });
+    const after = read(backlogDir, "tasks", "BACK-1 - one.md");
+    // Exactly the status line changed; every other byte, including CRLF, is intact.
+    assert.equal(after, before.replace("status: To Do", "status: In Progress"));
+    assert.ok(after.includes("\r\n"), "CRLF endings survive the update");
+    assert.ok(noBareLf(after), "no bare LF was introduced");
+  });
+
+  it("keeps CRLF newlines when closing", (t) => {
+    const { adapter, backlogDir } = makeStore(t, { seedTasks: [["BACK-1 - one.md", crlf(1)]] });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+    adapter.close("BACK-1");
+    const archived = read(backlogDir, "completed", "BACK-1 - one.md");
+    assert.equal(archived, before.replace("status: To Do", "status: Done"));
+    assert.ok(archived.includes("\r\n"));
+    assert.ok(noBareLf(archived), "no bare LF was introduced on close");
+  });
+});
+
+describe("local list items encode losslessly", () => {
+  it("round-trips YAML-significant label and dependency items", (t) => {
+    const { adapter, backlogDir } = makeStore(t);
+    const labels = ["#bug", "a: b", "true", "false", "[x]", "{a}", " leading", "trailing ", "quote's", "123"];
+    const dependencies = ["- dash", "@handle", "key: val", "BACK-9"];
+    adapter.create({ title: "Encoded", labels, dependencies });
+
+    const task = adapter.read("BACK-1");
+    assert.deepEqual(task.labels, labels);
+    assert.deepEqual(task.dependencies, dependencies);
+
+    // Survives a metadata-only update and a re-read of both read and list.
+    adapter.update("BACK-1", { priority: "high" });
+    assert.deepEqual(adapter.read("BACK-1").labels, labels);
+    assert.deepEqual(adapter.list()[0].dependencies, dependencies);
+
+    // YAML-significant items are quoted so meaning cannot change; a plain token stays bare.
+    const raw = read(backlogDir, "tasks", "BACK-1 - encoded.md");
+    assert.match(raw, /^ {2}- '#bug'$/m);
+    assert.match(raw, /^ {2}- 'a: b'$/m);
+    assert.match(raw, /^ {2}- 'true'$/m);
+    assert.match(raw, /^ {2}- '123'$/m);
+    assert.match(raw, /^ {2}- 'quote''s'$/m);
+    assert.match(raw, /^ {2}- BACK-9$/m);
+  });
+});
+
+describe("local allocation is precision-safe for large parent ids", () => {
+  it("allocates strictly above a parent id beyond Number.MAX_SAFE_INTEGER", (t) => {
+    const big = "9007199254740993"; // 2^53 + 1: rounds down when handled as a JS float
+    const { adapter, backlogDir } = makeStore(t, {
+      seedTasks: [[`BACK-${big} - big.md`, taskFile({ id: big, title: "Big" })]],
+    });
+    const created = adapter.create({ title: "Next" });
+    assert.equal(created.id, "9007199254740994");
+    assert.notEqual(created.id, "9007199254740992"); // the rounded-down (colliding) value
+    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-9007199254740994 - next.md")));
+    assert.equal(adapter.read(`BACK-${big}`).id, big);
+    assert.equal(adapter.read("BACK-9007199254740994").id, "9007199254740994");
+  });
+});
+
+describe("local publication cleans partial temp files when the write itself fails", () => {
+  function failingWrite(tmp) {
+    fs.writeFileSync(tmp, "partial bytes"); // a partial temp lands on disk...
+    const error = new Error("ENOSPC: no space left on device, write");
+    error.code = "ENOSPC";
+    throw error; // ...then the write itself is reported as failed
+  }
+
+  it("removes the stray temp on create when the write fails", (t) => {
+    const { backlogDir } = makeStore(t);
+    const adapter = createLocalAdapter({ backlogDir, now: FIXED_NOW, testHooks: { writeFile: failingWrite } });
+    assert.throws(() => adapter.create({ title: "Boom" }));
+    assert.deepEqual(listNames(backlogDir, "tasks"), []);
+    assert.deepEqual(strays(backlogDir, "tasks"), []);
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+  });
+
+  it("removes the stray temp on update when the write fails and preserves the task", (t) => {
+    const { backlogDir } = makeStore(t, { seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]] });
+    const before = read(backlogDir, "tasks", "BACK-1 - one.md");
+    const adapter = createLocalAdapter({ backlogDir, now: FIXED_NOW, testHooks: { writeFile: failingWrite } });
+    assert.throws(() => adapter.update("BACK-1", { status: "In Progress" }));
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), before, "original bytes untouched");
+    assert.deepEqual(strays(backlogDir, "tasks"), []);
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
+  });
+});
