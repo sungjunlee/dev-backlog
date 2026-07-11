@@ -36,6 +36,9 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 
 ### Learnings
 <!-- LEARN:BEGIN -->
+- 2026-07-11 (Sprint tracker-seam, PRs #271/#280/#282/#284/#286): Configured tracker resolution must never use availability failure to choose another store; missing configuration is a stable GitHub compatibility rule, while explicit local remains unavailable until persistence lands.
+- 2026-07-11 (PR #284): Exact task-ref matching needs tests for numeric collisions, decimal descendants, punctuation, alphanumeric suffixes, hyphenated foreign prefixes, and numeric slugs; visual regex review missed several of these boundaries.
+- 2026-07-11 (PR #286): Moving GitHub calls behind a provider seam must preserve marker ownership in dry-run as well as apply mode, keep injection/argv/output compatibility, and confine direct `gh` calls to the lifecycle adapter or explicit capability transports.
 <!-- LEARN:END -->
 
 ### Decisions
