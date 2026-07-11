@@ -1,7 +1,7 @@
 ---
 id: BACK-276
 title: 'feat: add offline local canonical task adapter'
-status: To Do
+status: Done
 labels:
   - enhancement
 priority: medium
@@ -19,13 +19,13 @@ Implement an offline local adapter that completes canonical task lifecycle and t
 
 ## Acceptance Criteria
 
-- [ ] Local list/read/create/update/close operations work against Backlog.md-compatible `backlog/tasks/` and `backlog/completed/` files.
-- [ ] ID allocation is deterministic, collision-safe, prefix-aware, and preserves existing decimal subtask compatibility.
-- [ ] Create and update preserve human-authored descriptions and AC checkbox state; close archives the exact task atomically.
-- [ ] Local plan/work/complete uses normalized task refs and does not invoke `gh` or require GitHub authentication.
-- [ ] Unsupported milestone, PR relationship, mirror, progress issue, comment, and close-keyword operations return actionable capability errors.
-- [ ] Offline integration tests run with `gh` absent from `PATH` and prove create → plan → read/work state → complete/archive.
-- [ ] Concurrent or duplicate ID allocation fails safely rather than overwriting a task.
+- [x] Local list/read/create/update/close operations work against Backlog.md-compatible `backlog/tasks/` and `backlog/completed/` files.
+- [x] ID allocation is deterministic, collision-safe, prefix-aware, and preserves existing decimal subtask compatibility.
+- [x] Create and update preserve human-authored descriptions and AC checkbox state; close archives the exact task atomically.
+- [x] Local plan/work/complete uses normalized task refs and does not invoke `gh` or require GitHub authentication.
+- [x] Unsupported milestone, PR relationship, mirror, progress issue, comment, and close-keyword operations return actionable capability errors.
+- [x] Offline integration tests run with `gh` absent from `PATH` and prove create → plan → read/work state → complete/archive.
+- [x] Concurrent or duplicate ID allocation fails safely rather than overwriting a task.
 
 ## Non-Goals
 
