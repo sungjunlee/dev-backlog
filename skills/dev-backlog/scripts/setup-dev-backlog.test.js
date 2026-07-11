@@ -11,7 +11,9 @@ const {
   ConfigValidationError,
   collectGithubEvidence,
   inspectConfig,
+  isGithubRemote,
   mutateTrackerText,
+  parseArgs,
   runSetup,
 } = require("./setup-dev-backlog.js");
 
@@ -141,9 +143,53 @@ describe("tracker config state machine", () => {
       );
     }
   });
+
+  it("ignores tracker-like unknown keys and block scalar text", () => {
+    const raw = [
+      "project_name: preserved",
+      "tracker-options: manual",
+      "note: |",
+      "  tracker: local",
+      "  literal text",
+      "tracker: github",
+      "",
+    ].join("\n");
+    const state = inspectConfig(raw, "/repo/backlog/config.yml");
+    assert.equal(state.kind, "selected");
+    assert.equal(state.tracker, "github");
+    assert.equal(mutateTrackerText(raw, state, "local"), raw.replace("tracker: github", "tracker: local"));
+  });
+
+  it("recognizes a BOM-prefixed top-level tracker without disturbing the BOM", () => {
+    const raw = "\uFEFFtracker: github\r\nother: yes";
+    const state = inspectConfig(raw, "/repo/backlog/config.yml");
+    assert.equal(state.tracker, "github");
+    assert.equal(mutateTrackerText(raw, state, "local"), "\uFEFFtracker: local\r\nother: yes");
+  });
+});
+
+describe("CLI argument boundary", () => {
+  it("rejects every duplicate tracker flag spelling, even when values agree", () => {
+    for (const argv of [
+      ["--tracker", "local", "--tracker", "github"],
+      ["--tracker=local", "--tracker=local"],
+      ["--tracker", "github", "--tracker=local"],
+      ["--tracker=github", "--tracker", "github"],
+    ]) {
+      assert.throws(() => parseArgs(argv), /only once/);
+    }
+  });
 });
 
 describe("provider evidence", () => {
+  it("accepts only exact github.com remote hosts", () => {
+    assert.equal(isGithubRemote("https://github.com/owner/repo.git"), true);
+    assert.equal(isGithubRemote("git@github.com:owner/repo.git"), true);
+    assert.equal(isGithubRemote("https://user:secret@github.com/owner/repo.git"), true);
+    assert.equal(isGithubRemote("https://github.com.evil.test/owner/repo.git"), false);
+    assert.equal(isGithubRemote("git@github.com.evil.test:owner/repo.git"), false);
+  });
+
   it("recommends github only for the usable-origin/authenticated matrix cell", () => {
     const matrix = [
       {
@@ -230,18 +276,16 @@ describe("setup filesystem behavior", () => {
     assert.equal(resolved.tracker, "local");
   });
 
-  it("creates a fresh explicit github setup and reports repair without fallback", async (t) => {
+  it("creates a fresh explicit github setup without probing and emits static repair guidance", async (t) => {
     const root = makeRoot(t);
-    const mock = evidenceExec({ remote: "https://github.com/o/r", gh: "unauthenticated" });
     const result = await runSetup(
       { cwd: root, tracker: "github", nonInteractive: true, projectName: "demo" },
-      { execFileSync: mock.execFileSync }
+      { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
     );
 
     assert.equal(result.selection, "github");
-    assert.equal(result.github.available, false);
+    assert.equal(result.github.checked, false);
     assert.match(result.github.repair, /gh auth login --hostname github\.com/);
-    assert.doesNotMatch(JSON.stringify(result), /SECRET-TOKEN/);
     assert.match(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), /^tracker: github$/m);
   });
 
@@ -265,7 +309,7 @@ describe("setup filesystem behavior", () => {
     writeConfig(root, "project_name: legacy\n# exact comment\ntask_prefix: BACK\n");
     const result = await runSetup(
       { cwd: root, nonInteractive: true },
-      { execFileSync: noProviderCalls(), checkGithubAvailability: () => ({ available: true }) }
+      { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
     );
     assert.equal(result.selection, "github");
     assert.equal(result.selectionSource, "legacy-pin");
@@ -273,6 +317,28 @@ describe("setup filesystem behavior", () => {
       fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"),
       "project_name: legacy\n# exact comment\ntask_prefix: BACK\ntracker: github\n"
     );
+  });
+
+  it("fails closed before reinterpreting legacy GitHub mirrors as local", async (t) => {
+    const root = makeRoot(t);
+    writeConfig(root, "project_name: legacy\n# exact comment\ntask_prefix: BACK\n");
+    fs.mkdirSync(path.join(root, "backlog/tasks"));
+    fs.writeFileSync(path.join(root, "backlog/tasks/BACK-42.md"), "---\nid: 42\n---\nlegacy mirror\n");
+    const before = snapshotTree(root);
+
+    await assert.rejects(
+      runSetup(
+        { cwd: root, tracker: "local", nonInteractive: true },
+        { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
+      ),
+      (error) => {
+        assert.match(error.message, /legacy GitHub authority/);
+        assert.match(error.message, /--non-interactive/);
+        assert.match(error.message, /--tracker.*local/);
+        return true;
+      }
+    );
+    assert.deepEqual(snapshotTree(root), before);
   });
 
   it("keeps an existing choice immutable across remote/auth changes unless explicit", async (t) => {
@@ -292,7 +358,7 @@ describe("setup filesystem behavior", () => {
 
     await runSetup(
       { cwd: root, tracker: "github", nonInteractive: true },
-      { checkGithubAvailability: () => ({ available: true }) }
+      { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
     );
     assert.equal(
       fs.readFileSync(configPath, "utf8"),
@@ -300,7 +366,7 @@ describe("setup filesystem behavior", () => {
     );
   });
 
-  it("preserves an existing github selection when evidence degrades and only reports repair", async (t) => {
+  it("preserves an existing github selection with zero provider probes and static repair guidance", async (t) => {
     const root = makeRoot(t);
     writeConfig(root, "project_name: stable\ntracker: github\n# tail\n");
     for (const name of ["tasks", "sprints", "completed"]) {
@@ -308,20 +374,16 @@ describe("setup filesystem behavior", () => {
     }
     const configPath = path.join(root, "backlog/config.yml");
     const before = fs.statSync(configPath);
-    const mock = evidenceExec({
-      remote: "https://example.com/owner/repo.git",
-      gh: "missing",
-    });
     const result = await runSetup(
       { cwd: root, nonInteractive: true },
-      { execFileSync: mock.execFileSync }
+      { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
     );
     const after = fs.statSync(configPath);
     assert.equal(result.selection, "github");
     assert.equal(result.selectionSource, "preserved");
-    assert.equal(result.github.available, false);
+    assert.equal(result.github.checked, false);
     assert.equal(result.github.fallbackAttempted, false);
-    assert.match(result.github.repair, /GitHub CLI/);
+    assert.match(result.github.repair, /gh auth login/);
     assert.equal(after.ino, before.ino);
     assert.equal(after.mtimeMs, before.mtimeMs);
     assert.equal(fs.readFileSync(configPath, "utf8"), "project_name: stable\ntracker: github\n# tail\n");
@@ -418,6 +480,29 @@ describe("setup filesystem behavior", () => {
       assert.equal(realFs.readFileSync(configPath, "utf8"), original);
       assert.deepEqual(realFs.readdirSync(path.dirname(configPath)), ["config.yml"]);
     }
+  });
+
+  it("preserves config mode across an atomic tracker replacement", async (t) => {
+    const root = makeRoot(t);
+    writeConfig(root, "project_name: mode\ntracker: local\n");
+    const configPath = path.join(root, "backlog/config.yml");
+    fs.chmodSync(configPath, 0o640);
+    await runSetup(
+      { cwd: root, tracker: "github", nonInteractive: true },
+      { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
+    );
+    assert.equal(fs.statSync(configPath).mode & 0o777, 0o640);
+  });
+
+  it("rejects symlinked backlog/config paths before mutation", async (t) => {
+    const root = makeRoot(t);
+    const outside = makeRoot(t, "setup-outside-");
+    fs.symlinkSync(outside, path.join(root, "backlog"));
+    await assert.rejects(
+      runSetup({ cwd: root, tracker: "local", nonInteractive: true }),
+      /unsafe backlog path/
+    );
+    assert.deepEqual(fs.readdirSync(outside), []);
   });
 });
 

@@ -15,6 +15,16 @@ const readline = require("node:readline/promises");
 const ALLOWED_TRACKERS = Object.freeze(["github", "local"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints", "tasks", "completed"]);
 
+function shellQuote(value) {
+  const text = String(value);
+  if (/^[A-Za-z0-9_./:=@+-]+$/.test(text)) return text;
+  return `'${text.replaceAll("'", `'"'"'`)}'`;
+}
+
+function setupCommand(args = []) {
+  return [shellQuote(process.execPath), shellQuote(__filename), ...args.map(shellQuote)].join(" ");
+}
+
 class SetupError extends Error {
   constructor(message, options = {}) {
     super(message, options);
@@ -28,7 +38,7 @@ class ConfigValidationError extends SetupError {
     super(
       `Invalid tracker configuration in ${configPath}: ${reason}. ` +
         `Expected exactly one top-level "tracker: github" or "tracker: local" line. ` +
-        `Repair the file, then rerun: node setup-dev-backlog.js --tracker github --non-interactive.`
+        `Repair the file, then rerun: ${setupCommand(["--tracker", "github", "--non-interactive"])}.`
     );
     this.name = "ConfigValidationError";
     this.configPath = configPath;
@@ -64,13 +74,18 @@ function parseArgs(argv = process.argv.slice(2)) {
     help: false,
   };
   let positionalProjectName;
+  let trackerFlagSeen = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--tracker") {
+      if (trackerFlagSeen) throw new SetupError("--tracker may be supplied only once.");
+      trackerFlagSeen = true;
       options.tracker = takeValue(argv, index, "--tracker");
       index += 1;
     } else if (arg.startsWith("--tracker=")) {
+      if (trackerFlagSeen) throw new SetupError("--tracker may be supplied only once.");
+      trackerFlagSeen = true;
       options.tracker = arg.slice("--tracker=".length);
     } else if (arg === "--project-name") {
       options.projectName = takeValue(argv, index, "--project-name");
@@ -128,16 +143,36 @@ function lineRecords(raw) {
 function looksLikeTrackerDeclaration(line) {
   if (!line.trim() || line.trimStart().startsWith("#")) return false;
   return (
-    /^\s*tracker\b/.test(line) ||
+    /^\uFEFF?\s*tracker\s*:/.test(line) ||
     /^\s*["']tracker["']\s*:/.test(line) ||
     /^\s*-\s*tracker\s*:/.test(line) ||
     /[{,]\s*tracker\s*:/.test(line)
   );
 }
 
+function trackerCandidates(raw) {
+  const candidates = [];
+  let blockScalarParentIndent = null;
+
+  for (const record of lineRecords(raw)) {
+    const withoutBom = record.text.replace(/^\uFEFF/, "");
+    const trimmed = withoutBom.trim();
+    const indent = withoutBom.match(/^[ \t]*/)[0].length;
+    if (blockScalarParentIndent !== null) {
+      if (!trimmed || indent > blockScalarParentIndent) continue;
+      blockScalarParentIndent = null;
+    }
+    if (looksLikeTrackerDeclaration(record.text)) candidates.push(record);
+    if (/^\s*(?:[^#][^:]*):[ \t]*[>|](?:[1-9][+-]?|[+-][1-9]?)?\s*(?:#.*)?$/.test(withoutBom)) {
+      blockScalarParentIndent = indent;
+    }
+  }
+  return candidates;
+}
+
 function parseValidTrackerLine(record) {
   const match = record.text.match(
-    /^tracker:([ \t]*)(?:(["'])(github|local)\2|(github|local))([ \t]*(?:#.*)?)$/
+    /^\uFEFF?tracker:([ \t]*)(?:(["'])(github|local)\2|(github|local))([ \t]*(?:#.*)?)$/
   );
   if (!match) return null;
 
@@ -159,7 +194,7 @@ function inspectConfig(raw, configPath = "backlog/config.yml") {
     throw new ConfigValidationError(configPath, "the config could not be read as text");
   }
 
-  const candidates = lineRecords(raw).filter((record) => looksLikeTrackerDeclaration(record.text));
+  const candidates = trackerCandidates(raw);
   if (candidates.length === 0) {
     return Object.freeze({ kind: "legacy", tracker: undefined });
   }
@@ -356,6 +391,29 @@ function ensureMinimumDirectories(backlogDir, fsApi) {
   return { backlogCreated, created };
 }
 
+function validateExistingStructure(backlogDir, configPath, fsApi) {
+  if (fsApi.existsSync(backlogDir)) {
+    const backlogStat = fsApi.lstatSync(backlogDir);
+    if (backlogStat.isSymbolicLink() || !backlogStat.isDirectory()) {
+      throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
+    }
+  }
+  if (fsApi.existsSync(configPath)) {
+    const configStat = fsApi.lstatSync(configPath);
+    if (configStat.isSymbolicLink() || !configStat.isFile()) {
+      throw new SetupError(`Refusing unsafe config path: ${configPath} must be a regular file.`);
+    }
+  }
+  for (const name of MINIMUM_DIRECTORIES) {
+    const directory = path.join(backlogDir, name);
+    if (!fsApi.existsSync(directory)) continue;
+    const stat = fsApi.lstatSync(directory);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw new SetupError(`Refusing unsafe backlog path: ${directory} must be a real directory.`);
+    }
+  }
+}
+
 function rollbackCreatedDirectories(backlogDir, structure, fsApi) {
   for (const name of [...structure.created].reverse()) {
     try {
@@ -380,7 +438,17 @@ function defaultProjectName(cwd) {
 function refusalMessage() {
   return (
     "Fresh non-interactive setup requires an explicit tracker. " +
-    "Recommended safe rerun: node setup-dev-backlog.js --tracker local --non-interactive"
+    `Recommended safe rerun: ${setupCommand(["--tracker", "local", "--non-interactive"])}`
+  );
+}
+
+function legacyLocalRefusalMessage() {
+  const pin = setupCommand(["--non-interactive"]);
+  const switchTracker = setupCommand(["--tracker", "local", "--non-interactive"]);
+  return (
+    "Existing tracker-less config has legacy GitHub authority and cannot switch directly to local. " +
+    `First pin compatibility with ${pin}; then explicitly switch with ${switchTracker}. ` +
+    "This setup does not migrate task files."
   );
 }
 
@@ -389,6 +457,7 @@ async function runSetup(options = {}, dependencies = {}) {
   const cwd = path.resolve(options.cwd || process.cwd());
   const backlogDir = path.join(cwd, "backlog");
   const configPath = path.join(backlogDir, "config.yml");
+  validateExistingStructure(backlogDir, configPath, fsApi);
   const configExists = fsApi.existsSync(configPath);
   let raw;
   let configState;
@@ -406,15 +475,18 @@ async function runSetup(options = {}, dependencies = {}) {
   let selection;
   let selectionSource;
   let recommendationEvidence;
-  if (options.tracker !== undefined) {
+  if (configState && configState.kind === "legacy" && options.tracker === "local") {
+    throw new SetupError(legacyLocalRefusalMessage());
+  }
+  if (configState && configState.kind === "legacy") {
+    selection = "github";
+    selectionSource = "legacy-pin";
+  } else if (options.tracker !== undefined) {
     selection = options.tracker;
     selectionSource = "explicit";
   } else if (configState && configState.kind === "selected") {
     selection = configState.tracker;
     selectionSource = "preserved";
-  } else if (configState && configState.kind === "legacy") {
-    selection = "github";
-    selectionSource = "legacy-pin";
   } else {
     const interactive = !options.nonInteractive && (
       dependencies.isInteractive !== undefined
@@ -462,10 +534,11 @@ async function runSetup(options = {}, dependencies = {}) {
     if (recommendationEvidence) {
       github = githubAvailabilityFromEvidence(recommendationEvidence);
     } else {
-      const availability = dependencies.checkGithubAvailability || checkGithubAvailability;
-      github = availability({
-        cwd,
-        execFileSync: dependencies.execFileSync || childProcess.execFileSync,
+      github = Object.freeze({
+        available: undefined,
+        checked: false,
+        fallbackAttempted: false,
+        repair: "verify with gh auth status --hostname github.com; repair with gh auth login --hostname github.com",
       });
     }
   }
@@ -499,9 +572,11 @@ function printHumanResult(result, output = process.stdout) {
   if (result.evidence) {
     output.write(`Recommendation evidence: ${evidenceSummary(result.evidence)}\n`);
   }
-  if (result.github && !result.github.available) {
+  if (result.github && result.github.available === false) {
     output.write(`GitHub tracker remains selected but is unavailable: ${result.github.reason}.\n`);
     output.write(`Repair: ${result.github.repair}. No local fallback was attempted.\n`);
+  } else if (result.github && result.github.checked === false) {
+    output.write(`GitHub tracker remains selected without provider probing. If unavailable, ${result.github.repair}.\n`);
   }
 }
 
