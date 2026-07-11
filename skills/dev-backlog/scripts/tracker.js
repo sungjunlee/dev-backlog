@@ -26,6 +26,7 @@ const CAPABILITY_NAMES = Object.freeze([
   "comments",
   "closing-semantics",
 ]);
+const UNSUPPORTED_CAPABILITY_CODE = "TRACKER_CAPABILITY_UNSUPPORTED";
 
 const DEFAULT_BACKLOG_DIR = "backlog";
 
@@ -71,9 +72,41 @@ class UnsupportedTrackerCapabilityError extends Error {
   constructor(tracker, capability) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
+    this.code = UNSUPPORTED_CAPABILITY_CODE;
     this.tracker = tracker;
     this.capability = capability;
+    this.remediation =
+      `Use tracker "${tracker}" without "${capability}", or explicitly change ` +
+      "backlog/config.yml to a tracker that supports it before retrying. " +
+      "No tracker switch was attempted.";
   }
+}
+
+function serializeTrackerError(error) {
+  if (!(error instanceof UnsupportedTrackerCapabilityError)) return null;
+  return {
+    code: error.code,
+    tracker: error.tracker,
+    capability: error.capability,
+    message: error.message,
+    remediation: error.remediation,
+  };
+}
+
+function writeTrackerCliError(error, {
+  json = false,
+  stdout = process.stdout,
+  stderr = process.stderr,
+  prefix = "",
+} = {}) {
+  const serialized = serializeTrackerError(error);
+  if (!serialized) return false;
+  if (json) {
+    stdout.write(`${JSON.stringify({ error: serialized })}\n`);
+  } else {
+    stderr.write(`${prefix}${serialized.message}\n${serialized.remediation}\n`);
+  }
+  return true;
 }
 
 function renderValue(value) {
@@ -282,12 +315,15 @@ module.exports = {
   TRACKER_KEYS,
   REQUIRED_ADAPTER_OPERATIONS,
   CAPABILITY_NAMES,
+  UNSUPPORTED_CAPABILITY_CODE,
   TRACKER_ADAPTERS,
   TrackerConfigurationError,
   TrackerContractError,
   TrackerIdentityError,
   TrackerUnavailableError,
   UnsupportedTrackerCapabilityError,
+  serializeTrackerError,
+  writeTrackerCliError,
   selectTracker,
   validateAdapter,
   validateIdentity,

@@ -18,7 +18,11 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { readConfig } = require("./lib.js");
-const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+  writeTrackerCliError,
+} = require("./tracker.js");
 const {
   githubIssueNumber,
   parsePlanCheckbox,
@@ -418,6 +422,9 @@ function main() {
 
     printResult(result);
   } catch (e) {
+    if (writeTrackerCliError(e, { json: options.json })) {
+      process.exit(1);
+    }
     console.error(`Error: ${e.message}`);
     process.exit(1);
   }
