@@ -418,7 +418,15 @@ describe("local canonical identity — fail closed on corruption", () => {
       seedCompleted: [["BACK-1 - archived.md", taskFile({ id: 1, title: "Archived", status: "Done" })]],
     });
     assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
-    assert.throws(() => adapter.list({ state: "all" }), LocalStoreError);
+    for (const state of ["open", "closed", "all"]) {
+      assert.throws(
+        () => adapter.list({ state }),
+        (error) =>
+          error instanceof LocalStoreError &&
+          /exists in both active and completed|unique across the canonical stores/i.test(error.message),
+        `${state} filtering must not hide store-wide exact-id corruption`
+      );
+    }
   });
 });
 

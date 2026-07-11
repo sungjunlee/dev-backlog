@@ -1195,19 +1195,26 @@ function createLocalAdapter(options = {}) {
     assertCanonicalDirs(); // refuse a symlinked/foreign store before reading it
     // list never mutates: an interrupted close is healed on the next mutation,
     // not here. Duplicate copies from a crash surface as a fail-closed error.
+    // Integrity is store-wide, independent of the requested result state: an
+    // active/completed twin must make open, closed, and all views fail alike.
+    const entriesByKind = {
+      [TASKS_DIR]: listDir(TASKS_DIR),
+      [COMPLETED_DIR]: listDir(COMPLETED_DIR),
+    };
+    const activeIds = new Set(entriesByKind[TASKS_DIR].map((entry) => entry.identity.id));
+    for (const entry of entriesByKind[COMPLETED_DIR]) {
+      if (activeIds.has(entry.identity.id)) {
+        throw new LocalStoreError(
+          `local task ${entry.identity.ref} exists in both active and completed stores; ` +
+            "an exact id must be unique across the canonical stores"
+        );
+      }
+    }
+
     const kinds = LIST_STATE_KINDS[state];
     const tasks = [];
-    const seen = new Map();
     for (const kind of kinds) {
-      for (const entry of listDir(kind)) {
-        const prior = seen.get(entry.identity.id);
-        if (prior && prior !== kind) {
-          throw new LocalStoreError(
-            `local task ${entry.identity.ref} exists in both active and completed stores; ` +
-              "an exact id must be unique across the canonical stores"
-          );
-        }
-        seen.set(entry.identity.id, kind);
+      for (const entry of entriesByKind[kind]) {
         tasks.push(readTask(kind, entry));
       }
     }
