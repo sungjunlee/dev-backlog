@@ -137,8 +137,19 @@ describe("readConfig", () => {
 
   it("returns defaults when config file is missing", () => {
     const config = readConfig(path.join(tmpDir, "nonexistent"));
+    assert.equal(config.tracker, "github");
     assert.equal(config.task_prefix, CONFIG_DEFAULTS.task_prefix);
     assert.equal(config.default_status, CONFIG_DEFAULTS.default_status);
+  });
+
+  it("reads an explicit tracker while preserving the github compatibility default", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), "tracker: local\n");
+    assert.equal(readConfig(tmpDir).tracker, "local");
+
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
+    const compatibilityConfig = readConfig(tmpDir);
+    assert.equal(compatibilityConfig.tracker, "github");
+    assert.equal(compatibilityConfig.task_prefix, "PROJ");
   });
 
   it("reads task_prefix from valid config", () => {

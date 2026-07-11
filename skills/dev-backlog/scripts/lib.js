@@ -28,6 +28,7 @@ const GH_EXEC_DEFAULTS = {
 };
 
 const CONFIG_DEFAULTS = {
+  tracker: "github",
   task_prefix: "BACK",
   default_status: "To Do",
   statuses: ["To Do", "In Progress", "Done"],
