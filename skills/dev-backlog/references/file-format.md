@@ -52,7 +52,7 @@ Extended set (if using more granular tracking):
 
 ## Filename Convention
 
-```
+```text
 {PREFIX}-{N[.M]} - {Title-Slug}.md
 ```
 

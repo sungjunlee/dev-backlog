@@ -325,6 +325,7 @@ function runGithubCycle(fixture) {
     SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone", "--json",
   ], fixture), "github sprint-init");
   const sprintPath = path.join(fixture.root, init.sprintFile);
+  const sprintSlug = path.basename(init.sprintFile, ".md");
   assert.match(fs.readFileSync(sprintPath, "utf8"), /^due: 2026-06-30$/m);
   assert.match(fs.readFileSync(sprintPath, "utf8"), /^- \[ \] #42 Cycle task$/m);
 
@@ -361,7 +362,7 @@ function runGithubCycle(fixture) {
     "| In-flight (open PRs) | 1 |", "| Stuck candidates | 0 |", "",
     "## Month End", "", `- Finalized on: ${progress.finalizedAt}`,
     "- State: closed", "", "## Active Sprint", "",
-    "**2026-07-cycle.md** — 0/1 done, 0 in-flight, 1 remaining", "",
+    `**${sprintSlug}.md** — 0/1 done, 0 in-flight, 1 remaining`, "",
   ].join("\n"));
 
   const originalBody = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
@@ -389,7 +390,17 @@ function runGithubCycle(fixture) {
   const calls = fixture.providerCalls();
   const mirrorCreateBody = calls[6]?.[5];
   const mirrorUpdateBody = calls[8]?.[4];
-  const mirrorBodyPattern = /^<!-- dev-backlog:sprint-mirror sprint=2026-07-cycle -->\n\n> The local sprint file is canonical\. This mirror is read-only — it is\n> not edited by hand — and sync is always explicit; there is no daemon\.\n\n## Goal\n\n\[One sentence: what's true when this sprint is done\]\n\n## Plan\n\n- \[ \] #42 Cycle task\n\n## Latest Progress\n\n_No progress recorded yet\._\n\nLast explicit sync: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+  const mirrorBodyPrefix = [
+    `<!-- dev-backlog:sprint-mirror sprint=${sprintSlug} -->`, "",
+    "> The local sprint file is canonical. This mirror is read-only — it is",
+    "> not edited by hand — and sync is always explicit; there is no daemon.", "",
+    "## Goal", "", "[One sentence: what's true when this sprint is done]", "",
+    "## Plan", "", "- [ ] #42 Cycle task", "", "## Latest Progress", "",
+    "_No progress recorded yet._", "", "Last explicit sync: ",
+  ].join("\n");
+  const mirrorBodyPattern = new RegExp(
+    `^${escapeRegExp(mirrorBodyPrefix)}\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$`
+  );
   assert.match(mirrorCreateBody, mirrorBodyPattern);
   assert.match(mirrorUpdateBody, mirrorBodyPattern);
   assert.deepEqual(calls, [
