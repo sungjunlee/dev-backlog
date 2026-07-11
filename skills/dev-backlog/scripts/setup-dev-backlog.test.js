@@ -531,6 +531,41 @@ describe("setup filesystem behavior", () => {
     }
   });
 
+  it("keeps tracker authority across block and multiline scalar content", async (t) => {
+    const root = makeRoot(t, "setup-runtime-physical-scalars-");
+    const raw = [
+      "tracker: local",
+      "literal: |",
+      "  tracker: github",
+      "folded: >-",
+      "  tracker: github",
+      "single: 'first line",
+      "  tracker: github",
+      "  it''s still quoted",
+      "  last line'",
+      'double: "first \\"still quoted',
+      "  tracker: github",
+      '  last line"',
+      'task_prefix: "REAL"',
+      "",
+    ].join("\n");
+    writeConfig(root, raw);
+    for (const name of ["tasks", "sprints", "completed"]) {
+      fs.mkdirSync(path.join(root, "backlog", name));
+    }
+    const before = snapshotTree(path.join(root, "backlog"));
+    await runSetup(
+      { cwd: root, nonInteractive: true },
+      { execFileSync: noProviderCalls() }
+    );
+    assert.deepEqual(snapshotTree(path.join(root, "backlog")), before);
+    const config = readConfig(path.join(root, "backlog"));
+    assert.equal(config.task_prefix, "REAL");
+    assert.equal(resolveConfiguredTracker(config, {
+      backlogDir: path.join(root, "backlog"),
+    }).tracker, "local");
+  });
+
   it("creates a fresh explicit local setup without any provider call", async (t) => {
     const root = makeRoot(t);
     const result = await runSetup(

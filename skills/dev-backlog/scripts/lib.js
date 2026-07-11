@@ -110,11 +110,39 @@ function parseYamlScalar(raw) {
   return value;
 }
 
+function isBlockScalarValue(raw) {
+  const value = stripYamlSeparationComment(raw).trim();
+  return /^(?:(?:[&!]\S+)\s+)*(?:[>|](?:[1-9][+-]?|[+-][1-9]?)?)$/.test(value);
+}
+
+function quotedScalarCloses(text, quote, start = 0) {
+  for (let index = start; index < text.length; index += 1) {
+    if (quote === "'" && text[index] === "'" && text[index + 1] === "'") {
+      index += 1;
+    } else if (quote === '"' && text[index] === "\\" && index + 1 < text.length) {
+      index += 1;
+    } else if (text[index] === quote) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseSimpleYaml(raw) {
   const root = {};
   const stack = [{ indent: -1, value: root }];
+  let physicalScalar = null;
 
   for (const line of raw.split(/\r?\n/)) {
+    if (physicalScalar && physicalScalar.kind === "block") {
+      if (!line.trim()) continue;
+      const indent = line.match(/^\s*/)[0].length;
+      if (indent > physicalScalar.indent) continue;
+      physicalScalar = null;
+    } else if (physicalScalar && physicalScalar.kind === "quoted") {
+      if (quotedScalarCloses(line, physicalScalar.quote)) physicalScalar = null;
+      continue;
+    }
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
 
     const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
@@ -136,6 +164,15 @@ function parseSimpleYaml(raw) {
     }
 
     parent[key] = parseYamlScalar(rawValue);
+    if (isBlockScalarValue(rawValue)) {
+      physicalScalar = { kind: "block", indent };
+    } else {
+      const scalar = stripYamlSeparationComment(rawValue).trimStart();
+      const quote = scalar[0];
+      if ((quote === "'" || quote === '"') && !quotedScalarCloses(scalar, quote, 1)) {
+        physicalScalar = { kind: "quoted", quote };
+      }
+    }
   }
 
   return root;

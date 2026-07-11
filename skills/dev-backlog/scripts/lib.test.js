@@ -187,6 +187,39 @@ describe("readConfig", () => {
     }
   });
 
+  it("does not parse block scalar physical content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "literal: |",
+      "  tracker: github",
+      "  task_prefix: HIDDEN",
+      "folded: &copy !text >-2 # keep",
+      "  tracker: github",
+      "  task_prefix: ALSO-HIDDEN",
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
+  });
+
+  it("does not parse multiline quoted scalar content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "single: 'first line",
+      "  tracker: github",
+      "  it''s still quoted",
+      "  last line'",
+      'double: "first \\"still quoted',
+      "  tracker: github",
+      '  last line"',
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
+  });
+
   it("reads task_prefix from valid config", () => {
     fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
     const config = readConfig(tmpDir);
