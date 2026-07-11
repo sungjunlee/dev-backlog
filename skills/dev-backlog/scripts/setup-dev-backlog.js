@@ -140,8 +140,8 @@ function lineRecords(raw) {
   return records;
 }
 
-function consumeQuotedToken(line, start, quote) {
-  let raw = "";
+function consumeQuotedToken(line, start, quote, initialRaw = "") {
+  let raw = initialRaw;
   for (let index = start + 1; index < line.length; index += 1) {
     if (quote === "'" && line[index] === "'" && line[index + 1] === "'") {
       raw += "''";
@@ -199,10 +199,29 @@ function tokenizeYamlLine(line, state = {}) {
   let nodeBoundary = flowDepth > 0 ? Boolean(state.nodeBoundary) : true;
 
   if (carriedQuote) {
-    const continuation = consumeQuotedToken(line, -1, carriedQuote);
-    if (!continuation.closed) {
-      return { tokens, state: { quote: carriedQuote, flowDepth, nodeBoundary: false } };
+    let continuationStart = -1;
+    let initialRaw = carriedQuote.raw;
+    if (carriedQuote.char === '"' && initialRaw.endsWith("\\")) {
+      initialRaw = initialRaw.slice(0, -1);
+      while (/[ \t]/.test(line[continuationStart + 1] || "")) continuationStart += 1;
+    } else {
+      initialRaw += " ";
     }
+    const continuation = consumeQuotedToken(line, continuationStart, carriedQuote.char, initialRaw);
+    if (!continuation.closed) {
+      return {
+        tokens,
+        state: {
+          quote: { char: carriedQuote.char, raw: continuation.raw },
+          flowDepth,
+          nodeBoundary: false,
+        },
+      };
+    }
+    const value = carriedQuote.char === "'"
+      ? continuation.raw.replaceAll("''", "'")
+      : decodeDoubleQuotedScalar(continuation.raw);
+    tokens.push({ type: "scalar", value, quoted: true });
     index = continuation.end;
     carriedQuote = null;
     nodeBoundary = false;
@@ -219,7 +238,7 @@ function tokenizeYamlLine(line, state = {}) {
     if (nodeBoundary && (char === "'" || char === '"')) {
       const quoted = consumeQuotedToken(line, index, char);
       if (!quoted.closed) {
-        return { tokens, state: { quote: char, flowDepth, nodeBoundary: false } };
+        return { tokens, state: { quote: { char, raw: quoted.raw }, flowDepth, nodeBoundary: false } };
       }
       const value = char === "'"
         ? quoted.raw.replaceAll("''", "'")
@@ -238,18 +257,31 @@ function tokenizeYamlLine(line, state = {}) {
       } else {
         while (index < line.length && !/[ \t,\[\]{}]/.test(line[index])) index += 1;
       }
-      tokens.push({ type: "property", value: line.slice(start, index) });
+      tokens.push({
+        type: "property",
+        value: line.slice(start, index),
+        anchor: char === "&" ? line.slice(start + 1, index) : null,
+      });
       continue;
     }
 
-    if (char === "{" || char === "[") {
+    if (nodeBoundary && char === "*") {
+      const start = index + 1;
+      index = start;
+      while (index < line.length && /[A-Za-z0-9_-]/.test(line[index])) index += 1;
+      tokens.push({ type: "alias", name: line.slice(start, index) });
+      nodeBoundary = false;
+      continue;
+    }
+
+    if (nodeBoundary && (char === "{" || char === "[")) {
       tokens.push({ type: char });
       flowDepth += 1;
       nodeBoundary = true;
       index += 1;
       continue;
     }
-    if (char === "}" || char === "]") {
+    if (flowDepth > 0 && (char === "}" || char === "]")) {
       tokens.push({ type: char });
       flowDepth = Math.max(0, flowDepth - 1);
       nodeBoundary = false;
@@ -268,7 +300,7 @@ function tokenizeYamlLine(line, state = {}) {
       index += 1;
       continue;
     }
-    if (nodeBoundary && char === "?" && /[ \t]/.test(line[index + 1] || "")) {
+    if (nodeBoundary && char === "?" && (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
       tokens.push({ type: "?" });
       index += 1;
       continue;
@@ -282,7 +314,7 @@ function tokenizeYamlLine(line, state = {}) {
     const start = index;
     while (index < line.length) {
       const current = line[index];
-      if (current === "#" || current === "{" || current === "[" || current === "}" || current === "]") break;
+      if (current === "#" || (flowDepth > 0 && /[{}\[\]]/.test(current))) break;
       if (flowDepth > 0 && current === ",") break;
       if (current === ":" && isColonIndicator(line, index)) break;
       index += 1;
@@ -296,15 +328,62 @@ function tokenizeYamlLine(line, state = {}) {
   return { tokens, state: { quote: null, flowDepth, nodeBoundary } };
 }
 
-function trackerKeyCount(tokens) {
+function resolveAliasValue(token, anchors) {
+  if (token.type !== "alias") return token.type === "scalar" ? token.value : undefined;
+  const anchored = anchors.get(token.name);
+  return anchored && anchored.kind === "scalar" ? anchored.value : undefined;
+}
+
+function trackerKeyCount(tokens, anchors, onAmbiguousAlias) {
   let count = 0;
   for (let index = 0; index < tokens.length; index += 1) {
-    if (tokens[index].type !== "scalar" || tokens[index].value !== "tracker") continue;
+    if (tokens[index].type !== "scalar" && tokens[index].type !== "alias") continue;
     const next = tokens[index + 1];
     const previous = tokens[index - 1];
-    if ((next && next.type === ":") || (previous && previous.type === "?")) count += 1;
+    const keyPosition = (next && next.type === ":") || (previous && previous.type === "?");
+    if (!keyPosition) continue;
+    const anchored = tokens[index].type === "alias" ? anchors.get(tokens[index].name) : null;
+    const value = resolveAliasValue(tokens[index], anchors);
+    if (value === "tracker") count += 1;
+    else if (tokens[index].type === "alias" && !anchored) onAmbiguousAlias(tokens[index].name);
   }
   return count;
+}
+
+function firstNodeToken(tokens, start = 0) {
+  return tokens.slice(start).find((token) => token.type === "scalar" || token.type === "alias" || token.type === "{" || token.type === "[");
+}
+
+function recordDocumentAnchors(tokens, documentState) {
+  const pending = [...documentState.pendingAnchors];
+  documentState.pendingAnchors.length = 0;
+  if (pending.length > 0) {
+    const node = firstNodeToken(tokens);
+    if (node) {
+      const value = resolveAliasValue(node, documentState.anchors);
+      for (const name of pending) {
+        documentState.anchors.set(name, node.type === "scalar" || node.type === "alias"
+          ? { kind: "scalar", value }
+          : { kind: "collection" });
+      }
+    } else {
+      documentState.pendingAnchors.push(...pending);
+    }
+  }
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.type === "property" && token.anchor) {
+      const node = firstNodeToken(tokens, index + 1);
+      if (node) {
+        const value = resolveAliasValue(node, documentState.anchors);
+        documentState.anchors.set(token.anchor, node.type === "scalar" || node.type === "alias"
+          ? { kind: "scalar", value }
+          : { kind: "collection" });
+      } else {
+        documentState.pendingAnchors.push(token.anchor);
+      }
+    }
+  }
 }
 
 function isBlockScalarHeader(tokens) {
@@ -315,10 +394,17 @@ function isBlockScalarHeader(tokens) {
   return tokens.some((token) => token.type === ":");
 }
 
-function trackerCandidates(raw) {
+function trackerCandidates(raw, configPath) {
   const candidates = [];
   let blockScalarParentIndent = null;
   let lexicalState = { quote: null, flowDepth: 0, nodeBoundary: true };
+  const documentState = { anchors: new Map(), pendingAnchors: [], explicitKeyPending: false };
+  const ambiguousAlias = (name) => {
+    throw new ConfigValidationError(
+      configPath,
+      `alias ${JSON.stringify(`*${name}`)} could resolve to tracker authority and is ambiguous`
+    );
+  };
 
   for (const record of lineRecords(raw)) {
     const withoutBom = record.text.replace(/^\uFEFF/, "");
@@ -330,10 +416,37 @@ function trackerCandidates(raw) {
     }
     const scanned = tokenizeYamlLine(record.text, lexicalState);
     lexicalState = scanned.state;
-    for (let count = trackerKeyCount(scanned.tokens); count > 0; count -= 1) candidates.push(record);
+    recordDocumentAnchors(scanned.tokens, documentState);
+    for (
+      let count = trackerKeyCount(scanned.tokens, documentState.anchors, ambiguousAlias);
+      count > 0;
+      count -= 1
+    ) candidates.push(record);
+
+    if (documentState.explicitKeyPending) {
+      const node = firstNodeToken(scanned.tokens);
+      if (node) {
+        const anchored = node.type === "alias" ? documentState.anchors.get(node.name) : null;
+        const value = resolveAliasValue(node, documentState.anchors);
+        if (value === "tracker") candidates.push(record);
+        else if (node.type === "alias" && !anchored) ambiguousAlias(node.name);
+        documentState.explicitKeyPending = false;
+      }
+    }
+    const last = scanned.tokens[scanned.tokens.length - 1];
+    if (last && last.type === "?") documentState.explicitKeyPending = true;
+
+    for (let index = 0; index < scanned.tokens.length - 2; index += 1) {
+      const [key, colon, alias] = scanned.tokens.slice(index, index + 3);
+      if (key.type === "scalar" && key.value === "<<" && colon.type === ":" && alias.type === "alias" &&
+          !documentState.anchors.has(alias.name)) ambiguousAlias(alias.name);
+    }
     if (!lexicalState.quote && lexicalState.flowDepth === 0 && isBlockScalarHeader(scanned.tokens)) {
       blockScalarParentIndent = indent;
     }
+  }
+  if (lexicalState.quote || lexicalState.flowDepth !== 0 || documentState.explicitKeyPending) {
+    throw new ConfigValidationError(configPath, "the YAML lexical structure is incomplete at end of file");
   }
   return candidates;
 }
@@ -362,7 +475,7 @@ function inspectConfig(raw, configPath = "backlog/config.yml") {
     throw new ConfigValidationError(configPath, "the config could not be read as text");
   }
 
-  const candidates = trackerCandidates(raw);
+  const candidates = trackerCandidates(raw, configPath);
   if (candidates.length === 0) {
     return Object.freeze({ kind: "legacy", tracker: undefined });
   }
@@ -412,8 +525,15 @@ function isGithubRemote(remote) {
   const value = String(remote || "").trim();
   if (!value) return false;
   const component = "[A-Za-z0-9_.-]+";
-  if (new RegExp(`^git@github\\.com:${component}/${component}(?:\\.git)?$`).test(value)) {
-    return true;
+  const scp = value.match(/^git@([^:]+):(.+)$/);
+  if (scp && scp[1].toLowerCase() === "github.com") {
+    const parts = scp[2].split("/");
+    const repo = (parts[1] || "").replace(/\.git$/, "");
+    return parts.length === 2 &&
+      new RegExp(`^${component}$`).test(parts[0]) &&
+      new RegExp(`^${component}$`).test(repo) &&
+      ![".", ".."].includes(parts[0]) &&
+      ![".", ".."].includes(repo);
   }
   try {
     const parsed = new URL(value);

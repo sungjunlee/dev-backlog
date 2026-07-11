@@ -333,6 +333,28 @@ describe("setup-dev-backlog real process integration", () => {
     }
   });
 
+  it("rejects incomplete EOF and cross-line authority before any real CLI mutation", (t) => {
+    for (const raw of [
+      'note: "unterminated\ntracker: local\n',
+      "mapping: {other: value\ntracker: local\n",
+      "tracker: local\n?\n",
+      "?\n  tracker\n: github\ntracker: local\n",
+      '?\n  "track\\\n    er"\n: github\ntracker: local\n',
+      "key_name: &authority tracker\n*authority: github\ntracker: local\n",
+      "*unknown: value\ntracker: local\n",
+      "<<: *unknown\ntracker: local\n",
+    ]) {
+      const root = makeRoot(t, "setup-document-state-");
+      fs.mkdirSync(path.join(root, "backlog"));
+      fs.writeFileSync(path.join(root, "backlog/config.yml"), raw);
+      const before = snapshot(root);
+      const run = runCli(root, ["--non-interactive"]);
+      assert.notEqual(run.status, 0, raw);
+      assert.match(run.stderr, /Invalid tracker configuration/, raw);
+      assert.deepEqual(snapshot(root), before, raw);
+    }
+  });
+
   it("uses stubbed origin and gh evidence for fresh interactive recommendations", (t) => {
     for (const row of [
       { remote: "https://github.com/owner/repo.git", ghStatus: 0, expected: "github" },

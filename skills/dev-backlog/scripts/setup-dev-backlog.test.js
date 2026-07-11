@@ -225,6 +225,47 @@ describe("tracker config state machine", () => {
     }
   });
 
+  it("tracks cross-line explicit keys and anchored alias keys as tracker authority", () => {
+    for (const declaration of [
+      "?\n  tracker\n: github",
+      '?\n  "tracker"\n: github',
+      '?\n  "track\\\n    er"\n: github',
+      "key_name: &authority tracker\n*authority: github",
+      "key_name: &authority\n  tracker\n*authority: github",
+    ]) {
+      assert.throws(
+        () => inspectConfig(`${declaration}\ntracker: local\n`, "/repo/backlog/config.yml"),
+        ConfigValidationError,
+        declaration
+      );
+    }
+  });
+
+  it("preserves unrelated anchors and aliases but rejects unresolved authority aliases", () => {
+    for (const raw of [
+      "key_name: &other something\n*other: value\ntracker: local\n",
+      "base: &base {other: value}\n<<: *base\ntracker: local\n",
+    ]) {
+      assert.equal(inspectConfig(raw, "/repo/backlog/config.yml").tracker, "local");
+    }
+    for (const raw of [
+      "*unknown: value\ntracker: local\n",
+      "<<: *unknown\ntracker: local\n",
+    ]) {
+      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /ambiguous/);
+    }
+  });
+
+  it("rejects incomplete quoted, flow, and explicit-key lexical state at EOF", () => {
+    for (const raw of [
+      'note: "unterminated\ntracker: local\n',
+      "mapping: {other: value\ntracker: local\n",
+      "tracker: local\n?\n",
+    ]) {
+      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /incomplete/);
+    }
+  });
+
   it("recognizes a BOM-prefixed top-level tracker without disturbing the BOM", () => {
     const raw = "\uFEFFtracker: github\r\nother: yes";
     const state = inspectConfig(raw, "/repo/backlog/config.yml");
@@ -252,6 +293,7 @@ describe("provider evidence", () => {
       "https://github.com/owner/repo.git",
       "ssh://git@github.com/owner/repo.git",
       "git@github.com:owner/repo.git",
+      "git@GitHub.COM:owner/repo.git",
       "ssh://git@ssh.github.com:443/owner/repo.git",
     ]) assert.equal(isGithubRemote(remote), true, remote);
 
@@ -276,6 +318,13 @@ describe("provider evidence", () => {
       "ssh://git@ssh.github.com/owner/repo.git",
       "ssh://alice@ssh.github.com:443/owner/repo.git",
       "git@github.com:owner/repo/issues",
+      "git@github.com:./repo.git",
+      "git@github.com:../repo.git",
+      "git@github.com:owner/..",
+      "git@github.com:owner/.",
+      "git@github.com:/repo.git",
+      "git@github.com:owner/",
+      "git@github.com:owner/../repo.git",
     ]) assert.equal(isGithubRemote(remote), false, remote);
   });
 
