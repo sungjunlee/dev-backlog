@@ -174,7 +174,8 @@ function createSprintFile({
   hasCapabilities,
 }) {
   if (!getDue || !getIssues) {
-    const resolved = resolveConfiguredTracker(readConfig(path.dirname(sprintsDir)));
+    const backlogDir = path.dirname(sprintsDir);
+    const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
     invokeCapability(resolved, "milestones", () => undefined);
     getDue = getDue || getMilestoneDue;
     getIssues = getIssues || getMilestoneIssues;

@@ -53,7 +53,7 @@ Extended set (if using more granular tracking):
 ## Filename Convention
 
 ```
-{PREFIX}-{N} - {Title-Slug}.md
+{PREFIX}-{N[.M]} - {Title-Slug}.md
 ```
 
 Examples:
@@ -92,7 +92,11 @@ For manual task files or Backlog.md CLI compatibility, you can optionally add st
 
 The `<!-- AC:BEGIN/END -->` markers enable machine parsing by the Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
 
-Only AC checkboxes get updated in task files during work. Everything else (notes, technical decisions, running context) lives in the sprint file.
+Configured-adapter operations may update supported frontmatter fields, and an
+explicit body update may change task-body content. Metadata-only updates
+preserve body and AC bytes. During normal execution, keep human task-body edits
+to AC checkboxes; notes, technical decisions, and running context belong in the
+sprint file.
 
 ## Sprint Frontmatter (spec-axis fields)
 

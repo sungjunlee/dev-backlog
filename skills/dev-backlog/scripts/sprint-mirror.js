@@ -185,7 +185,7 @@ function sync({
   execFile = execFileSync,
   sprintStatePath = SPRINT_STATE_PATH,
 } = {}) {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   invokeCapability(resolved, "mirrors", () => undefined);
   const state = resolveSprintState({ backlogDir, execFile, sprintStatePath });
   const slug = path.basename(state.active_sprint.path, ".md");

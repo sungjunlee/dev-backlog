@@ -99,6 +99,12 @@ PR relationships, sprint/progress mirrors, comments, or closing-keyword links.
 Those requests fail before side effects with actionable remediation; JSON-capable
 commands return the same structured error contract.
 
+For task `list`, `read`, `create`, `update`, and `close`, the stable invocation
+boundary is the configured adapter exported by `scripts/tracker.js`. Operators
+and agents resolve it with the target `backlogDir` and call those methods in
+either mode; the exact procedure and signatures are documented in
+[the process guide](skills/dev-backlog/references/process.md#required-core-lifecycle-invocation-boundary).
+
 ### Upgrade behavior
 
 There is zero automatic migration. A repository whose existing

@@ -7,6 +7,7 @@
 
 const { createGithubAdapter } = require("./github-tracker.js");
 const { createLocalAdapter } = require("./local-tracker.js");
+const path = require("path");
 
 const TRACKER_KEYS = Object.freeze(["github", "local"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
@@ -69,7 +70,7 @@ class TrackerUnavailableError extends Error {
 }
 
 class UnsupportedTrackerCapabilityError extends Error {
-  constructor(tracker, capability) {
+  constructor(tracker, capability, configPath = path.join(DEFAULT_BACKLOG_DIR, "config.yml")) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
     this.code = UNSUPPORTED_CAPABILITY_CODE;
@@ -77,7 +78,7 @@ class UnsupportedTrackerCapabilityError extends Error {
     this.capability = capability;
     this.remediation =
       `Use tracker "${tracker}" without "${capability}", or explicitly change ` +
-      "backlog/config.yml to a tracker that supports it before retrying. " +
+      `${configPath} to a tracker that supports it before retrying. ` +
       "No tracker switch was attempted.";
   }
 }
@@ -210,7 +211,11 @@ function resolveConfiguredTracker(config, { execFile, adapters, backlogDir } = {
     github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
     local: backlogDir ? createLocalAdapter({ backlogDir }) : TRACKER_ADAPTERS.local,
   };
-  return resolveTracker(config, { adapters: registered });
+  const resolved = resolveTracker(config, { adapters: registered });
+  return Object.freeze({
+    ...resolved,
+    configPath: path.join(backlogDir || DEFAULT_BACKLOG_DIR, "config.yml"),
+  });
 }
 
 function validateIdentity(identity) {
@@ -301,7 +306,11 @@ function invokeCapability(resolved, capability, operation, ...args) {
 
   const supported = readCapabilities(resolved.tracker, resolved.adapter);
   if (!supported.includes(capability)) {
-    throw new UnsupportedTrackerCapabilityError(resolved.tracker, capability);
+    throw new UnsupportedTrackerCapabilityError(
+      resolved.tracker,
+      capability,
+      resolved.configPath
+    );
   }
   return operation(...args);
 }

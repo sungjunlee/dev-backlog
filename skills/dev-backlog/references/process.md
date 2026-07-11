@@ -11,6 +11,33 @@ Adapter mechanics and the compatibility proof have one implementation owner:
 2. For an existing tracker-less config, keep the deterministic GitHub default. Setup first pins that legacy GitHub authority; any later switch must be explicit.
 3. Never infer selection from `gh`, authentication, remotes, existing task files, or an operation failure. Setup does not migrate task files.
 
+## Required Core Lifecycle Invocation Boundary
+
+The official create/read/update/close boundary for operators and agents is the
+configured adapter exported by `scripts/tracker.js`. Resolve it from the target
+backlog directory; do not import `github-tracker.js` or `local-tracker.js`
+directly and do not select an adapter from runtime availability:
+
+```js
+const path = require("node:path");
+const skillDir = "/resolved/dev-backlog-skill";
+const backlogDir = "backlog"; // or the custom backlog directory in use
+const { readConfig } = require(path.join(skillDir, "scripts/lib.js"));
+const { resolveConfiguredTracker } = require(path.join(skillDir, "scripts/tracker.js"));
+
+const { adapter } = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
+```
+
+Call `adapter.list({ state, limit })`, `adapter.read(selector)`,
+`adapter.create(input)`, `adapter.update(selector, changes)`, or
+`adapter.close(selector, options)`. Feed the returned normalized `ref` into the
+sprint Plan. GitHub selectors are `#N`; local selectors are
+`{PREFIX}-N[.M]`. These exported adapter methods are the stable core lifecycle
+API; shell/Node scripts such as `status.sh`, `sync-pull.js`, and
+`sprint-close.sh` are workflow boundaries around it, not substitutes for task
+create/read/update/close. Low-level storage and provider argv remain owned by
+the linked Tracker Adapter Design Contract.
+
 ## Orient — Starting a Session
 
 1. If `backlog/` does not exist, complete **Setup**.

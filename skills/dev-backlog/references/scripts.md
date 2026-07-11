@@ -16,8 +16,9 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 
 - `scripts/setup-dev-backlog.js [project-name] [--tracker github|local] [--non-interactive] [--json]` — persist one canonical tracker and minimum directories without migrating task files; fresh non-interactive setup requires an explicit tracker.
 - `scripts/init.sh [project-name]` — bootstrap `backlog/` with config and directories.
+- `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `process.md`.
 - `scripts/next.sh` — show the next actionable batch.
-- `scripts/status.sh` — summarize sprint file + GitHub state.
+- `scripts/status.sh` — summarize sprint-file state plus task state from the configured tracker.
 - `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — pull open GitHub issues into `backlog/tasks/`.
 - `scripts/sprint-init.js "topic" [--milestone "Name"] [--dry-run] [--json]` — create one active sprint skeleton; refuses a second active sprint. Emits `objectives:`/`component:` only when the backing spec file exists (see `spec-fallback.md`).
 - `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — sync monthly progress issue.

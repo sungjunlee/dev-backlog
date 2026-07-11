@@ -9,7 +9,7 @@ const {
 const { closeMilestone } = require("./github-milestones.js");
 
 function requireCapability(capability, backlogDir = "backlog") {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir));
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
   return invokeCapability(resolved, capability, () => resolved);
 }
 

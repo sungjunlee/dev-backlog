@@ -217,7 +217,7 @@ function sync({
   readFs = { readTaskFiles, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
 }) {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   const requiredCapabilities = [
     "progress-issues",
     "pull-request-relationships",
