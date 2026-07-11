@@ -32,15 +32,16 @@ function makeWorkspace() {
   return dir;
 }
 
-function writeMockGh(binDir) {
+function writeMockGh(binDir, issues = []) {
   const ghPath = path.join(binDir, "gh");
   fs.mkdirSync(binDir, { recursive: true });
   fs.writeFileSync(ghPath, `#!/usr/bin/env node
 const args = process.argv.slice(2);
 const joined = args.join(" ");
+const issues = ${JSON.stringify(issues)};
 
 if (joined.includes("issue list")) {
-  process.stdout.write("[]");
+  process.stdout.write(JSON.stringify(issues));
   process.exit(0);
 }
 
@@ -97,5 +98,68 @@ describe("progress-sync CLI", () => {
     assert.equal(payload.summary.sprint.file, "2026-04-maintenance.md");
     assert.equal(payload.comments.created, 0);
     assert.ok(payload.body.includes("| Merged PRs (month) | 1 |"));
+  });
+
+  it("refuses an exact-title issue without the managed marker in dry-run", () => {
+    const workspaceDir = makeWorkspace();
+    const binDir = path.join(workspaceDir, "bin");
+    writeMockGh(binDir, [{
+      number: 50,
+      title: "Progress: April 2026",
+      body: "Human-owned issue without a marker",
+    }]);
+
+    const result = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--dry-run", "--month", "2026-04"],
+      {
+        cwd: workspaceDir,
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          PATH: `${binDir}:${process.env.PATH || ""}`,
+        },
+      }
+    );
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.equal(
+      result.stderr,
+      "Error: Refusing to update GitHub issue #50: missing managed progress marker for 2026-04.\n"
+    );
+    assert.doesNotMatch(result.stdout, /Would update|#50/);
+  });
+
+  it("keeps marker-owned dry-run update output compatible", () => {
+    const workspaceDir = makeWorkspace();
+    const binDir = path.join(workspaceDir, "bin");
+    writeMockGh(binDir, [{
+      number: 50,
+      title: "Progress: April 2026",
+      body: "<!-- dev-backlog:progress-issue month=2026-04 -->\nOld body",
+    }]);
+
+    const result = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--dry-run", "--month", "2026-04"],
+      {
+        cwd: workspaceDir,
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          PATH: `${binDir}:${process.env.PATH || ""}`,
+        },
+      }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, "");
+    assert.equal(result.stdout, `[dry-run] Would update #50: Progress: April 2026
+  merged PRs (month): 1, in-flight: 1, stuck candidates: 1
+  sprint: 2026-04-maintenance.md (1/3 done)
+  comments: 2 created, 0 updated, 0 skipped, 0 repaired
+Done.
+`);
   });
 });

@@ -257,7 +257,7 @@ function sync({
   });
   const title = monthTitle(month);
 
-  if (existing && parseMarkerMonth(existing.body) !== month && !dryRun) {
+  if (existing && parseMarkerMonth(existing.body) !== month) {
     throw new Error(
       `Refusing to update GitHub issue #${existing.number}: missing managed progress marker for ${month}.`
     );
