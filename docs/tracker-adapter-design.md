@@ -1,13 +1,31 @@
 # Tracker Adapter Design Contract
 
 Status: accepted target design for issue #272. Runtime evidence was inventoried
-at commit `019a6ec`; the adapter design described below is not yet implemented.
-GitHub is the compatibility baseline for issues #273-#275.
+at commit `019a6ec`. Issue #273 now implements only the configured runtime seam
+described below; GitHub caller wiring (#275) and local persistence (#276) remain
+future work. GitHub is the compatibility baseline for issues #273-#275.
 
-This document freezes the smallest tracker boundary that can support another
-canonical task store without weakening existing GitHub behavior. It does not
-configure a tracker, implement an adapter, persist local tasks, change setup,
-or alter any command, Markdown, JSON, helper export, sprint, or task mirror.
+This document froze the smallest tracker boundary that can support another
+canonical task store without weakening existing GitHub behavior. The #272
+freeze itself did not configure a tracker or implement an adapter; the #273
+state is recorded separately below. Neither issue persists local tasks, changes
+setup, or alters command, Markdown, JSON, sprint, or task-mirror behavior.
+
+## Runtime Seam State (#273)
+
+`backlog/config.yml` selects one `tracker`, initially `github` or `local`.
+Repositories without that key use `github` as a deterministic compatibility
+default. Selection reads only the supplied configuration value: it performs no
+CLI, authentication, remote, adapter, or filesystem detection.
+
+`skills/dev-backlog/scripts/tracker.js` owns selection, exact adapter-shape and
+identity validation, configured-only availability probing, and optional
+capability gates. An unavailable or throwing configured adapter fails with no
+probe or fallback to the other slot. The GitHub slot declares the accepted
+capabilities, but existing GitHub command transports and injection seams remain
+where they are until #275; no current caller has moved. The local slot reports
+one implementation-pending reason and fails all lifecycle calls consistently
+until #276 adds persistence. This seam does not make local task files canonical.
 
 ## Current Runtime Evidence
 

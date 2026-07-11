@@ -1,5 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   CAPABILITY_NAMES,
@@ -31,6 +33,12 @@ function makeAdapter(overrides = {}) {
 }
 
 describe("configured tracker selection", () => {
+  it("persists exactly one top-level github selection in this repository", () => {
+    const configPath = path.resolve(__dirname, "../../../backlog/config.yml");
+    const raw = fs.readFileSync(configPath, "utf8");
+    assert.deepEqual(raw.match(/^tracker:\s*github\s*$/gm), ["tracker: github"]);
+  });
+
   it("uses github as the deterministic compatibility default", () => {
     assert.equal(selectTracker({}), "github");
     assert.equal(selectTracker(), "github");
@@ -42,7 +50,7 @@ describe("configured tracker selection", () => {
   });
 
   it("rejects invalid and non-string selections before adapter use", () => {
-    for (const value of ["gitlab", "", 7, false, null, [], {}]) {
+    for (const value of ["gitlab", "", 7, false, null, undefined, [], {}]) {
       let adapterRead = false;
       const adapters = {};
       Object.defineProperty(adapters, "github", {
@@ -55,10 +63,13 @@ describe("configured tracker selection", () => {
       assert.throws(
         () => resolveTracker({ tracker: value }, { adapters }),
         (error) => {
+          const rendered = typeof value === "string"
+            ? value
+            : JSON.stringify(value) ?? String(value);
           assert.ok(error instanceof TrackerConfigurationError);
           assert.match(error.message, /github/);
           assert.match(error.message, /local/);
-          assert.match(error.message, new RegExp(String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+          assert.ok(error.message.includes(rendered));
           return true;
         }
       );
@@ -68,6 +79,27 @@ describe("configured tracker selection", () => {
 });
 
 describe("configured-only resolution", () => {
+  it("resolves the built-in github slot for missing and explicit selection", () => {
+    for (const config of [{}, { tracker: "github" }]) {
+      const resolved = resolveTracker(config);
+      assert.equal(resolved.tracker, "github");
+      assert.equal(resolved.adapter, TRACKER_ADAPTERS.github);
+      assert.deepEqual(resolved.availability, { available: true });
+    }
+  });
+
+  it("fails explicitly selected local resolution with its #276 reason", () => {
+    assert.throws(
+      () => resolveTracker({ tracker: "local" }),
+      (error) => {
+        assert.ok(error instanceof TrackerUnavailableError);
+        assert.equal(error.tracker, "local");
+        assert.match(error.reason, /#276/);
+        return true;
+      }
+    );
+  });
+
   it("probes and returns only the configured adapter", () => {
     let githubProbes = 0;
     let localProbes = 0;
@@ -205,6 +237,7 @@ describe("normalized tracker identity", () => {
       { tracker: "github", id: "id", ref: "" },
       { tracker: "github", id: "id", ref: "#1", url: "not a url" },
       { tracker: "github", id: "id", ref: "#1", number: 1 },
+      Object.create({ tracker: "github", id: "id", ref: "#1" }),
     ]) {
       assert.throws(() => validateIdentity(identity), TrackerIdentityError);
     }

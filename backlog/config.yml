@@ -1,4 +1,5 @@
 project_name: "dev-backlog"
+tracker: github
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 task_prefix: "BACK"

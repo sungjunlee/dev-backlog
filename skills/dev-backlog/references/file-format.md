@@ -103,12 +103,21 @@ Sprint files (`backlog/sprints/*.md`) carry `objectives:` and `component:` along
 
 ```yaml
 project_name: "my-project"
+tracker: github
 task_prefix: "BACK"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 ```
 
-dev-backlog reads `task_prefix`, `default_status`, and `statuses`; `project_name` is retained as metadata. Other Backlog.md config fields are not consumed by dev-backlog.
+`tracker` accepts only `github` or `local`. A missing key deterministically
+defaults to `github`; runtime availability never changes that selection or
+falls back to the other adapter. The `local` adapter is intentionally
+unavailable until #276 implements persistence, and existing GitHub callers are
+not moved behind the seam until #275.
+
+dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;
+`project_name` is retained as metadata. Other Backlog.md config fields are not
+consumed by dev-backlog.
 
 ## Sub-tasks
 
