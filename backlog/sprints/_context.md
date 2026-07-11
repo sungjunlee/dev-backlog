@@ -3,6 +3,9 @@
 ## Architecture Decisions
 - GitHub Issues are the source of truth; `backlog/` is the execution layer
 - Script interfaces should stay stable unless an issue explicitly changes the CLI contract
+- Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
+- Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` and local `{PREFIX}-N[.M]` share one exact parser, while legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
+- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, mirrors, progress issues, comments, and closing semantics remain explicit capabilities or narrowly named provider transports.
 
 ## Conventions
 - Prefer minimal-diff refactors over repo-wide rewrites
