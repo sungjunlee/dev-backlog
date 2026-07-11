@@ -73,9 +73,9 @@ else
   echo "(no backlog/sprints/ directory)"
 fi
 
-# --- GitHub Issues ---
+# --- Configured Tracker Tasks ---
 echo ""
-echo "=== GitHub Issues ==="
+echo "=== Tracker Tasks ==="
 if command -v column >/dev/null 2>&1; then
   node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t' \
     || echo "(gh not available)"

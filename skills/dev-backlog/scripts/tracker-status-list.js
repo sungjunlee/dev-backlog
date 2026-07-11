@@ -4,13 +4,13 @@ const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
 
 function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   return resolved.adapter.list({
     state: "open",
     limit: 20,
     fields: "number,title,labels,milestone",
   }).map((task) => [
-    task.number,
+    task.number ?? task.ref,
     task.milestone?.title || "-",
     task.title,
     (task.labels || []).map((label) => typeof label === "string" ? label : label.name).join(","),
