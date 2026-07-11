@@ -34,4 +34,3 @@ Make the GitHub adapter the sole owner of canonical GitHub task operations and p
 - New GitHub features.
 
 Depends on #273 and #274. Parent: #270.
-

@@ -34,4 +34,3 @@ Add idempotent `setup-dev-backlog` behavior that initializes or repairs the mini
 - Runtime auto-detection on every command.
 
 Depends on #273 and #276. Parent: #270.
-

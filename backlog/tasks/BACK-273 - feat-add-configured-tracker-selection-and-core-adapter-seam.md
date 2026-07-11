@@ -34,4 +34,3 @@ Add explicit tracker configuration, fail-closed resolution, capability reporting
 - Adding setup automation.
 
 Depends on #272. Parent: #270.
-

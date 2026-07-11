@@ -34,4 +34,3 @@ Implement an offline local adapter that completes canonical task lifecycle and t
 - GitLab/Gitea/Forgejo adapters.
 
 Depends on #273 and #274; begins after GitHub regression proof in #275. Parent: #270.
-

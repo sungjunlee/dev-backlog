@@ -33,4 +33,3 @@ Introduce tracker-neutral task references and additive JSON identity while prese
 - Implementing tracker persistence.
 
 Depends on #272 and coordinates with #273. Parent: #270.
-

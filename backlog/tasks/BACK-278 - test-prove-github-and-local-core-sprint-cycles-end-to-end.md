@@ -35,4 +35,3 @@ Ship a deterministic dual-mode acceptance harness, upgrade documentation, and fi
 - Generic provider parity beyond declared capabilities.
 
 Depends on #275, #276, and #277. Parent: #270.
-
