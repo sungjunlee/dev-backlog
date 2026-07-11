@@ -4,6 +4,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { readConfig } = require("./lib.js");
+const { resolveConfiguredTracker } = require("./tracker.js");
 
 const {
   ConfigValidationError,
@@ -173,6 +175,38 @@ describe("provider evidence", () => {
       assert.doesNotMatch(JSON.stringify(evidence), /token|SECRET/i);
     }
   });
+
+  it("uses sanitized evidence only to recommend a fresh interactive choice", async (t) => {
+    for (const row of [
+      {
+        input: { remote: "git@github.com:owner/repo.git", gh: "authenticated" },
+        expected: "github",
+      },
+      {
+        input: { remote: "https://example.com/owner/repo.git", gh: "authenticated" },
+        expected: "local",
+      },
+    ]) {
+      const root = makeRoot(t, `setup-interactive-${row.expected}-`);
+      const mock = evidenceExec(row.input);
+      let promptInput;
+      const result = await runSetup(
+        { cwd: root, projectName: "interactive" },
+        {
+          isInteractive: true,
+          execFileSync: mock.execFileSync,
+          prompt: (input) => {
+            promptInput = input;
+            return "";
+          },
+        }
+      );
+      assert.equal(result.selection, row.expected);
+      assert.equal(result.selectionSource, "recommended");
+      assert.equal(promptInput.recommendation, row.expected);
+      assert.doesNotMatch(JSON.stringify(promptInput), /SECRET-TOKEN/);
+    }
+  });
 });
 
 describe("setup filesystem behavior", () => {
@@ -190,6 +224,10 @@ describe("setup filesystem behavior", () => {
     ]);
     const raw = fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8");
     assert.deepEqual(raw.match(/^tracker:\s*local\s*$/gm), ["tracker: local"]);
+    const resolved = resolveConfiguredTracker(readConfig(path.join(root, "backlog")), {
+      backlogDir: path.join(root, "backlog"),
+    });
+    assert.equal(resolved.tracker, "local");
   });
 
   it("creates a fresh explicit github setup and reports repair without fallback", async (t) => {
@@ -262,6 +300,33 @@ describe("setup filesystem behavior", () => {
     );
   });
 
+  it("preserves an existing github selection when evidence degrades and only reports repair", async (t) => {
+    const root = makeRoot(t);
+    writeConfig(root, "project_name: stable\ntracker: github\n# tail\n");
+    for (const name of ["tasks", "sprints", "completed"]) {
+      fs.mkdirSync(path.join(root, "backlog", name));
+    }
+    const configPath = path.join(root, "backlog/config.yml");
+    const before = fs.statSync(configPath);
+    const mock = evidenceExec({
+      remote: "https://example.com/owner/repo.git",
+      gh: "missing",
+    });
+    const result = await runSetup(
+      { cwd: root, nonInteractive: true },
+      { execFileSync: mock.execFileSync }
+    );
+    const after = fs.statSync(configPath);
+    assert.equal(result.selection, "github");
+    assert.equal(result.selectionSource, "preserved");
+    assert.equal(result.github.available, false);
+    assert.equal(result.github.fallbackAttempted, false);
+    assert.match(result.github.repair, /GitHub CLI/);
+    assert.equal(after.ino, before.ino);
+    assert.equal(after.mtimeMs, before.mtimeMs);
+    assert.equal(fs.readFileSync(configPath, "utf8"), "project_name: stable\ntracker: github\n# tail\n");
+  });
+
   it("repairs partial structure while preserving all user files and reruns as a true no-op", async (t) => {
     const root = makeRoot(t);
     writeConfig(root, "project_name: partial\ntracker: local\n");
@@ -286,6 +351,25 @@ describe("setup filesystem behavior", () => {
       { execFileSync: noProviderCalls() }
     );
     assert.deepEqual(snapshotTree(path.join(root, "backlog")), repaired);
+  });
+
+  it("adds a missing config without changing task, sprint, or completed names/bytes/metadata", async (t) => {
+    const root = makeRoot(t);
+    for (const name of ["tasks", "sprints", "completed"]) {
+      fs.mkdirSync(path.join(root, "backlog", name), { recursive: true });
+    }
+    fs.writeFileSync(path.join(root, "backlog/tasks/BACK-7.md"), "task\r\nbytes");
+    fs.writeFileSync(path.join(root, "backlog/sprints/sprint.md"), "sprint bytes\n");
+    fs.writeFileSync(path.join(root, "backlog/completed/BACK-3.md"), "completed bytes");
+    const before = snapshotTree(path.join(root, "backlog"));
+
+    await runSetup(
+      { cwd: root, tracker: "local", nonInteractive: true, projectName: "partial" },
+      { execFileSync: noProviderCalls() }
+    );
+    const after = snapshotTree(path.join(root, "backlog"));
+    for (const key of Object.keys(before)) assert.deepEqual(after[key], before[key]);
+    assert.equal(after["config.yml"].type, "file");
   });
 
   it("fails malformed or duplicate tracker config before directories or temp files", async (t) => {
@@ -370,5 +454,20 @@ describe("CLI and compatibility wrapper", () => {
     const raw = fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8");
     assert.match(raw, /^project_name: "wrapper-demo"$/m);
     assert.deepEqual(raw.match(/^tracker:\s*github\s*$/gm), ["tracker: github"]);
+  });
+
+  it("init.sh preserves an existing local selection without provider probing", (t) => {
+    const root = makeRoot(t);
+    writeConfig(root, "project_name: existing\ntracker: local\n# keep\n");
+    for (const name of ["tasks", "sprints", "completed"]) {
+      fs.mkdirSync(path.join(root, "backlog", name));
+    }
+    const before = snapshotTree(path.join(root, "backlog"));
+    const run = spawnSync("bash", [INIT, "ignored-new-name"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(snapshotTree(path.join(root, "backlog")), before);
   });
 });

@@ -13,6 +13,9 @@ const ALLOWED_DIRECT_GH = new Set([
   "skills/dev-backlog/scripts/github-milestones.js",
   "skills/dev-backlog/scripts/github-mirrors.js",
   "skills/dev-backlog/scripts/progress-sync-github.js",
+  // Setup owns only provider recommendation/repair diagnostics (`gh auth status`),
+  // never task lifecycle operations.
+  "skills/dev-backlog/scripts/setup-dev-backlog.js",
   "skills/backlog-triage/scripts/triage-github.js",
 ]);
 
@@ -26,7 +29,7 @@ function productionJavascriptFiles(directory) {
 }
 
 describe("direct gh production ownership", () => {
-  it("confines execution to the required adapter and explicit GitHub capability transports", () => {
+  it("confines execution to the adapter, capability transports, and setup diagnostics", () => {
     const directPattern = /execFile(?:Sync)?\(\s*["']gh["']|^[ \t]*["']gh["'][ \t]*,/m;
     const directFiles = SCRIPT_ROOTS
       .flatMap(productionJavascriptFiles)
