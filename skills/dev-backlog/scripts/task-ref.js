@@ -88,7 +88,7 @@ function containsTaskRef(text, identity) {
   if (typeof text !== "string" || !identity) return false;
   const ref = renderTaskRef(identity);
   const escaped = escapeRegExp(ref);
-  const left = identity.tracker === "github" ? "[^A-Za-z0-9_#]" : "[^A-Za-z0-9_]";
+  const left = identity.tracker === "github" ? "[^A-Za-z0-9_#]" : "[^A-Za-z0-9_-]";
   const right = identity.tracker === "github"
     ? "(?![A-Za-z0-9_]|\\.\\d)"
     : "(?![A-Za-z0-9_-]|\\.\\d)";

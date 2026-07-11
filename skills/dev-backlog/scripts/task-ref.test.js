@@ -101,6 +101,13 @@ describe("containsTaskRef", () => {
     assert.equal(containsTaskRef("- 2026-07-01: BACK-42_suffix is not exact", task), false);
     assert.equal(containsTaskRef("- 2026-07-01: BACK-42.1 is a descendant", task), false);
   });
+
+  it("rejects hyphenated identifier prefixes while allowing a list delimiter", () => {
+    const task = parseTaskRef("BACK-1", OPTIONS);
+    assert.equal(containsTaskRef("- 2026-07-01: MY-BACK-1 is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: prefix-BACK-1 is not exact", task), false);
+    assert.equal(containsTaskRef("- 2026-07-01: - BACK-1 started", task), true);
+  });
 });
 
 describe("Plan and task-file boundaries", () => {
