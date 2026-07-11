@@ -225,13 +225,13 @@ describe("tracker config state machine", () => {
     }
   });
 
-  it("tracks cross-line explicit keys and anchored alias keys as tracker authority", () => {
+  it("rejects every explicit mapping key as authority-obscuring syntax", () => {
     for (const declaration of [
       "?\n  tracker\n: github",
       '?\n  "tracker"\n: github',
       '?\n  "track\\\n    er"\n: github',
-      "key_name: &authority tracker\n*authority: github",
-      "key_name: &authority\n  tracker\n*authority: github",
+      "?\n  unrelated\n: value",
+      "&key_property ?\n  unrelated\n: value",
     ]) {
       assert.throws(
         () => inspectConfig(`${declaration}\ntracker: local\n`, "/repo/backlog/config.yml"),
@@ -241,29 +241,61 @@ describe("tracker config state machine", () => {
     }
   });
 
-  it("preserves unrelated anchors and aliases but rejects unresolved authority aliases", () => {
+  it("preserves anchor and alias values but rejects every alias mapping key", () => {
     for (const raw of [
-      "key_name: &other something\n*other: value\ntracker: local\n",
-      "base: &base {other: value}\n<<: *base\ntracker: local\n",
+      "key_name: &other something\ncopy: *other\ntracker: local\n",
+      "note: &empty\ntracker: local\nnote2: *empty\n",
     ]) {
       assert.equal(inspectConfig(raw, "/repo/backlog/config.yml").tracker, "local");
     }
     for (const raw of [
       "*unknown: value\ntracker: local\n",
-      "<<: *unknown\ntracker: local\n",
+      "key_name: &known something\n*known: value\ntracker: local\n",
     ]) {
-      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /ambiguous/);
+      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /alias mapping keys/);
     }
+  });
+
+  it("rejects every merge-key value shape and preserves ordinary alias values", () => {
+    for (const merge of [
+      "<<: *unknown",
+      "<<: [*one, *two]",
+      "mapping: {<<: *unknown}",
+      "base: &base {other: value}\n<<: *base",
+      "!!merge '<<': *unknown",
+    ]) {
+      assert.throws(
+        () => inspectConfig(`${merge}\ntracker: local\n`, "/repo/backlog/config.yml"),
+        /merge keys/
+      );
+    }
+  });
+
+  it("allows only one optional leading YAML document marker", () => {
+    assert.equal(inspectConfig("---\ntracker: local\n", "/repo/backlog/config.yml").tracker, "local");
+    for (const raw of [
+      "tracker: local\n---\n",
+      "---\n---\ntracker: local\n",
+      "---\ntracker: local\n...\n",
+    ]) assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /document/);
+
+    for (const raw of [
+      "note: |\n  ---\n  ...\ntracker: local\n",
+      'note: "---\n  ..."\ntracker: local\n',
+    ]) assert.equal(inspectConfig(raw, "/repo/backlog/config.yml").tracker, "local");
   });
 
   it("rejects incomplete quoted, flow, and explicit-key lexical state at EOF", () => {
     for (const raw of [
       'note: "unterminated\ntracker: local\n',
       "mapping: {other: value\ntracker: local\n",
-      "tracker: local\n?\n",
     ]) {
       assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), /incomplete/);
     }
+    assert.throws(
+      () => inspectConfig("tracker: local\n?\n", "/repo/backlog/config.yml"),
+      /explicit mapping keys/
+    );
   });
 
   it("recognizes a BOM-prefixed top-level tracker without disturbing the BOM", () => {
@@ -292,6 +324,7 @@ describe("provider evidence", () => {
     for (const remote of [
       "https://github.com/owner/repo.git",
       "ssh://git@github.com/owner/repo.git",
+      "ssh://git@github.com:22/owner/repo.git",
       "git@github.com:owner/repo.git",
       "git@GitHub.COM:owner/repo.git",
       "ssh://git@ssh.github.com:443/owner/repo.git",

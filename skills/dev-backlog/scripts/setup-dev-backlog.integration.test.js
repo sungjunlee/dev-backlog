@@ -343,6 +343,11 @@ describe("setup-dev-backlog real process integration", () => {
       "key_name: &authority tracker\n*authority: github\ntracker: local\n",
       "*unknown: value\ntracker: local\n",
       "<<: *unknown\ntracker: local\n",
+      "<<: [*one, *two]\ntracker: local\n",
+      "mapping: {<<: *unknown}\ntracker: local\n",
+      "tracker: local\n---\n",
+      "---\n---\ntracker: local\n",
+      "---\ntracker: local\n...\n",
     ]) {
       const root = makeRoot(t, "setup-document-state-");
       fs.mkdirSync(path.join(root, "backlog"));
@@ -353,6 +358,26 @@ describe("setup-dev-backlog real process integration", () => {
       assert.match(run.stderr, /Invalid tracker configuration/, raw);
       assert.deepEqual(snapshot(root), before, raw);
     }
+  });
+
+  it("preserves null anchors, alias values, and markers inside scalar content", (t) => {
+    const root = makeRoot(t, "setup-narrow-yaml-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const raw = [
+      "---",
+      "note: &empty",
+      "note2: *empty",
+      "literal: |",
+      "  ---",
+      "  ...",
+      'quoted: "--- and ..."',
+      "tracker: local",
+      "",
+    ].join("\n");
+    fs.writeFileSync(path.join(root, "backlog/config.yml"), raw);
+    const run = runCli(root, ["--non-interactive"]);
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), raw);
   });
 
   it("uses stubbed origin and gh evidence for fresh interactive recommendations", (t) => {

@@ -197,6 +197,7 @@ function tokenizeYamlLine(line, state = {}) {
   let carriedQuote = state.quote || null;
   let flowDepth = state.flowDepth || 0;
   let nodeBoundary = flowDepth > 0 ? Boolean(state.nodeBoundary) : true;
+  let keyAllowed = flowDepth > 0 ? Boolean(state.keyAllowed) : true;
 
   if (carriedQuote) {
     let continuationStart = -1;
@@ -215,6 +216,7 @@ function tokenizeYamlLine(line, state = {}) {
           quote: { char: carriedQuote.char, raw: continuation.raw },
           flowDepth,
           nodeBoundary: false,
+          keyAllowed: false,
         },
       };
     }
@@ -225,6 +227,7 @@ function tokenizeYamlLine(line, state = {}) {
     index = continuation.end;
     carriedQuote = null;
     nodeBoundary = false;
+    keyAllowed = false;
   }
 
   while (index < line.length) {
@@ -246,6 +249,7 @@ function tokenizeYamlLine(line, state = {}) {
       tokens.push({ type: "scalar", value, quoted: true });
       index = quoted.end;
       nodeBoundary = false;
+      keyAllowed = false;
       continue;
     }
 
@@ -260,7 +264,6 @@ function tokenizeYamlLine(line, state = {}) {
       tokens.push({
         type: "property",
         value: line.slice(start, index),
-        anchor: char === "&" ? line.slice(start + 1, index) : null,
       });
       continue;
     }
@@ -271,6 +274,7 @@ function tokenizeYamlLine(line, state = {}) {
       while (index < line.length && /[A-Za-z0-9_-]/.test(line[index])) index += 1;
       tokens.push({ type: "alias", name: line.slice(start, index) });
       nodeBoundary = false;
+      keyAllowed = false;
       continue;
     }
 
@@ -278,6 +282,7 @@ function tokenizeYamlLine(line, state = {}) {
       tokens.push({ type: char });
       flowDepth += 1;
       nodeBoundary = true;
+      keyAllowed = true;
       index += 1;
       continue;
     }
@@ -285,22 +290,26 @@ function tokenizeYamlLine(line, state = {}) {
       tokens.push({ type: char });
       flowDepth = Math.max(0, flowDepth - 1);
       nodeBoundary = false;
+      keyAllowed = false;
       index += 1;
       continue;
     }
     if (flowDepth > 0 && char === ",") {
       tokens.push({ type: "," });
       nodeBoundary = true;
+      keyAllowed = true;
       index += 1;
       continue;
     }
     if (char === ":" && isColonIndicator(line, index)) {
       tokens.push({ type: ":" });
       nodeBoundary = true;
+      keyAllowed = false;
       index += 1;
       continue;
     }
-    if (nodeBoundary && char === "?" && (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
+    if (nodeBoundary && keyAllowed && char === "?" &&
+        (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
       tokens.push({ type: "?" });
       index += 1;
       continue;
@@ -308,6 +317,7 @@ function tokenizeYamlLine(line, state = {}) {
     if (nodeBoundary && char === "-" && (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
       tokens.push({ type: "-" });
       index += 1;
+      keyAllowed = true;
       continue;
     }
 
@@ -322,68 +332,21 @@ function tokenizeYamlLine(line, state = {}) {
     const value = line.slice(start, index).trim();
     if (value) tokens.push({ type: "scalar", value, quoted: false });
     nodeBoundary = false;
+    keyAllowed = false;
     if (index === start) index += 1;
   }
 
-  return { tokens, state: { quote: null, flowDepth, nodeBoundary } };
+  return { tokens, state: { quote: null, flowDepth, nodeBoundary, keyAllowed } };
 }
 
-function resolveAliasValue(token, anchors) {
-  if (token.type !== "alias") return token.type === "scalar" ? token.value : undefined;
-  const anchored = anchors.get(token.name);
-  return anchored && anchored.kind === "scalar" ? anchored.value : undefined;
-}
-
-function trackerKeyCount(tokens, anchors, onAmbiguousAlias) {
+function trackerKeyCount(tokens) {
   let count = 0;
   for (let index = 0; index < tokens.length; index += 1) {
-    if (tokens[index].type !== "scalar" && tokens[index].type !== "alias") continue;
+    if (tokens[index].type !== "scalar" || tokens[index].value !== "tracker") continue;
     const next = tokens[index + 1];
-    const previous = tokens[index - 1];
-    const keyPosition = (next && next.type === ":") || (previous && previous.type === "?");
-    if (!keyPosition) continue;
-    const anchored = tokens[index].type === "alias" ? anchors.get(tokens[index].name) : null;
-    const value = resolveAliasValue(tokens[index], anchors);
-    if (value === "tracker") count += 1;
-    else if (tokens[index].type === "alias" && !anchored) onAmbiguousAlias(tokens[index].name);
+    if (next && next.type === ":") count += 1;
   }
   return count;
-}
-
-function firstNodeToken(tokens, start = 0) {
-  return tokens.slice(start).find((token) => token.type === "scalar" || token.type === "alias" || token.type === "{" || token.type === "[");
-}
-
-function recordDocumentAnchors(tokens, documentState) {
-  const pending = [...documentState.pendingAnchors];
-  documentState.pendingAnchors.length = 0;
-  if (pending.length > 0) {
-    const node = firstNodeToken(tokens);
-    if (node) {
-      const value = resolveAliasValue(node, documentState.anchors);
-      for (const name of pending) {
-        documentState.anchors.set(name, node.type === "scalar" || node.type === "alias"
-          ? { kind: "scalar", value }
-          : { kind: "collection" });
-      }
-    } else {
-      documentState.pendingAnchors.push(...pending);
-    }
-  }
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token.type === "property" && token.anchor) {
-      const node = firstNodeToken(tokens, index + 1);
-      if (node) {
-        const value = resolveAliasValue(node, documentState.anchors);
-        documentState.anchors.set(token.anchor, node.type === "scalar" || node.type === "alias"
-          ? { kind: "scalar", value }
-          : { kind: "collection" });
-      } else {
-        documentState.pendingAnchors.push(token.anchor);
-      }
-    }
-  }
 }
 
 function isBlockScalarHeader(tokens) {
@@ -397,14 +360,9 @@ function isBlockScalarHeader(tokens) {
 function trackerCandidates(raw, configPath) {
   const candidates = [];
   let blockScalarParentIndent = null;
-  let lexicalState = { quote: null, flowDepth: 0, nodeBoundary: true };
-  const documentState = { anchors: new Map(), pendingAnchors: [], explicitKeyPending: false };
-  const ambiguousAlias = (name) => {
-    throw new ConfigValidationError(
-      configPath,
-      `alias ${JSON.stringify(`*${name}`)} could resolve to tracker authority and is ambiguous`
-    );
-  };
+  let lexicalState = { quote: null, flowDepth: 0, nodeBoundary: true, keyAllowed: true };
+  let contentSeen = false;
+  let leadingDocumentMarkerSeen = false;
 
   for (const record of lineRecords(raw)) {
     const withoutBom = record.text.replace(/^\uFEFF/, "");
@@ -416,36 +374,48 @@ function trackerCandidates(raw, configPath) {
     }
     const scanned = tokenizeYamlLine(record.text, lexicalState);
     lexicalState = scanned.state;
-    recordDocumentAnchors(scanned.tokens, documentState);
-    for (
-      let count = trackerKeyCount(scanned.tokens, documentState.anchors, ambiguousAlias);
-      count > 0;
-      count -= 1
-    ) candidates.push(record);
+    const marker = scanned.tokens.length === 1 && scanned.tokens[0].type === "scalar" &&
+      !scanned.tokens[0].quoted ? scanned.tokens[0].value : null;
+    if (marker === "---") {
+      if (contentSeen || leadingDocumentMarkerSeen) {
+        throw new ConfigValidationError(configPath, "multiple YAML documents are unsupported");
+      }
+      leadingDocumentMarkerSeen = true;
+      continue;
+    }
+    if (marker === "...") {
+      throw new ConfigValidationError(configPath, "YAML document end markers are unsupported");
+    }
+    if (scanned.tokens.length > 0) contentSeen = true;
 
-    if (documentState.explicitKeyPending) {
-      const node = firstNodeToken(scanned.tokens);
-      if (node) {
-        const anchored = node.type === "alias" ? documentState.anchors.get(node.name) : null;
-        const value = resolveAliasValue(node, documentState.anchors);
-        if (value === "tracker") candidates.push(record);
-        else if (node.type === "alias" && !anchored) ambiguousAlias(node.name);
-        documentState.explicitKeyPending = false;
+    if (scanned.tokens.some((token) => token.type === "?")) {
+      throw new ConfigValidationError(
+        configPath,
+        "explicit mapping keys are authority-obscuring and unsupported"
+      );
+    }
+    for (let index = 0; index < scanned.tokens.length; index += 1) {
+      const token = scanned.tokens[index];
+      const next = scanned.tokens[index + 1];
+      if (token.type === "alias" && next && next.type === ":") {
+        throw new ConfigValidationError(
+          configPath,
+          "alias mapping keys are authority-obscuring and unsupported"
+        );
+      }
+      if (token.type === "scalar" && token.value === "<<" && next && next.type === ":") {
+        throw new ConfigValidationError(
+          configPath,
+          "YAML merge keys are authority-obscuring and unsupported"
+        );
       }
     }
-    const last = scanned.tokens[scanned.tokens.length - 1];
-    if (last && last.type === "?") documentState.explicitKeyPending = true;
-
-    for (let index = 0; index < scanned.tokens.length - 2; index += 1) {
-      const [key, colon, alias] = scanned.tokens.slice(index, index + 3);
-      if (key.type === "scalar" && key.value === "<<" && colon.type === ":" && alias.type === "alias" &&
-          !documentState.anchors.has(alias.name)) ambiguousAlias(alias.name);
-    }
+    for (let count = trackerKeyCount(scanned.tokens); count > 0; count -= 1) candidates.push(record);
     if (!lexicalState.quote && lexicalState.flowDepth === 0 && isBlockScalarHeader(scanned.tokens)) {
       blockScalarParentIndent = indent;
     }
   }
-  if (lexicalState.quote || lexicalState.flowDepth !== 0 || documentState.explicitKeyPending) {
+  if (lexicalState.quote || lexicalState.flowDepth !== 0) {
     throw new ConfigValidationError(configPath, "the YAML lexical structure is incomplete at end of file");
   }
   return candidates;
@@ -541,7 +511,7 @@ function isGithubRemote(remote) {
     const standardHttps = parsed.protocol === "https:" && host === "github.com" &&
       parsed.port === "" && parsed.username === "" && parsed.password === "";
     const standardSsh = parsed.protocol === "ssh:" && host === "github.com" &&
-      parsed.port === "" && parsed.username === "git" && parsed.password === "";
+      (parsed.port === "" || parsed.port === "22") && parsed.username === "git" && parsed.password === "";
     const sshOver443 = parsed.protocol === "ssh:" && host === "ssh.github.com" &&
       parsed.port === "443" && parsed.username === "git" && parsed.password === "";
     return (
