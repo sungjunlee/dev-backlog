@@ -354,6 +354,16 @@ describe("setup-dev-backlog real process integration", () => {
       "note: !<unterminated\ntracker: local\n",
       'note: "bad\\q"\ntracker: local\n',
       "%YAML 1.2\n---\ntracker: local\n",
+      "%TAG ! tag:example.com,2026:\ntracker: local\n",
+      "%FOO bar\ntracker: local\n",
+      "note: &\ntracker: local\n",
+      "note: !\ntracker: local\n",
+      "note: *\ntracker: local\n",
+      "note: !<>\ntracker: local\n",
+      'note: "bad\\uD800"\ntracker: local\n',
+      "note: \0\ntracker: local\n",
+      "note: \x01\ntracker: local\n",
+      "note: \ufffe\ntracker: local\n",
     ]) {
       const root = makeRoot(t, "setup-document-state-");
       fs.mkdirSync(path.join(root, "backlog"));
@@ -401,6 +411,50 @@ describe("setup-dev-backlog real process integration", () => {
     assert.equal(run.status, 0, run.stderr);
     const after = snapshot(root);
     assert.deepEqual(after["backlog/config.yml"], before["backlog/config.yml"]);
+    assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), raw);
+  });
+
+  it("rejects a raw surrogate from the real CLI read boundary without mutation", (t) => {
+    const root = makeRoot(t, "setup-surrogate-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    fs.writeFileSync(path.join(root, "backlog/config.yml"), "tracker: local\n");
+    const preload = faultPreload(t, [
+      'const fs = require("node:fs");',
+      'const original = fs.readFileSync;',
+      'fs.readFileSync = function (target, options) {',
+      '  if (String(target).endsWith("/backlog/config.yml") && options === "utf8") {',
+      '    return "note: \\ud800\\ntracker: local\\n";',
+      '  }',
+      '  return original.call(this, target, options);',
+      '};',
+    ].join("\n"));
+    const before = snapshot(root);
+    const run = runCli(root, ["--non-interactive"], {
+      ...process.env,
+      NODE_OPTIONS: `--require=${preload}`,
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /raw surrogate/);
+    assert.deepEqual(snapshot(root), before);
+  });
+
+  it("preserves valid Unicode anchors, aliases, tags, and quoted escapes", (t) => {
+    const root = makeRoot(t, "setup-valid-unicode-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const raw = [
+      "note: &한글 값",
+      "copy: *한글",
+      "tagged: !<tag:example.com,2026:value> 값",
+      "local: !foo 값",
+      "standard: !!str 값",
+      'escaped: "\\N \\u263A \\U0001F600"',
+      "raw: 😀",
+      "tracker: local",
+      "",
+    ].join("\n");
+    fs.writeFileSync(path.join(root, "backlog/config.yml"), raw);
+    const run = runCli(root, ["--non-interactive"]);
+    assert.equal(run.status, 0, run.stderr);
     assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), raw);
   });
 

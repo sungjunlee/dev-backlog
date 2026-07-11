@@ -309,7 +309,36 @@ describe("tracker config state machine", () => {
       "note: !<unterminated\ntracker: local\n",
       'note: "bad\\q"\ntracker: local\n',
       "%YAML 1.2\n---\ntracker: local\n",
+      "%TAG ! tag:example.com,2026:\ntracker: local\n",
+      "%FOO bar\ntracker: local\n",
+      "note: &\ntracker: local\n",
+      "note: !\ntracker: local\n",
+      "note: *\ntracker: local\n",
+      "note: !<>\ntracker: local\n",
+      'note: "bad\\uD800"\ntracker: local\n',
+      'note: "bad\\U00110000"\ntracker: local\n',
     ]) assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), ConfigValidationError);
+  });
+
+  it("rejects non-printable raw YAML while preserving valid Unicode and escapes", () => {
+    for (const character of ["\0", "\x01", "\x7f", "\u0080", "\ufffe", "\uffff", "\ud800", "\udc00"]) {
+      assert.throws(
+        () => inspectConfig(`note: ${character}\ntracker: local\n`, "/repo/backlog/config.yml"),
+        /YAML-printable|surrogate/
+      );
+    }
+    const valid = [
+      "note: &한글 값",
+      "copy: *한글",
+      "tagged: !<tag:example.com,2026:value> 값",
+      "local: !foo 값",
+      "standard: !!str 값",
+      'escaped: "\\N \\u263A \\U0001F600"',
+      "raw: 😀",
+      "tracker: local",
+      "",
+    ].join("\n");
+    assert.equal(inspectConfig(valid, "/repo/backlog/config.yml").tracker, "local");
   });
 
   it("rejects incomplete quoted, flow, and explicit-key lexical state at EOF", () => {

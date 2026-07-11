@@ -180,11 +180,51 @@ function decodeDoubleQuotedScalar(raw) {
     const digits = raw.slice(index + 2, index + 2 + width);
     if (!width || digits.length !== width || !/^[0-9A-Fa-f]+$/.test(digits)) return null;
     const codePoint = Number.parseInt(digits, 16);
-    if (codePoint > 0x10ffff) return null;
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
     decoded += String.fromCodePoint(codePoint);
     index += width + 1;
   }
   return decoded;
+}
+
+function isYamlPrintableCodePoint(codePoint) {
+  return codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d ||
+    (codePoint >= 0x20 && codePoint <= 0x7e) || codePoint === 0x85 ||
+    (codePoint >= 0xa0 && codePoint <= 0xd7ff) ||
+    (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
+    (codePoint >= 0x10000 && codePoint <= 0x10ffff);
+}
+
+function validateYamlPrintable(raw, configPath) {
+  for (let index = 0; index < raw.length; index += 1) {
+    const first = raw.charCodeAt(index);
+    let codePoint = first;
+    if (first >= 0xd800 && first <= 0xdbff) {
+      const second = raw.charCodeAt(index + 1);
+      if (!(second >= 0xdc00 && second <= 0xdfff)) {
+        throw new ConfigValidationError(configPath, "an unpaired raw surrogate is not YAML-printable");
+      }
+      codePoint = ((first - 0xd800) * 0x400) + (second - 0xdc00) + 0x10000;
+      index += 1;
+    } else if (first >= 0xdc00 && first <= 0xdfff) {
+      throw new ConfigValidationError(configPath, "an unpaired raw surrogate is not YAML-printable");
+    }
+    if (!isYamlPrintableCodePoint(codePoint)) {
+      throw new ConfigValidationError(
+        configPath,
+        `character U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} is not YAML-printable`
+      );
+    }
+  }
+}
+
+function validAnchorOrAliasName(name) {
+  return /^[\p{L}\p{N}_.-]+$/u.test(name);
+}
+
+function validTagToken(tag) {
+  if (tag.length <= 1 || /%(?![0-9A-Fa-f]{2})/.test(tag)) return false;
+  return /^!(?:![^\s!,\[\]{}]+|[^\s!,\[\]{}]+(?:![^\s!,\[\]{}]+)?)$/u.test(tag);
 }
 
 function isColonIndicator(line, index) {
@@ -270,9 +310,20 @@ function tokenizeYamlLine(line, state = {}) {
         if (close === -1) {
           return { tokens, state: { quote: null, flowStack, error: "unterminated verbatim tag" } };
         }
+        const tag = line.slice(index + 2, close);
+        if (!tag || /[\s<>]/.test(tag) || /%(?![0-9A-Fa-f]{2})/.test(tag)) {
+          return { tokens, state: { quote: null, flowStack, error: "invalid verbatim tag spelling" } };
+        }
         index = close + 1;
       } else {
         while (index < line.length && !/[ \t,\[\]{}]/.test(line[index])) index += 1;
+        const property = line.slice(start, index);
+        const valid = char === "&"
+          ? validAnchorOrAliasName(property.slice(1))
+          : validTagToken(property);
+        if (!valid) {
+          return { tokens, state: { quote: null, flowStack, error: "invalid tag or anchor spelling" } };
+        }
       }
       tokens.push({
         type: "property",
@@ -284,8 +335,12 @@ function tokenizeYamlLine(line, state = {}) {
     if (nodeBoundary && char === "*") {
       const start = index + 1;
       index = start;
-      while (index < line.length && /[A-Za-z0-9_-]/.test(line[index])) index += 1;
-      tokens.push({ type: "alias", name: line.slice(start, index) });
+      while (index < line.length && !/[ \t,\[\]{}:]/.test(line[index])) index += 1;
+      const name = line.slice(start, index);
+      if (!validAnchorOrAliasName(name)) {
+        return { tokens, state: { quote: null, flowStack, error: "invalid alias spelling" } };
+      }
+      tokens.push({ type: "alias", name });
       nodeBoundary = false;
       keyAllowed = false;
       continue;
@@ -400,7 +455,7 @@ function trackerCandidates(raw, configPath) {
       leadingDocumentMarkerSeen = true;
       continue;
     }
-    if (atDocumentBoundary && /^\uFEFF?%YAML(?:[ \t]|$)/.test(record.text)) {
+    if (!lexicalState.quote && /^\uFEFF?%/.test(record.text)) {
       throw new ConfigValidationError(configPath, "YAML directives are unsupported");
     }
     const scanned = tokenizeYamlLine(record.text, lexicalState);
@@ -464,6 +519,7 @@ function inspectConfig(raw, configPath = "backlog/config.yml") {
   if (typeof raw !== "string") {
     throw new ConfigValidationError(configPath, "the config could not be read as text");
   }
+  validateYamlPrintable(raw, configPath);
 
   const candidates = trackerCandidates(raw, configPath);
   if (candidates.length === 0) {
