@@ -192,6 +192,19 @@ describe("tracker config state machine", () => {
     }
   });
 
+  it("does not open quote state for apostrophes or embedded quotes in plain scalars", () => {
+    const raw = [
+      "note: don't hide the authority",
+      'message: say "tracker: github" plainly',
+      "tracker: local",
+      "",
+    ].join("\n");
+    const state = inspectConfig(raw, "/repo/backlog/config.yml");
+    assert.equal(state.kind, "selected");
+    assert.equal(state.tracker, "local");
+    assert.equal(mutateTrackerText(raw, state, "local"), raw);
+  });
+
   it("fails closed on actual top-level, nested, sequence, and flow tracker declarations", () => {
     for (const declaration of [
       "tracker: github",
@@ -199,6 +212,13 @@ describe("tracker config state machine", () => {
       "- tracker: github",
       "mapping: {tracker: github}",
       "mapping: {'tracker': github}",
+      "items: [tracker: github]",
+      "&authority tracker: github",
+      "!authority tracker: github",
+      "? tracker\n: github",
+      'mapping: {"track\\x65r": github}',
+      "mapping: {emoji: 😀, tracker: github}",
+      "mapping: [\n  {emoji: 😀,\n   tracker: github}\n]",
     ]) {
       const raw = `${declaration}\ntracker: local\n`;
       assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), ConfigValidationError);
@@ -230,14 +250,15 @@ describe("provider evidence", () => {
   it("accepts only exact github.com remote hosts", () => {
     for (const remote of [
       "https://github.com/owner/repo.git",
-      "http://github.com/owner/repo",
       "ssh://git@github.com/owner/repo.git",
       "git@github.com:owner/repo.git",
-      "git://github.com/owner/repo.git",
-      "https://user:secret@github.com/owner/repo.git",
+      "ssh://git@ssh.github.com:443/owner/repo.git",
     ]) assert.equal(isGithubRemote(remote), true, remote);
 
     for (const remote of [
+      "http://github.com/owner/repo.git",
+      "git://github.com/owner/repo.git",
+      "https://user:secret@github.com/owner/repo.git",
       "https://github.com.evil.test/owner/repo.git",
       "git@github.com.evil.test:owner/repo.git",
       "https://github.com/owner",
@@ -247,6 +268,13 @@ describe("provider evidence", () => {
       "https://github.com/owner/repo#readme",
       "ftp://github.com/owner/repo.git",
       "github.com/owner/repo",
+      "github.com:owner/repo.git",
+      "alice@github.com:owner/repo.git",
+      "GIT@github.com:owner/repo.git",
+      "ssh://alice@github.com/owner/repo.git",
+      "ssh://github.com/owner/repo.git",
+      "ssh://git@ssh.github.com/owner/repo.git",
+      "ssh://alice@ssh.github.com:443/owner/repo.git",
       "git@github.com:owner/repo/issues",
     ]) assert.equal(isGithubRemote(remote), false, remote);
   });
@@ -266,7 +294,7 @@ describe("provider evidence", () => {
         expected: { recommendation: "local", remote: "github", cli: "available", auth: "unauthenticated" },
       },
       {
-        input: { remote: "https://user:token@github.com/owner/repo.git", gh: "missing" },
+        input: { remote: "ssh://git@ssh.github.com:443/owner/repo.git", gh: "missing" },
         expected: { recommendation: "local", remote: "github", cli: "missing", auth: "not-checked" },
       },
       {

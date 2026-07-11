@@ -305,6 +305,34 @@ describe("setup-dev-backlog real process integration", () => {
     );
   });
 
+  it("preserves plain apostrophes and rejects advanced tracker keys before mutation", (t) => {
+    const preserved = makeRoot(t, "setup-plain-quotes-");
+    fs.mkdirSync(path.join(preserved, "backlog"));
+    const plainRaw = "note: don't stop\nmessage: say \"go\" now\ntracker: local\n";
+    fs.writeFileSync(path.join(preserved, "backlog/config.yml"), plainRaw);
+    const preservedRun = runCli(preserved, ["--non-interactive"]);
+    assert.equal(preservedRun.status, 0, preservedRun.stderr);
+    assert.equal(fs.readFileSync(path.join(preserved, "backlog/config.yml"), "utf8"), plainRaw);
+
+    for (const declaration of [
+      "items: [tracker: github]",
+      "&authority tracker: github",
+      "? tracker\n: github",
+      'mapping: {"track\\x65r": github}',
+      "mapping: {emoji: 😀, tracker: github}",
+      "mapping: [\n  {emoji: 😀,\n   tracker: github}\n]",
+    ]) {
+      const root = makeRoot(t, "setup-advanced-key-");
+      fs.mkdirSync(path.join(root, "backlog"));
+      fs.writeFileSync(path.join(root, "backlog/config.yml"), `${declaration}\ntracker: local\n`);
+      const before = snapshot(root);
+      const run = runCli(root, ["--non-interactive"]);
+      assert.notEqual(run.status, 0, declaration);
+      assert.match(run.stderr, /Invalid tracker configuration/, declaration);
+      assert.deepEqual(snapshot(root), before, declaration);
+    }
+  });
+
   it("uses stubbed origin and gh evidence for fresh interactive recommendations", (t) => {
     for (const row of [
       { remote: "https://github.com/owner/repo.git", ghStatus: 0, expected: "github" },

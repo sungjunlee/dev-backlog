@@ -140,85 +140,185 @@ function lineRecords(raw) {
   return records;
 }
 
-function scanYamlLine(line, carriedQuote = null) {
-  const visible = [...line];
-  let quote = carriedQuote;
-  let quotedTrackerKey = false;
+function consumeQuotedToken(line, start, quote) {
+  let raw = "";
+  for (let index = start + 1; index < line.length; index += 1) {
+    if (quote === "'" && line[index] === "'" && line[index + 1] === "'") {
+      raw += "''";
+      index += 1;
+    } else if (quote === '"' && line[index] === "\\" && index + 1 < line.length) {
+      raw += line.slice(index, index + 2);
+      index += 1;
+    } else if (line[index] === quote) {
+      return { closed: true, end: index + 1, raw };
+    } else {
+      raw += line[index];
+    }
+  }
+  return { closed: false, end: line.length, raw };
+}
 
-  for (let index = 0; index < line.length; index += 1) {
-    if (quote) {
-      visible[index] = " ";
-      if (quote === "'" && line[index] === "'" && line[index + 1] === "'") {
-        visible[index + 1] = " ";
-        index += 1;
-      } else if (quote === '"' && line[index] === "\\") {
-        if (index + 1 < line.length) {
-          visible[index + 1] = " ";
-          index += 1;
-        }
-      } else if (line[index] === quote) {
-        quote = null;
+function decodeDoubleQuotedScalar(raw) {
+  const simpleEscapes = Object.freeze({
+    "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f",
+    r: "\r", e: "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+  });
+  let decoded = "";
+  for (let index = 0; index < raw.length; index += 1) {
+    if (raw[index] !== "\\") {
+      decoded += raw[index];
+      continue;
+    }
+    const escape = raw[index + 1];
+    if (Object.hasOwn(simpleEscapes, escape)) {
+      decoded += simpleEscapes[escape];
+      index += 1;
+      continue;
+    }
+    const width = escape === "x" ? 2 : escape === "u" ? 4 : escape === "U" ? 8 : 0;
+    const digits = raw.slice(index + 2, index + 2 + width);
+    if (!width || digits.length !== width || !/^[0-9A-Fa-f]+$/.test(digits)) return null;
+    const codePoint = Number.parseInt(digits, 16);
+    if (codePoint > 0x10ffff) return null;
+    decoded += String.fromCodePoint(codePoint);
+    index += width + 1;
+  }
+  return decoded;
+}
+
+function isColonIndicator(line, index) {
+  const next = line[index + 1];
+  return next === undefined || /[ \t\r\n,\[\]{}]/.test(next);
+}
+
+function tokenizeYamlLine(line, state = {}) {
+  const tokens = [];
+  let index = 0;
+  let carriedQuote = state.quote || null;
+  let flowDepth = state.flowDepth || 0;
+  let nodeBoundary = flowDepth > 0 ? Boolean(state.nodeBoundary) : true;
+
+  if (carriedQuote) {
+    const continuation = consumeQuotedToken(line, -1, carriedQuote);
+    if (!continuation.closed) {
+      return { tokens, state: { quote: carriedQuote, flowDepth, nodeBoundary: false } };
+    }
+    index = continuation.end;
+    carriedQuote = null;
+    nodeBoundary = false;
+  }
+
+  while (index < line.length) {
+    if (/[ \t\uFEFF]/.test(line[index])) {
+      index += 1;
+      continue;
+    }
+    if (line[index] === "#") break;
+
+    const char = line[index];
+    if (nodeBoundary && (char === "'" || char === '"')) {
+      const quoted = consumeQuotedToken(line, index, char);
+      if (!quoted.closed) {
+        return { tokens, state: { quote: char, flowDepth, nodeBoundary: false } };
       }
+      const value = char === "'"
+        ? quoted.raw.replaceAll("''", "'")
+        : decodeDoubleQuotedScalar(quoted.raw);
+      tokens.push({ type: "scalar", value, quoted: true });
+      index = quoted.end;
+      nodeBoundary = false;
       continue;
     }
 
-    if (line[index] === "#") {
-      visible.fill(" ", index);
-      break;
-    }
-    if (line[index] !== "'" && line[index] !== '"') continue;
-
-    const opening = line[index];
-    const start = index;
-    let content = "";
-    visible[index] = " ";
-    quote = opening;
-    for (index += 1; index < line.length; index += 1) {
-      visible[index] = " ";
-      if (opening === "'" && line[index] === "'" && line[index + 1] === "'") {
-        content += "'";
-        visible[index + 1] = " ";
-        index += 1;
-      } else if (opening === '"' && line[index] === "\\") {
-        if (index + 1 < line.length) {
-          content += line[index + 1];
-          visible[index + 1] = " ";
-          index += 1;
-        }
-      } else if (line[index] === opening) {
-        quote = null;
-        break;
+    if (nodeBoundary && (char === "&" || char === "!")) {
+      const start = index;
+      if (char === "!" && line[index + 1] === "<") {
+        const close = line.indexOf(">", index + 2);
+        index = close === -1 ? line.length : close + 1;
       } else {
-        content += line[index];
+        while (index < line.length && !/[ \t,\[\]{}]/.test(line[index])) index += 1;
       }
+      tokens.push({ type: "property", value: line.slice(start, index) });
+      continue;
     }
 
-    if (!quote && content === "tracker") {
-      let after = index + 1;
-      while (after < line.length && /[ \t]/.test(line[after])) after += 1;
-      const prefix = visible.slice(0, start).join("").replace(/^\uFEFF/, "");
-      const mappingBoundary = /^\s*(?:-\s*)?$/.test(prefix) || /(?:^|[{,])\s*$/.test(prefix);
-      if (line[after] === ":" && mappingBoundary) quotedTrackerKey = true;
+    if (char === "{" || char === "[") {
+      tokens.push({ type: char });
+      flowDepth += 1;
+      nodeBoundary = true;
+      index += 1;
+      continue;
     }
+    if (char === "}" || char === "]") {
+      tokens.push({ type: char });
+      flowDepth = Math.max(0, flowDepth - 1);
+      nodeBoundary = false;
+      index += 1;
+      continue;
+    }
+    if (flowDepth > 0 && char === ",") {
+      tokens.push({ type: "," });
+      nodeBoundary = true;
+      index += 1;
+      continue;
+    }
+    if (char === ":" && isColonIndicator(line, index)) {
+      tokens.push({ type: ":" });
+      nodeBoundary = true;
+      index += 1;
+      continue;
+    }
+    if (nodeBoundary && char === "?" && /[ \t]/.test(line[index + 1] || "")) {
+      tokens.push({ type: "?" });
+      index += 1;
+      continue;
+    }
+    if (nodeBoundary && char === "-" && (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
+      tokens.push({ type: "-" });
+      index += 1;
+      continue;
+    }
+
+    const start = index;
+    while (index < line.length) {
+      const current = line[index];
+      if (current === "#" || current === "{" || current === "[" || current === "}" || current === "]") break;
+      if (flowDepth > 0 && current === ",") break;
+      if (current === ":" && isColonIndicator(line, index)) break;
+      index += 1;
+    }
+    const value = line.slice(start, index).trim();
+    if (value) tokens.push({ type: "scalar", value, quoted: false });
+    nodeBoundary = false;
+    if (index === start) index += 1;
   }
 
-  return { visible: visible.join(""), carriedQuote: quote, quotedTrackerKey };
+  return { tokens, state: { quote: null, flowDepth, nodeBoundary } };
 }
 
-function looksLikeTrackerDeclaration(visible, quotedTrackerKey) {
-  if (quotedTrackerKey) return true;
-  if (!visible.trim()) return false;
-  return (
-    /^\uFEFF?\s*tracker\s*:/.test(visible) ||
-    /^\s*-\s*tracker\s*:/.test(visible) ||
-    /(?:^|[{,])\s*tracker\s*:/.test(visible)
-  );
+function trackerKeyCount(tokens) {
+  let count = 0;
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].type !== "scalar" || tokens[index].value !== "tracker") continue;
+    const next = tokens[index + 1];
+    const previous = tokens[index - 1];
+    if ((next && next.type === ":") || (previous && previous.type === "?")) count += 1;
+  }
+  return count;
+}
+
+function isBlockScalarHeader(tokens) {
+  const last = tokens[tokens.length - 1];
+  if (!last || last.type !== "scalar" || !/^[>|](?:[1-9][+-]?|[+-][1-9]?)?$/.test(last.value)) {
+    return false;
+  }
+  return tokens.some((token) => token.type === ":");
 }
 
 function trackerCandidates(raw) {
   const candidates = [];
   let blockScalarParentIndent = null;
-  let carriedQuote = null;
+  let lexicalState = { quote: null, flowDepth: 0, nodeBoundary: true };
 
   for (const record of lineRecords(raw)) {
     const withoutBom = record.text.replace(/^\uFEFF/, "");
@@ -228,13 +328,10 @@ function trackerCandidates(raw) {
       if (!trimmed || indent > blockScalarParentIndent) continue;
       blockScalarParentIndent = null;
     }
-    const scanned = scanYamlLine(record.text, carriedQuote);
-    carriedQuote = scanned.carriedQuote;
-    if (looksLikeTrackerDeclaration(scanned.visible, scanned.quotedTrackerKey)) candidates.push(record);
-    if (
-      !carriedQuote &&
-      /:\s*(?:(?:[&!][^\s,\[\]{}]+)\s+)*(?:[>|](?:[1-9][+-]?|[+-][1-9]?)?)\s*$/.test(scanned.visible.replace(/^\uFEFF/, ""))
-    ) {
+    const scanned = tokenizeYamlLine(record.text, lexicalState);
+    lexicalState = scanned.state;
+    for (let count = trackerKeyCount(scanned.tokens); count > 0; count -= 1) candidates.push(record);
+    if (!lexicalState.quote && lexicalState.flowDepth === 0 && isBlockScalarHeader(scanned.tokens)) {
       blockScalarParentIndent = indent;
     }
   }
@@ -315,16 +412,20 @@ function isGithubRemote(remote) {
   const value = String(remote || "").trim();
   if (!value) return false;
   const component = "[A-Za-z0-9_.-]+";
-  if (new RegExp(`^[^@\\s]+@github\\.com:${component}/${component}(?:\\.git)?$`, "i").test(value)) {
+  if (new RegExp(`^git@github\\.com:${component}/${component}(?:\\.git)?$`).test(value)) {
     return true;
   }
   try {
     const parsed = new URL(value);
-    const allowedProtocol = new Set(["http:", "https:", "ssh:", "git:"]);
+    const host = parsed.hostname.toLowerCase();
+    const standardHttps = parsed.protocol === "https:" && host === "github.com" &&
+      parsed.port === "" && parsed.username === "" && parsed.password === "";
+    const standardSsh = parsed.protocol === "ssh:" && host === "github.com" &&
+      parsed.port === "" && parsed.username === "git" && parsed.password === "";
+    const sshOver443 = parsed.protocol === "ssh:" && host === "ssh.github.com" &&
+      parsed.port === "443" && parsed.username === "git" && parsed.password === "";
     return (
-      allowedProtocol.has(parsed.protocol) &&
-      parsed.hostname.toLowerCase() === "github.com" &&
-      parsed.port === "" &&
+      (standardHttps || standardSsh || sshOver443) &&
       parsed.search === "" &&
       parsed.hash === "" &&
       new RegExp(`^/${component}/${component}(?:\\.git)?$`).test(parsed.pathname)
