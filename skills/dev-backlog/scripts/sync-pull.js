@@ -19,9 +19,13 @@ const {
   slugify,
   escapeYaml,
   readConfig,
-  GH_EXEC_DEFAULTS,
   getOpenIssueCount: getSharedOpenIssueCount,
 } = require("./lib");
+const {
+  createGithubAdapter,
+  stripNormalizedIdentity,
+} = require("./github-tracker.js");
+const { resolveConfiguredTracker } = require("./tracker.js");
 const { parseMarkerMonth } = require("./progress-sync-render");
 const {
   parseTaskFileName,
@@ -282,18 +286,16 @@ function getOpenIssueCount(execFile = execFileSync) {
 }
 
 function fetchOpenIssues(limit, execFile = execFileSync) {
-  const out = execFile("gh", [
-    "issue", "list", "--state", "open", "--limit", String(limit),
-    "--json", ISSUE_JSON_FIELDS,
-  ], GH_EXEC_DEFAULTS);
-
-  return JSON.parse(out);
+  return createGithubAdapter({ execFile })
+    .list({ limit, fields: ISSUE_JSON_FIELDS })
+    .map(stripNormalizedIdentity);
 }
 
-function loadOpenIssues({ limit, execFile = execFileSync } = {}) {
-  const resolvedLimit = limit ?? getOpenIssueCount(execFile);
-  if (resolvedLimit === 0) return [];
-  return fetchOpenIssues(resolvedLimit, execFile);
+function loadOpenIssues({ limit, execFile = execFileSync, config = {} } = {}) {
+  const resolved = resolveConfiguredTracker(config, { execFile });
+  return resolved.adapter
+    .list({ limit, fields: ISSUE_JSON_FIELDS })
+    .map(stripNormalizedIdentity);
 }
 
 function main() {
@@ -307,9 +309,10 @@ function main() {
 
   let issues;
   try {
-    issues = loadOpenIssues({ limit: options.limit });
+    issues = loadOpenIssues({ limit: options.limit, config });
   } catch (e) {
-    console.error(`gh error: ${e.message}`);
+    const prefix = e?.tracker ? "tracker error" : "gh error";
+    console.error(`${prefix}: ${e.message}`);
     process.exit(1);
   }
 

@@ -1,17 +1,19 @@
 # Tracker Adapter Design Contract
 
 Status: accepted target design for issue #272. Runtime evidence was inventoried
-at commit `019a6ec`. Issue #273 now implements only the configured runtime seam
-described below; GitHub caller wiring (#275) and local persistence (#276) remain
-future work. GitHub is the compatibility baseline for issues #273-#275.
+at commit `019a6ec`. Issues #273-#275 now implement configured selection,
+tracker-neutral references, and the GitHub adapter wiring described below.
+Local persistence (#276) remains future work. GitHub remains the compatibility
+baseline.
 
 This document froze the smallest tracker boundary that can support another
 canonical task store without weakening existing GitHub behavior. The #272
-freeze itself did not configure a tracker or implement an adapter; the #273
-state is recorded separately below. Neither issue persists local tasks, changes
-setup, or alters command, Markdown, JSON, sprint, or task-mirror behavior.
+freeze itself did not configure a tracker or implement an adapter; the current
+foundation state is recorded separately below. These changes do not persist
+local tasks, alter setup, or rewrite command, Markdown, JSON, sprint, or
+task-mirror compatibility surfaces.
 
-## Runtime Seam State (#273)
+## Runtime Adapter State (#273-#275)
 
 `backlog/config.yml` selects one `tracker`, initially `github` or `local`.
 Repositories without that key use `github` as a deterministic compatibility
@@ -21,11 +23,15 @@ CLI, authentication, remote, adapter, or filesystem detection.
 `skills/dev-backlog/scripts/tracker.js` owns selection, exact adapter-shape and
 identity validation, configured-only availability probing, and optional
 capability gates. An unavailable or throwing configured adapter fails with no
-probe or fallback to the other slot. The GitHub slot declares the accepted
-capabilities, but existing GitHub command transports and injection seams remain
-where they are until #275; no current caller has moved. The local slot reports
-one implementation-pending reason and fails all lifecycle calls consistently
-until #276 adds persistence. This seam does not make local task files canonical.
+probe or fallback to the other slot. The GitHub slot now delegates its required
+task lifecycle to `github-tracker.js`; generic sync and orientation callers use
+configured-only resolution. Milestone, mirror, progress/PR/comment, and triage
+GitHub transports live in explicitly named provider modules and are reached only
+after their declared capability gates. Legacy helper exports remain compatibility
+shims over those owners, including their injected execution seams. The local slot
+still reports one implementation-pending reason and fails all lifecycle calls
+consistently until #276 adds persistence. This runtime does not make local task
+files canonical.
 
 ## Current Runtime Evidence
 

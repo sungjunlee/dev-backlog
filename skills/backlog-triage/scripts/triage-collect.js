@@ -5,9 +5,17 @@ const fs = require("fs");
 const path = require("path");
 const {
   GH_EXEC_DEFAULTS,
+  readConfig,
   readTriageConfig,
 } = require("../../dev-backlog/scripts/lib");
+const {
+  TRACKER_ADAPTERS,
+  createGithubAdapter,
+  invokeCapability,
+  resolveConfiguredTracker,
+} = require("../../dev-backlog/scripts/tracker.js");
 const { parseMarkerMonth } = require("../../dev-backlog/scripts/progress-sync-render");
+const { executeGithub } = require("./triage-github.js");
 
 const CONFIG_PATH = path.join("backlog", "triage-config.yml");
 const SNAPSHOT_DIR = path.join("backlog", "triage", ".cache");
@@ -300,8 +308,8 @@ function fetchOpenIssuesGraphql({ repo, limit, execFile = execFileSync }) {
   const { owner, name } = parseRepoParts(repo);
   const pageSize = Math.min(resolvedLimit, GRAPHQL_PAGE_SIZE);
   const paginate = resolvedLimit > GRAPHQL_PAGE_SIZE || resolvedLimit === TRIAGE_DEFAULT_FETCH_LIMIT;
-  const output = execFile(
-    "gh",
+  const output = executeGithub(
+    execFile,
     graphqlArgs(
       OPEN_ISSUES_QUERY,
       { owner, name, pageSize },
@@ -343,8 +351,8 @@ function normalizeIssueComments(comments) {
 
 function fetchIssueComments({ repo, issueNumber, execFile = execFileSync }) {
   const { owner, name } = parseRepoParts(repo);
-  const output = execFile(
-    "gh",
+  const output = executeGithub(
+    execFile,
     [
       "api",
       `repos/${owner}/${name}/issues/${issueNumber}/comments`,
@@ -418,8 +426,8 @@ function fetchClosedIssues({ repo, generated, config, execFile = execFileSync })
     "is:closed",
     `closed:>=${isoDateDaysAgo(generated, resolveClosedIssueDays(config))}`,
   ].join(" ");
-  const output = execFile(
-    "gh",
+  const output = executeGithub(
+    execFile,
     graphqlArgs(
       CLOSED_ISSUES_QUERY,
       { searchQuery, pageSize: Math.min(closedIssueLimit, GRAPHQL_PAGE_SIZE) },
@@ -574,15 +582,30 @@ async function collectSnapshot({
   execFile = execFileSync,
   generated = new Date().toISOString(),
   config = undefined,
+  trackerConfig = undefined,
   configPath = CONFIG_PATH,
   snapshotDir = SNAPSHOT_DIR,
 } = {}) {
-  const resolvedRepo = repo || detectRepo(execFile);
+  let resolvedRepo;
+  const github = createGithubAdapter({
+    execFile,
+    listTransport: ({ limit: requestedLimit }) => fetchOpenIssuesGraphql({
+      repo: resolvedRepo,
+      limit: requestedLimit,
+      execFile,
+    }),
+  });
+  const resolved = resolveConfiguredTracker(trackerConfig || readConfig("backlog"), {
+    adapters: { ...TRACKER_ADAPTERS, github },
+  });
+  invokeCapability(resolved, "pull-request-relationships", () => undefined);
+  if (withComments) invokeCapability(resolved, "comments", () => undefined);
+  if (withClosedIssues) invokeCapability(resolved, "closing-semantics", () => undefined);
+  resolvedRepo = repo || detectRepo(execFile);
   const triageConfig = config || readTriageConfig("backlog");
-  const issues = fetchOpenIssuesGraphql({
+  const issues = resolved.adapter.list({
     repo: resolvedRepo,
     limit,
-    execFile,
   });
   const candidateIssues = issues.filter((issue) => !isProgressIssue(issue));
   const issuesWithComments = withComments

@@ -3,7 +3,17 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("node:child_process");
+const { readConfig } = require("../../dev-backlog/scripts/lib.js");
+const {
+  githubIdentity,
+  stripNormalizedIdentity,
+} = require("../../dev-backlog/scripts/github-tracker.js");
+const {
+  invokeCapability,
+  resolveConfiguredTracker,
+} = require("../../dev-backlog/scripts/tracker.js");
 const { ANCHOR_PATTERN, parseAnchor } = require("./triage-report.js");
+const { runGh: runGithubCommand } = require("./triage-github.js");
 
 const DEFAULT_TRIAGE_DIR = path.join("backlog", "triage");
 const CHECKBOX_PATTERN = /^\s*-\s+\[([ xX])\]\s+/;
@@ -312,23 +322,87 @@ function trimStderr(stderr) {
 }
 
 function runGh(argv, { execFile = execFileSync } = {}) {
+  return runGithubCommand(argv, { execFile });
+}
+
+function execFileFromRunGh(runCommand) {
+  return (_command, argv) => {
+    const result = runCommand(argv);
+    if (result.status === 0) return result.stdout || "";
+    const error = new Error(result.stderr || `gh exited with status ${result.status}`);
+    error.status = result.status;
+    error.stdout = result.stdout;
+    error.stderr = result.stderr;
+    error.ghResult = result;
+    throw error;
+  };
+}
+
+function parseOptionValues(argv, option) {
+  const values = [];
+  for (let index = 0; index < argv.length - 1; index += 1) {
+    if (argv[index] === option) values.push(argv[index + 1]);
+  }
+  return values;
+}
+
+function runTrackerCommand(argv, { resolved, providerRunGh }) {
   try {
-    const stdout = execFile("gh", argv, {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return {
-      status: 0,
-      stdout: stdout || "",
-      stderr: "",
-    };
+    const [resource, verb, issue] = argv;
+    if (resource !== "issue") return providerRunGh(argv);
+    const identity = githubIdentity(issue);
+
+    if (verb === "comment") {
+      return invokeCapability(resolved, "comments", () => providerRunGh(argv));
+    }
+    if (verb === "view") {
+      const fields = argv[argv.indexOf("--json") + 1];
+      const task = resolved.adapter.read(identity, { fields });
+      return {
+        status: 0,
+        stdout: JSON.stringify(stripNormalizedIdentity(task)),
+        stderr: "",
+      };
+    }
+    if (verb === "edit") {
+      const milestone = parseOptionValues(argv, "--milestone")[0];
+      if (milestone !== undefined) {
+        invokeCapability(resolved, "milestones", () => undefined);
+      }
+      resolved.adapter.update(identity, {
+        addLabels: parseOptionValues(argv, "--add-label"),
+        removeLabels: parseOptionValues(argv, "--remove-label"),
+        ...(milestone === undefined ? {} : { milestone }),
+      });
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (verb === "close") {
+      const reason = parseOptionValues(argv, "-r")[0];
+      if (reason) invokeCapability(resolved, "closing-semantics", () => undefined);
+      resolved.adapter.close(identity, { reason });
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    return providerRunGh(argv);
   } catch (error) {
-    return {
+    return error.ghResult || {
       status: error.status || 1,
-      stdout: typeof error.stdout === "string" ? error.stdout : error.stdout?.toString?.("utf-8") || "",
-      stderr: typeof error.stderr === "string" ? error.stderr : error.stderr?.toString?.("utf-8") || error.message,
+      stdout: error.stdout || "",
+      stderr: error.stderr || error.message,
     };
   }
+}
+
+function requiredCapabilitiesForActions(actions) {
+  const capabilities = new Set();
+  for (const action of actions) {
+    if (!action.checked || !action.knownVerb) continue;
+    if (["close", "revisit", "close-duplicate"].includes(action.verb)) {
+      capabilities.add("comments");
+    }
+    if (action.verb === "close-duplicate") capabilities.add("closing-semantics");
+    if (action.verb === "assign-milestone") capabilities.add("milestones");
+  }
+  return [...capabilities];
 }
 
 function parseGhLabels(stdout) {
@@ -742,7 +816,23 @@ function execute(argv = process.argv.slice(2), deps = {}) {
 
   let logPath;
   let appliedCommandsByAction = new Map();
+  let resolved;
+  let providerRunGh;
   if (options.apply) {
+    providerRunGh = deps.runGh
+      || ((argvToRun) => runGh(argvToRun, { execFile: deps.execFile || execFileSync }));
+    try {
+      resolved = resolveConfiguredTracker(
+        deps.trackerConfig || readConfig(path.join(cwd, "backlog")),
+        { execFile: execFileFromRunGh(providerRunGh) }
+      );
+      for (const capability of requiredCapabilitiesForActions(deduped)) {
+        invokeCapability(resolved, capability, () => undefined);
+      }
+    } catch (error) {
+      return { ...result, exitCode: 1, error: error.message };
+    }
+
     const reportDate = resolveReportDate(report.frontmatter, now());
     logPath = resolveLogPath(reportDate, cwd);
 
@@ -759,7 +849,9 @@ function execute(argv = process.argv.slice(2), deps = {}) {
 
   const effectDeps = {
     now,
-    runGh: deps.runGh || ((argvToRun) => runGh(argvToRun, { execFile: deps.execFile || execFileSync })),
+    runGh: options.apply
+      ? (argvToRun) => runTrackerCommand(argvToRun, { resolved, providerRunGh })
+      : deps.runGh || ((argvToRun) => runGh(argvToRun, { execFile: deps.execFile || execFileSync })),
     appendFile: deps.appendFile || fs.appendFileSync,
     mkdir: deps.mkdir || fs.mkdirSync,
   };

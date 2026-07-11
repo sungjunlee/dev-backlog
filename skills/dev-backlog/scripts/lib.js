@@ -5,6 +5,14 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const {
+  GH_EXEC_DEFAULTS,
+  OPEN_ISSUE_COUNT_QUERY,
+  OPEN_ISSUE_JSON_FIELDS,
+  createGithubAdapter,
+  getOpenIssueCount: getGithubOpenIssueCount,
+  stripNormalizedIdentity,
+} = require("./github-tracker.js");
 
 function slugify(text) {
   return text
@@ -20,12 +28,6 @@ function escapeYaml(text) {
   }
   return text;
 }
-
-/** Default options for gh CLI execFileSync calls (prevents silent truncation). */
-const GH_EXEC_DEFAULTS = {
-  encoding: "utf-8",
-  maxBuffer: 50 * 1024 * 1024,
-};
 
 const CONFIG_DEFAULTS = {
   tracker: "github",
@@ -43,10 +45,6 @@ const TRIAGE_CONFIG_DEFAULTS = {
   stale_days: 60,
   duplicate_threshold: 0.75,
 };
-
-const OPEN_ISSUE_COUNT_QUERY =
-  "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }";
-const OPEN_ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees,createdAt,updatedAt";
 
 function stripQuotes(text) {
   if (
@@ -156,50 +154,8 @@ function readTriageConfig(backlogDir) {
   );
 }
 
-function buildIssueCountArgs(repo) {
-  if (!repo) {
-    return [
-      "api",
-      "graphql",
-      "-F",
-      "owner={owner}",
-      "-F",
-      "name={repo}",
-      "-f",
-      `query=${OPEN_ISSUE_COUNT_QUERY}`,
-      "--jq",
-      ".data.repository.issues.totalCount",
-    ];
-  }
-
-  const [owner, name] = repo.split("/");
-  if (!owner || !name) {
-    throw new Error(`Invalid repo value: ${repo}. Expected OWNER/REPO.`);
-  }
-
-  return [
-    "api",
-    "graphql",
-    "-F",
-    `owner=${owner}`,
-    "-F",
-    `name=${name}`,
-    "-f",
-    `query=${OPEN_ISSUE_COUNT_QUERY}`,
-    "--jq",
-    ".data.repository.issues.totalCount",
-  ];
-}
-
 function getOpenIssueCount({ repo, execFile = execFileSync } = {}) {
-  const out = execFile("gh", buildIssueCountArgs(repo), GH_EXEC_DEFAULTS).trim();
-  const count = Number.parseInt(out, 10);
-
-  if (!Number.isInteger(count) || count < 0) {
-    throw new Error(`Invalid issue count from gh: ${out}`);
-  }
-
-  return count;
+  return getGithubOpenIssueCount({ repo, execFile });
 }
 
 /**
@@ -212,14 +168,9 @@ function getOpenIssueCount({ repo, execFile = execFileSync } = {}) {
  * spawning a process.
  */
 function fetchOpenIssues({ repo, limit, defaultLimit, execFile = execFileSync } = {}) {
-  const resolvedLimit = limit ?? defaultLimit ?? getOpenIssueCount({ repo, execFile });
-  if (resolvedLimit === 0) return [];
-
-  const args = ["issue", "list", "--state", "open", "--limit", String(resolvedLimit)];
-  if (repo) args.push("--repo", repo);
-  args.push("--json", OPEN_ISSUE_JSON_FIELDS);
-
-  return JSON.parse(execFile("gh", args, GH_EXEC_DEFAULTS));
+  return createGithubAdapter({ execFile })
+    .list({ repo, limit, defaultLimit })
+    .map(stripNormalizedIdentity);
 }
 
 /**

@@ -38,6 +38,13 @@ for arg in "$@"; do
   esac
 done
 
+# Optional provider mutations must be authorized before local sprint mutation.
+if $CLOSE_MILESTONE; then
+  if ! node "$SCRIPT_DIR/tracker-capability.js" require milestones "$BACKLOG_DIR"; then
+    exit 1
+  fi
+fi
+
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 TASKS_DIR="$BACKLOG_DIR/tasks"
 COMPLETED_DIR="$BACKLOG_DIR/completed"
@@ -137,13 +144,7 @@ if $CLOSE_MILESTONE; then
     if $DRY_RUN; then
       echo "[dry-run] Would close milestone: $MILESTONE"
     else
-      MS="$MILESTONE" gh api repos/{owner}/{repo}/milestones \
-        --jq '.[] | select(.title==env.MS) | .number' 2>/dev/null | \
-        while IFS= read -r ms_num; do
-          gh api -X PATCH "repos/{owner}/{repo}/milestones/$ms_num" -f state=closed 2>/dev/null && \
-            echo "Closed milestone: $MILESTONE" || \
-            echo "Warning: Could not close milestone: $MILESTONE"
-        done
+      node "$SCRIPT_DIR/tracker-capability.js" close-milestone milestones "$BACKLOG_DIR" "$MILESTONE" 2>/dev/null
     fi
   fi
 fi

@@ -18,6 +18,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { readConfig } = require("./lib.js");
+const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
 const {
   githubIssueNumber,
   parsePlanCheckbox,
@@ -212,6 +213,16 @@ function sync({
   readFs = { readTaskFiles, readActiveSprintSummary },
   fetchComments = fetchIssueComments,
 }) {
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile });
+  const requiredCapabilities = [
+    "progress-issues",
+    "pull-request-relationships",
+    "comments",
+    ...(finalize ? ["closing-semantics"] : []),
+  ];
+  for (const capability of requiredCapabilities) {
+    invokeCapability(resolved, capability, () => undefined);
+  }
   const tasksDir = path.join(backlogDir, "tasks");
   const sprintsDir = path.join(backlogDir, "sprints");
 
@@ -245,6 +256,12 @@ function sync({
     nextIssueNumber,
   });
   const title = monthTitle(month);
+
+  if (existing && parseMarkerMonth(existing.body) !== month) {
+    throw new Error(
+      `Refusing to update GitHub issue #${existing.number}: missing managed progress marker for ${month}.`
+    );
+  }
 
   const result = {
     action: "progress-sync",

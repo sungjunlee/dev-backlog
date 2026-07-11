@@ -11,11 +11,12 @@
  * Filename: YYYY-MM-<topic>.md
  */
 
-const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { renderTaskRef } = require("./task-ref.js");
-const { slugify, estimateSize, GH_EXEC_DEFAULTS } = require("./lib");
+const { slugify, estimateSize, readConfig } = require("./lib");
+const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
+const { invokeCapability, resolveConfiguredTracker } = require("./tracker.js");
 const { resolveCharterPath } = require("./spec-paths.js");
 
 function parseArgs(args) {
@@ -141,30 +142,6 @@ function createSprintResult({
   };
 }
 
-function getMilestoneDue(milestone) {
-  try {
-    const out = execFileSync("gh", [
-      "api", "repos/{owner}/{repo}/milestones",
-      "--jq", '.[] | select(.title==env.MS) | .due_on'
-    ], { ...GH_EXEC_DEFAULTS, env: { ...process.env, MS: milestone } }).trim();
-    return out ? out.slice(0, 10) : "TBD";
-  } catch {
-    return "TBD";
-  }
-}
-
-function getMilestoneIssues(milestone) {
-  try {
-    const out = execFileSync("gh", [
-      "issue", "list", "--milestone", milestone,
-      "--state", "open", "--json", "number,title,labels"
-    ], GH_EXEC_DEFAULTS);
-    return JSON.parse(out);
-  } catch {
-    return [];
-  }
-}
-
 // Detect whether the spec axis backs each field. Charter resolves canonical
 // spec/charter.md or legacy root CHARTER.md; capabilities is spec/capabilities.md.
 function detectSpecPresence({ repoRoot = process.cwd(), fileExists = fs.existsSync } = {}) {
@@ -186,12 +163,18 @@ function createSprintFile({
   fileExists = fs.existsSync,
   mkdir = (dir) => fs.mkdirSync(dir, { recursive: true }),
   writeFile = fs.writeFileSync,
-  getDue = getMilestoneDue,
-  getIssues = getMilestoneIssues,
+  getDue,
+  getIssues,
   // Optional overrides; when omitted, detected from repoRoot's spec/ files.
   hasCharter,
   hasCapabilities,
 }) {
+  if (!getDue || !getIssues) {
+    const resolved = resolveConfiguredTracker(readConfig(path.dirname(sprintsDir)));
+    invokeCapability(resolved, "milestones", () => undefined);
+    getDue = getDue || getMilestoneDue;
+    getIssues = getIssues || getMilestoneIssues;
+  }
   if (!dryRun) mkdir(sprintsDir);
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
