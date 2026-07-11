@@ -38,4 +38,5 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - Back-compat is the merge gate for Batch 2–3: single-active output must stay byte-identical (PRD G4).
 
 ## Progress
-- 2026-07-11: sprint planned. Epic #289 + children #290–#295 filed; dev-relay epic #954 + #955–#957 filed. Design doc landed in docs/ (uncommitted).
+- 2026-07-11: sprint planned. Epic #289 + children #290–#295 filed; dev-relay epic #954 + #955–#957 filed. Design doc landed in docs/ → PR #296.
+- 2026-07-11: issue set reviewed (independent + self pass) and hardened. Fixed 3 real blockers: #290 overlap fixture was trivially green on HEAD (now asserts the new overlap message); schema_version bump breaks `sprint-mirror.js:87` on single-track (now atomic in #291); G4 "byte-identical" pinned to text-only (JSON changes by design). Added two shared contracts to the PRD: `scopesOverlap()` helper (lib.js, one impl for #291/#292/#293) and the schema-bump atomicity rule.
