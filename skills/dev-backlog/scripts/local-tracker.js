@@ -96,13 +96,26 @@ function sleepSync(ms) {
 
 // --- stale-lock reclamation (crash recovery) ---
 
-function readLockOwner(lockPath) {
+// The lock file stamps `${pid}:${token}`: the pid decides staleness, while the
+// token is a per-acquisition nonce so reclaim and release can bind their unlink
+// to the exact file instance they inspected and never evict a different live
+// holder that replaced the one they saw.
+function readLockStamp(lockPath) {
+  let raw;
   try {
-    const pid = Number.parseInt(fs.readFileSync(lockPath, "utf-8").trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
+    raw = fs.readFileSync(lockPath, "utf-8").trim();
   } catch {
     return null;
   }
+  const colon = raw.indexOf(":");
+  const pid = Number.parseInt(colon === -1 ? raw : raw.slice(0, colon), 10);
+  if (!(Number.isInteger(pid) && pid > 0)) return null;
+  return { pid, token: colon === -1 ? "" : raw.slice(colon + 1) };
+}
+
+function readLockOwner(lockPath) {
+  const stamp = readLockStamp(lockPath);
+  return stamp ? stamp.pid : null;
 }
 
 function processAlive(pid) {
@@ -114,18 +127,40 @@ function processAlive(pid) {
   }
 }
 
-// Reclaim a lock whose stamped owner is provably gone. Returns false (leaving
-// the lock untouched) for a live owner, our own pid, or an unstamped/racing
-// lock, so a running allocator is never evicted.
-function reclaimStaleLock(lockPath) {
+// Reclaim a lock whose stamped owner is provably gone. Two reclaimers must never
+// both remove "the same" stale lock and then race each other's fresh lock, so
+// removal is bound to a specific file instance: capture the lock by an atomic
+// rename (only one racer wins it; the loser gets ENOENT and retries), then judge
+// the captured file. If a live owner had replaced the stale lock between our read
+// and the capture, restore it and bow out rather than evict a running holder.
+function reclaimStaleLock(lockPath, stagePath) {
   const owner = readLockOwner(lockPath);
   if (owner === null || owner === process.pid || processAlive(owner)) return false;
   try {
-    fs.unlinkSync(lockPath);
+    fs.renameSync(lockPath, stagePath);
   } catch {
-    /* another process reclaimed it first */
+    return false; // vanished or another reclaimer captured it first
   }
-  return true;
+  const captured = readLockOwner(stagePath);
+  if (captured !== null && captured !== process.pid && !processAlive(captured)) {
+    try {
+      fs.unlinkSync(stagePath); // provably dead: drop it so the acquire loop recreates
+    } catch {
+      /* already gone */
+    }
+    return true;
+  }
+  // Captured a live/ambiguous lock — restore it so its owner keeps exclusivity.
+  try {
+    fs.renameSync(stagePath, lockPath);
+  } catch {
+    try {
+      fs.unlinkSync(stagePath);
+    } catch {
+      /* nothing to restore */
+    }
+  }
+  return false;
 }
 
 // --- frontmatter / body split, preserving human bytes verbatim ---
@@ -361,6 +396,38 @@ function buildUpdateFieldChanges(changes) {
   return fieldChanges;
 }
 
+// --- filesystem-boundary guards ---
+
+function contentHash(content) {
+  return crypto.createHash("sha256").update(content, "utf-8").digest("hex");
+}
+
+function lstatSafe(target) {
+  try {
+    return fs.lstatSync(target);
+  } catch {
+    return null;
+  }
+}
+
+// A canonical task must be a real file. A symlinked task file would let a read
+// or close follow the link and touch bytes outside the backlog, so reject any
+// non-regular file (symlink, directory, socket) before it is read or archived.
+function assertRegularFile(full, ref) {
+  const stat = lstatSafe(full);
+  if (!stat) {
+    throw new LocalStoreError(`cannot access local task ${ref}: file is missing or unreadable`);
+  }
+  if (!stat.isFile()) {
+    throw new LocalStoreError(`local task ${ref} is not a regular file; symlinked task files are refused`);
+  }
+}
+
+/** True only when `dest`'s resolved parent is exactly `dir` (no traversal). */
+function withinDir(dir, dest) {
+  return path.resolve(path.dirname(dest)) === path.resolve(dir);
+}
+
 // --- close compensation: identity-checked rollback of a published copy ---
 
 function fileIdentity(target) {
@@ -443,7 +510,7 @@ function createLocalAdapter(options = {}) {
 
   /** Refuse any write whose resolved parent is not exactly the target dir. */
   function assertWithin(dir, dest) {
-    if (path.resolve(path.dirname(dest)) !== path.resolve(dir)) {
+    if (!withinDir(dir, dest)) {
       throw new LocalStoreError(
         `refusing to write a local task outside its canonical directory: ${dest}`
       );
@@ -530,6 +597,7 @@ function createLocalAdapter(options = {}) {
 
   function readTask(kind, entry) {
     const full = path.join(dirPath(kind), entry.file);
+    assertRegularFile(full, entry.identity.ref);
     const content = fs.readFileSync(full, "utf-8");
     const split = splitDocument(content);
     if (!split) {
@@ -554,25 +622,29 @@ function createLocalAdapter(options = {}) {
   function acquireLock() {
     fs.mkdirSync(backlogDir, { recursive: true });
     const lockPath = path.join(backlogDir, LOCK_FILE);
+    const token = crypto.randomBytes(12).toString("hex");
     let reclaimed = false;
     for (let attempt = 0; attempt <= lockConfig.retries; attempt += 1) {
       try {
         const fd = fs.openSync(lockPath, "wx");
-        // Stamp the owner pid so a later process can tell a crashed holder from
-        // a live one and reclaim only a provably dead lock.
+        // Stamp `${pid}:${token}` so a later process can tell a crashed holder
+        // from a live one (pid) and bind reclaim/release to this exact lock
+        // instance (token) rather than to the path alone.
         try {
-          fs.writeSync(fd, String(process.pid));
+          fs.writeSync(fd, `${process.pid}:${token}`);
         } catch {
           /* the lock is held regardless of whether the stamp lands */
         }
-        return fd;
+        return { fd, token };
       } catch (error) {
         if (error.code !== "EEXIST") {
           throw new LocalStoreError(`cannot acquire local allocation lock: ${error.message}`, { cause: error });
         }
         // Reclaim a crashed holder's lock exactly once, and only when its owner
-        // is provably gone, so a live allocator is never evicted.
-        if (!reclaimed && reclaimStaleLock(lockPath)) {
+        // is provably gone, so a live allocator is never evicted. The stage path
+        // is unique to us so concurrent reclaimers cannot collide on it.
+        const stagePath = `${lockPath}.${process.pid}.${token}.reclaiming`;
+        if (!reclaimed && reclaimStaleLock(lockPath, stagePath)) {
           reclaimed = true;
           continue;
         }
@@ -585,17 +657,23 @@ function createLocalAdapter(options = {}) {
     );
   }
 
-  function releaseLock(fd) {
+  function releaseLock(handle) {
     const lockPath = path.join(backlogDir, LOCK_FILE);
     try {
-      fs.closeSync(fd);
+      fs.closeSync(handle.fd);
     } catch {
       /* fd already closed */
     }
-    try {
-      fs.unlinkSync(lockPath);
-    } catch {
-      /* lock already gone */
+    // Only unlink the lock if it is still ours: a token mismatch means another
+    // process already reclaimed it (having judged us dead) and may now hold it,
+    // so unlinking would evict a live holder. Bind the removal to our token.
+    const stamp = readLockStamp(lockPath);
+    if (stamp && stamp.token === handle.token) {
+      try {
+        fs.unlinkSync(lockPath);
+      } catch {
+        /* lock already gone */
+      }
     }
   }
 
@@ -623,11 +701,68 @@ function createLocalAdapter(options = {}) {
     }
   }
 
+  // The close journal is untrusted data. Accept only a marker whose filename is
+  // a safe basename that parses back to the journaled identity; a malformed or
+  // mismatched marker returns null so recovery fails closed instead of acting on
+  // an attacker-controlled path. Absolute src/dest strings are never trusted —
+  // the paths are reconstructed from the validated relative filename below.
+  function validateCloseMarker(marker) {
+    if (!marker || typeof marker !== "object") return null;
+    if (marker.v !== 1 || marker.phase !== "publish") return null;
+    const { id, ref, file, destHash } = marker;
+    if (typeof id !== "string" || typeof ref !== "string") return null;
+    if (typeof file !== "string" || typeof destHash !== "string") return null;
+    if (!/^[0-9a-f]{64}$/.test(destHash)) return null;
+    if (file !== path.basename(file) || /[\\/]/.test(file)) return null;
+    const parsed = parseTaskFileName(file, { taskPrefix, tracker: "local" });
+    if (!parsed || parsed.id !== id || parsed.ref !== ref) return null;
+    return { id, ref, file, destHash };
+  }
+
+  // Read a canonical file's frontmatter id and content hash without following a
+  // symlink. Returns null for anything that is not a regular file, so a
+  // symlinked src/dest can never be promoted or deleted by recovery.
+  function readIdentityAndHash(target) {
+    const stat = lstatSafe(target);
+    if (!stat || !stat.isFile()) return null;
+    let content;
+    try {
+      content = fs.readFileSync(target, "utf-8");
+    } catch {
+      return null;
+    }
+    const split = splitDocument(content);
+    let id = null;
+    if (split) {
+      const idEntry = parseFrontmatterEntries(split.frontmatter).find((entry) => entry.key === "id");
+      if (idEntry) id = String(entryValue(idEntry));
+    }
+    return { id, hash: contentHash(content) };
+  }
+
+  // The destination is this close's publication only if it is a regular file
+  // whose exact bytes (content evidence) and frontmatter id (identity evidence)
+  // match the journaled intent — never an external or partially written file.
+  function publishedMatches(dest, ref, destHash) {
+    const info = readIdentityAndHash(dest);
+    return !!info && info.hash === destHash && info.id === ref;
+  }
+
+  function activeSourceMatches(src, ref) {
+    const info = readIdentityAndHash(src);
+    return !!info && info.id === ref;
+  }
+
   // Finish or discard a close a previous process left half-applied. MUST run
-  // under the store lock. A durable marker means the completed copy was (about
-  // to be) published; reconcile so exactly one authoritative file remains:
-  //   dest present + source present -> roll the move forward (retire source)
-  //   dest absent                   -> publish never landed; source is authority
+  // under the store lock. The journal records only the intent to publish;
+  // recovery derives the actual phase from evidence on disk rather than trusting
+  // the marker:
+  //   dest proves it is our publication (bytes + id) -> retire a matching active
+  //                                                     source (roll the move forward)
+  //   dest absent / unverified (external, partial)   -> publish never landed; the
+  //                                                     active source stays authority
+  // Nothing outside the canonical stores, and nothing whose identity we cannot
+  // confirm, is ever deleted or promoted; the marker is then cleared.
   function recover() {
     let raw;
     try {
@@ -643,12 +778,20 @@ function createLocalAdapter(options = {}) {
       removeCloseMarker(); // an unreadable marker cannot be acted on
       return;
     }
-    const { src, dest } = marker;
-    if (typeof src !== "string" || typeof dest !== "string") {
+    const plan = validateCloseMarker(marker);
+    if (!plan) {
+      removeCloseMarker(); // malformed/untrusted marker: fail closed, touch nothing
+      return;
+    }
+    const src = path.join(dirPath(TASKS_DIR), plan.file);
+    const dest = path.join(dirPath(COMPLETED_DIR), plan.file);
+    // Containment: the reconstructed paths must resolve exactly into their
+    // canonical directories (validation guarantees this; verify defensively).
+    if (!withinDir(dirPath(TASKS_DIR), src) || !withinDir(dirPath(COMPLETED_DIR), dest)) {
       removeCloseMarker();
       return;
     }
-    if (fs.existsSync(dest) && fs.existsSync(src)) {
+    if (publishedMatches(dest, plan.ref, plan.destHash) && activeSourceMatches(src, plan.ref)) {
       try {
         fs.unlinkSync(src);
       } catch {
@@ -662,21 +805,15 @@ function createLocalAdapter(options = {}) {
   // section so reads and writes across the two stores are serializable; a close
   // can never race an update into archiving stale bytes. Recovery runs first so
   // any interrupted close is healed before the next mutation observes the store.
+  // Recovery never runs on the read paths (list/read), which stay non-mutating.
   function withStoreLock(fn) {
-    const fd = acquireLock();
+    const handle = acquireLock();
     try {
       recover();
       return fn();
     } finally {
-      releaseLock(fd);
+      releaseLock(handle);
     }
-  }
-
-  // Lock-free read paths (list/read) take the lock only when a marker exists, so
-  // a crashed close is healed before its duplicate copies would fail them closed.
-  function recoverIfNeeded() {
-    if (!fs.existsSync(closeMarkerPath())) return;
-    withStoreLock(() => {});
   }
 
   function allocateParentId() {
@@ -822,10 +959,15 @@ function createLocalAdapter(options = {}) {
     for (const probe of [backlogDir, dirPath(TASKS_DIR), dirPath(COMPLETED_DIR)]) {
       let stat;
       try {
-        stat = fs.statSync(probe);
+        // lstat, not stat: a symlinked canonical directory must be refused, not
+        // resolved, or create/read/close could escape the backlog through it.
+        stat = fs.lstatSync(probe);
       } catch (error) {
         if (error.code === "ENOENT") continue; // created lazily on first write
         return { available: false, reason: `local store path ${probe} is unusable: ${error.message}` };
+      }
+      if (stat.isSymbolicLink()) {
+        return { available: false, reason: `local store path ${probe} must not be a symlink` };
       }
       if (!stat.isDirectory()) {
         return { available: false, reason: `local store path ${probe} is not a directory` };
@@ -844,7 +986,8 @@ function createLocalAdapter(options = {}) {
         `invalid local list state ${JSON.stringify(state)}; expected one of open, closed, all`
       );
     }
-    recoverIfNeeded();
+    // list never mutates: an interrupted close is healed on the next mutation,
+    // not here. Duplicate copies from a crash surface as a fail-closed error.
     const kinds = LIST_STATE_KINDS[state];
     const tasks = [];
     const seen = new Map();
@@ -866,7 +1009,8 @@ function createLocalAdapter(options = {}) {
 
   function read(selector) {
     const identity = resolveIdentity(selector);
-    recoverIfNeeded();
+    // read never mutates; recovery of an interrupted close is deferred to the
+    // next create/update/close under the store lock.
     const { active, completed } = locateEntry(identity);
     const kind = active ? TASKS_DIR : COMPLETED_DIR;
     const entry = active || completed;
@@ -932,6 +1076,7 @@ function createLocalAdapter(options = {}) {
         throw new LocalStoreError(`no active local task to update: ${identity.ref}`);
       }
       const full = path.join(dirPath(TASKS_DIR), entry.file);
+      assertRegularFile(full, identity.ref);
       const content = fs.readFileSync(full, "utf-8");
       const split = splitDocument(content);
       if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
@@ -968,6 +1113,7 @@ function createLocalAdapter(options = {}) {
       }
 
       const src = path.join(dirPath(TASKS_DIR), activeEntry.file);
+      assertRegularFile(src, identity.ref);
       const content = fs.readFileSync(src, "utf-8");
       const split = splitDocument(content);
       if (!split) throw new LocalStoreError(`local task file for ${identity.ref} is malformed`);
@@ -977,10 +1123,20 @@ function createLocalAdapter(options = {}) {
       const entries = applyFrontmatterChanges(currentEntries, { status: DONE_STATUS });
       const doneContent = `${stringifyFrontmatter(entries, split.eol)}${split.body}`;
       const dest = path.join(dirPath(COMPLETED_DIR), activeEntry.file);
-      // Journal the intent before publishing so a crash anywhere between here and
-      // the source unlink is reconciled to a single authority on the next open:
-      // no marker survives a fully successful move or a completed rollback.
-      writeCloseMarker({ id: identity.id, ref: identity.ref, src, dest });
+      // Journal only the validated relative identity/filename plus the exact
+      // bytes we intend to publish (destHash). A crash anywhere between here and
+      // the source unlink is reconciled to a single authority on the next
+      // mutation: recovery reconstructs src/dest inside the canonical dirs and
+      // rolls forward only when the destination proves it is this publication —
+      // never a raw path taken from the marker.
+      writeCloseMarker({
+        v: 1,
+        phase: "publish",
+        id: identity.id,
+        ref: identity.ref,
+        file: activeEntry.file,
+        destHash: contentHash(doneContent),
+      });
       try {
         publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
         retireSourceAfterPublish(identity, src, dest);

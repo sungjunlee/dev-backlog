@@ -879,3 +879,107 @@ describe("local publication cleans partial temp files when the write itself fail
     assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")));
   });
 });
+
+const CLOSE_MARKER = ".local-tracker.close";
+
+function symlinkSupported(root) {
+  try {
+    const link = path.join(root, ".symlink-probe");
+    fs.symlinkSync(path.join(root, ".symlink-target"), link);
+    fs.unlinkSync(link);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe("local rejects symlinked canonical paths", () => {
+  it("refuses a symlinked task file on read, list, and close without following it", (t) => {
+    const { root, backlogDir, adapter } = makeStore(t);
+    if (!symlinkSupported(root)) return; // platform without symlink privileges
+    // A real, well-formed task living OUTSIDE the backlog. A symlink in tasks/
+    // would let read/close follow it and touch bytes beyond the canonical store.
+    const outside = path.join(root, "outside.md");
+    fs.writeFileSync(outside, taskFile({ id: 1, title: "Outside", body: "\n## Description\nsecret\n" }));
+    fs.symlinkSync(outside, path.join(backlogDir, "tasks", "BACK-1 - one.md"));
+
+    assert.throws(() => adapter.read("BACK-1"), LocalStoreError);
+    assert.throws(() => adapter.list(), LocalStoreError);
+    assert.throws(() => adapter.close("BACK-1"), LocalStoreError);
+    assert.ok(fs.existsSync(outside), "the symlink target outside the backlog is never touched");
+  });
+
+  it("reports unavailable for a symlinked canonical directory", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-symdir-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    if (!symlinkSupported(root)) return;
+    const backlogDir = path.join(root, "backlog");
+    fs.mkdirSync(backlogDir, { recursive: true });
+    fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
+    const elsewhere = path.join(root, "elsewhere");
+    fs.mkdirSync(elsewhere, { recursive: true });
+    fs.symlinkSync(elsewhere, path.join(backlogDir, "tasks")); // tasks/ is a symlink
+    const report = createLocalAdapter({ backlogDir, now: FIXED_NOW }).availability();
+    assert.equal(report.available, false);
+    assert.match(report.reason, /symlink/);
+  });
+});
+
+describe("local recovery treats the close journal as untrusted", () => {
+  function writeMarker(backlogDir, marker) {
+    fs.writeFileSync(path.join(backlogDir, CLOSE_MARKER), JSON.stringify(marker));
+  }
+
+  it("keeps list and read non-mutating when a stale marker is present", (t) => {
+    const { backlogDir, adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One" })]],
+    });
+    writeMarker(backlogDir, { v: 1, phase: "publish", id: "1", ref: "BACK-1", file: "BACK-1 - one.md", destHash: "0".repeat(64) });
+    assert.equal(adapter.read("BACK-1").id, "1");
+    assert.equal(adapter.list().length, 1);
+    assert.ok(fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "read/list never delete the marker");
+    assert.ok(!fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), "read/list never take the lock");
+  });
+
+  it("does not promote an unverified external destination or delete the active source", (t) => {
+    const { backlogDir, adapter } = makeStore(t, {
+      seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", body: "\n## Description\nauthoritative\n" })]],
+      seedCompleted: [["BACK-1 - one.md", taskFile({ id: 1, title: "External", status: "Done", body: "\n## Description\nexternal\n" })]],
+    });
+    const activeBefore = read(backlogDir, "tasks", "BACK-1 - one.md");
+    const externalBefore = read(backlogDir, "completed", "BACK-1 - one.md");
+    // Intent recorded, but the destination bytes never matched our publication.
+    writeMarker(backlogDir, { v: 1, phase: "publish", id: "1", ref: "BACK-1", file: "BACK-1 - one.md", destHash: "0".repeat(64) });
+
+    adapter.create({ title: "trigger recovery" }); // any mutation runs recover() first
+
+    assert.equal(read(backlogDir, "tasks", "BACK-1 - one.md"), activeBefore, "authoritative active source is retained");
+    assert.equal(read(backlogDir, "completed", "BACK-1 - one.md"), externalBefore, "the external destination is never promoted or altered");
+    assert.ok(!fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "the untrusted marker is discarded");
+  });
+
+  it("fails closed on a marker whose filename escapes the canonical store", (t) => {
+    const { root, backlogDir, adapter } = makeStore(t);
+    const victim = path.join(root, "victim.md");
+    fs.writeFileSync(victim, "do not delete me");
+    writeMarker(backlogDir, { v: 1, phase: "publish", id: "1", ref: "BACK-1", file: "../../victim.md", destHash: "0".repeat(64) });
+
+    adapter.create({ title: "trigger recovery" });
+
+    assert.ok(fs.existsSync(victim), "a traversal filename never reaches an unlink");
+    assert.ok(!fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "the malformed marker is cleared");
+  });
+
+  it("ignores a legacy absolute-path marker without deleting its targets", (t) => {
+    const { root, backlogDir, adapter } = makeStore(t);
+    const victim = path.join(root, "victim.md");
+    fs.writeFileSync(victim, "arbitrary file the old marker pointed at");
+    // The round-6 marker shape carried arbitrary absolute src/dest strings.
+    writeMarker(backlogDir, { src: victim, dest: victim });
+
+    adapter.create({ title: "trigger recovery" });
+
+    assert.ok(fs.existsSync(victim), "an untyped legacy marker cannot drive an arbitrary unlink");
+    assert.ok(!fs.existsSync(path.join(backlogDir, CLOSE_MARKER)), "the legacy marker is cleared");
+  });
+});
