@@ -195,10 +195,59 @@ function estimateSize(labels) {
   return "";
 }
 
+/**
+ * Resolve a sprint's scope key from its frontmatter (multi-track partitioning).
+ * Priority: non-empty `component:` wins; else `scope:` path globs; else none.
+ * A track declares one axis, never both (PRD D1).
+ */
+function sprintScopeKey(frontmatter) {
+  const fm = frontmatter || {};
+  const component = typeof fm.component === "string" ? fm.component.trim() : "";
+  if (component) return { kind: "component", value: component };
+  const scope = Array.isArray(fm.scope)
+    ? fm.scope.map((glob) => String(glob).trim()).filter(Boolean)
+    : [];
+  if (scope.length) return { kind: "scope", globs: scope };
+  return { kind: "none" };
+}
+
+// Reduce a path glob to a comparable directory prefix:
+// "src/auth/**" -> "src/auth", "src/auth/*" -> "src/auth", "src/auth/" -> "src/auth".
+function normalizeScopePrefix(glob) {
+  return String(glob).replace(/\/+\**$/, "").replace(/\/+$/, "");
+}
+
+function globsOverlap(a, b) {
+  const na = normalizeScopePrefix(a);
+  const nb = normalizeScopePrefix(b);
+  if (na === "" || nb === "") return true; // a root scope overlaps anything
+  if (na === nb) return true;
+  return na.startsWith(`${nb}/`) || nb.startsWith(`${na}/`); // nested paths overlap
+}
+
+/**
+ * Do two sprints' scopes overlap? The single shared predicate consumed by
+ * sprint-state (OVERLAPPING_TRACKS), sprint-init (refuse), and backlog-doctor.
+ * component: exact equality; scope: globs: normalized path-prefix containment.
+ * Cross-axis or scopeless pairs return false — "cannot prove overlap" — and the
+ * doctor separately warns on two scopeless active tracks.
+ */
+function scopesOverlap(frontmatterA, frontmatterB) {
+  const a = sprintScopeKey(frontmatterA);
+  const b = sprintScopeKey(frontmatterB);
+  if (a.kind === "component" && b.kind === "component") return a.value === b.value;
+  if (a.kind === "scope" && b.kind === "scope") {
+    return a.globs.some((ga) => b.globs.some((gb) => globsOverlap(ga, gb)));
+  }
+  return false;
+}
+
 module.exports = {
   slugify,
   escapeYaml,
   parseSimpleYaml,
+  sprintScopeKey,
+  scopesOverlap,
   readConfig,
   readTriageConfig,
   estimateSize,

@@ -33,7 +33,15 @@ else
   ACTIVE_STATUS=$?
 fi
 if [ "$ACTIVE_STATUS" -eq 2 ]; then
-  echo "[Sprint warning] Multiple active sprints found; resolve backlog/sprints/ before editing."
+  COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
+  PARTS=""
+  while IFS= read -r sprint; do
+    [ -z "$sprint" ] && continue
+    NAME=$(basename "$sprint" .md)
+    count_checkboxes "$sprint"
+    PARTS="$PARTS, $NAME($CB_DONE/$CB_TOTAL)"
+  done < <(find_active_sprints "$SPRINTS_DIR")
+  echo "[Sprint portfolio] $COUNT tracks active: ${PARTS#, }"
   exit 0
 fi
 

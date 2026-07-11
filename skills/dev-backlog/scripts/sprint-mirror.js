@@ -91,10 +91,13 @@ function resolveSprintState({
     throw new Error(`sprint-state.js produced invalid JSON: ${error.message}`);
   }
 
-  if (state.schema_version !== 1) {
+  if (state.schema_version !== 1 && state.schema_version !== 2) {
     throw new Error(`Unsupported sprint-state schema_version: ${state.schema_version}`);
   }
 
+  // v2 keeps `active_sprint` populated only when exactly one track is active; a
+  // portfolio (N>1) leaves it null. sprint-mirror still mirrors one sprint —
+  // per-track selection is #292's work.
   if (!state.active_sprint) {
     throw new Error("No active sprint found. sprint-mirror requires exactly one active sprint.");
   }

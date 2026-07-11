@@ -11,15 +11,21 @@ source "$SCRIPT_DIR/lib.sh"
 
 BACKLOG_DIR="backlog"
 JSON=0
-for arg in "$@"; do
-  if [ "$arg" = "--json" ]; then
-    JSON=1
-  else
-    BACKLOG_DIR="$arg"
-  fi
+TRACK=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --json) JSON=1 ;;
+    --track) shift; TRACK="${1:-}" ;;
+    --track=*) TRACK="${1#--track=}" ;;
+    *) BACKLOG_DIR="$1" ;;
+  esac
+  shift
 done
 
 if [ "$JSON" -eq 1 ]; then
+  if [ -n "$TRACK" ]; then
+    exec node "$SCRIPT_DIR/sprint-state.js" --mode next --track "$TRACK" "$BACKLOG_DIR"
+  fi
   exec node "$SCRIPT_DIR/sprint-state.js" --mode next "$BACKLOG_DIR"
 fi
 
@@ -30,21 +36,45 @@ if [ ! -d "$SPRINTS_DIR" ]; then
   exit 1
 fi
 
-ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
-ACTIVE_STATUS=$?
+if [ -n "$TRACK" ]; then
+  ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+  if [ -z "$ACTIVE" ]; then
+    echo "No active track matches '$TRACK'. Active tracks:"
+    find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+      [ -z "$sprint" ] && continue
+      echo "  - $(basename "$sprint" .md)"
+    done
+    exit 1
+  fi
+else
+  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+  ACTIVE_STATUS=$?
 
-if [ "$ACTIVE_STATUS" -eq 2 ]; then
-  echo "Multiple active sprints found. Resolve backlog/sprints/ before choosing next work."
-  find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
-    echo "  - $(basename "$sprint")"
-  done
-  exit 1
-fi
+  if [ "$ACTIVE_STATUS" -eq 2 ]; then
+    # Multiple disjoint tracks: a portfolio. Overlap is the doctor's fail signal.
+    ACTIVE_COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
+    echo "=== $ACTIVE_COUNT active tracks (portfolio) ==="
+    echo ""
+    find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+      [ -z "$sprint" ] && continue
+      NAME=$(basename "$sprint" .md)
+      count_checkboxes "$sprint"
+      LINE="$NAME: $CB_DONE/$CB_TOTAL done"
+      [ "$CB_IN_FLIGHT" -gt 0 ] && LINE="$LINE, $CB_IN_FLIGHT in-flight"
+      echo "$LINE"
+      NEXT_ITEM=$(next_todo_item "$sprint" 2>/dev/null || true)
+      [ -n "$NEXT_ITEM" ] && echo "  Next: $NEXT_ITEM"
+    done
+    echo ""
+    echo "Use 'next.sh --track <slug>' for a single track."
+    exit 0
+  fi
 
-if [ "$ACTIVE_STATUS" -ne 0 ]; then
-  echo "No active sprint found."
-  echo "Check GitHub: gh issue list --state open"
-  exit 0
+  if [ "$ACTIVE_STATUS" -ne 0 ]; then
+    echo "No active sprint found."
+    echo "Check GitHub: gh issue list --state open"
+    exit 0
+  fi
 fi
 
 SPRINT_NAME=$(basename "$ACTIVE" .md)

@@ -105,7 +105,7 @@ RECOVERY_JSON=$(printf '{"status":%s,"next":%s}' "$STATUS_JSON" "$NEXT_JSON")
 assert_json_eval "recovery live: files-only state is orientable" "$RECOVERY_JSON" '
 const recovery = JSON.parse(require("fs").readFileSync(0, "utf8"));
 const { status, next } = recovery;
-if (status.schema_version !== 1 || next.schema_version !== 1) {
+if (status.schema_version !== 2 || next.schema_version !== 2) {
   process.exit(1);
 }
 const sprintPath = status.active_sprint && status.active_sprint.path;
@@ -428,7 +428,7 @@ OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/backlog")
 assert_json_eval "status json: structured state" "$OUT" '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 if (
-  j.schema_version !== 1 ||
+  j.schema_version !== 2 ||
   !j.active_sprint ||
   j.active_sprint.frontmatter.status !== "active" ||
   j.active_sprint.goal !== "Test the checkbox parsing." ||
@@ -445,7 +445,7 @@ OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog")
 assert_json_eval "next json: next batch" "$OUT" '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 if (
-  j.schema_version !== 1 ||
+  j.schema_version !== 2 ||
   !("next_batch" in j) ||
   !j.next_batch ||
   j.next_batch.heading !== "### Batch 3 — Remaining" ||
@@ -591,38 +591,69 @@ status: active
 - [ ] #2 Task B
 EOF
 
+# Two scopeless active tracks are disjoint-by-default (cannot prove overlap):
+# a portfolio, not an error (#291). Overlap is handled as fail-loud below.
 set +e
 OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog" 2>&1)
 STATUS=$?
 set -e
-assert_equals "next multiple-active: exit code" "$STATUS" "1"
-assert_contains "next multiple-active: message" "$OUT" "Multiple active sprints found"
-assert_contains "next multiple-active: lists first" "$OUT" "2026-03-active-a.md"
-assert_contains "next multiple-active: lists second" "$OUT" "2026-03-active-b.md"
+assert_equals "next portfolio: exit code" "$STATUS" "0"
+assert_contains "next portfolio: header" "$OUT" "active tracks (portfolio)"
+assert_contains "next portfolio: lists first" "$OUT" "2026-03-active-a"
+assert_contains "next portfolio: lists second" "$OUT" "2026-03-active-b"
 
 OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog" 2>&1)
-assert_contains "status multiple-active: warning" "$OUT" "Multiple active sprints found"
-assert_contains "status multiple-active: lists first" "$OUT" "2026-03-active-a.md"
-assert_contains "status multiple-active: lists second" "$OUT" "2026-03-active-b.md"
+assert_contains "status portfolio: header" "$OUT" "active tracks (portfolio)"
+assert_contains "status portfolio: lists first" "$OUT" "2026-03-active-a"
+assert_contains "status portfolio: lists second" "$OUT" "2026-03-active-b"
 
 set +e
 OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog" 2>&1)
 STATUS=$?
 set -e
-assert_equals "next json multiple-active: exit code" "$STATUS" "1"
-assert_contains "next json multiple-active: error" "$OUT" "Multiple active sprint files found"
-
-set +e
-OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/backlog" 2>&1)
-STATUS=$?
-set -e
-assert_equals "status json multiple-active: exit code" "$STATUS" "1"
-assert_contains "status json multiple-active: error" "$OUT" "Multiple active sprint files found"
+assert_equals "next json portfolio: exit code" "$STATUS" "0"
+assert_json_eval "next json portfolio: two disjoint tracks, no single active_sprint" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.schema_version !== 2 || j.active_sprint !== null) process.exit(1);
+if (!Array.isArray(j.active_sprints) || j.active_sprints.length !== 2) process.exit(1);
+'
 
 OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog" 2>&1)
-assert_contains "hook multiple-active: warning" "$OUT" "Multiple active sprints found"
+assert_contains "hook portfolio: line" "$OUT" "[Sprint portfolio] 2 tracks active"
+
+# --track selects one disjoint track (single render, other track excluded)
+OUT=$(bash "$SCRIPT_DIR/next.sh" --track 2026-03-active-a "$TEST_DIR/backlog" 2>&1)
+assert_contains "next --track: shows selected track" "$OUT" "2026-03-active-a"
+assert_not_contains "next --track: excludes other track" "$OUT" "Task B"
 
 rm "$TEST_DIR/backlog/sprints/2026-03-active-a.md" "$TEST_DIR/backlog/sprints/2026-03-active-b.md"
+
+# Overlapping scope (same component) is fail-loud in JSON mode (#291).
+cat > "$TEST_DIR/backlog/sprints/2026-03-ov-a.md" << 'EOF'
+---
+status: active
+component: "shared-thing"
+---
+
+## Plan
+- [ ] #1 Task A
+EOF
+cat > "$TEST_DIR/backlog/sprints/2026-03-ov-b.md" << 'EOF'
+---
+status: active
+component: "shared-thing"
+---
+
+## Plan
+- [ ] #2 Task B
+EOF
+set +e
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "next json overlap: fail-loud exit code" "$STATUS" "1"
+assert_contains "next json overlap: message" "$OUT" "Active tracks overlap on scope"
+rm "$TEST_DIR/backlog/sprints/2026-03-ov-a.md" "$TEST_DIR/backlog/sprints/2026-03-ov-b.md"
 
 # --- status.sh: local files section ---
 mkdir -p "$TEST_DIR/backlog/tasks"
@@ -1187,8 +1218,17 @@ mt_write_sprint "$MT_OVERLAP_DIR/backlog/sprints/2026-07-auth-b.md" "AuthB" 4 '[
 set +e
 OUT=$(cd "$MT_OVERLAP_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
 set -e
-if printf "%s" "$OUT" | grep -qF "Active tracks overlap on scope"; then MT_OVERLAP_RES="pass"; else MT_OVERLAP_RES="fail"; fi
-gated_assert "multi-track: doctor emits scope-overlap message, not generic multi-active (#293 B2)" "$GATE_MT_OVERLAP" "$MT_OVERLAP_RES"
+# Key on the active_sprint CHECK's own summary — not a raw grep of the whole
+# doctor output. From #291 the OVERLAPPING_TRACKS message can appear in a
+# skipped in-flight check summary; only #293 makes the active_sprint verdict
+# itself carry the overlap message, which is what this gate should track.
+if printf "%s" "$OUT" | node -e '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const c = (j.checks || []).find((x) => x.name === "active_sprint");
+const summary = (c && c.detail && c.detail.summary) || "";
+process.exit(/Active tracks overlap on scope/.test(summary) ? 0 : 1);
+' 2>/dev/null; then MT_OVERLAP_RES="pass"; else MT_OVERLAP_RES="fail"; fi
+gated_assert "multi-track: doctor active_sprint verdict emits scope-overlap message (#293 B2)" "$GATE_MT_OVERLAP" "$MT_OVERLAP_RES"
 
 # (3) Back-compat (ENFORCED, GATE=1 — must stay GREEN on HEAD and after Phase 1).
 #     A single active track behaves exactly as today; this is the G4 text anchor
@@ -1200,6 +1240,31 @@ OUT=$(cd "$MT_SINGLE_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" 2>/dev/null ||
 assert_contains "multi-track G4: single active track still reports 'Exactly one active sprint' (text)" "$OUT" "Exactly one active sprint"
 OUT=$(cd "$MT_SINGLE_DIR" && bash "$SCRIPT_DIR/next.sh" 2>/dev/null || true)
 assert_contains "multi-track G4: single-track next.sh still names the sprint (text)" "$OUT" "2026-07-solo"
+
+# --- Phase 1a (#291) ENFORCED: resolvers deliver the portfolio + track selection ---
+# Reuses MT_DISJOINT_DIR (two disjoint-scope tracks: 2026-07-auth, 2026-07-billing).
+set +e
+OUT=$(cd "$MT_DISJOINT_DIR" && node "$SCRIPT_DIR/sprint-state.js" --json)
+set -e
+assert_json_eval "multi-track #291: sprint-state emits schema-2 portfolio for disjoint tracks" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.schema_version !== 2) process.exit(1);
+if (j.active_sprint !== null) process.exit(1);
+if (!Array.isArray(j.active_sprints) || j.active_sprints.length !== 2) process.exit(1);
+'
+OUT=$(cd "$MT_DISJOINT_DIR" && node "$SCRIPT_DIR/sprint-state.js" --track 2026-07-auth)
+assert_json_eval "multi-track #291: --track resolves exactly one sprint (single shape)" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (!j.active_sprint || !/2026-07-auth\.md$/.test(j.active_sprint.path)) process.exit(1);
+if (!Array.isArray(j.active_sprints) || j.active_sprints.length !== 1) process.exit(1);
+'
+OUT=$(cd "$MT_DISJOINT_DIR" && bash "$SCRIPT_DIR/next.sh")
+assert_contains "multi-track #291: next.sh renders a portfolio for N>1" "$OUT" "active tracks (portfolio)"
+assert_contains "multi-track #291: portfolio names track auth" "$OUT" "2026-07-auth"
+assert_contains "multi-track #291: portfolio names track billing" "$OUT" "2026-07-billing"
+OUT=$(cd "$MT_DISJOINT_DIR" && bash "$SCRIPT_DIR/next.sh" --track 2026-07-billing)
+assert_contains "multi-track #291: next.sh --track shows the selected track" "$OUT" "2026-07-billing"
+assert_not_contains "multi-track #291: next.sh --track excludes other tracks" "$OUT" "2026-07-auth"
 
 # --- Results ---
 echo ""

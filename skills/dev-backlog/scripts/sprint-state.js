@@ -8,14 +8,17 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseSimpleYaml, readConfig } = require("./lib.js");
+const { parseSimpleYaml, readConfig, scopesOverlap } = require("./lib.js");
 const {
   containsTaskRef,
   githubIssueNumber,
   parsePlanCheckbox,
 } = require("./task-ref.js");
 
-const SCHEMA_VERSION = 1;
+// v2 (multi-track): adds `active_sprints[]`; `active_sprint` + the top-level
+// single-sprint fields are retained (sole element when exactly one is active,
+// null when a portfolio) so v1 consumers keep working. See PRD §5.2 / R5.
+const SCHEMA_VERSION = 2;
 const DEFAULT_BACKLOG_DIR = "backlog";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -31,15 +34,31 @@ const STATE_BY_MARKER = {
 };
 
 function usage() {
-  return "Usage: sprint-state.js [--mode status|next] [backlog-dir]";
+  return "Usage: sprint-state.js [--mode status|next] [--track slug | --component slug] [backlog-dir]";
 }
 
 function parseArgs(args) {
   const options = {
     mode: "status",
     backlogDir: DEFAULT_BACKLOG_DIR,
+    track: null,
+    component: null,
   };
   let backlogDirSet = false;
+
+  const valueFlag = (arg, i, name, key) => {
+    if (arg === `--${name}`) {
+      const next = args[i + 1];
+      if (!next) return { consumed: 1, error: `Missing value for --${name}. ${usage()}` };
+      options[key] = next;
+      return { consumed: 2 };
+    }
+    if (arg.startsWith(`--${name}=`)) {
+      options[key] = arg.slice(`--${name}=`.length);
+      return { consumed: 1 };
+    }
+    return null;
+  };
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -56,6 +75,17 @@ function parseArgs(args) {
       options.mode = arg.slice("--mode=".length);
       continue;
     }
+    let handled = false;
+    for (const [name, key] of [["track", "track"], ["component", "component"]]) {
+      const res = valueFlag(arg, i, name, key);
+      if (res) {
+        if (res.error) return { ...options, error: res.error };
+        i += res.consumed - 1;
+        handled = true;
+        break;
+      }
+    }
+    if (handled) continue;
     if (arg.startsWith("--")) {
       return { ...options, error: `Unknown argument: ${arg}. ${usage()}` };
     }
@@ -70,17 +100,51 @@ function parseArgs(args) {
     return { ...options, error: `Invalid --mode: ${options.mode}. ${usage()}` };
   }
 
+  if (options.track && options.component) {
+    return { ...options, error: `Use only one of --track / --component. ${usage()}` };
+  }
+
   return options;
 }
 
-function emptyState() {
+// Per-sprint fields shared by the single and portfolio shapes. Kept null/empty
+// at the top level of a portfolio (N>1) so v1 consumers that read
+// active_sprint/plan_items degrade to "no single active sprint".
+function emptyTopLevel() {
   return {
-    schema_version: SCHEMA_VERSION,
     active_sprint: null,
     plan_items: [],
     next_batch: null,
     latest_progress: [],
     in_flight: [],
+  };
+}
+
+function emptyState() {
+  return {
+    schema_version: SCHEMA_VERSION,
+    active_sprints: [],
+    ...emptyTopLevel(),
+  };
+}
+
+// One active track: retain the v1 top-level fields (back-compat) and also list
+// it under active_sprints[].
+function singleState(perSprint) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    active_sprints: [perSprint],
+    ...perSprint,
+  };
+}
+
+// N disjoint active tracks: the portfolio. Top-level singular fields are
+// null/empty; consumers read active_sprints[] or pass --track/--component.
+function portfolioState(perSprints) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    active_sprints: perSprints,
+    ...emptyTopLevel(),
   };
 }
 
@@ -300,8 +364,8 @@ function parseSprintContent({
       ...computeAge(item, progressEntries, frontmatter.started, today),
     }));
 
+  // Per-sprint state (no schema_version — that lives on the top-level wrapper).
   return {
-    schema_version: SCHEMA_VERSION,
     active_sprint: {
       path: sprintPath,
       frontmatter,
@@ -314,9 +378,45 @@ function parseSprintContent({
   };
 }
 
+function sprintSlug(sprintPath) {
+  return path.basename(sprintPath, ".md");
+}
+
+// Ascending by frontmatter `started:` (D4), filename as a stable tiebreaker.
+function comparePerSprint(a, b) {
+  const sa = a.active_sprint.frontmatter.started || "";
+  const sb = b.active_sprint.frontmatter.started || "";
+  if (sa !== sb) return sa < sb ? -1 : 1;
+  return a.active_sprint.path < b.active_sprint.path ? -1 : 1;
+}
+
+function matchesSelector(perSprint, { track, component }) {
+  const fm = perSprint.active_sprint.frontmatter || {};
+  const fmComponent = typeof fm.component === "string" ? fm.component.trim() : "";
+  if (component) return fmComponent === component;
+  // --track matches the sprint slug or its component handle.
+  return sprintSlug(perSprint.active_sprint.path) === track || fmComponent === track;
+}
+
+function firstOverlappingPair(perSprints) {
+  for (let i = 0; i < perSprints.length; i += 1) {
+    for (let j = i + 1; j < perSprints.length; j += 1) {
+      if (scopesOverlap(
+        perSprints[i].active_sprint.frontmatter,
+        perSprints[j].active_sprint.frontmatter
+      )) {
+        return [perSprints[i], perSprints[j]];
+      }
+    }
+  }
+  return null;
+}
+
 function readSprintState({
   backlogDir = DEFAULT_BACKLOG_DIR,
   today = new Date(),
+  track = null,
+  component = null,
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
@@ -329,22 +429,39 @@ function readSprintState({
   });
 
   if (activeFiles.length === 0) return emptyState();
-  if (activeFiles.length > 1) {
-    const error = new Error(
-      `Multiple active sprint files found:\n${activeFiles.map((file) => `  ${file}`).join("\n")}`
-    );
-    error.code = "MULTIPLE_ACTIVE_SPRINTS";
-    error.files = activeFiles;
-    throw error;
+
+  const taskPrefix = readConfig(backlogDir).task_prefix;
+  const perSprints = activeFiles
+    .map((sprintPath) => parseSprintContent({
+      sprintPath,
+      content: readFileSync(sprintPath, "utf-8"),
+      today,
+      taskPrefix,
+    }))
+    .sort(comparePerSprint);
+
+  // Explicit track/component selector: resolve to that one track deterministically.
+  if (track || component) {
+    const matches = perSprints.filter((s) => matchesSelector(s, { track, component }));
+    if (matches.length === 0) return emptyState();
+    return singleState(matches[0]);
   }
 
-  const sprintPath = activeFiles[0];
-  return parseSprintContent({
-    sprintPath,
-    content: readFileSync(sprintPath, "utf-8"),
-    today,
-    taskPrefix: readConfig(backlogDir).task_prefix,
-  });
+  if (perSprints.length === 1) return singleState(perSprints[0]);
+
+  // N active tracks: a portfolio when scopes are disjoint; fail loud on overlap.
+  const overlap = firstOverlappingPair(perSprints);
+  if (overlap) {
+    const [a, b] = overlap;
+    const error = new Error(
+      `Active tracks overlap on scope:\n  ${a.active_sprint.path}\n  ${b.active_sprint.path}\n`
+      + "Give them disjoint component:/scope: or close one before continuing."
+    );
+    error.code = "OVERLAPPING_TRACKS";
+    error.files = [a.active_sprint.path, b.active_sprint.path];
+    throw error;
+  }
+  return portfolioState(perSprints);
 }
 
 function main() {
@@ -359,7 +476,11 @@ function main() {
   }
 
   try {
-    const state = readSprintState({ backlogDir: parsed.backlogDir });
+    const state = readSprintState({
+      backlogDir: parsed.backlogDir,
+      track: parsed.track,
+      component: parsed.component,
+    });
     console.log(JSON.stringify(state, null, 2));
   } catch (error) {
     console.error(error.message);

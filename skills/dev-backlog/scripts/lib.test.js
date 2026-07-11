@@ -5,6 +5,7 @@ const path = require("path");
 const {
   slugify,
   escapeYaml,
+  scopesOverlap,
   readConfig,
   readTriageConfig,
   estimateSize,
@@ -346,5 +347,24 @@ describe("fetchOpenIssues", () => {
     assert.deepEqual(issues, []);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].args[0], "api");
+  });
+});
+
+describe("scopesOverlap", () => {
+  it("component: overlaps only on exact equality", () => {
+    assert.equal(scopesOverlap({ component: "auth" }, { component: "auth" }), true);
+    assert.equal(scopesOverlap({ component: "auth" }, { component: "billing" }), false);
+  });
+
+  it("scope: globs overlap on normalized path-prefix containment", () => {
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/billing/**"] }), false);
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/auth/**"] }), true);
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/auth/session/**"] }), true);
+  });
+
+  it("cross-axis or scopeless pairs cannot prove overlap (false)", () => {
+    assert.equal(scopesOverlap({ component: "auth" }, { scope: ["src/auth/**"] }), false);
+    assert.equal(scopesOverlap({}, {}), false);
+    assert.equal(scopesOverlap({ component: "auth" }, {}), false);
   });
 });
