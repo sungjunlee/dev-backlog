@@ -20,6 +20,7 @@
 const { execFileSync } = require("child_process");
 const path = require("path");
 const { GH_EXEC_DEFAULTS } = require("./lib.js");
+const { parseTaskRef, renderTaskRef } = require("./task-ref.js");
 
 const MARKER_PREFIX = "<!-- dev-backlog:sprint-mirror sprint=";
 const MARKER_SUFFIX = " -->";
@@ -107,7 +108,10 @@ function formatPointer(item) {
 
 function formatPlanItem(item) {
   const title = item.title ? ` ${item.title}` : "";
-  return `- [${item.checkbox_state}] #${item.issue_number}${title}${formatPointer(item)}`;
+  const identity = item.tracker
+    ? item
+    : parseTaskRef(`#${item.issue_number}`);
+  return `- [${item.checkbox_state}] ${renderTaskRef(identity)}${title}${formatPointer(item)}`;
 }
 
 function renderPlanSection(planItems) {

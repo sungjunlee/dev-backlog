@@ -81,6 +81,9 @@ Expose actor-readable execution state.
       line: "- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing) [run:issue-211-20260701120000000]",
       checkbox_state: "~",
       state: "in_flight",
+      tracker: "github",
+      id: "211",
+      ref: "#211",
       issue_number: 211,
       title: "Add JSON surfaces (~2hr)",
       batch_heading: "### Batch 2 - Active",
@@ -123,6 +126,39 @@ Expose actor-readable execution state.
       () => readSprintState({ backlogDir }),
       /Multiple active sprint files found/
     );
+  });
+
+  it("uses the configured prefix for mixed GitHub and local Plan identities", () => {
+    writeFile(path.join(backlogDir, "config.yml"), "task_prefix: TASK\n");
+    writeFile(path.join(backlogDir, "sprints", "mixed.md"), `---
+status: active
+started: 2026-07-01
+---
+
+## Plan
+- [~] #1 Legacy task → PR #11 (reviewing)
+- [ ] TASK-11.2 Local subtask
+
+## Progress
+- 2026-07-02: #11 is a different GitHub task.
+- 2026-07-03: #1 dispatched → PR #11
+`);
+
+    const state = readSprintState({
+      backlogDir,
+      today: new Date("2026-07-04T00:00:00Z"),
+    });
+
+    assert.equal(state.schema_version, 1);
+    assert.deepEqual(state.plan_items.map(({ tracker, id, ref, issue_number }) => ({
+      tracker, id, ref, issue_number,
+    })), [
+      { tracker: "github", id: "1", ref: "#1", issue_number: 1 },
+      { tracker: "local", id: "11.2", ref: "TASK-11.2", issue_number: null },
+    ]);
+    assert.equal(state.plan_items[0].pr.number, 11);
+    assert.equal(state.in_flight[0].age_basis_date, "2026-07-03");
+    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["TASK-11.2"]);
   });
 });
 
@@ -213,5 +249,32 @@ status: active
     assert.equal(withoutDate.in_flight[0].age_days, null);
     assert.equal(withoutDate.in_flight[0].age_source, null);
     assert.equal(withoutDate.in_flight[0].age_basis_date, null);
+  });
+
+  it("matches local Progress refs exactly across parents and decimal subtasks", () => {
+    const state = parseSprintContent({
+      sprintPath: "backlog/sprints/local-age.md",
+      taskPrefix: "BACK",
+      content: `---
+status: active
+started: 2026-06-30
+---
+
+## Plan
+- [~] BACK-1 Parent
+- [~] BACK-1.1 Subtask
+
+## Progress
+- 2026-07-01: BACK-11 is unrelated.
+- 2026-07-02: BACK-1.1 started.
+- 2026-07-03: BACK-1 started.
+`,
+      today: new Date("2026-07-04T00:00:00Z"),
+    });
+
+    assert.deepEqual(state.in_flight.map((item) => [item.ref, item.age_basis_date]), [
+      ["BACK-1", "2026-07-03"],
+      ["BACK-1.1", "2026-07-02"],
+    ]);
   });
 });

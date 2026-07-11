@@ -2,6 +2,11 @@ const MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
 const MARKER_SUFFIX = " -->";
 const COMMENT_MARKER_PREFIX = "<!-- dev-backlog:progress-comment id=";
 const COMMENT_MARKER_SUFFIX = " -->";
+const {
+  githubIssueNumber,
+  parseTaskFileName,
+  sameTaskIdentity,
+} = require("./task-ref.js");
 
 function makeMarker(month) {
   return `${MARKER_PREFIX}${month}${MARKER_SUFFIX}`;
@@ -47,9 +52,8 @@ function relayStuckEntryKey(runId) {
   return `run/${runId}/stuck`;
 }
 
-function parseTaskIssueNumber(taskFile) {
-  const match = String(taskFile || "").match(/^[A-Za-z]+-(\d+)\b/);
-  return match ? Number(match[1]) : null;
+function parseTaskIssueNumber(taskFile, options = {}) {
+  return githubIssueNumber(parseTaskFileName(taskFile, { ...options, tracker: "github" }));
 }
 
 function monthTitle(month) {
@@ -226,8 +230,15 @@ function buildDesiredCommentEntries({ mergedPRs, stuckTasks, month, relayMetadat
   }
 
   for (const task of stuckTasks) {
-    const taskIssueNumber = task.issueNumber ?? parseTaskIssueNumber(task.file);
-    const relay = relayMetadata?.runId && relayMetadata.issueNumber === taskIssueNumber ? relayMetadata : null;
+    const taskIdentity = task.tracker && task.id
+      ? task
+      : parseTaskFileName(task.file, { tracker: "github" });
+    const relayIdentity = Number.isFinite(relayMetadata?.issueNumber)
+      ? { tracker: "github", id: String(relayMetadata.issueNumber) }
+      : null;
+    const relay = relayMetadata?.runId && sameTaskIdentity(relayIdentity, taskIdentity)
+      ? relayMetadata
+      : null;
     desired.push({
       entryId: relay ? relayStuckEntryKey(relay.runId) : stuckEntryKey(month, task.file),
       aliasIds: relay ? [stuckEntryKey(month, task.file)] : [],

@@ -24,6 +24,7 @@ const {
   analyzeCapabilities,
   hasHardFailures: hasCapabilityHardFailures,
 } = require("./capabilities-doctor.js");
+const { readConfig } = require("./lib.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_BACKLOG_DIR = "backlog";
@@ -170,6 +171,7 @@ function runDoctor({
     checkCapabilities({ repoRoot: root, capabilitiesPath }),
     checkSprintShape({
       repoRoot: root,
+      backlogPath,
       activePath: active.detail.active_path,
       activeStatus: active.status,
     }),
@@ -394,7 +396,7 @@ function loadSprintState({ activePath, backlogPath, today }) {
   }
 }
 
-function checkSprintShape({ repoRoot, activePath, activeStatus }) {
+function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
   if (!activePath) {
     const status = activeStatus === "fail" ? "warn" : "pass";
     return verdict("sprint_shape", status, {
@@ -406,7 +408,8 @@ function checkSprintShape({ repoRoot, activePath, activeStatus }) {
   const missingSections = REQUIRED_ACTIVE_SECTIONS.filter(
     (section) => !hasSection(content, section),
   );
-  const unparseable = findUnparseablePlanLines(content);
+  const taskPrefix = readConfig(backlogPath).task_prefix;
+  const unparseable = findUnparseablePlanLines(content, { taskPrefix });
 
   if (missingSections.length > 0 || unparseable.length > 0) {
     const parts = [];
@@ -418,6 +421,7 @@ function checkSprintShape({ repoRoot, activePath, activeStatus }) {
       required_sections: REQUIRED_ACTIVE_SECTIONS,
       missing_sections: missingSections,
       checkbox_grammar: "^- \\[( |~|x)\\] #\\d+",
+      task_ref_grammar: `#N or ${taskPrefix}-N[.M]`,
       unparseable_plan_lines: unparseable,
     });
   }
@@ -429,12 +433,12 @@ function checkSprintShape({ repoRoot, activePath, activeStatus }) {
   });
 }
 
-function findUnparseablePlanLines(content) {
+function findUnparseablePlanLines(content, options = {}) {
   return extractSectionLines(content, "Plan")
     .map((line, index) => ({ line, plan_line: index + 1 }))
     .filter(({ line }) => line.trim() !== "")
     .filter(({ line }) => !/^###\s+/.test(line))
-    .filter(({ line }) => parsePlanItem(line) === null);
+    .filter(({ line }) => parsePlanItem(line, null, options) === null);
 }
 
 function checkInFlightTrace({ sprintState, activeStatus }) {
@@ -708,6 +712,9 @@ function countLines(content) {
 function publicPlanItem(item) {
   return {
     line: item.line,
+    tracker: item.tracker,
+    id: item.id,
+    ref: item.ref,
     issue_number: item.issue_number,
     age_days: item.age_days,
     age_source: item.age_source,

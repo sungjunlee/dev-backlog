@@ -8,13 +8,17 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseSimpleYaml } = require("./lib.js");
+const { parseSimpleYaml, readConfig } = require("./lib.js");
+const {
+  containsTaskRef,
+  githubIssueNumber,
+  parsePlanCheckbox,
+} = require("./task-ref.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_BACKLOG_DIR = "backlog";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const CHECKBOX_RE = /^- \[( |~|x)\] #(\d+)(?:\s+(.*))?$/;
 const RUN_ID_RE = /\[run:([^\]]+)\]$/;
 const BRANCH_RE = /\[branch:([^\]\s]+)\]/;
 const PR_RE = /→ PR #(\d+) \((\w+)\)$/;
@@ -146,7 +150,7 @@ function parseProgressEntries(progressLines) {
     });
 }
 
-function parsePlanItems(planLines) {
+function parsePlanItems(planLines, options = {}) {
   const items = [];
   let batchHeading = null;
 
@@ -156,20 +160,20 @@ function parsePlanItems(planLines) {
       continue;
     }
 
-    const item = parsePlanItem(line, batchHeading);
+    const item = parsePlanItem(line, batchHeading, options);
     if (item) items.push(item);
   }
 
   return items;
 }
 
-function parsePlanItem(line, batchHeading = null) {
-  const checkbox = line.match(CHECKBOX_RE);
+function parsePlanItem(line, batchHeading = null, options = {}) {
+  const checkbox = parsePlanCheckbox(line, options);
   if (!checkbox) return null;
 
-  const checkboxState = checkbox[1];
-  const issueNumber = Number.parseInt(checkbox[2], 10);
-  let title = (checkbox[3] || "").trim();
+  const checkboxState = checkbox.checkboxState;
+  const identity = checkbox.identity;
+  let title = checkbox.title;
 
   const runMatch = line.match(RUN_ID_RE);
   const runId = runMatch ? runMatch[1] : null;
@@ -191,7 +195,10 @@ function parsePlanItem(line, batchHeading = null) {
     line,
     checkbox_state: checkboxState,
     state,
-    issue_number: issueNumber,
+    tracker: identity.tracker,
+    id: identity.id,
+    ref: identity.ref,
+    issue_number: githubIssueNumber(identity),
     title,
     batch_heading: batchHeading,
     pr,
@@ -241,10 +248,12 @@ function daysBetween(startDate, endDate) {
   return Math.max(0, Math.floor((dateToUtcMs(endDate) - dateToUtcMs(startDate)) / MS_PER_DAY));
 }
 
-function computeAge(issueNumber, progressEntries, startedDate, today) {
-  const issueRe = new RegExp(`#${issueNumber}(?!\\d)`);
+function computeAge(identityOrIssueNumber, progressEntries, startedDate, today) {
+  const identity = typeof identityOrIssueNumber === "number"
+    ? { tracker: "github", id: String(identityOrIssueNumber), ref: `#${identityOrIssueNumber}` }
+    : identityOrIssueNumber;
   const progressDates = progressEntries
-    .filter((entry) => entry.date && issueRe.test(entry.line))
+    .filter((entry) => entry.date && containsTaskRef(entry.line, identity))
     .map((entry) => entry.date)
     .sort();
 
@@ -277,17 +286,18 @@ function parseSprintContent({
   sprintPath,
   content,
   today = new Date(),
+  taskPrefix = "BACK",
 }) {
   const frontmatter = parseFrontmatter(content);
   const goal = extractSectionLines(content, "Goal").join("\n").trim();
-  const planItems = parsePlanItems(extractSectionLines(content, "Plan"));
+  const planItems = parsePlanItems(extractSectionLines(content, "Plan"), { taskPrefix });
   const progressEntries = parseProgressEntries(extractSectionLines(content, "Progress"));
   const nextBatch = findNextBatch(planItems);
   const inFlight = planItems
     .filter((item) => item.state === "in_flight")
     .map((item) => ({
       ...item,
-      ...computeAge(item.issue_number, progressEntries, frontmatter.started, today),
+      ...computeAge(item, progressEntries, frontmatter.started, today),
     }));
 
   return {
@@ -333,6 +343,7 @@ function readSprintState({
     sprintPath,
     content: readFileSync(sprintPath, "utf-8"),
     today,
+    taskPrefix: readConfig(backlogDir).task_prefix,
   });
 }
 

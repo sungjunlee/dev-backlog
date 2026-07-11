@@ -76,7 +76,7 @@ fi
 # Show in-flight items (dispatched via dev-relay, marked [~])
 if [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "In flight:"
-  grep "$RE_CB_INFLIGHT" "$ACTIVE" | while IFS= read -r line; do
+  checkbox_lines "$ACTIVE" "~" | while IFS= read -r line; do
     echo "  $line"
   done
   echo ""
@@ -85,11 +85,12 @@ fi
 # Find current batch (first batch with unchecked items)
 CURRENT_BATCH=""
 IN_BATCH=""
+TODO_ITEMS=$(checkbox_lines "$ACTIVE" " ")
 while IFS= read -r line; do
   if echo "$line" | grep -q '^### Batch'; then
     IN_BATCH="$line"
   fi
-  if [ -n "$IN_BATCH" ] && echo "$line" | grep -q "$RE_CB_TODO"; then
+  if [ -n "$IN_BATCH" ] && printf '%s\n' "$TODO_ITEMS" | grep -Fqx -- "$line"; then
     if [ -z "$CURRENT_BATCH" ]; then
       CURRENT_BATCH="$IN_BATCH"
       echo "Next: $CURRENT_BATCH"
@@ -105,7 +106,8 @@ done < "$ACTIVE"
 # If no batch headers, show all unchecked items
 if [ -z "$CURRENT_BATCH" ]; then
   echo "Next items:"
-  grep "$RE_CB_TODO" "$ACTIVE" | while IFS= read -r line; do
+  printf '%s\n' "$TODO_ITEMS" | while IFS= read -r line; do
+    [ -z "$line" ] && continue
     echo "  $line"
   done
 fi

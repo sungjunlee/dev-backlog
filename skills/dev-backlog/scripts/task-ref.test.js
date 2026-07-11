@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 
 const {
   containsTaskRef,
+  parsePlanCheckbox,
+  parseTaskFileName,
   parseTaskRef,
   renderTaskRef,
 } = require("./task-ref.js");
@@ -71,6 +73,7 @@ describe("containsTaskRef", () => {
     assert.equal(containsTaskRef("- 2026-07-01: #1 started", one), true);
     assert.equal(containsTaskRef("- 2026-07-01: #11 started", one), false);
     assert.equal(containsTaskRef("- 2026-07-01: note#1 started", one), false);
+    assert.equal(containsTaskRef("- 2026-07-01: review → PR #1", one), false);
   });
 
   it("keeps BACK-1 distinct from BACK-11 and decimal descendants", () => {
@@ -79,5 +82,29 @@ describe("containsTaskRef", () => {
     assert.equal(containsTaskRef("- 2026-07-01: BACK-11 started", one), false);
     assert.equal(containsTaskRef("- 2026-07-01: BACK-1.1 started", one), false);
     assert.equal(containsTaskRef("- 2026-07-01: XBACK-1 started", one), false);
+  });
+});
+
+describe("Plan and task-file boundaries", () => {
+  it("parses only a complete task token after a supported checkbox", () => {
+    assert.deepEqual(parsePlanCheckbox("- [~] BACK-1.2 Child [branch:child]", OPTIONS), {
+      checkboxState: "~",
+      identity: { tracker: "local", id: "1.2", ref: "BACK-1.2" },
+      title: "Child [branch:child]",
+    });
+    assert.equal(parsePlanCheckbox("- [ ] BACK-1.2x Partial", OPTIONS), null);
+  });
+
+  it("parses exact configured task filenames and keeps tracker aliases explicit", () => {
+    assert.deepEqual(parseTaskFileName("BACK-1 - short.md", {
+      ...OPTIONS,
+      tracker: "github",
+    }), { tracker: "github", id: "1", ref: "#1" });
+    assert.deepEqual(parseTaskFileName("BACK-11.2 - child.md", {
+      ...OPTIONS,
+      tracker: "local",
+    }), { tracker: "local", id: "11.2", ref: "BACK-11.2" });
+    assert.equal(parseTaskFileName("BACK-1x - partial.md", OPTIONS), null);
+    assert.equal(parseTaskFileName("OTHER-1 - foreign.md", OPTIONS), null);
   });
 });

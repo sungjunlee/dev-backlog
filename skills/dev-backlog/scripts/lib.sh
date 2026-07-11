@@ -2,12 +2,28 @@
 # Shared library for dev-backlog bash scripts.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
-# Checkbox regex patterns — integration contract with dev-relay.
+# Legacy GitHub checkbox regex aliases — integration contract with dev-relay.
+# Core shell consumers use checkbox_lines/count_checkboxes below, which delegate
+# task-ref grammar to task-ref.js and therefore also accept configured local refs.
 # See: references/integration-contract.md
 RE_CB_ANY='^\- \[.\] #'
 RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
+
+TASK_REF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Print valid Plan checkbox lines, optionally limited to one marker (space/~ /x).
+# Usage: checkbox_lines "$FILE" [marker]
+checkbox_lines() {
+  local file="$1" marker="${2-}" backlog_dir
+  backlog_dir=$(dirname "$(dirname "$file")")
+  if [ "$#" -gt 1 ]; then
+    node "$TASK_REF_SCRIPT_DIR/task-ref.js" plan-lines "$file" "$backlog_dir" "$marker"
+  else
+    node "$TASK_REF_SCRIPT_DIR/task-ref.js" plan-lines "$file" "$backlog_dir"
+  fi
+}
 
 # List active sprint files (status: active in frontmatter).
 # Usage: find_active_sprints "$SPRINTS_DIR"
@@ -46,25 +62,23 @@ find_active_sprint() {
   printf "%s\n" "$active"
 }
 
-# Count checkbox states in a sprint file (single awk pass).
+# Count checkbox states in a sprint file through the shared task-ref parser.
 # Sets: CB_TOTAL, CB_DONE, CB_IN_FLIGHT, CB_TODO
 # Usage: count_checkboxes "$FILE"
 count_checkboxes() {
   local file="$1"
-  local counts
-  # Awk patterns mirror RE_CB_* constants (awk can't reference shell vars directly)
-  counts=$(awk '/^- \[.\] #/{t++} /^- \[x\] #/{d++} /^- \[~\] #/{f++} END{print t+0, d+0, f+0}' "$file" 2>/dev/null)
-  read -r CB_TOTAL CB_DONE CB_IN_FLIGHT <<< "$counts"
-  CB_TODO=$((CB_TOTAL - CB_DONE - CB_IN_FLIGHT))
+  local backlog_dir counts
+  backlog_dir=$(dirname "$(dirname "$file")")
+  counts=$(node "$TASK_REF_SCRIPT_DIR/task-ref.js" counts "$file" "$backlog_dir")
+  read -r CB_TOTAL CB_DONE CB_IN_FLIGHT CB_TODO <<< "$counts"
 }
 
 # Return the first unchecked todo item (stripped of "- [ ] " prefix).
 # Usage: NEXT=$(next_todo_item "$FILE")
 next_todo_item() {
   local file="$1"
-  # Strip display prefix "- [ ] " but keep the "#" issue ref.
-  # Sed pattern mirrors RE_CB_TODO minus trailing "#"; keep in sync if format changes.
-  grep "$RE_CB_TODO" "$file" 2>/dev/null | head -1 | sed 's/^- \[ \] //'
+  # Strip the stable checkbox display prefix while keeping the parsed task ref.
+  checkbox_lines "$file" " " | head -1 | sed 's/^- \[ \] //'
 }
 
 # Extract a markdown section by heading (## level).
