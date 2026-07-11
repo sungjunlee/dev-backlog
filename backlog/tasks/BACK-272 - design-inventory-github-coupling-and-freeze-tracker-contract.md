@@ -1,7 +1,7 @@
 ---
 id: BACK-272
 title: 'design: inventory GitHub coupling and freeze tracker contract'
-status: To Do
+status: Done
 labels:
   - enhancement
 priority: medium
@@ -27,12 +27,12 @@ Freeze the smallest deep tracker module interface, its capability model, and the
 
 ## Acceptance Criteria
 
-- [ ] A durable design reference inventories direct `gh` coupling and numeric `#N` assumptions with current owning callers.
-- [ ] The required tracker interface contains only list/read/create/update/close, stable identity/link data, availability probing, and capability reporting.
-- [ ] Optional milestones, PR relationships, mirrors, progress issues, comments, and close-keyword behavior are capability-gated rather than required.
-- [ ] The compatibility matrix names every existing GitHub CLI, markdown, JSON, and exported helper surface that must remain stable.
-- [ ] Runtime selection is explicitly persistent and fail-closed; detection is setup-only and never causes a silent adapter switch.
-- [ ] The design passes `git diff --check` and relevant spec/component validation.
+- [x] A durable design reference inventories direct `gh` coupling and numeric `#N` assumptions with current owning callers.
+- [x] The required tracker interface contains only list/read/create/update/close, stable identity/link data, availability probing, and capability reporting.
+- [x] Optional milestones, PR relationships, mirrors, progress issues, comments, and close-keyword behavior are capability-gated rather than required.
+- [x] The compatibility matrix names every existing GitHub CLI, markdown, JSON, and exported helper surface that must remain stable.
+- [x] Runtime selection is explicitly persistent and fail-closed; detection is setup-only and never causes a silent adapter switch.
+- [x] The design passes `git diff --check` and relevant spec/component validation.
 
 ## Non-Goals
 
