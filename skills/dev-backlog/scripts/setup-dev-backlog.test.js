@@ -507,6 +507,30 @@ describe("provider evidence", () => {
 });
 
 describe("setup filesystem behavior", () => {
+  it("preserves separated tracker comments through setup and runtime resolution", async (t) => {
+    for (const [line, expected] of [
+      ["tracker: local # keep\n", "local"],
+      ["tracker: 'local'\t# keep\n", "local"],
+      ['tracker: "github"  # keep\n', "github"],
+    ]) {
+      const root = makeRoot(t, `setup-runtime-separated-${expected}-`);
+      writeConfig(root, line);
+      for (const name of ["tasks", "sprints", "completed"]) {
+        fs.mkdirSync(path.join(root, "backlog", name));
+      }
+      const before = snapshotTree(path.join(root, "backlog"));
+      await runSetup(
+        { cwd: root, nonInteractive: true },
+        { execFileSync: noProviderCalls(), checkGithubAvailability: noProviderCalls() }
+      );
+      assert.deepEqual(snapshotTree(path.join(root, "backlog")), before);
+      assert.equal(fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8"), line);
+      assert.equal(resolveConfiguredTracker(readConfig(path.join(root, "backlog")), {
+        backlogDir: path.join(root, "backlog"),
+      }).tracker, expected);
+    }
+  });
+
   it("creates a fresh explicit local setup without any provider call", async (t) => {
     const root = makeRoot(t);
     const result = await runSetup(

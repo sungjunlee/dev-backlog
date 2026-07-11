@@ -62,8 +62,36 @@ function parseInlineArray(raw) {
   return inner.split(",").map((part) => stripQuotes(part.trim()));
 }
 
+function stripYamlSeparationComment(raw) {
+  let quote = null;
+  const firstNonSpace = raw.search(/\S/);
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (quote === "'") {
+      if (char === "'" && raw[index + 1] === "'") index += 1;
+      else if (char === "'") quote = null;
+      continue;
+    }
+    if (quote === '"') {
+      if (char === "\\" && index + 1 < raw.length) index += 1;
+      else if (char === '"') quote = null;
+      continue;
+    }
+    const previousNonSpace = raw.slice(0, index).trimEnd().at(-1);
+    if ((char === "'" || char === '"') &&
+        (index === firstNonSpace || previousNonSpace === "[" || previousNonSpace === ",")) {
+      quote = char;
+      continue;
+    }
+    if (char === "#" && index > 0 && /[ \t]/.test(raw[index - 1])) {
+      return raw.slice(0, index);
+    }
+  }
+  return raw;
+}
+
 function parseYamlScalar(raw) {
-  const value = raw.trim();
+  const value = stripYamlSeparationComment(raw).trim();
   if (!value) return "";
   if (
     (value.startsWith('"') && value.endsWith('"')) ||
@@ -89,7 +117,7 @@ function parseSimpleYaml(raw) {
   for (const line of raw.split(/\r?\n/)) {
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
 
-    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
     if (!match) continue;
 
     const indent = match[1].length;
