@@ -120,6 +120,30 @@ describe("tracker config state machine", () => {
     );
   });
 
+  it("requires whitespace before tracker comments and matches runtime selection", (t) => {
+    for (const raw of [
+      "tracker: local\n",
+      "tracker: local \t\n",
+      "tracker: local # comment\n",
+      "tracker: 'local'\t# comment\n",
+      'tracker: "github"  # comment\n',
+    ]) assert.ok(inspectConfig(raw, "/repo/backlog/config.yml").tracker);
+
+    for (const tracker of ["local", "github"]) {
+      const raw = `tracker: ${tracker}#not-a-comment\n`;
+      assert.throws(() => inspectConfig(raw, "/repo/backlog/config.yml"), ConfigValidationError);
+
+      const root = makeRoot(t, `setup-runtime-comment-${tracker}-`);
+      writeConfig(root, raw);
+      assert.throws(
+        () => resolveConfiguredTracker(readConfig(path.join(root, "backlog")), {
+          backlogDir: path.join(root, "backlog"),
+        }),
+        /Invalid tracker configuration/
+      );
+    }
+  });
+
   it("rejects invalid, missing-value, duplicate, nested, and ambiguous tracker forms", () => {
     const cases = [
       "tracker: gitlab\n",

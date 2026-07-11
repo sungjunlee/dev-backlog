@@ -498,7 +498,7 @@ function trackerCandidates(raw, configPath) {
 
 function parseValidTrackerLine(record) {
   const match = record.text.match(
-    /^\uFEFF?tracker:([ \t]*)(?:(["'])(github|local)\2|(github|local))([ \t]*(?:#.*)?)$/
+    /^\uFEFF?tracker:([ \t]*)(?:(["'])(github|local)\2|(github|local))((?:[ \t]+#.*|[ \t]*))$/
   );
   if (!match) return null;
 

@@ -205,6 +205,20 @@ describe("setup-dev-backlog real process integration", () => {
     assert.deepEqual(snapshot(root), before);
   });
 
+  it("rejects tracker values with an unseparated hash before real CLI mutation", (t) => {
+    for (const tracker of ["local", "github"]) {
+      const root = makeRoot(t, `setup-comment-boundary-${tracker}-`);
+      fs.mkdirSync(path.join(root, "backlog/tasks"), { recursive: true });
+      fs.writeFileSync(path.join(root, "backlog/config.yml"), `tracker: ${tracker}#not-a-comment\n`);
+      fs.writeFileSync(path.join(root, "backlog/tasks/user.md"), "user bytes\n");
+      const before = snapshot(root);
+      const run = runCli(root, ["--non-interactive"]);
+      assert.notEqual(run.status, 0, tracker);
+      assert.match(run.stderr, /Invalid tracker configuration/);
+      assert.deepEqual(snapshot(root), before, tracker);
+    }
+  });
+
   it("rejects every dangling canonical symlink before any mutation", (t) => {
     for (const relative of [
       "backlog",
