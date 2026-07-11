@@ -648,6 +648,34 @@ assert_contains "status: todo count" "$OUT" "1 To Do"
 assert_contains "status: inprog count" "$OUT" "1 In Progress"
 assert_contains "status: completed count" "$OUT" "Completed: 1"
 
+# A missing formatter must be detected before starting the Node producer. This
+# keeps the compatibility fallback and prevents a closed pipe from surfacing as
+# an unhandled EPIPE in tracker-status-list.js.
+NO_COLUMN_BIN="$TEST_DIR/no-column-bin"
+NO_COLUMN_BACKLOG="$TEST_DIR/no-column-backlog"
+NODE_CALLED="$TEST_DIR/no-column-node-called"
+mkdir -p "$NO_COLUMN_BIN" "$NO_COLUMN_BACKLOG"
+ln -s "$(command -v dirname)" "$NO_COLUMN_BIN/dirname"
+ln -s "$(command -v git)" "$NO_COLUMN_BIN/git"
+cat > "$NO_COLUMN_BIN/node" << 'EOF'
+#!/bin/bash
+: > "$NODE_CALLED"
+exit 99
+EOF
+chmod +x "$NO_COLUMN_BIN/node"
+
+set +e
+OUT=$(NODE_CALLED="$NODE_CALLED" PATH="$NO_COLUMN_BIN" RELAY_HOME="$TEST_DIR/no-relay" \
+  /bin/bash "$SCRIPT_DIR/status.sh" "$NO_COLUMN_BACKLOG" 2>&1)
+STATUS=$?
+set -e
+assert_equals "status no-column: exit code" "$STATUS" "0"
+assert_contains "status no-column: compatibility fallback" "$OUT" "(gh not available)"
+NODE_WAS_CALLED=0
+[ -e "$NODE_CALLED" ] && NODE_WAS_CALLED=1
+assert_equals "status no-column: skips Node producer" "$NODE_WAS_CALLED" "0"
+assert_not_contains "status no-column: no EPIPE" "$OUT" "EPIPE"
+
 # ============================================================
 # context-hook.sh tests
 # ============================================================
