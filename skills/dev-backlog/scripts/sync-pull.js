@@ -23,6 +23,12 @@ const {
   getOpenIssueCount: getSharedOpenIssueCount,
 } = require("./lib");
 const { parseMarkerMonth } = require("./progress-sync-render");
+const {
+  parseTaskFileName,
+  parseTaskRef,
+  sameTaskIdentity,
+  taskFileRef,
+} = require("./task-ref.js");
 
 const ISSUE_JSON_FIELDS = "number,title,body,labels,milestone,assignees";
 
@@ -146,18 +152,31 @@ function recordOperation(result, type, file) {
   if (type === "skipped") result.skippedFiles.push(file);
 }
 
-function findExistingTaskFile({ tasksDir, prefix, issueNumber }) {
-  const prefixMatch = `${prefix}-${issueNumber} - `;
+function githubTaskIdentity(issueNumber) {
+  const identity = parseTaskRef(`#${issueNumber}`);
+  if (!identity) throw new Error(`Invalid GitHub issue number: ${issueNumber}`);
+  return identity;
+}
+
+function findExistingTaskFile({ tasksDir, prefix, identity }) {
   if (!fs.existsSync(tasksDir)) return undefined;
-  return fs.readdirSync(tasksDir).find((file) => file.startsWith(prefixMatch) && file.endsWith(".md"));
+  return fs.readdirSync(tasksDir).find((file) => sameTaskIdentity(
+    parseTaskFileName(file, { taskPrefix: prefix, tracker: "github" }),
+    identity,
+  ));
 }
 
-function buildTaskFilename({ issue, prefix }) {
+function buildTaskFilename({ issue, prefix, identity = githubTaskIdentity(issue.number) }) {
   const slug = slugify(issue.title) || String(issue.number);
-  return `${prefix}-${issue.number} - ${slug}.md`;
+  return `${taskFileRef(identity, { taskPrefix: prefix })} - ${slug}.md`;
 }
 
-function buildTaskFrontmatter({ issue, prefix, today = new Date().toISOString().slice(0, 10) }) {
+function buildTaskFrontmatter({
+  issue,
+  prefix,
+  identity = githubTaskIdentity(issue.number),
+  today = new Date().toISOString().slice(0, 10),
+}) {
   const labelNames = (issue.labels || []).map((label) => label.name);
   const milestone = issue.milestone?.title || "";
   const status = statusFromLabels(labelNames);
@@ -170,7 +189,7 @@ function buildTaskFrontmatter({ issue, prefix, today = new Date().toISOString().
     : " []";
 
   return `---
-id: ${prefix}-${issue.number}
+id: ${taskFileRef(identity, { taskPrefix: prefix })}
 title: ${escapeYaml(issue.title)}
 status: ${status}
 labels:${labelsYaml}
@@ -190,10 +209,11 @@ function isMachineManagedIssueBody(body) {
 }
 
 function syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result }) {
-  const filename = buildTaskFilename({ issue, prefix });
+  const identity = githubTaskIdentity(issue.number);
+  const filename = buildTaskFilename({ issue, prefix, identity });
   const filepath = path.join(tasksDir, filename);
-  const existing = findExistingTaskFile({ tasksDir, prefix, issueNumber: issue.number });
-  const frontmatter = buildTaskFrontmatter({ issue, prefix });
+  const existing = findExistingTaskFile({ tasksDir, prefix, identity });
+  const frontmatter = buildTaskFrontmatter({ issue, prefix, identity });
   const structuredBody = structureBody(issue.body || "");
 
   if (existing) {
