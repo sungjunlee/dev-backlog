@@ -18,7 +18,7 @@ Existing GitHub users retain compatible behavior while core sprint execution gai
 - [x] #272 Inventory GitHub coupling and freeze the tracker contract (~1hr) → PR #280 (merged)
 
 ### Batch 2 - Add explicit tracker resolution (after #272)
-- [ ] #273 Add configured tracker selection and the core adapter seam (~2hr)
+- [x] #273 Add configured tracker selection and the core adapter seam (~2hr) → PR #282 (merged)
 
 ### Batch 3 - Generalize task identity (after #273)
 - [ ] #274 Add backward-compatible tracker-neutral task references (~2hr)
@@ -32,9 +32,11 @@ Existing GitHub users retain compatible behavior while core sprint execution gai
 - The tracker module must be deep: required lifecycle and identity stay small; milestones, PR relationships, mirrors, progress issues, comments, and closing semantics remain capability-gated.
 - Existing GitHub markdown, CLI, JSON, and helper exports are compatibility surfaces. Additive normalized fields must not remove `issue_number` or rewrite historical sprints.
 - #272 found nine production files that invoke `gh` directly. `progress-sync.js` also has an independent exported `readActiveSprintSummary` parser for numeric Plan checkboxes; #274 must migrate that path as well as `sprint-state.js`.
+- #273 added `tracker.js`: selection comes only from configuration, a missing key defaults to GitHub, resolution probes only the configured adapter, required operations and identities are validated exactly, and provider-specific features are capability-gated. The local slot remains explicitly unavailable until #276.
 - Sprint A is deliberately serial because #273-#275 share the tracker resolver, sprint parser, and GitHub call sites. Sprint B starts only after GitHub regression proof merges.
 
 ## Progress
 - 2026-07-11: #270 accepted-with-narrowing recorded and spec PR #271 merged after three independent review rounds; Milestone 13 and issues #272-#278 created.
 - 2026-07-11: Sprint A opened with four serial execution waves; task mirrors refreshed from live GitHub state.
 - 2026-07-11: #272 → PR #280 merged after internal/post-publication review (LGTM, round 4); design contract froze nine direct `gh` callers, numeric identity surfaces, compatibility promises, and #273-#275 verification ownership.
+- 2026-07-11: #273 → PR #282 merged after TDD plus internal/post-publication review (LGTM, round 2); configured-only resolution, the exact adapter/identity contract, capability gates, and GitHub/local slots landed without migrating current callers.
