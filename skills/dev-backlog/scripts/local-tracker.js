@@ -411,15 +411,27 @@ function realDirIssue(dir) {
   return null;
 }
 
-// --- close compensation: identity-checked rollback of a published copy ---
+// --- close compensation: identity-and-content-checked rollback ---
 
-function fileIdentity(target) {
-  const stat = fs.statSync(target);
-  return { dev: stat.dev, ino: stat.ino };
+function fileEvidence(target) {
+  // Bind the content hash to the same inode represented by the evidence: path
+  // stat followed by path read could itself observe two different files.
+  const fd = fs.openSync(target, "r");
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) {
+      const error = new Error(`rollback target is not a regular file: ${target}`);
+      error.code = "EINVAL";
+      throw error;
+    }
+    return { dev: stat.dev, ino: stat.ino, hash: contentHash(fs.readFileSync(fd)) };
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
-function sameFileIdentity(a, b) {
-  return a.dev === b.dev && a.ino === b.ino;
+function sameFileEvidence(a, b) {
+  return a.dev === b.dev && a.ino === b.ino && a.hash === b.hash;
 }
 
 function closeSourceRetained(identity, src, cause) {
@@ -1081,8 +1093,26 @@ function createLocalAdapter(options = {}) {
   // After the completed copy is published, remove the active source to finish the
   // move. A failed unlink means both stores momentarily claim the id, so roll the
   // publication back — leaving the active source as the single authoritative task.
-  function retireSourceAfterPublish(identity, src, dest) {
-    const published = fileIdentity(dest);
+  function rollbackEvidence(target) {
+    const evidence = fileEvidence(target);
+    // Deterministically model inode reuse in regression tests without allowing a
+    // hook to alter the content proof used by production rollback decisions.
+    if (!testHooks.rollbackFileIdentity) return evidence;
+    const projected = testHooks.rollbackFileIdentity(target, evidence);
+    return { ...evidence, dev: projected.dev, ino: projected.ino };
+  }
+
+  function retireSourceAfterPublish(identity, src, dest, expectedHash) {
+    const published = rollbackEvidence(dest);
+    if (published.hash !== expectedHash) {
+      throw closeSplitStore(
+        identity,
+        src,
+        dest,
+        new Error("completed publication did not retain its exact intended bytes"),
+        null
+      );
+    }
     try {
       if (testHooks.beforeUnlinkSource) testHooks.beforeUnlinkSource(src);
       fs.unlinkSync(src);
@@ -1092,17 +1122,18 @@ function createLocalAdapter(options = {}) {
   }
 
   // Undo exactly the copy this close created. Re-stat the destination first: if
-  // it vanished the source already survives alone; if its inode no longer matches
-  // our publication an external writer replaced it and we must not erase it.
+  // it vanished the source already survives alone; if either its inode OR exact
+  // SHA-256 content differs from our publication, an external writer replaced it
+  // (including Linux inode reuse) and we must not erase it.
   function rollbackPublishedCopy(identity, src, dest, published, unlinkError) {
     let live;
     try {
-      live = fileIdentity(dest);
+      live = rollbackEvidence(dest);
     } catch (statError) {
       if (statError.code === "ENOENT") throw closeSourceRetained(identity, src, unlinkError);
       throw closeSplitStore(identity, src, dest, unlinkError, statError);
     }
-    if (!sameFileIdentity(live, published)) {
+    if (!sameFileEvidence(live, published)) {
       throw closeSplitStore(identity, src, dest, unlinkError, null);
     }
     try {
@@ -1302,6 +1333,7 @@ function createLocalAdapter(options = {}) {
 
       const entries = applyFrontmatterChanges(currentEntries, { status: DONE_STATUS });
       const doneContent = `${stringifyFrontmatter(entries, split.eol)}${split.body}`;
+      const destHash = contentHash(doneContent);
       const dest = path.join(dirPath(COMPLETED_DIR), activeEntry.file);
       // Journal only the validated relative identity/filename plus the exact
       // bytes we intend to publish (destHash). A crash anywhere between here and
@@ -1315,11 +1347,11 @@ function createLocalAdapter(options = {}) {
         id: identity.id,
         ref: identity.ref,
         file: activeEntry.file,
-        destHash: contentHash(doneContent),
+        destHash,
       });
       try {
         publishNewFile(dirPath(COMPLETED_DIR), activeEntry.file, doneContent);
-        retireSourceAfterPublish(identity, src, dest);
+        retireSourceAfterPublish(identity, src, dest, destHash);
       } catch (error) {
         removeCloseMarker();
         throw error;

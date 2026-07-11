@@ -548,7 +548,7 @@ describe("local close — unlink failure compensation and recovery", () => {
     assert.match(read(backlogDir, "completed", "BACK-1 - one.md"), /^status: Done$/m);
   });
 
-  it("does not erase an externally replaced completed destination during rollback", (t) => {
+  it("does not erase a byte-different replacement even when rollback sees the same dev and inode", (t) => {
     const { backlogDir } = makeStore(t, {
       seedTasks: [["BACK-1 - one.md", taskFile({ id: 1, title: "One", body: "\n## Description\nactive\n" })]],
     });
@@ -558,8 +558,14 @@ describe("local close — unlink failure compensation and recovery", () => {
       backlogDir,
       now: FIXED_NOW,
       testHooks: {
+        rollbackFileIdentity() {
+          // Model Linux immediately reusing the publication's dev+ino for the
+          // replacement. Content evidence must independently veto deletion.
+          return { dev: 7, ino: 11 };
+        },
         beforeUnlinkSource() {
-          // Simulate another writer swapping our fresh publication for their own inode.
+          // Simulate another writer swapping our fresh publication while the
+          // filesystem reports the same projected identity for both files.
           fs.rmSync(completedPath);
           fs.writeFileSync(completedPath, external);
           throw new Error("injected source unlink failure");
