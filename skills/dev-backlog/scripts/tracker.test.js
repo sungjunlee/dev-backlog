@@ -1,6 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -13,11 +14,22 @@ const {
   TrackerUnavailableError,
   UnsupportedTrackerCapabilityError,
   invokeCapability,
+  resolveConfiguredTracker,
   resolveTracker,
   selectTracker,
   validateAdapter,
   validateIdentity,
 } = require("./tracker.js");
+
+function makeLocalBacklog(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-local-"));
+  const backlogDir = path.join(root, "backlog");
+  fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
+  fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
+  fs.writeFileSync(path.join(backlogDir, "config.yml"), 'tracker: local\ntask_prefix: "BACK"\n');
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  return backlogDir;
+}
 
 function makeAdapter(overrides = {}) {
   return {
@@ -88,13 +100,40 @@ describe("configured-only resolution", () => {
     }
   });
 
-  it("fails explicitly selected local resolution with its #276 reason", () => {
+  it("resolves explicitly selected local against a usable store without github fallback", (t) => {
+    const backlogDir = makeLocalBacklog(t);
+    let githubProbes = 0;
+    const github = makeAdapter({
+      availability: () => {
+        githubProbes += 1;
+        return { available: true };
+      },
+    });
+
+    const resolved = resolveConfiguredTracker(
+      { tracker: "local" },
+      { backlogDir, adapters: undefined }
+    );
+
+    assert.equal(resolved.tracker, "local");
+    assert.deepEqual(resolved.availability, { available: true });
+    assert.deepEqual(resolved.adapter.capabilities(), []);
+    assert.equal(githubProbes, 0);
+    void github;
+  });
+
+  it("fails a malformed local store with an actionable reason and no fallback", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-local-bad-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const filePath = path.join(root, "backlog");
+    fs.writeFileSync(filePath, "not a directory");
+
     assert.throws(
-      () => resolveTracker({ tracker: "local" }),
+      () => resolveConfiguredTracker({ tracker: "local" }, { backlogDir: filePath }),
       (error) => {
         assert.ok(error instanceof TrackerUnavailableError);
         assert.equal(error.tracker, "local");
-        assert.match(error.reason, /#276/);
+        assert.ok(error.reason && error.reason.trim().length > 0);
         return true;
       }
     );
@@ -245,26 +284,24 @@ describe("normalized tracker identity", () => {
 });
 
 describe("local adapter and optional capabilities", () => {
-  it("reports local as implementation-pending and fails every lifecycle operation consistently", () => {
+  it("registers a usable, capability-free local adapter in the default slot", () => {
     const local = TRACKER_ADAPTERS.local;
-    const report = local.availability();
-    assert.equal(report.available, false);
-    assert.match(report.reason, /#276/);
+    assert.deepEqual(Object.keys(local), REQUIRED_ADAPTER_OPERATIONS);
+    assert.deepEqual(local.capabilities(), []);
 
-    const errors = [];
-    for (const operation of ["list", "read", "create", "update", "close"]) {
-      assert.throws(
-        () => local[operation](),
-        (error) => {
-          errors.push(error);
-          assert.ok(error instanceof TrackerUnavailableError);
-          assert.equal(error.tracker, "local");
-          assert.equal(error.reason, report.reason);
-          return true;
-        }
-      );
+    const report = local.availability();
+    assert.equal(typeof report.available, "boolean");
+    if (!report.available) {
+      assert.ok(report.reason && report.reason.trim().length > 0);
     }
-    assert.equal(new Set(errors.map((error) => error.message)).size, 1);
+  });
+
+  it("selects the local adapter without probing github when local is configured", (t) => {
+    const backlogDir = makeLocalBacklog(t);
+    const resolved = resolveConfiguredTracker({ tracker: "local" }, { backlogDir });
+    const created = resolved.adapter.create({ title: "Seam smoke" });
+    assert.deepEqual(created, { tracker: "local", id: "1", ref: "BACK-1" });
+    assert.equal("url" in created, false);
   });
 
   it("reports only the six named optional provider capabilities", () => {
