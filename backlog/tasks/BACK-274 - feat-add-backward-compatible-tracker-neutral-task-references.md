@@ -1,7 +1,7 @@
 ---
 id: BACK-274
 title: 'feat: add backward-compatible tracker-neutral task references'
-status: To Do
+status: Done
 labels:
   - enhancement
 priority: medium
@@ -19,12 +19,12 @@ Introduce tracker-neutral task references and additive JSON identity while prese
 
 ## Acceptance Criteria
 
-- [ ] The sprint parser accepts legacy GitHub `#N` references and local canonical `{PREFIX}-N` references without ambiguous partial matches.
-- [ ] Machine state adds normalized tracker/task identity fields while retaining `issue_number` unchanged for GitHub entries.
-- [ ] Existing GitHub sprint markdown renders byte-for-byte compatible plan references unless a caller opts into normalized fields.
-- [ ] Progress age matching, exact task-file lookup, next-batch grouping, mirror rendering, and closeout use one normalized task-ref implementation.
-- [ ] Tests cover `#1` vs `#11`, `BACK-1` vs `BACK-11`, decimal subtask IDs where supported, invalid refs, and mixed legacy fixtures.
-- [ ] The actor integration contract documents additive fields, compatibility aliases, and local reference grammar.
+- [x] The sprint parser accepts legacy GitHub `#N` references and local canonical `{PREFIX}-N` references without ambiguous partial matches.
+- [x] Machine state adds normalized tracker/task identity fields while retaining `issue_number` unchanged for GitHub entries.
+- [x] Existing GitHub sprint markdown renders byte-for-byte compatible plan references unless a caller opts into normalized fields.
+- [x] Progress age matching, exact task-file lookup, next-batch grouping, mirror rendering, and closeout use one normalized task-ref implementation.
+- [x] Tests cover `#1` vs `#11`, `BACK-1` vs `BACK-11`, decimal subtask IDs where supported, invalid refs, and mixed legacy fixtures.
+- [x] The actor integration contract documents additive fields, compatibility aliases, and local reference grammar.
 
 ## Non-Goals
 
