@@ -112,4 +112,5 @@ The accepted adapter seam must still prove backward-compatible task references a
 - Capability contracts: [`capabilities.md`](capabilities.md)
 - Sprint execution contract: [`../skills/dev-backlog/SKILL.md`](../skills/dev-backlog/SKILL.md)
 - Machine consumption contract and JSON schema: [`../skills/dev-backlog/references/integration-contract.md`](../skills/dev-backlog/references/integration-contract.md)
+- Tracker adapter contract and GitHub compatibility inventory: [`../docs/tracker-adapter-design.md`](../docs/tracker-adapter-design.md)
 - Spec-system rationale: [`../docs/spec-system-design.md`](../docs/spec-system-design.md)
