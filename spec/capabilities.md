@@ -10,6 +10,41 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 
 ---
 
+## Capability: tracker-task-truth
+
+**Goal:** A repository explicitly selects one canonical task tracker and completes the same core sprint cycle without hidden synchronization or provider-specific assumptions leaking into sprint execution.
+
+**In-scope:**
+- Persisted tracker selection and availability probing
+- Normalized list/read/create/update/close task lifecycle
+- Stable task identity, display references, links, and capability reporting
+- `github` and `local` adapters
+
+**Out-of-scope:**
+- Synchronizing multiple canonical trackers
+- GitLab, Gitea, Forgejo, Jira, Linear, or Notion adapters before the seam is proven
+- Provider-specific milestones, PR links, mirror issues, progress issues, and close-keyword semantics
+
+### Expected Behaviors
+- Setup persists exactly one tracker selection, and every later command uses that selection or fails with an actionable availability error.
+- `github` and `local` expose the same normalized task lifecycle and stable task references needed by create, plan, work, and complete operations.
+- Capability discovery reports optional features explicitly so callers either invoke supported behavior or return a clear unsupported-capability result.
+
+### Hard Constraints
+- Runtime never silently changes the configured tracker or treats two task stores as co-authoritative.
+- The normalized interface never fabricates provider semantics; unsupported milestones, PR relationships, publications, and closing links fail clearly.
+
+### Learnings
+<!-- LEARN:BEGIN -->
+<!-- LEARN:END -->
+
+### Decisions
+| date | decision | rationale | supersedes |
+| --- | --- | --- | --- |
+| 2026-07-11 | Admit `tracker-task-truth` as a separate capability from `backlog-sync` | canonical ownership and task lifecycle are required in every mode; mirroring and publication are optional transport behaviors | — |
+
+---
+
 ## Capability: sprint-execution
 
 **Goal:** An agent or human resuming work mid-session reads the active sprint file and acts on its in-flight items without re-asking what is going on.
@@ -48,16 +83,17 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 
 ## Capability: backlog-sync
 
-**Goal:** GitHub Issues and local backlog state mirror each other in both directions — issues into `backlog/tasks/*.md`, the active sprint out to a machine-managed mirror issue — without either direction ever diverging human-authored content.
+**Goal:** Canonical tracker tasks are materialized locally and supported execution state is explicitly published without either direction ever diverging human-authored content.
 
 **In-scope:**
-- `sync-pull.js` (with and without `--update`), task-file frontmatter (number, title, labels, milestone, assignees)
+- `sync-pull.js` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
 - AC checkbox preservation in task bodies for non-machine-managed issues
 - `sprint-mirror.js`: explicit publish of the single active sprint to a marker-identified (`<!-- dev-backlog:sprint-mirror sprint=<slug> -->`) read-only mirror issue
 - Idempotent re-runs in both directions against unchanged state
 
 **Out-of-scope:**
-- Writing to human-authored GitHub content (issue bodies without a dev-backlog machine marker, comments, labels, state)
+- Canonical task ownership and lifecycle (`tracker-task-truth` capability)
+- Writing to human-authored provider content (task bodies without a dev-backlog machine marker, comments, labels, state)
 - Monthly progress-issue lifecycle (`task-progress-reporting` capability)
 - Cross-repo mirroring
 
