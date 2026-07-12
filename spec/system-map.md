@@ -47,8 +47,8 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 1. **Setup:** create minimum directories and persist exactly one tracker; never migrate task files.
 2. **Create/read/update/close:** call the configured adapter's required lifecycle and carry normalized `{ tracker, id, ref, url? }` identity.
 3. **Materialize:** GitHub mode explicitly mirrors canonical issues through `sync-pull.js`; local mode already stores canonical Markdown and has no provider sync.
-4. **Plan/orient:** write normalized refs into the active sprint; consume state via `status.sh --json` / `next.sh --json`.
-5. **Complete:** close the canonical task, check the Plan, run `sprint-close.sh`, archive remaining checked task files, and retain sprint history.
+4. **Plan/orient:** write normalized refs into the active track's sprint file; consume state via `status.sh --json` / `next.sh --json` (`--track` selects among multiple disjoint-scope tracks).
+5. **Complete:** close the canonical task, check the Plan, run `sprint-close.sh` (`--track` when multiple tracks are active), archive remaining checked task files, and retain sprint history.
 6. **Publish/enrich:** milestones, PR relationships, sprint mirrors, Progress issues, comments, and closing semantics run only when reported. Unsupported requests return the shared typed error before effects.
 7. **Groom/spec:** triage stays advisory by default; doctor/reassess may recommend spec work but do not mutate durable specs automatically.
 

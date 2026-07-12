@@ -25,7 +25,7 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - [x] #293 Phase 1c: backlog-doctor active_sprint → scope-disjointness check → PR #305 (merged)
 
 ### Batch 4 — Spec amendment (HUMAN-GATED)
-- [ ] #294 Phase 1e: amend capabilities.md singleton invariant
+- [x] #294 Phase 1e: amend capabilities.md singleton invariant → PR #308 (human-run spec-grill pass 2026-07-12)
 
 ### Batch 5 — Docs + contract
 - [ ] #295 Phase 3: docs + integration-contract schema_version → 2
@@ -44,3 +44,4 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - 2026-07-12: Batches 1–2 landed while the sprint file was held: #290 RED gate (PR #297), #291 Phase 1a resolvers (PR #300) — sprint-state schema 2, portfolio + --track/--component, scopesOverlap in lib.js.
 - 2026-07-12: #293 Phase 1c landed (PR #305) — doctor scope-disjointness with per-track fan-out; GATE_MT_DISJOINT/GATE_MT_OVERLAP enforced, smoke 172/172, 0 xfail; single-active output verified byte-identical. Sprint file re-added as sole active.
 - 2026-07-12: #292 Phase 1b — sprint-init refuses only on scope overlap (--scope flag, D2 explicit), sprint-close/--track, sprint-mirror/--track; init/close single-track G4 verified byte-identical (text + exit codes + written files); fixed the cwd-dependent sprint-init.test.js #13 rot. Smoke 187/187.
+- 2026-07-12: #294 human-gated spec-grill pass — capabilities.md sprint-execution invariant flipped to track-partitioned scope disjointness, backlog-sync sprint-mirror predicate rewritten per-track, header notes component: as the track-scope key; Decisions rows appended in both capabilities; system-map Core Flows 4/5 de-singularized (the originally cited :36 line no longer existed post tracker-adapter refactor). Unblocks #295.
