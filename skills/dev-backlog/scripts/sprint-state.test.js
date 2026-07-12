@@ -69,7 +69,7 @@ Expose actor-readable execution state.
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
-    assert.equal(state.schema_version, 1);
+    assert.equal(state.schema_version, 2);
     assert.equal(state.active_sprint.path, sprintPath);
     assert.equal(state.active_sprint.frontmatter.status, "active");
     assert.deepEqual(state.active_sprint.frontmatter.objectives, ["O1", "O2"]);
@@ -118,14 +118,65 @@ Expose actor-readable execution state.
     }]);
   });
 
-  it("throws on ambiguous active sprint state", () => {
+  it("returns a portfolio for multiple disjoint active tracks, ordered by started", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "auth.md"),
+      "---\nstatus: active\nstarted: 2026-07-02\ncomponent: \"auth\"\n---\n"
+    );
+    writeFile(
+      path.join(backlogDir, "sprints", "billing.md"),
+      "---\nstatus: active\nstarted: 2026-07-01\ncomponent: \"billing\"\n---\n"
+    );
+
+    const state = readSprintState({ backlogDir });
+    assert.equal(state.schema_version, 2);
+    assert.equal(state.active_sprint, null);
+    assert.equal(state.active_sprints.length, 2);
+    assert.deepEqual(
+      state.active_sprints.map((s) => s.active_sprint.frontmatter.component),
+      ["billing", "auth"]
+    );
+  });
+
+  it("returns a portfolio for two scopeless active tracks (cannot prove overlap)", () => {
     writeFile(path.join(backlogDir, "sprints", "a.md"), "---\nstatus: active\n---\n");
     writeFile(path.join(backlogDir, "sprints", "b.md"), "---\nstatus: active\n---\n");
 
+    const state = readSprintState({ backlogDir });
+    assert.equal(state.active_sprints.length, 2);
+    assert.equal(state.active_sprint, null);
+  });
+
+  it("throws OVERLAPPING_TRACKS when two active tracks share scope", () => {
+    writeFile(path.join(backlogDir, "sprints", "a.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
+    writeFile(path.join(backlogDir, "sprints", "b.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
+
     assert.throws(
       () => readSprintState({ backlogDir }),
-      /Multiple active sprint files found/
+      /Active tracks overlap on scope/
     );
+  });
+
+  it("resolves a single track by --component or --track slug", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "auth.md"),
+      "---\nstatus: active\nstarted: 2026-07-02\ncomponent: \"auth\"\n---\n"
+    );
+    writeFile(
+      path.join(backlogDir, "sprints", "billing.md"),
+      "---\nstatus: active\nstarted: 2026-07-01\ncomponent: \"billing\"\n---\n"
+    );
+
+    const byComponent = readSprintState({ backlogDir, component: "auth" });
+    assert.equal(byComponent.active_sprint.frontmatter.component, "auth");
+    assert.equal(byComponent.active_sprints.length, 1);
+
+    const byTrackSlug = readSprintState({ backlogDir, track: "billing" });
+    assert.equal(byTrackSlug.active_sprint.frontmatter.component, "billing");
+
+    const noMatch = readSprintState({ backlogDir, component: "missing" });
+    assert.equal(noMatch.active_sprint, null);
+    assert.deepEqual(noMatch.active_sprints, []);
   });
 
   it("uses the configured prefix for mixed GitHub and local Plan identities", () => {
@@ -149,7 +200,7 @@ started: 2026-07-01
       today: new Date("2026-07-04T00:00:00Z"),
     });
 
-    assert.equal(state.schema_version, 1);
+    assert.equal(state.schema_version, 2);
     assert.deepEqual(state.plan_items.map(({ tracker, id, ref, issue_number }) => ({
       tracker, id, ref, issue_number,
     })), [

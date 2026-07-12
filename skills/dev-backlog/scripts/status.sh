@@ -8,15 +8,21 @@ source "$SCRIPT_DIR/lib.sh"
 
 BACKLOG_DIR="backlog"
 JSON=0
-for arg in "$@"; do
-  if [ "$arg" = "--json" ]; then
-    JSON=1
-  else
-    BACKLOG_DIR="$arg"
-  fi
+TRACK=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --json) JSON=1 ;;
+    --track) shift; TRACK="${1:-}" ;;
+    --track=*) TRACK="${1#--track=}" ;;
+    *) BACKLOG_DIR="$1" ;;
+  esac
+  shift
 done
 
 if [ "$JSON" -eq 1 ]; then
+  if [ -n "$TRACK" ]; then
+    exec node "$SCRIPT_DIR/sprint-state.js" --mode status --track "$TRACK" "$BACKLOG_DIR"
+  fi
   exec node "$SCRIPT_DIR/sprint-state.js" --mode status "$BACKLOG_DIR"
 fi
 
@@ -25,12 +31,26 @@ SPRINTS_DIR="$BACKLOG_DIR/sprints"
 # --- Active Sprint ---
 echo "=== Active Sprint ==="
 if [ -d "$SPRINTS_DIR" ]; then
-  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
-  ACTIVE_STATUS=$?
+  if [ -n "$TRACK" ]; then
+    ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+    if [ -z "$ACTIVE" ]; then ACTIVE_STATUS=1; else ACTIVE_STATUS=0; fi
+  else
+    ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+    ACTIVE_STATUS=$?
+  fi
   if [ "$ACTIVE_STATUS" -eq 2 ]; then
-    echo "!! Multiple active sprints found. Resolve before continuing:"
+    ACTIVE_COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
+    echo "$ACTIVE_COUNT active tracks (portfolio):"
     find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
-      echo "  - $(basename "$sprint")"
+      [ -z "$sprint" ] && continue
+      NAME=$(basename "$sprint" .md)
+      count_checkboxes "$sprint"
+      if [ "$CB_TOTAL" -gt 0 ]; then PCT=$((CB_DONE * 100 / CB_TOTAL)); else PCT=0; fi
+      if [ "$CB_IN_FLIGHT" -gt 0 ]; then
+        echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%) — $CB_IN_FLIGHT in-flight"
+      else
+        echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%)"
+      fi
     done
   elif [ "$ACTIVE_STATUS" -eq 0 ]; then
     SPRINT_NAME=$(basename "$ACTIVE" .md)
@@ -67,7 +87,11 @@ if [ -d "$SPRINTS_DIR" ]; then
       echo ">> All items done — ready to close sprint"
     fi
   else
-    echo "(no active sprint)"
+    if [ -n "$TRACK" ]; then
+      echo "(no active track matches '$TRACK')"
+    else
+      echo "(no active sprint)"
+    fi
   fi
 else
   echo "(no backlog/sprints/ directory)"

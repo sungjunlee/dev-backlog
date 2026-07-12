@@ -62,6 +62,23 @@ find_active_sprint() {
   printf "%s\n" "$active"
 }
 
+# Print the active sprint file whose slug (basename) or component: matches $2.
+# Return 0 and print the path when found; return 1 when no active track matches.
+# Usage: SPRINT=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+resolve_track() {
+  local sprints_dir="$1" track="$2" f slug component
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    slug=$(basename "$f" .md)
+    component=$(awk -F': *' '/^component:/{gsub(/["'"'"']/,"",$2); print $2; exit}' "$f")
+    if [ "$slug" = "$track" ] || [ "$component" = "$track" ]; then
+      printf '%s\n' "$f"
+      return 0
+    fi
+  done < <(find_active_sprints "$sprints_dir")
+  return 1
+}
+
 # Count checkbox states in a sprint file through the shared task-ref parser.
 # Sets: CB_TOTAL, CB_DONE, CB_IN_FLIGHT, CB_TODO
 # Usage: count_checkboxes "$FILE"

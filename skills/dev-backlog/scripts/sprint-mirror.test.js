@@ -39,7 +39,7 @@ function planItem(overrides = {}) {
 
 function sprintState(overrides = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     active_sprint: {
       path: "backlog/sprints/2026-07-sample-sprint.md",
       frontmatter: { status: "active" },
@@ -155,7 +155,7 @@ describe("resolveSprintState", () => {
   });
 
   it("rejects an unsupported schema_version", () => {
-    const { execFile } = makeExecFile({ state: { ...sprintState(), schema_version: 2 } });
+    const { execFile } = makeExecFile({ state: { ...sprintState(), schema_version: 99 } });
     assert.throws(() => resolveSprintState({ execFile }), /Unsupported sprint-state schema_version/);
   });
 
