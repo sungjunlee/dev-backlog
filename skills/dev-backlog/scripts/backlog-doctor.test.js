@@ -71,11 +71,13 @@ ${sections}
 }
 
 // A sprint whose spec-axis frontmatter keys can each be present-empty, present-
-// valued, or fully omitted (pass no value). Used to exercise the B3 omission paths.
-function sprintNoSpecFields({ objectives, component } = {}) {
+// valued, or fully omitted (pass no value). Used to exercise the B3 omission
+// paths and, via scope:, the multi-track disjointness paths (#293).
+function sprintNoSpecFields({ objectives, component, scope, plan = "- [ ] #1 Ship the health check" } = {}) {
   const fm = ["---", "status: active", "started: 2026-07-03"];
   if (objectives !== undefined) fm.push(`objectives: ${objectives}`);
   if (component !== undefined) fm.push(`component: "${component}"`);
+  if (scope !== undefined) fm.push(`scope: ${scope}`);
   fm.push("---");
   return `${fm.join("\n")}
 
@@ -85,7 +87,7 @@ function sprintNoSpecFields({ objectives, component } = {}) {
 Keep the sprint healthy.
 
 ## Plan
-- [ ] #1 Ship the health check
+${plan}
 
 ## Running Context
 - Follow existing script contracts.
@@ -173,17 +175,97 @@ describe("runDoctor", () => {
       "context_bloat",
     ]);
     assert.ok(formatHumanSummary(report).includes("[PASS] active_sprint"));
+    // G4: a single active track never grows track tags (text and JSON alike).
+    assert.ok(report.checks.every((item) => item.track === undefined));
   });
 
-  it("fails on ambiguous active sprint state", () => {
+  it("fails when two active tracks share the same component (scope overlap, #293)", () => {
     seedCleanRepo(repoRoot);
     write(path.join(repoRoot, "backlog", "sprints", "2026-07-second.md"), sprint());
 
     const report = runDoctor({ repoRoot });
 
     assert.equal(check(report, "active_sprint").status, "fail");
-    assert.match(check(report, "active_sprint").detail.summary, /Multiple active sprint files/);
+    assert.match(check(report, "active_sprint").detail.summary, /Active tracks overlap on scope/);
     assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("passes disjoint-scope active tracks as a portfolio and fans per-sprint checks out per track (#293)", () => {
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),
+      sprintNoSpecFields({ scope: '["src/auth/**"]' }),
+    );
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-billing.md"),
+      sprintNoSpecFields({ scope: '["src/billing/**"]' }),
+    );
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    assert.equal(check(report, "active_sprint").status, "pass");
+    assert.match(check(report, "active_sprint").detail.summary, /2 active tracks, scopes disjoint/);
+    assert.equal(exitCodeFor(report), 0);
+
+    for (const name of ["objectives_check", "component_lint", "sprint_shape", "in_flight_trace", "in_flight_staleness"]) {
+      const fanned = report.checks.filter((item) => item.name === name);
+      assert.equal(fanned.length, 2, `${name} should run once per track`);
+      assert.deepEqual(fanned.map((item) => item.track), ["2026-07-auth", "2026-07-billing"]);
+    }
+    assert.match(formatHumanSummary(report), /\[PASS\] sprint_shape \[2026-07-auth\]/);
+  });
+
+  it("tags per-track verdicts so a warn names the track it belongs to (#293)", () => {
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),
+      sprintNoSpecFields({ scope: '["src/auth/**"]', plan: "- [~] #1 Needs a pointer" }),
+    );
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-billing.md"),
+      sprintNoSpecFields({ scope: '["src/billing/**"]' }),
+    );
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    const traces = report.checks.filter((item) => item.name === "in_flight_trace");
+    assert.deepEqual(
+      traces.map((item) => [item.track, item.status]),
+      [["2026-07-auth", "warn"], ["2026-07-billing", "pass"]],
+    );
+    assert.equal(exitCodeFor(report), 0);
+  });
+
+  it("fails when active tracks overlap via nested scope globs (#293)", () => {
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-auth-a.md"),
+      sprintNoSpecFields({ scope: '["src/auth/**"]' }),
+    );
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-auth-b.md"),
+      sprintNoSpecFields({ scope: '["src/auth/api/**"]' }),
+    );
+
+    const report = runDoctor({ repoRoot });
+
+    assert.equal(check(report, "active_sprint").status, "fail");
+    assert.match(check(report, "active_sprint").detail.summary, /Active tracks overlap on scope/);
+    assert.deepEqual(check(report, "active_sprint").detail.overlapping_files, [
+      "backlog/sprints/2026-07-auth-a.md",
+      "backlog/sprints/2026-07-auth-b.md",
+    ]);
+    assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("warns informationally when two or more active tracks are scopeless (cannot prove disjoint, #293)", () => {
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-two.md"), sprintNoSpecFields());
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    const activeCheck = check(report, "active_sprint");
+    assert.equal(activeCheck.status, "warn");
+    assert.equal(activeCheck.informational, true);
+    assert.match(activeCheck.detail.summary, /cannot prove disjoint/);
+    assert.equal(exitCodeFor(report), 0);
   });
 
   it("warns when existing sprint files contain no active sprint because that is normal between sprints", () => {
