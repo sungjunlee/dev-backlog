@@ -1154,16 +1154,17 @@ fi
 gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$GATE_A2A3" "$A2A3_RES"
 
 # ============================================================
-# multi-track sprints RED gate (PRD 2026-07-multi-track-sprints, #290)
+# multi-track sprints gates (PRD 2026-07-multi-track-sprints, #290)
 # ============================================================
 # Two disjoint-scope sprints may be active at once (a portfolio); overlapping
-# scopes fail with a NEW message. RED against HEAD (single-active only). Flip
-# each gate when its fix lands. NOTE: exit-fail alone is not a valid RED signal
-# for the overlap case — HEAD already fails on ANY two actives with a DIFFERENT
-# message ("Multiple active sprint files found"), so the overlap fixture keys on
-# the new "Active tracks overlap on scope" message, not the exit code (#290 B2).
-GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-0}"  # flip when #291+#293 land: doctor passes on disjoint-scope tracks
-GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-0}"    # flip when #293 lands: doctor emits the scope-overlap message
+# scopes fail with the doctor's scope-overlap message. Born RED at #290;
+# enforced since #293 landed the doctor disjointness rewrite. NOTE: exit-fail
+# alone was never a valid signal for the overlap case — pre-#293 HEAD already
+# failed on ANY two actives with a DIFFERENT message ("Multiple active sprint
+# files found"), so the overlap fixture keys on the active_sprint verdict's
+# "Active tracks overlap on scope" message, not the exit code (#290 B2).
+GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-1}"  # #291+#293 landed: enforced — doctor passes on disjoint-scope tracks
+GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-1}"    # #293 landed: enforced — doctor active_sprint verdict emits the scope-overlap message
 
 # helper: write a minimal, shape-valid active sprint with a given scope
 mt_write_sprint() { # dir file title issue scope_yaml
@@ -1229,6 +1230,60 @@ const summary = (c && c.detail && c.detail.summary) || "";
 process.exit(/Active tracks overlap on scope/.test(summary) ? 0 : 1);
 ' 2>/dev/null; then MT_OVERLAP_RES="pass"; else MT_OVERLAP_RES="fail"; fi
 gated_assert "multi-track: doctor active_sprint verdict emits scope-overlap message (#293 B2)" "$GATE_MT_OVERLAP" "$MT_OVERLAP_RES"
+
+# (2b) #293 enforced extras: a disjoint portfolio is fully healthy (exit 0) and
+#      the per-sprint checks fan out per active track with track-tagged verdicts.
+set +e
+OUT=$(cd "$MT_DISJOINT_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
+STATUS=$?
+set -e
+assert_equals "multi-track #293: doctor exit code on disjoint portfolio" "$STATUS" "0"
+assert_json_eval "multi-track #293: per-sprint checks fan out per track with track tags" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const shapes = (j.checks || []).filter((c) => c.name === "sprint_shape");
+if (shapes.length !== 2) process.exit(1);
+const tags = shapes.map((c) => c.track).sort();
+if (tags[0] !== "2026-07-auth" || tags[1] !== "2026-07-billing") process.exit(1);
+'
+
+# (2c) Two scopeless active tracks: cannot prove disjoint → informational warn,
+#      never a fail (#293; matches the between-sprints informational stance).
+MT_SCOPELESS_DIR="$TEST_DIR/mt-scopeless"
+mkdir -p "$MT_SCOPELESS_DIR/backlog/sprints"
+for slug in one two; do
+  cat > "$MT_SCOPELESS_DIR/backlog/sprints/2026-07-$slug.md" << EOF
+---
+milestone: mt
+status: active
+started: 2026-07-01
+---
+
+# Scopeless $slug
+
+## Goal
+Scopeless $slug done.
+
+## Plan
+- [ ] #9 Scopeless $slug task
+
+## Running Context
+- none
+
+## Progress
+- 2026-07-01: opened.
+EOF
+done
+set +e
+OUT=$(cd "$MT_SCOPELESS_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
+STATUS=$?
+set -e
+assert_equals "multi-track #293: scopeless pair doctor exit code" "$STATUS" "0"
+assert_json_eval "multi-track #293: scopeless pair warns informationally (cannot prove disjoint)" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+const c = (j.checks || []).find((x) => x.name === "active_sprint");
+if (!c || c.status !== "warn" || c.informational !== true) process.exit(1);
+if (!/cannot prove disjoint/.test(c.detail.summary)) process.exit(1);
+'
 
 # (3) Back-compat (ENFORCED, GATE=1 — must stay GREEN on HEAD and after Phase 1).
 #     A single active track behaves exactly as today; this is the G4 text anchor

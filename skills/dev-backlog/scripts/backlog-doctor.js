@@ -13,7 +13,8 @@ const {
   extractSectionLines,
   hasSection,
   parsePlanItem,
-  readSprintState,
+  parseFrontmatter,
+  parseSprintContent,
 } = require("./sprint-state.js");
 const { checkObjectives } = require("./objectives-check.js");
 const {
@@ -24,7 +25,7 @@ const {
   analyzeCapabilities,
   hasHardFailures: hasCapabilityHardFailures,
 } = require("./capabilities-doctor.js");
-const { readConfig } = require("./lib.js");
+const { readConfig, sprintScopeKey, scopesOverlap } = require("./lib.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_BACKLOG_DIR = "backlog";
@@ -157,26 +158,43 @@ function runDoctor({
   const sprintsDir = path.join(backlogPath, "sprints");
   const capabilitiesPath = path.join(root, "spec", "capabilities.md");
 
-  const active = checkActiveSprint({ repoRoot: root, sprintsDir });
-  const sprintState = loadSprintState({
-    activePath: active.detail.active_path,
-    backlogPath,
-    today,
+  const tracks = loadActiveTracks(sprintsDir);
+  const active = checkActiveSprint({ repoRoot: root, sprintsDir, tracks });
+
+  // Per-sprint checks fan out per active track (PRD §5.3): 0 or 1 active keeps
+  // today's single untagged run; N>1 runs each check once per track and tags
+  // the verdict with that track's slug.
+  const trackRuns = tracks.length > 0 ? tracks : [null];
+  const perTrack = trackRuns.map((track) => {
+    const activePath = track ? track.path : null;
+    const tag = tracks.length > 1 ? track : null;
+    const sprintState = loadSprintState({ activePath, backlogPath, today });
+    return {
+      objectives: tagTrack(checkObjectiveDrift({ repoRoot: root, sprintsDir, activePath }), tag),
+      component_lint: tagTrack(
+        checkComponentRouting({ repoRoot: root, sprintsDir, capabilitiesPath, activePath }),
+        tag,
+      ),
+      sprint_shape: tagTrack(
+        checkSprintShape({ repoRoot: root, backlogPath, activePath, activeStatus: active.status }),
+        tag,
+      ),
+      in_flight_trace: tagTrack(checkInFlightTrace({ sprintState, activeStatus: active.status }), tag),
+      in_flight_staleness: tagTrack(
+        checkInFlightStaleness({ sprintState, activeStatus: active.status, staleDays }),
+        tag,
+      ),
+    };
   });
 
   const checks = [
     active,
-    checkObjectiveDrift({ repoRoot: root, sprintsDir, activePath: active.detail.active_path }),
-    checkComponentRouting({ repoRoot: root, sprintsDir, capabilitiesPath, activePath: active.detail.active_path }),
+    ...perTrack.map((run) => run.objectives),
+    ...perTrack.map((run) => run.component_lint),
     checkCapabilities({ repoRoot: root, capabilitiesPath }),
-    checkSprintShape({
-      repoRoot: root,
-      backlogPath,
-      activePath: active.detail.active_path,
-      activeStatus: active.status,
-    }),
-    checkInFlightTrace({ sprintState, activeStatus: active.status }),
-    checkInFlightStaleness({ sprintState, activeStatus: active.status, staleDays }),
+    ...perTrack.map((run) => run.sprint_shape),
+    ...perTrack.map((run) => run.in_flight_trace),
+    ...perTrack.map((run) => run.in_flight_staleness),
     checkContextBloat({ repoRoot: root, sprintsDir, threshold: contextLineThreshold }),
   ];
 
@@ -213,14 +231,80 @@ function listSprintFiles(sprintsDir) {
     .sort();
 }
 
-function checkActiveSprint({ repoRoot, sprintsDir }) {
+// Active sprint files as track records: path + slug + parsed frontmatter, in
+// portfolio order (`started:` ascending per D4, filename as a stable tiebreaker
+// — same ordering as sprint-state.js).
+function loadActiveTracks(sprintsDir) {
+  return findActiveSprintFiles(sprintsDir)
+    .map((filePath) => ({
+      path: filePath,
+      slug: path.basename(filePath, ".md"),
+      frontmatter: parseFrontmatter(fs.readFileSync(filePath, "utf-8")),
+    }))
+    .sort(compareTracks);
+}
+
+function compareTracks(a, b) {
+  const sa = a.frontmatter.started || "";
+  const sb = b.frontmatter.started || "";
+  if (sa !== sb) return sa < sb ? -1 : 1;
+  return a.path < b.path ? -1 : 1;
+}
+
+function firstOverlappingTrackPair(tracks) {
+  for (let i = 0; i < tracks.length; i += 1) {
+    for (let j = i + 1; j < tracks.length; j += 1) {
+      if (scopesOverlap(tracks[i].frontmatter, tracks[j].frontmatter)) {
+        return [tracks[i], tracks[j]];
+      }
+    }
+  }
+  return null;
+}
+
+// N>1 only: tag a per-sprint verdict with the track it belongs to.
+function tagTrack(check, track) {
+  if (!track) return check;
+  return { ...check, track: track.slug };
+}
+
+function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(sprintsDir) }) {
   const sprintFiles = listSprintFiles(sprintsDir);
-  const activeFiles = findActiveSprintFiles(sprintsDir);
+  const activeFiles = tracks.map((track) => track.path);
   const displayActive = activeFiles.map((file) => displayPath(repoRoot, file));
 
-  if (activeFiles.length > 1) {
-    return verdict("active_sprint", "fail", {
-      summary: `Multiple active sprint files found (${activeFiles.length}).`,
+  if (tracks.length > 1) {
+    const overlap = firstOverlappingTrackPair(tracks);
+    if (overlap) {
+      const [a, b] = overlap;
+      return verdict("active_sprint", "fail", {
+        summary: `Active tracks overlap on scope: ${displayPath(repoRoot, a.path)} ∩ ${displayPath(repoRoot, b.path)}. Give them disjoint component:/scope: or close one before continuing.`,
+        active_files: displayActive,
+        overlapping_files: [displayPath(repoRoot, a.path), displayPath(repoRoot, b.path)],
+        sprint_count: sprintFiles.length,
+        active_path: null,
+      });
+    }
+
+    const scopeless = tracks.filter((track) => sprintScopeKey(track.frontmatter).kind === "none");
+    if (scopeless.length >= 2) {
+      // informational: scopeless tracks cannot be proven disjoint, but cannot
+      // be proven overlapping either; like the between-sprints zero-active
+      // state this stays out of the reassess-signal warn count.
+      return {
+        ...verdict("active_sprint", "warn", {
+          summary: `${tracks.length} active tracks, ${scopeless.length} without component:/scope:; cannot prove disjoint. Declare component: or scope: on each track.`,
+          active_files: displayActive,
+          scopeless_files: scopeless.map((track) => displayPath(repoRoot, track.path)),
+          sprint_count: sprintFiles.length,
+          active_path: null,
+        }),
+        informational: true,
+      };
+    }
+
+    return verdict("active_sprint", "pass", {
+      summary: `${tracks.length} active tracks, scopes disjoint.`,
       active_files: displayActive,
       sprint_count: sprintFiles.length,
       active_path: null,
@@ -384,11 +468,19 @@ function checkCapabilities({ repoRoot, capabilitiesPath }) {
   }
 }
 
+// Parse one track's sprint file directly (not via readSprintState, whose
+// no-selector read is portfolio-global and fails loud on overlapping tracks;
+// the doctor reports overlap itself via the active_sprint verdict).
 function loadSprintState({ activePath, backlogPath, today }) {
   if (!activePath) return { state: null, error: null };
   try {
     return {
-      state: readSprintState({ backlogDir: backlogPath, today }),
+      state: parseSprintContent({
+        sprintPath: activePath,
+        content: fs.readFileSync(activePath, "utf-8"),
+        today,
+        taskPrefix: readConfig(backlogPath).task_prefix,
+      }),
       error: null,
     };
   } catch (error) {
@@ -741,9 +833,10 @@ function exitCodeFor(report) {
 
 function formatHumanSummary(report) {
   const labels = { pass: "PASS", warn: "WARN", fail: "FAIL" };
-  const lines = report.checks.map((check) => (
-    `[${labels[check.status]}] ${check.name} - ${check.detail.summary}`
-  ));
+  const lines = report.checks.map((check) => {
+    const trackTag = check.track ? ` [${check.track}]` : "";
+    return `[${labels[check.status]}] ${check.name}${trackTag} - ${check.detail.summary}`;
+  });
   lines.push(`Exit hint: ${report.exit_hint}`);
   lines.push(
     `Reassess signal: ${report.reassess_signal.fired ? "fired" : "quiet"} - ${report.reassess_signal.reason}`,
