@@ -194,6 +194,32 @@ Users can log in and access protected API endpoints.
 
 The configured tracker handles task truth. The sprint file handles execution.
 
+## Multi-Track Sprints
+
+Most repos run one active sprint at a time, and nothing changes for them. But two workstreams that touch **disjoint code** don't have to serialize: since the 2026-07 multi-track change, sprints partition by *scope*, and multiple disjoint-scope tracks may be `status: active` at once.
+
+**When to open a second track:** the new work touches a different component or directory subtree than every current active track, and waiting for that sprint to close would just serialize unrelated work.
+
+**Declaring scope** (explicit, never inferred — one axis per track):
+
+```yaml
+component: "auth-system"   # primary scope key when a capability axis exists
+scope: ["src/auth/**"]     # explicit path globs otherwise (sprint-init.js --scope)
+```
+
+**The invariant:** no two active tracks may overlap — same `component:`, or colliding `scope:` globs (nested paths overlap). Overlap fails loud everywhere: `sprint-init.js` refuses to create the track, `backlog-doctor` fails with `Active tracks overlap on scope`, and JSON reads exit with `OVERLAPPING_TRACKS`. Two scopeless active tracks can't be *proven* disjoint, so the doctor warns (informationally) instead.
+
+**Working a portfolio:**
+
+```bash
+bash skills/dev-backlog/scripts/next.sh                      # portfolio: one stanza per track
+bash skills/dev-backlog/scripts/next.sh --track 2026-07-auth # one track, deterministic
+bash skills/dev-backlog/scripts/sprint-close.sh --track 2026-07-auth  # close just that track
+node skills/dev-backlog/scripts/sprint-mirror.js --track 2026-07-auth # mirror one track
+```
+
+`status.sh --json` / `next.sh --json` emit `schema_version: 2` with `active_sprints[]`; the single-track fields are retained and byte-compatible, so existing consumers keep working.
+
 ## Optional extensions
 
 The core loop above needs none of these. Add one only when you want its capability — each row prices what it adds and what it requires.

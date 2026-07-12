@@ -43,7 +43,7 @@ backlog/config.yml (one tracker: github | local)
 backlog/sprints/ <- shared execution hub in both modes
 ```
 
-- Exactly one sprint file may have `status: active`; scripts warn/refuse ambiguous active sprint state.
+- One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
 - Task files are thin mirrors in GitHub mode and canonical records in local mode. In both modes, decisions, progress, and cross-task context stay in the sprint file.
 - A missing `tracker:` key is the zero-migration GitHub compatibility default. Runtime failure never changes the selected tracker.
@@ -53,13 +53,14 @@ backlog/sprints/ <- shared execution hub in both modes
 
 ## Sprint File Contract
 
-One active sprint file in `backlog/sprints/YYYY-MM-<topic>.md` carries:
+Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` carries:
 
 | Section / field | Purpose | Completion check |
 | --- | --- | --- |
-| `status: active` | Marks the single active sprint | No other sprint is active. |
+| `status: active` | Marks an active track | No other active sprint overlaps this track's scope. |
 | `objectives: [O1]` | Charter Objective IDs advanced by the sprint | IDs exist and are actionable; omit the field entirely when no charter exists (see `references/spec-fallback.md`). |
-| `component: "slug"` | Primary capability and relay-Learnings routing handle | Resolves to one capability whose `## Learnings` block receives relay-merge entries; omit the field entirely when no capabilities file exists. |
+| `component: "slug"` | Primary capability handle, relay-Learnings routing, and the track-scope key | Resolves to one capability whose `## Learnings` block receives relay-merge entries; omit the field entirely when no capabilities file exists. |
+| `scope: ["glob"]` | Explicit path-glob track scope when no component axis fits (one axis per track, never both; never inferred) | Optional; declared via `sprint-init.js --scope`. Two scopeless active tracks draw an informational doctor warn. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and complete `#N` or `{PREFIX}-N[.M]` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
@@ -80,11 +81,11 @@ Full sprint and task-file examples live in `references/file-format.md`.
 ### Orient
 
 1. Read `_context.md` if present.
-2. Find the single active sprint; if none exists, list open tasks through the configured adapter and route to `plan`.
-3. Read the active sprint's Goal, Plan, Running Context, and latest Progress.
-4. Identify the next unchecked Plan item or route to `complete` when all items are done.
+2. Find the active sprint(s); if none exists, list open tasks through the configured adapter and route to `plan`.
+3. One active track: read its Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `next.sh`/`status.sh` render a portfolio (one stanza per track); use `--track <slug>` to work one track.
+4. Identify the next unchecked Plan item (per track) or route to `complete` when all items are done.
 
-Done when you can name the current sprint state and the next actionable batch.
+Done when you can name the current sprint state and the next actionable batch — per track when a portfolio is active.
 
 ### Create
 
@@ -98,10 +99,10 @@ local mirror; local mode already wrote the canonical task file.
 
 1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
 2. List/inspect open tasks. Use milestone selection only when the configured adapter reports `milestones`; local planning writes normalized refs directly and does not fabricate one.
-3. Create one active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:`. Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
-4. Refuse to create a second active sprint until the previous one is completed.
+3. Create the active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:` (or explicit `--scope` globs when no component axis fits). Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
+4. A second active track is refused only when its scope overlaps an existing active track; declare a disjoint `component:`/`scope:` to run tracks concurrently. A scopeless sprint next to a scopeless active track warns and allows (cannot prove overlap).
 
-Done when the sprint file is the single active execution hub and each planned issue has a clear batch position.
+Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
 
@@ -161,8 +162,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - `scripts/setup-dev-backlog.js` — persist the explicit canonical tracker without migrating task files.
 - `scripts/sync-pull.js` — materialize configured open tasks; in GitHub mode, preserve legacy mirrors.
 - `scripts/sprint-init.js` — create a milestone-backed sprint when supported; local plans are authored from normalized refs.
-- `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state.
-- `scripts/sprint-close.sh` — close the active sprint; prints the doctor/reassess summary.
+- `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
+- `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
 - `scripts/backlog-doctor.js` — aggregate health checks; JSON includes `reassess_signal`.
 
 ## References
@@ -180,8 +181,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 ## Eval Prompts (fresh-session recovery)
 
 - "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name latest Progress, and return the first unchecked batch.
-- "Plan a sprint when another sprint is already `status: active`." Expected: refuse or complete the old sprint first; never create a second active sprint.
-- "(Multi-track target — PRD 2026-07-multi-track-sprints, gated on #291/#293/#295) Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically; `backlog-doctor` passes because scopes are disjoint. Once this lands, the prior bullet's single-active refusal narrows to *overlapping-scope* tracks; disjoint tracks coexist.
+- "Plan a sprint whose scope overlaps a track that is already `status: active`." Expected: refuse, naming the conflicting track — declare a disjoint `component:`/`scope:` or complete the conflicting track first. Disjoint scopes are NOT refused; they open a second track.
+- "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically; `backlog-doctor` passes because scopes are disjoint.
 - "Cold adopter: a repo with open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
 - "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
 - "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: use `status.sh --json` and `next.sh --json` to name the active sprint, next actionable batch, and every in-flight `[~]` item with its owner/pointer (PR, branch, or run-id); if `--json` is unavailable, read the sprint file directly.
