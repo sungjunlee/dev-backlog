@@ -6,11 +6,21 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
-Headline: writing-great-skills review batch — reference docs re-synced with the SKILL.md contracts, release metadata aligned, spec-* move aftermath cleaned up, and one live-hit script bug fixed.
+Headline: multi-track sprints — the global "exactly one active sprint" singleton is replaced by component-partitioned concurrent tracks (epic [#289](https://github.com/sungjunlee/dev-backlog/issues/289), PRD `docs/prd-2026-07-multi-track-sprints.md`); plus the writing-great-skills review batch.
+
+### Added
+
+- **Multi-track sprints**: multiple `status: active` sprints may coexist when their scopes are disjoint (`component:` equality or `scope:` path-glob collision = overlap, decided by the single shared `scopesOverlap` predicate in `lib.js`). Single-track behavior is byte-identical (G4, fixture-verified against the pre-change scripts). Shipped in phases:
+  - `sprint-state.js` `schema_version` 2 — `active_sprints[]` portfolio plus retained back-compat single-track fields; `--track`/`--component` selectors; `OVERLAPPING_TRACKS` replaces `MULTIPLE_ACTIVE_SPRINTS` and fires only on scope collision. `next.sh`/`status.sh`/`context-hook.sh` render a portfolio for N>1 disjoint tracks. Closes [#291](https://github.com/sungjunlee/dev-backlog/issues/291) / PR [#300](https://github.com/sungjunlee/dev-backlog/pull/300).
+  - `backlog-doctor.js` `active_sprint` check rewritten as scope-disjointness (pass portfolio / fail overlap with `Active tracks overlap on scope` / informational warn for ≥2 scopeless tracks); per-sprint checks fan out per active track with track-tagged verdicts. Closes [#293](https://github.com/sungjunlee/dev-backlog/issues/293) / PR [#305](https://github.com/sungjunlee/dev-backlog/pull/305).
+  - Lifecycle track-awareness: `sprint-init.js` refuses only overlapping scopes (new `--scope "glob[,glob]"` flag; scopeless-next-to-scopeless warns and allows), `sprint-close.sh --track`, `sprint-mirror.js --track`. Closes [#292](https://github.com/sungjunlee/dev-backlog/issues/292) / PR [#307](https://github.com/sungjunlee/dev-backlog/pull/307).
+  - `spec/capabilities.md` singleton invariant amended to track-partitioned disjointness via a human-gated `spec-grill` pass; `spec/system-map.md` Core Flows de-singularized. Closes [#294](https://github.com/sungjunlee/dev-backlog/issues/294) / PR [#308](https://github.com/sungjunlee/dev-backlog/pull/308).
+  - Docs: `references/integration-contract.md` documents JSON `schema_version: 2`, the portfolio/overlap contract, and track resolution for relay-merge updates and capability-Learnings appends; SKILL.md, `references/process.md`, and README prose flipped off the singleton. Closes [#295](https://github.com/sungjunlee/dev-backlog/issues/295).
 
 ### Fixed
 
 - `sprint-close.sh` now parses flags position-independently: `--dry-run` without a positional backlog-dir works, positional/flags accept any order, and unknown `--*` flags fail loud instead of being treated as a directory; smoke-test coverage added. Closes [#247](https://github.com/sungjunlee/dev-backlog/issues/247) / PR [#251](https://github.com/sungjunlee/dev-backlog/pull/251).
+- `sprint-init.test.js` "produces frontmatter compatible with find_active_sprint" no longer depends on the test runner's cwd containing a `spec/` directory (pre-existing rot from the #258 omission change; pinned with explicit overrides). Fixed in PR [#307](https://github.com/sungjunlee/dev-backlog/pull/307).
 
 ### Changed
 

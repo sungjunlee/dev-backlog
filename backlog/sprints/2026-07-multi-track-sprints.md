@@ -28,7 +28,7 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - [x] #294 Phase 1e: amend capabilities.md singleton invariant → PR #308 (human-run spec-grill pass 2026-07-12)
 
 ### Batch 5 — Docs + contract
-- [ ] #295 Phase 3: docs + integration-contract schema_version → 2
+- [x] #295 Phase 3: docs + integration-contract schema_version → 2 → PR #309
 
 ## Running Context
 - Design + decisions frozen in `docs/prd-2026-07-multi-track-sprints.md` (§9 D1–D4 resolved).
@@ -45,3 +45,4 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - 2026-07-12: #293 Phase 1c landed (PR #305) — doctor scope-disjointness with per-track fan-out; GATE_MT_DISJOINT/GATE_MT_OVERLAP enforced, smoke 172/172, 0 xfail; single-active output verified byte-identical. Sprint file re-added as sole active.
 - 2026-07-12: #292 Phase 1b — sprint-init refuses only on scope overlap (--scope flag, D2 explicit), sprint-close/--track, sprint-mirror/--track; init/close single-track G4 verified byte-identical (text + exit codes + written files); fixed the cwd-dependent sprint-init.test.js #13 rot. Smoke 187/187.
 - 2026-07-12: #294 human-gated spec-grill pass — capabilities.md sprint-execution invariant flipped to track-partitioned scope disjointness, backlog-sync sprint-mirror predicate rewritten per-track, header notes component: as the track-scope key; Decisions rows appended in both capabilities; system-map Core Flows 4/5 de-singularized (the originally cited :36 line no longer existed post tracker-adapter refactor). Unblocks #295.
+- 2026-07-12: #295 docs — integration-contract documents schema_version 2 (active_sprints[] + retained v1 fields), portfolio/overlap contract, track resolution for relay-merge and Learnings appends; SKILL.md/process.md/scripts.md/README prose flipped off the singleton (no residual "exactly one active sprint" claim); CHANGELOG multi-track entry; multi-track eval prompt un-gated. dev-relay#954 coordination comment posted. dev-backlog side of epic #289 complete — remaining work is dev-relay #955/#956/#957.

@@ -42,12 +42,12 @@ the linked Tracker Adapter Design Contract.
 
 1. If `backlog/` does not exist, complete **Setup**.
 2. Read `backlog/sprints/_context.md` when present.
-3. Find the active sprint and read Goal, Plan, Running Context, and latest Progress.
+3. Find the active sprint(s). One track: read Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `status.sh`/`next.sh` render a portfolio; pass `--track <slug>` to work one track.
 4. If no active sprint exists, list open tasks through the configured adapter and proceed to **Plan**.
-5. Use `status.sh --json` and `next.sh --json` for normalized `tracker`/`id`/`ref` state; GitHub keeps numeric `issue_number`, local returns `null`.
-6. If all Plan items are checked, proceed to **Complete**.
+5. Use `status.sh --json` and `next.sh --json` for normalized `tracker`/`id`/`ref` state (`schema_version: 2`: `active_sprints[]` plus the retained single-track fields); GitHub keeps numeric `issue_number`, local returns `null`.
+6. If all Plan items are checked, proceed to **Complete** for that track.
 
-Two sprint files at most (`_context.md` plus active sprint) provide the execution picture; canonical task reads come from the configured adapter.
+`_context.md` plus the track's sprint file provide the execution picture; canonical task reads come from the configured adapter.
 
 ## Create — New Tasks
 
@@ -59,8 +59,8 @@ Two sprint files at most (`_context.md` plus active sprint) provide the executio
 
 When starting a new sprint:
 
-1. Refuse a new sprint while another is active; complete the existing sprint rather than flipping `status:` inline.
-2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`.
+1. Refuse a new sprint only when its scope overlaps an existing active track (`component:` equality or `scope:` glob collision — `sprint-init.js` checks via the shared `scopesOverlap` predicate); disjoint-scope tracks coexist. Complete a conflicting track rather than flipping `status:` inline. A scopeless sprint next to a scopeless active track warns and allows.
+2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`; declare explicit `scope:` globs (`sprint-init.js --scope "glob[,glob]"`) when opening a concurrent track with no component axis.
 3. List open tasks from the configured adapter.
 4. GitHub mode may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible.
 5. Local mode does not fabricate a milestone. Author the sprint file from normalized local refs returned by the adapter.
@@ -88,7 +88,7 @@ Per task:
 
 For the whole sprint:
 
-1. Run `scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]`. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
+1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
 2. The command sets `status: completed`, appends final Progress, archives checked active task files that remain, and prints the doctor/reassess summary.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
@@ -118,10 +118,10 @@ Create a sprint only when execution context needs to span work or sessions.
 
 - **Small (< 1hr):** use the Quick Fix path.
 - **Current sprint:** add the normalized ref as a new batch and note the scope change in Progress.
-- **Separate sprint:** close the current sprint first, then start another.
+- **Separate sprint:** when the new work's scope is disjoint from every active track, open a concurrent track with its own `component:`/`scope:`; when it overlaps, close the conflicting sprint first, then start another.
 
 ## Next — What to Work On
 
-1. Read the active sprint and find the first unchecked batch.
+1. Read the active sprint and find the first unchecked batch (`next.sh --track <slug>` selects one track when a portfolio is active).
 2. If it is done, list configured-tracker work or start the next sprint.
 3. Present the batch with its exact normalized refs and total estimate.

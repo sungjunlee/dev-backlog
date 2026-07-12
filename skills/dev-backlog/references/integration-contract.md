@@ -10,7 +10,7 @@ Changes to checkbox, annotation, path, or section patterns parsed by `dev-relay`
 
 Any actor consuming dev-backlog state should treat these files as the stable read surface:
 
-- `backlog/sprints/*.md` with `status: active` is the active execution hub: frontmatter identifies lifecycle and routing state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
+- `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
 - `backlog/tasks/` and `backlog/completed/` have mode-specific authority. With `tracker: github` they are derived issue mirrors; with `tracker: local` they are the canonical active/completed task store. Task files carry bodies and Acceptance Criteria checkboxes; sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
@@ -26,9 +26,9 @@ bash skills/dev-backlog/scripts/status.sh --json
 bash skills/dev-backlog/scripts/next.sh --json
 ```
 
-Both commands emit one JSON document to stdout with `schema_version: 1`. Tracker-neutral identity is an additive schema-v1 extension: existing consumers may ignore the new fields, and no existing field or GitHub value changes. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
+Both commands emit one JSON document to stdout with `schema_version: 2`. Schema v2 (multi-track, PRD 2026-07) adds `active_sprints[]` — every active track in `started:`-ascending order — while retaining every v1 top-level field: `active_sprint` and the other singular fields hold the sole track's values when exactly one track is active (byte-compatible with v1 consumers) and are `null`/empty for a portfolio of N>1 tracks. `--track <slug>` (or `--component <slug>`) selects one track and emits the single-track shape. Human-readable output remains the default when `--json` is absent. Snapshots are supported through normal shell redirection only, for example `status.sh --json > sprint-state.json`; dev-backlog does not create timestamped snapshot files or maintain a snapshot store.
 
-Ambiguous active sprint state is fail-loud in JSON mode: the command exits non-zero and writes the error to stderr instead of emitting partial JSON. Missing `## ` sections degrade to empty strings or arrays as shown below.
+Multiple active tracks are a **portfolio**, not an error; only **overlapping-scope** tracks are fail-loud: when two active tracks overlap (`component:` equality or `scope:` path-prefix collision, via the one shared `scopesOverlap` predicate in `lib.js`), JSON mode exits non-zero with `OVERLAPPING_TRACKS` on stderr instead of emitting partial JSON. Missing `## ` sections degrade to empty strings or arrays as shown below.
 
 ## Tracker Selection and Capability Error Surface
 
@@ -65,12 +65,13 @@ Top-level schema:
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `schema_version` | integer | Schema version for this JSON contract; starts at `1`. |
-| `active_sprint` | object or `null` | Active sprint metadata, or `null` when no active sprint is found. |
-| `plan_items` | array | Parsed `## Plan` checkbox items from the active sprint. |
-| `next_batch` | object or `null` | First batch with `[ ]` items, or flat unchecked items when no batch heading exists. |
-| `latest_progress` | array | Most recent five `## Progress` bullet entries, newest first. |
-| `in_flight` | array | `[~]` plan items plus file-derived age metadata. |
+| `schema_version` | integer | Schema version for this JSON contract; currently `2` (v1 fields all retained). |
+| `active_sprints` | array | One entry per active track in `started:`-ascending order; each entry carries the per-track `active_sprint`/`plan_items`/`next_batch`/`latest_progress`/`in_flight` fields below. Empty when nothing is active. |
+| `active_sprint` | object or `null` | Back-compat: the sole track's metadata when exactly one track is active (or a `--track`/`--component` selector resolved one); `null` for a portfolio or when no active sprint is found. |
+| `plan_items` | array | Parsed `## Plan` checkbox items from the single resolved sprint; empty for a portfolio. |
+| `next_batch` | object or `null` | First batch with `[ ]` items, or flat unchecked items when no batch heading exists; `null` for a portfolio. |
+| `latest_progress` | array | Most recent five `## Progress` bullet entries, newest first; empty for a portfolio. |
+| `in_flight` | array | `[~]` plan items plus file-derived age metadata; empty for a portfolio. |
 
 `active_sprint` fields:
 
@@ -160,7 +161,7 @@ Each `checks[]` entry has:
 | `status` | string | `pass`, `warn`, or `fail`. |
 | `detail` | object | Check-specific details. `detail.summary` is always a human-readable one-line summary. |
 
-Hard failures include ambiguous active sprint state, no active sprint while sprint files exist, objective/component drift, capabilities-doctor hard triggers, missing required active-sprint sections, and unparseable Plan checkbox lines. Soft warnings include unmoored `[~]` items (repair runbook: [`checkbox-repair.md`](checkbox-repair.md)), `[~]` items older than `--stale-days` (default `7`), capabilities-doctor warnings, and `_context.md` bloat. `_context.md` bloat warns above `200` lines; the threshold is deliberately generous so this signal means "promote or compact durable context soon," not "rewrite immediately."
+The doctor's own JSON schema stays at `1`; it is independent of the actor read-surface schema above. With multiple active tracks, per-sprint checks (`objectives_check`, `component_lint`, `sprint_shape`, `in_flight_trace`, `in_flight_staleness`) run once per track and carry a top-level `track` field naming the track slug; single-track output is unchanged and untagged. Hard failures include overlapping-scope active tracks (the `active_sprint` check emits `Active tracks overlap on scope: <a> ∩ <b>`), objective/component drift, capabilities-doctor hard triggers, missing required active-sprint sections, and unparseable Plan checkbox lines. Disjoint-scope tracks pass (`N active tracks, scopes disjoint`). Soft warnings include the informational between-sprints state (sprint files exist but none is active), two scopeless active tracks (cannot prove disjoint — also informational), unmoored `[~]` items (repair runbook: [`checkbox-repair.md`](checkbox-repair.md)), `[~]` items older than `--stale-days` (default `7`), capabilities-doctor warnings, and `_context.md` bloat. `_context.md` bloat warns above `200` lines; the threshold is deliberately generous so this signal means "promote or compact durable context soon," not "rewrite immediately."
 
 ## File Paths
 
@@ -219,6 +220,7 @@ Rules:
 - Non-empty values must match exactly one `## Capability: <slug>` heading in `spec/capabilities.md`.
 - Comma-separated values are invalid. If a sprint touches secondary areas, write that in `## Running Context` or sprint prose.
 - `component-lint.js` owns validation on the dev-backlog side; `backlog-doctor.js` warns (soft) only when the active sprint omits `component:` while `spec/capabilities.md` exists.
+- When multiple sprints are active, `component:` is also the primary track-scope key; two active tracks MUST NOT share a `component:`. A track with no component axis may declare explicit `scope:` path globs instead — one axis per track, never both. Overlap is decided by the one shared `scopesOverlap` predicate (`lib.js`).
 
 This is intentionally stricter than normal markdown prose. The field is an address for downstream writers, not a place to explain scope.
 
@@ -321,7 +323,9 @@ The following sections define the `dev-relay` consumer profile. They specialize 
 
 ## Relay-Merge Sprint Update Format
 
-When `relay-merge` completes a task, it updates the active sprint file in these specific formats:
+When `relay-merge` completes a task, it updates the active sprint file in these specific formats.
+
+**Track resolution:** with one active track, "the active sprint file" is unambiguous. With multiple active tracks, resolve the target sprint by track key — the task's owning `component:` (or track slug) selects the sprint file via `sprint-state.js --component <slug>` (or `--track <slug>`); never guess among tracks and never write one task's update into another track's sprint file.
 
 **Plan section** — mark checkbox done with PR annotation:
 ```
@@ -341,6 +345,8 @@ When `relay-merge` completes a task, it updates the active sprint file in these 
 ## Capability Learnings Append Contract
 
 When `spec/capabilities.md` exists and the active sprint has a primary `component:` value, `relay-merge` may append one capability-level Learning after a successful run. This is the `dev-relay` capability-learning writer profile, not permission for working agents or other actors to edit the capability spec.
+
+**Track resolution:** the `component` input below is also the track key. With multiple active tracks, resolve the run's sprint via `sprint-state.js --component <slug>` and take `component` from that resolved track's frontmatter — never from "the" active sprint, which is `null` in a portfolio.
 
 Inputs:
 
@@ -460,7 +466,7 @@ These patterns are also validated by `scripts/smoke-test.sh` (checkbox counting 
 
 ## Versioning
 
-This document is unversioned, while the actor JSON surface remains `schema_version: 1`. The normalized `tracker`, `id`, and `ref` fields and nullable non-GitHub `issue_number` semantics are additive schema-v1 behavior. Its checkbox and annotation grammar is compatibility-sensitive. Any change to grammar parsed by `dev-relay` regexes must be coordinated with `dev-relay` before landing; prefer strictly additive grammar that preserves existing GitHub matches and bytes.
+This document is unversioned, while the actor JSON surface is `schema_version: 2` (multi-track: adds `active_sprints[]` and track selectors; every v1 field is retained with single-track values byte-compatible, so v1 consumers keep working — see Structured JSON Read Surface). The doctor JSON surface remains its own independent `schema_version: 1`. The checkbox and annotation grammar is unchanged by schema v2 and remains compatibility-sensitive. Any change to grammar parsed by `dev-relay` regexes must be coordinated with `dev-relay` before landing; prefer strictly additive grammar that preserves existing GitHub matches and bytes.
 
 Breaking changes require:
 1. Update this document
