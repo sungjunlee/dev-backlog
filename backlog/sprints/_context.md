@@ -8,6 +8,7 @@
 - Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, mirrors, progress issues, comments, and closing semantics remain explicit capabilities or narrowly named provider transports.
 - Local mode owns the canonical `tasks/` → `completed/` core lifecycle; unsupported provider capabilities fail before effects instead of changing tracker authority.
 - Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
+- Active sprints partition by track scope (2026-07, epic #289): `component:` equality or explicit `scope:` globs decide overlap through the ONE `scopesOverlap()` in `scripts/lib.js` — never re-implement it. Disjoint tracks coexist as a portfolio; overlap fails loud; single-track behavior is the G4 text-byte-identity compatibility surface (anchored in smoke-test.sh; never snapshot `--json`, which is schema-versioned instead).
 
 ## Conventions
 - Prefer minimal-diff refactors over repo-wide rewrites
@@ -32,3 +33,4 @@
 - Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
 - Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in `smoke-test.sh` depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
+- Charter O1's "single execution state" wording predates multi-track; it means shared state, not sprint count (compatible per #294 analysis). A human-gated wording clarification stays an open candidate — never amend the charter silently (2026-07, epic #289)

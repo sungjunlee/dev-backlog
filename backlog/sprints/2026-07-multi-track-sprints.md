@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 multi-track sprints
-status: active
+status: completed
 started: 2026-07-11
 due: TBD
 objectives: [O1]
@@ -46,3 +46,4 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - 2026-07-12: #292 Phase 1b — sprint-init refuses only on scope overlap (--scope flag, D2 explicit), sprint-close/--track, sprint-mirror/--track; init/close single-track G4 verified byte-identical (text + exit codes + written files); fixed the cwd-dependent sprint-init.test.js #13 rot. Smoke 187/187.
 - 2026-07-12: #294 human-gated spec-grill pass — capabilities.md sprint-execution invariant flipped to track-partitioned scope disjointness, backlog-sync sprint-mirror predicate rewritten per-track, header notes component: as the track-scope key; Decisions rows appended in both capabilities; system-map Core Flows 4/5 de-singularized (the originally cited :36 line no longer existed post tracker-adapter refactor). Unblocks #295.
 - 2026-07-12: #295 docs — integration-contract documents schema_version 2 (active_sprints[] + retained v1 fields), portfolio/overlap contract, track resolution for relay-merge and Learnings appends; SKILL.md/process.md/scripts.md/README prose flipped off the singleton (no residual "exactly one active sprint" claim); CHANGELOG multi-track entry; multi-track eval prompt un-gated. dev-relay#954 coordination comment posted. dev-backlog side of epic #289 complete — remaining work is dev-relay #955/#956/#957.
+- 2026-07-12: Sprint closed. 6/6 tasks completed.
