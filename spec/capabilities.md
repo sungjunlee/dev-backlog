@@ -4,7 +4,7 @@ The middle layer between [`charter.md`](charter.md) and the active sprint. Each 
 
 Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `spec-grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `## Decisions` is append-only by convention.
 
-Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs. Put secondary touches in sprint prose, not in frontmatter.
+Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs. Put secondary touches in sprint prose, not in frontmatter. Since multi-track sprints (PRD 2026-07, epic #289), `component:` also serves as a track's scope key: concurrent active tracks partition by `component:` equality — or by explicit `scope:` path globs when no component axis fits — one axis per track, never both.
 
 The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks were removed on 2026-07-05: those skills moved to craftkit in 0.7.0 (charter Decision 2026-07-04), so their contracts live with the skill definitions there. This file keeps only capabilities this repo owns.
 
@@ -56,9 +56,9 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 **Goal:** An agent or human resuming work mid-session reads the active sprint file and acts on its in-flight items without re-asking what is going on.
 
 **In-scope:**
-- `backlog/sprints/*.md` body + frontmatter (status, milestone, objectives)
+- `backlog/sprints/*.md` body + frontmatter (status, milestone, objectives, and the track-scope key: `component:` or `scope:`)
 - Checkbox state machine: `[ ]` not started → `[~]` in flight → `[x]` done
-- `sprint-init.js`, `sprint-close.sh`, `find_active_sprint`, `next.sh`, `status.sh`
+- `sprint-init.js`, `sprint-close.sh`, `find_active_sprint`/`resolve_track`, `next.sh`, `status.sh`
 
 **Out-of-scope:**
 - Tasks outside the active sprint (those live in `backlog/tasks/`)
@@ -66,7 +66,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 - Backlog grooming or stale-issue detection (`triage-grooming` capability)
 
 ### Expected Behaviors
-- Exactly one sprint file with `status: active` exists per `backlog/sprints/` at all times — concurrent actives fail loud (find_active_sprint surfaces the conflict).
+- No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; two scopeless actives cannot be proven disjoint and surface an informational doctor warning.
 - Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
 - Closing a sprint via `sprint-close.sh` is atomic: the sprint flips `status: completed` AND its done-checkbox issues move into `backlog/completed/` in one invocation, not in two steps.
 
@@ -84,6 +84,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 ### Decisions
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
+| 2026-07-12 | Replace the single-active-sprint invariant with track-partitioned scope disjointness (epic #289, PRD `docs/prd-2026-07-multi-track-sprints.md`; human-gated pass #294) | disjoint-scope tracks remove the false serialization of unrelated work while overlap stays fail-loud through one shared predicate; single-track behavior is byte-identical (G4) | pre-#289 "exactly one active sprint" behavior |
 
 ---
 
@@ -94,7 +95,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 **In-scope:**
 - `sync-pull.js` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
 - AC checkbox preservation in task bodies for non-machine-managed issues
-- `sprint-mirror.js`: explicit publish of the single active sprint to a marker-identified (`<!-- dev-backlog:sprint-mirror sprint=<slug> -->`) read-only mirror issue
+- `sprint-mirror.js`: explicit publish of one active sprint track (`--track` selects when multiple are active) to a marker-identified (`<!-- dev-backlog:sprint-mirror sprint=<slug> -->`) read-only mirror issue
 - Idempotent re-runs in both directions against unchanged state
 
 **Out-of-scope:**
@@ -108,7 +109,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 - `sync-pull --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
 - Running `sync-pull` twice against unchanged GitHub state produces byte-identical task files on the second run.
 - Repeated `sprint-mirror` runs resolve to the same marker-identified issue via find-by-marker body upsert — never a duplicate mirror issue; the sprint file stays canonical and untouched.
-- `sprint-mirror` exits non-zero when there is no single unambiguous active sprint (zero or multiple actives); it never guesses, and it renders state only through `sprint-state.js` — no second markdown parser.
+- `sprint-mirror` mirrors exactly one track per invocation and never guesses: one active track needs no flag; multiple active tracks require `--track <slug>` and exit non-zero without it (naming the tracks); zero actives or a no-match selector exit non-zero. It renders state only through `sprint-state.js` — no second markdown parser.
 
 ### Hard Constraints
 - The only GitHub writes this capability may perform are creating, and body-editing, issues that carry its own `dev-backlog:sprint-mirror` marker; human-authored issue bodies, comments, labels, and issue state are untouchable.
@@ -123,6 +124,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | --- | --- | --- | --- |
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |
 | 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
+| 2026-07-12 | `sprint-mirror` becomes per-track: `--track` selects among multiple active tracks instead of failing on any second active (epic #289; human-gated pass #294) | the per-slug marker already made mirrors track-idempotent; only selection needed to change, and refusing to guess is preserved | 2026-07-04 single-active mirror selection |
 
 ---
 
