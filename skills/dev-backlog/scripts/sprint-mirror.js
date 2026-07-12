@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Publish the single active sprint to a machine-managed GitHub issue.
+ * Publish one active sprint track to a machine-managed GitHub issue.
  *
- * Usage: node scripts/sprint-mirror.js [backlog-dir] [--dry-run] [--json]
+ * Usage: node scripts/sprint-mirror.js [backlog-dir] [--track slug] [--dry-run] [--json]
  *
  * This is the option-(c) half of the SSOT decision (spec/charter.md,
  * Decision row 2026-07-03): the local sprint file stays canonical and is
@@ -12,9 +12,9 @@
  *
  * sprint-state.js is the single owner of sprint markdown parsing. This
  * script never reads sprint files itself — it shells out to sprint-state.js
- * (`--mode status`) and renders its JSON. If sprint-state.js reports no
- * active sprint, or fails because multiple sprints are active, this script
- * refuses rather than guessing.
+ * (`--mode status`, plus `--track` when selecting among multiple tracks) and
+ * renders its JSON. Mirrors are per track: N==1 needs no flag, a portfolio
+ * requires --track, and overlap or no-match refuses rather than guessing.
  */
 
 const { execFileSync } = require("child_process");
@@ -38,7 +38,7 @@ const SPRINT_STATE_PATH = path.join(__dirname, "sprint-state.js");
 const DEFAULT_BACKLOG_DIR = "backlog";
 
 function usage() {
-  return "Usage: sprint-mirror.js [backlog-dir] [--dry-run] [--json]";
+  return "Usage: sprint-mirror.js [backlog-dir] [--track slug] [--dry-run] [--json]";
 }
 
 function makeMarker(slug) {
@@ -48,7 +48,7 @@ function makeMarker(slug) {
 // --- Args ---
 
 function parseArgs(args) {
-  const options = { backlogDir: DEFAULT_BACKLOG_DIR, dryRun: false, json: false };
+  const options = { backlogDir: DEFAULT_BACKLOG_DIR, dryRun: false, json: false, track: null };
   let backlogDirSet = false;
 
   for (let i = 0; i < args.length; i += 1) {
@@ -56,6 +56,17 @@ function parseArgs(args) {
     if (arg === "--help" || arg === "-h") return { ...options, help: true };
     if (arg === "--dry-run") { options.dryRun = true; continue; }
     if (arg === "--json") { options.json = true; continue; }
+    if (arg === "--track") {
+      const next = args[i + 1];
+      if (!next) return { ...options, error: `Missing value for --track. ${usage()}` };
+      options.track = next;
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--track=")) {
+      options.track = arg.slice("--track=".length);
+      continue;
+    }
     if (arg.startsWith("--")) {
       return { ...options, error: `Unknown argument: ${arg}. ${usage()}` };
     }
@@ -75,12 +86,17 @@ function resolveSprintState({
   backlogDir = DEFAULT_BACKLOG_DIR,
   execFile = execFileSync,
   sprintStatePath = SPRINT_STATE_PATH,
+  track = null,
 } = {}) {
+  const stateArgs = [sprintStatePath, "--mode", "status"];
+  if (track) stateArgs.push("--track", track);
+  stateArgs.push(backlogDir);
+
   let out;
   try {
     out = execFile(
       process.execPath,
-      [sprintStatePath, "--mode", "status", backlogDir],
+      stateArgs,
       { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 }
     );
   } catch (error) {
@@ -99,10 +115,20 @@ function resolveSprintState({
     throw new Error(`Unsupported sprint-state schema_version: ${state.schema_version}`);
   }
 
-  // v2 keeps `active_sprint` populated only when exactly one track is active; a
-  // portfolio (N>1) leaves it null. sprint-mirror still mirrors one sprint —
-  // per-track selection is #292's work.
+  // v2 keeps `active_sprint` populated when exactly one track is active or a
+  // --track/--component selector resolved one. A portfolio (N>1) without a
+  // selector leaves it null: mirroring is per track, so ask for the track.
   if (!state.active_sprint) {
+    if (track) {
+      throw new Error(`No active track matches '${track}'.`);
+    }
+    const trackSlugs = (state.active_sprints || [])
+      .map((sprint) => path.basename(sprint.active_sprint.path, ".md"));
+    if (trackSlugs.length > 1) {
+      throw new Error(
+        `Multiple active tracks (${trackSlugs.join(", ")}). Pass --track <slug> to choose which sprint to mirror.`
+      );
+    }
     throw new Error("No active sprint found. sprint-mirror requires exactly one active sprint.");
   }
 
@@ -187,10 +213,11 @@ function sync({
   now = new Date(),
   execFile = execFileSync,
   sprintStatePath = SPRINT_STATE_PATH,
+  track = null,
 } = {}) {
   const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   invokeCapability(resolved, "mirrors", () => undefined);
-  const state = resolveSprintState({ backlogDir, execFile, sprintStatePath });
+  const state = resolveSprintState({ backlogDir, execFile, sprintStatePath, track });
   const slug = path.basename(state.active_sprint.path, ".md");
   const marker = makeMarker(slug);
   const title = `Sprint mirror: ${slug}`;
@@ -250,7 +277,7 @@ function main() {
   }
 
   try {
-    const result = sync({ backlogDir: parsed.backlogDir, dryRun: parsed.dryRun });
+    const result = sync({ backlogDir: parsed.backlogDir, dryRun: parsed.dryRun, track: parsed.track });
 
     if (parsed.json) {
       console.log(JSON.stringify({

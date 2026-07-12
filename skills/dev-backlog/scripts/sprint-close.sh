@@ -2,7 +2,10 @@
 set -uo pipefail
 # Close the active sprint: mark completed, move tasks, remind about context.
 #
-# Usage: bash scripts/sprint-close.sh [backlog-dir] [--dry-run] [--close-milestone]
+# Usage: bash scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]
+#
+# With multiple active tracks, --track <slug> picks which one to close;
+# without it the close refuses as ambiguous (a single active needs no flag).
 #
 # Steps:
 #   1. Run backlog-doctor pre-close and compute the text-only reassess signal
@@ -18,24 +21,35 @@ BACKLOG_DIR="backlog"
 DRY_RUN=false
 CLOSE_MILESTONE=false
 BACKLOG_DIR_SET=false
+TRACK=""
 
-for arg in "$@"; do
-  case "$arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --dry-run) DRY_RUN=true ;;
     --close-milestone) CLOSE_MILESTONE=true ;;
+    --track)
+      shift
+      TRACK="${1:-}"
+      if [ -z "$TRACK" ]; then
+        echo "Missing value for --track"
+        exit 1
+      fi
+      ;;
+    --track=*) TRACK="${1#--track=}" ;;
     --*)
-      echo "Unknown argument: $arg"
+      echo "Unknown argument: $1"
       exit 1
       ;;
     *)
       if $BACKLOG_DIR_SET; then
-        echo "Unexpected argument: $arg"
+        echo "Unexpected argument: $1"
         exit 1
       fi
-      BACKLOG_DIR="$arg"
+      BACKLOG_DIR="$1"
       BACKLOG_DIR_SET=true
       ;;
   esac
+  shift
 done
 
 # Optional provider mutations must be authorized before local sprint mutation.
@@ -54,19 +68,32 @@ if [ ! -d "$SPRINTS_DIR" ]; then
   exit 1
 fi
 
-ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
-ACTIVE_STATUS=$?
-if [ "$ACTIVE_STATUS" -eq 2 ]; then
-  echo "Multiple active sprints found. Refusing to close an ambiguous sprint:"
-  find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
-    echo "  - $(basename "$sprint")"
-  done
-  exit 1
-fi
+if [ -n "$TRACK" ]; then
+  ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+  if [ -z "$ACTIVE" ]; then
+    echo "No active track matches '$TRACK'. Active tracks:"
+    find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+      [ -z "$sprint" ] && continue
+      echo "  - $(basename "$sprint" .md)"
+    done
+    exit 1
+  fi
+else
+  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+  ACTIVE_STATUS=$?
+  if [ "$ACTIVE_STATUS" -eq 2 ]; then
+    echo "Multiple active sprints found. Refusing to close an ambiguous sprint:"
+    find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+      echo "  - $(basename "$sprint")"
+    done
+    echo "Pass --track <slug> to close one track."
+    exit 1
+  fi
 
-if [ "$ACTIVE_STATUS" -ne 0 ]; then
-  echo "No active sprint to close."
-  exit 0
+  if [ "$ACTIVE_STATUS" -ne 0 ]; then
+    echo "No active sprint to close."
+    exit 0
+  fi
 fi
 
 SPRINT_NAME=$(basename "$ACTIVE" .md)

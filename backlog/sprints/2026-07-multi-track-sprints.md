@@ -21,7 +21,7 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - [x] #291 Phase 1a: scope: frontmatter + portfolio-aware read resolvers → PR #300 (merged)
 
 ### Batch 3 — Behavior (parallel-safe: disjoint files)
-- [ ] #292 Phase 1b: sprint lifecycle track-awareness (init/close/mirror)
+- [x] #292 Phase 1b: sprint lifecycle track-awareness (init/close/mirror) → PR #307
 - [x] #293 Phase 1c: backlog-doctor active_sprint → scope-disjointness check → PR #305 (merged)
 
 ### Batch 4 — Spec amendment (HUMAN-GATED)
@@ -43,3 +43,4 @@ Replace the global single-active-sprint invariant with a component-partitioned m
 - 2026-07-11: sprint planned. Epic #289 + children #290–#295 filed; dev-relay epic #954 + #955–#957 filed. Design doc landed in docs/ (uncommitted).
 - 2026-07-12: Batches 1–2 landed while the sprint file was held: #290 RED gate (PR #297), #291 Phase 1a resolvers (PR #300) — sprint-state schema 2, portfolio + --track/--component, scopesOverlap in lib.js.
 - 2026-07-12: #293 Phase 1c landed (PR #305) — doctor scope-disjointness with per-track fan-out; GATE_MT_DISJOINT/GATE_MT_OVERLAP enforced, smoke 172/172, 0 xfail; single-active output verified byte-identical. Sprint file re-added as sole active.
+- 2026-07-12: #292 Phase 1b — sprint-init refuses only on scope overlap (--scope flag, D2 explicit), sprint-close/--track, sprint-mirror/--track; init/close single-track G4 verified byte-identical (text + exit codes + written files); fixed the cwd-dependent sprint-init.test.js #13 rot. Smoke 187/187.
