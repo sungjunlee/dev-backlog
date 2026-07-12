@@ -4,17 +4,24 @@
  *
  * Usage: ./scripts/sprint-init.js "auth-system"
  *        ./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
+ *        ./scripts/sprint-init.js "auth-system" --scope "src/auth/**"
  *        ./scripts/sprint-init.js "auth-system" --dry-run
  *        ./scripts/sprint-init.js "auth-system" --json
  *
  * First arg is the topic name. Milestone defaults to topic if not specified.
  * Filename: YYYY-MM-<topic>.md
+ *
+ * Multi-track (#292): a second active sprint is refused only when its scope
+ * overlaps an existing active track (shared scopesOverlap from lib.js);
+ * disjoint tracks are created without refusal, scopeless-next-to-scopeless
+ * warns and allows (cannot prove overlap).
  */
 
 const fs = require("fs");
 const path = require("path");
 const { renderTaskRef } = require("./task-ref.js");
-const { slugify, estimateSize, readConfig } = require("./lib");
+const { slugify, estimateSize, readConfig, sprintScopeKey, scopesOverlap } = require("./lib");
+const { parseFrontmatter } = require("./sprint-state.js");
 const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
 const {
   invokeCapability,
@@ -23,18 +30,20 @@ const {
 } = require("./tracker.js");
 const { resolveCharterPath } = require("./spec-paths.js");
 
+const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--scope "glob[,glob]"] [--dry-run] [--json]';
+
 function parseArgs(args) {
   const dryRun = args.includes("--dry-run");
   const json = args.includes("--json");
   const filteredArgs = args.filter((a) => a !== "--dry-run" && a !== "--json");
 
   if (!filteredArgs.length) {
-    return { error: 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--dry-run] [--json]' };
+    return { error: USAGE };
   }
 
   const topic = filteredArgs[0];
   if (topic.startsWith("--")) {
-    return { error: 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--dry-run] [--json]' };
+    return { error: USAGE };
   }
 
   let milestone = topic;
@@ -43,7 +52,19 @@ function parseArgs(args) {
     milestone = filteredArgs[msIdx + 1];
   }
 
-  return { topic, milestone, dryRun, json };
+  const parsed = { topic, milestone, dryRun, json };
+
+  // Explicit only (D2): scope is never inferred from touched paths.
+  const scopeIdx = filteredArgs.indexOf("--scope");
+  if (scopeIdx !== -1) {
+    const raw = filteredArgs[scopeIdx + 1];
+    if (!raw || raw.startsWith("--")) {
+      return { error: `Missing value for --scope. ${USAGE}` };
+    }
+    parsed.scope = raw.split(",").map((glob) => glob.trim()).filter(Boolean);
+  }
+
+  return parsed;
 }
 
 function buildIssueLines(issues) {
@@ -70,24 +91,33 @@ function buildSpecFrontmatterBlock({ hasCharter, hasCapabilities }) {
   return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
+// scope: is emitted only when explicitly requested (--scope, D2) — a track's
+// partition axis is declared, never inferred, and absent scope is never an error.
+function buildScopeFrontmatterLine(scope) {
+  if (!Array.isArray(scope) || scope.length === 0) return "";
+  return `scope: [${scope.map((glob) => `"${glob}"`).join(", ")}]\n`;
+}
+
 function buildSprintContent({
   milestone,
   started,
   due,
   topic,
   issues,
+  scope,
   hasCharter = false,
   hasCapabilities = false,
 }) {
   const issueLines = buildIssueLines(issues);
   const specBlock = buildSpecFrontmatterBlock({ hasCharter, hasCapabilities });
+  const scopeLine = buildScopeFrontmatterLine(scope);
 
   return `---
 milestone: ${milestone}
 status: active
 started: ${started}
 due: ${due}
-${specBlock}---
+${scopeLine}${specBlock}---
 
 # ${topic}
 
@@ -129,6 +159,7 @@ function createSprintResult({
   issues,
   content,
   existingFile,
+  warnings = [],
 }) {
   return {
     action: "sprint-init",
@@ -142,8 +173,46 @@ function createSprintResult({
     placeholderIssue: Boolean(content) && issues.length === 0,
     existingFile,
     created: !dryRun && !existingFile,
+    warnings,
     content,
   };
+}
+
+// Track records for the existing active sprints: file name + parsed frontmatter.
+function loadActiveTrackRecords(sprintsDir) {
+  return listActiveSprintFiles(sprintsDir).map((file) => ({
+    file,
+    frontmatter: parseFrontmatter(fs.readFileSync(path.join(sprintsDir, file), "utf-8")),
+  }));
+}
+
+// Refusal is per-track overlap (via the ONE shared scopesOverlap predicate),
+// no longer "any second active sprint". Scopeless pairs cannot be proven
+// disjoint — warn-and-allow, matching the doctor's informational stance.
+function checkTrackDisjointness({ sprintsDir, scope }) {
+  const activeTracks = loadActiveTrackRecords(sprintsDir);
+  const newFrontmatter = Array.isArray(scope) && scope.length ? { scope } : {};
+
+  const conflict = activeTracks.find(
+    (track) => scopesOverlap(newFrontmatter, track.frontmatter)
+  );
+  if (conflict) {
+    throw new Error(
+      `Active track overlaps on scope: ${conflict.file}. `
+      + "Give the new sprint a disjoint component:/scope: or close the conflicting track first."
+    );
+  }
+
+  const scopelessAfterCreate = activeTracks
+    .filter((track) => sprintScopeKey(track.frontmatter).kind === "none")
+    .map((track) => track.file);
+  if (sprintScopeKey(newFrontmatter).kind === "none" && scopelessAfterCreate.length >= 1) {
+    return [
+      `Active track(s) without component:/scope: (${scopelessAfterCreate.join(", ")}); `
+      + "cannot prove the new sprint is disjoint. Declare component: or scope: on each track (backlog-doctor will warn).",
+    ];
+  }
+  return [];
 }
 
 // Detect whether the spec axis backs each field. Charter resolves canonical
@@ -160,6 +229,7 @@ function detectSpecPresence({ repoRoot = process.cwd(), fileExists = fs.existsSy
 function createSprintFile({
   topic,
   milestone,
+  scope,
   dryRun,
   sprintsDir = path.join("backlog", "sprints"),
   today = new Date(),
@@ -187,17 +257,12 @@ function createSprintFile({
   const topicSlug = slugify(topic) || "sprint";
   const sprintFile = path.join(sprintsDir, `${datePrefix}-${topicSlug}.md`);
   const existingFile = fileExists(sprintFile);
-  const activeSprintFiles = listActiveSprintFiles(sprintsDir);
 
   if (existingFile && !dryRun) {
     throw new Error(`Sprint file already exists: ${sprintFile}`);
   }
 
-  if (activeSprintFiles.length > 0 && !existingFile) {
-    throw new Error(
-      `Active sprint already exists: ${activeSprintFiles.join(", ")}. Close it before creating another active sprint.`
-    );
-  }
+  const warnings = existingFile ? [] : checkTrackDisjointness({ sprintsDir, scope });
 
   const detected = detectSpecPresence({ repoRoot, fileExists });
   const charterPresent = hasCharter ?? detected.hasCharter;
@@ -213,6 +278,7 @@ function createSprintFile({
         due,
         topic,
         issues,
+        scope,
         hasCharter: charterPresent,
         hasCapabilities: capabilitiesPresent,
       });
@@ -231,6 +297,7 @@ function createSprintFile({
     issues,
     content,
     existingFile,
+    warnings,
   });
 }
 
@@ -238,6 +305,10 @@ function printResult(result) {
   if (result.existingFile && result.dryRun) {
     console.log(`[dry-run] File already exists: ${result.sprintFile}`);
     return;
+  }
+
+  for (const warning of result.warnings || []) {
+    console.log(`Warning: ${warning}`);
   }
 
   if (result.placeholderIssue) {
@@ -287,9 +358,11 @@ module.exports = {
   parseArgs,
   buildIssueLines,
   buildSpecFrontmatterBlock,
+  buildScopeFrontmatterLine,
   buildSprintContent,
   detectSpecPresence,
   listActiveSprintFiles,
+  checkTrackDisjointness,
   createSprintFile,
   printResult,
 };

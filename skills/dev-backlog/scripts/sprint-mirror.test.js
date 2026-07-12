@@ -88,7 +88,16 @@ function makeExecFile({
 describe("parseArgs", () => {
   it("defaults to backlog dir with no flags", () => {
     const parsed = parseArgs([]);
-    assert.deepEqual(parsed, { backlogDir: "backlog", dryRun: false, json: false });
+    assert.deepEqual(parsed, { backlogDir: "backlog", dryRun: false, json: false, track: null });
+  });
+
+  it("parses --track in both flag forms (#292)", () => {
+    assert.equal(parseArgs(["--track", "2026-07-auth"]).track, "2026-07-auth");
+    assert.equal(parseArgs(["--track=2026-07-auth"]).track, "2026-07-auth");
+  });
+
+  it("rejects --track without a value (#292)", () => {
+    assert.match(parseArgs(["--track"]).error, /Missing value for --track/);
   });
 
   it("parses backlog-dir, --dry-run, and --json together", () => {
@@ -141,6 +150,42 @@ describe("resolveSprintState", () => {
   it("refuses when there is no active sprint", () => {
     const { execFile } = makeExecFile({ state: { schema_version: 1, active_sprint: null } });
     assert.throws(() => resolveSprintState({ execFile }), /No active sprint/);
+  });
+
+  it("passes --track through to sprint-state.js (#292)", () => {
+    const { execFile, calls } = makeExecFile();
+    resolveSprintState({ backlogDir: "backlog", execFile, track: "2026-07-auth" });
+
+    assert.deepEqual(calls[0].args.slice(1), ["--mode", "status", "--track", "2026-07-auth", "backlog"]);
+  });
+
+  it("asks for --track when a portfolio of tracks is active (#292)", () => {
+    const { execFile } = makeExecFile({
+      state: {
+        schema_version: 2,
+        active_sprint: null,
+        active_sprints: [
+          { active_sprint: { path: "backlog/sprints/2026-07-auth.md" } },
+          { active_sprint: { path: "backlog/sprints/2026-07-billing.md" } },
+        ],
+      },
+    });
+
+    assert.throws(
+      () => resolveSprintState({ execFile }),
+      /Multiple active tracks \(2026-07-auth, 2026-07-billing\)\. Pass --track/
+    );
+  });
+
+  it("refuses a --track selector that matches no active track (#292)", () => {
+    const { execFile } = makeExecFile({
+      state: { schema_version: 2, active_sprint: null, active_sprints: [] },
+    });
+
+    assert.throws(
+      () => resolveSprintState({ execFile, track: "nope" }),
+      /No active track matches 'nope'/
+    );
   });
 
   it("refuses loudly when sprint-state.js fails (ambiguous active sprints)", () => {

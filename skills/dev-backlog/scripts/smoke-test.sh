@@ -1285,6 +1285,72 @@ if (!c || c.status !== "warn" || c.informational !== true) process.exit(1);
 if (!/cannot prove disjoint/.test(c.detail.summary)) process.exit(1);
 '
 
+# --- Phase 1b (#292) ENFORCED: lifecycle track-awareness (init/close) ---
+# init: a disjoint-scope second track is created without refusal; an
+# overlapping scope is refused naming the conflicting track. Scope is always
+# explicit via --scope (D2) — never inferred from touched paths.
+MT_LIFE_DIR="$TEST_DIR/mt-lifecycle"
+mkdir -p "$MT_LIFE_DIR/backlog/sprints"
+mt_write_sprint "$MT_LIFE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+set +e
+OUT=$(cd "$MT_LIFE_DIR" && node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
+STATUS=$?
+set -e
+assert_equals "multi-track #292: disjoint second-track init exit code" "$STATUS" "0"
+assert_json_eval "multi-track #292: disjoint init creates with scope frontmatter, no warnings" "$OUT" '
+const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+if (j.created !== true) process.exit(1);
+if (!Array.isArray(j.warnings) || j.warnings.length !== 0) process.exit(1);
+if (!/^scope: \["src\/billing\/\*\*"\]$/m.test(j.content)) process.exit(1);
+'
+
+set +e
+OUT=$(cd "$MT_LIFE_DIR" && node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_equals "multi-track #292: overlapping-scope init exit code" "$STATUS" "1"
+assert_contains "multi-track #292: overlapping init names the conflicting track" "$OUT" "Active track overlaps on scope: 2026-07-auth.md"
+
+# G4: first-sprint init (no active sprint yet) keeps today's text and exit code.
+MT_INIT_SOLO_DIR="$TEST_DIR/mt-init-solo"
+mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints"
+set +e
+OUT=$(cd "$MT_INIT_SOLO_DIR" && node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
+STATUS=$?
+set -e
+assert_equals "multi-track G4 #292: single-track init dry-run exit code" "$STATUS" "0"
+assert_contains "multi-track G4 #292: single-track init dry-run text" "$OUT" "[dry-run] Would create:"
+
+# close: --track picks one track out of a portfolio; ambiguous close still
+# refuses (now with a --track hint); a no-match selector fails loud.
+MT_CLOSE_DIR="$TEST_DIR/mt-close"
+mkdir -p "$MT_CLOSE_DIR/backlog/sprints"
+mt_write_sprint "$MT_CLOSE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+mt_write_sprint "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" 2>&1)
+STATUS=$?
+set -e
+assert_equals "multi-track #292: ambiguous close exit code" "$STATUS" "1"
+assert_contains "multi-track #292: ambiguous close refuses" "$OUT" "Refusing to close an ambiguous sprint"
+assert_contains "multi-track #292: ambiguous close suggests --track" "$OUT" "Pass --track <slug> to close one track."
+
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track 2026-07-billing --dry-run 2>&1)
+assert_contains "multi-track #292: close --track dry-run targets the selected track" "$OUT" "Would set status: completed in $MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md"
+assert_contains "multi-track #292: close --track dry-run leaves files untouched" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md")" "active"
+
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track 2026-07-billing 2>&1)
+assert_contains "multi-track #292: close --track closes the selected track" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md")" "completed"
+assert_contains "multi-track #292: close --track leaves the other track active" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-auth.md")" "active"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track bogus 2>&1)
+STATUS=$?
+set -e
+assert_equals "multi-track #292: close --track no-match exit code" "$STATUS" "1"
+assert_contains "multi-track #292: close --track no-match message" "$OUT" "No active track matches 'bogus'"
+
 # (3) Back-compat (ENFORCED, GATE=1 — must stay GREEN on HEAD and after Phase 1).
 #     A single active track behaves exactly as today; this is the G4 text anchor
 #     (text output only — never snapshot --json, which changes by design).

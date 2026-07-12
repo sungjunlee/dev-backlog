@@ -41,6 +41,20 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["--milestone", "Sprint W13"]);
     assert.match(parsed.error, /Usage: sprint-init\.js/);
   });
+
+  it("parses --scope into a glob list, splitting on commas (#292)", () => {
+    const parsed = parseArgs(["auth", "--scope", "src/auth/**, src/authz/**"]);
+    assert.deepEqual(parsed.scope, ["src/auth/**", "src/authz/**"]);
+  });
+
+  it("omits the scope key entirely when --scope is not passed (#292)", () => {
+    assert.ok(!("scope" in parseArgs(["auth"])));
+  });
+
+  it("rejects --scope without a value (#292)", () => {
+    assert.match(parseArgs(["auth", "--scope"]).error, /Missing value for --scope/);
+    assert.match(parseArgs(["auth", "--scope", "--json"]).error, /Missing value for --scope/);
+  });
 });
 
 describe("buildIssueLines", () => {
@@ -89,6 +103,20 @@ describe("buildSprintContent", () => {
     assert.match(content, /due: TBD\n---/);
     assert.doesNotMatch(content, /^objectives:/m);
     assert.doesNotMatch(content, /^component:/m);
+  });
+
+  it("emits a scope: line only when explicitly requested (D2, #292)", () => {
+    const scoped = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      scope: ["src/auth/**", "src/authz/**"],
+    });
+    assert.match(scoped, /^scope: \["src\/auth\/\*\*", "src\/authz\/\*\*"\]$/m);
+    assert.match(scoped, /due: TBD\nscope: \["src\/auth\/\*\*", "src\/authz\/\*\*"\]\n---/);
+
+    const unscoped = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+    });
+    assert.doesNotMatch(unscoped, /^scope:/m);
   });
 
   it("emits objectives only when charter present, component only when capabilities present", () => {
@@ -202,36 +230,112 @@ describe("createSprintFile", () => {
     ]);
   });
 
-  it("refuses to create a new active sprint when another active sprint exists", () => {
-    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+  it("refuses when the new sprint scope overlaps an active track (#292)", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "2026-04-current.md"),
+      '---\nstatus: active\nscope: ["src/auth/**"]\n---\n',
+    );
 
     assert.throws(() => {
       createSprintFile({
         topic: "next-sprint",
         milestone: "Sprint W14",
+        scope: ["src/auth/api/**"],
         dryRun: false,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
         getDue: () => "2026-04-12",
         getIssues: () => [],
       });
-    }, /Active sprint already exists: 2026-04-current\.md/);
+    }, /Active track overlaps on scope: 2026-04-current\.md/);
   });
 
-  it("also refuses dry-run creation when another active sprint exists", () => {
-    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+  it("also refuses dry-run creation on scope overlap (#292)", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "2026-04-current.md"),
+      '---\nstatus: active\nscope: ["src/auth/**"]\n---\n',
+    );
 
     assert.throws(() => {
       createSprintFile({
         topic: "next-sprint",
         milestone: "Sprint W14",
+        scope: ["src/auth/**"],
         dryRun: true,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
         getDue: () => "2026-04-12",
         getIssues: () => [],
       });
-    }, /Active sprint already exists: 2026-04-current\.md/);
+    }, /Active track overlaps on scope: 2026-04-current\.md/);
+  });
+
+  it("refuses when a shared component: overlaps, regardless of scope globs (#292)", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "2026-04-current.md"),
+      '---\nstatus: active\ncomponent: "auth-system"\n---\n',
+    );
+
+    // A scopeless new sprint next to a component-scoped track cannot be proven
+    // to overlap — but two tracks on the SAME component axis can, via frontmatter.
+    const disjoint = createSprintFile({
+      topic: "billing",
+      milestone: "Sprint W14",
+      scope: ["src/billing/**"],
+      dryRun: true,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "TBD",
+      getIssues: () => [],
+    });
+    assert.deepEqual(disjoint.warnings, []);
+  });
+
+  it("creates a disjoint-scope second active track without refusal (#292)", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "2026-04-current.md"),
+      '---\nstatus: active\nscope: ["src/auth/**"]\n---\n',
+    );
+
+    const result = createSprintFile({
+      topic: "billing",
+      milestone: "Sprint W14",
+      scope: ["src/billing/**"],
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "2026-04-12",
+      getIssues: () => [],
+      hasCharter: false,
+      hasCapabilities: false,
+    });
+
+    assert.equal(result.created, true);
+    assert.deepEqual(result.warnings, []);
+    const written = fs.readFileSync(result.sprintFile, "utf-8");
+    assert.match(written, /^scope: \["src\/billing\/\*\*"\]$/m);
+    assert.match(written, /^status: active$/m);
+  });
+
+  it("warns and allows a scopeless sprint next to a scopeless active track (#292)", () => {
+    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+
+    const result = createSprintFile({
+      topic: "next-sprint",
+      milestone: "Sprint W14",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "2026-04-12",
+      getIssues: () => [],
+      hasCharter: false,
+      hasCapabilities: false,
+    });
+
+    assert.equal(result.created, true);
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0], /cannot prove/);
+    assert.match(result.warnings[0], /2026-04-current\.md/);
   });
 
   it("returns placeholder metadata on dry-run when milestone has no issues", () => {
@@ -364,6 +468,10 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [{ number: 1, title: "Task", labels: [] }],
+      // Explicit overrides: spec-field emission must not depend on the test
+      // runner's cwd having (or lacking) a spec/ directory (#258).
+      hasCharter: true,
+      hasCapabilities: true,
     });
 
     const content = fs.readFileSync(result.sprintFile, "utf-8");
