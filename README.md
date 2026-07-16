@@ -140,8 +140,9 @@ bash skills/dev-backlog/scripts/smoke-test.sh
 
 Windows uses Git for Windows Bash. If Git comes from a nonstandard installation,
 set `DEV_BACKLOG_BASH` to its `bash.exe` before running the Node tests. POSIX mode
-and symlink-privilege tests are skipped when the Windows filesystem cannot
-represent those semantics; the behavior remains covered by the Ubuntu job.
+symlink-privilege, and open-file replacement race tests are skipped when the
+Windows filesystem cannot represent those semantics; the behavior remains
+covered by the Ubuntu job.
 
 After editing this repository's skill bundle, run the discovery smoke check from the repository root:
 

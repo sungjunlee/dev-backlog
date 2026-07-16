@@ -1133,6 +1133,10 @@ describe("local allocation lock is never auto-reclaimed and release is identity-
   }
 
   it("preserves a replacement lock installed between the critical section and release", (t) => {
+    if (process.platform === "win32") {
+      t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race");
+      return;
+    }
     const { backlogDir } = makeStore(t);
     const lockPath = path.join(backlogDir, ".local-tracker.lock");
     let replacementBytes = null;
@@ -1165,6 +1169,10 @@ describe("local allocation lock is never auto-reclaimed and release is identity-
   });
 
   it("captures and restores a replacement installed after release validation without unlinking its inode", (t) => {
+    if (process.platform === "win32") {
+      t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race");
+      return;
+    }
     const { backlogDir } = makeStore(t);
     const lockPath = path.join(backlogDir, ".local-tracker.lock");
     const replacementBytes = `${process.pid}:post-validation-replacement`;
@@ -1212,6 +1220,10 @@ describe("local allocation lock is never auto-reclaimed and release is identity-
   });
 
   it("preserves both a foreign capture and a newer canonical owner during no-overwrite restoration", (t) => {
+    if (process.platform === "win32") {
+      t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race");
+      return;
+    }
     const { backlogDir } = makeStore(t);
     const lockPath = path.join(backlogDir, ".local-tracker.lock");
     const capturedBytes = `${process.pid}:captured-foreign-owner`;
