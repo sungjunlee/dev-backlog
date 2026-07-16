@@ -56,6 +56,8 @@ npx skills add sungjunlee/dev-backlog -g -y
 - [`gh` CLI](https://cli.github.com/) authenticated with `gh auth login` (GitHub mode only)
 - Git
 - Node.js 18+
+- Bash. On Windows, use Git for Windows Bash; Node-based acceptance tests resolve
+  it from `git.exe` instead of selecting an ambient WSL `bash.exe`.
 
 ### Want to inspect or run the helper scripts directly?
 
@@ -128,6 +130,19 @@ Then use the skill during your coding session:
 For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
 ## Maintainer Verification
+
+Run the same cross-platform checks used by CI:
+
+```bash
+node --test skills/*/scripts/*.test.js
+bash skills/dev-backlog/scripts/smoke-test.sh
+```
+
+Windows uses Git for Windows Bash. If Git comes from a nonstandard installation,
+set `DEV_BACKLOG_BASH` to its `bash.exe` before running the Node tests. POSIX mode
+symlink-privilege, and open-file replacement race tests are skipped when the
+Windows filesystem cannot represent those semantics; the behavior remains
+covered by the Ubuntu job.
 
 After editing this repository's skill bundle, run the discovery smoke check from the repository root:
 

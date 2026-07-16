@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { spawnBashSync } = require("./bash-runtime.js");
 const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
 
@@ -793,6 +794,10 @@ describe("setup filesystem behavior", () => {
   });
 
   it("preserves config mode across an atomic tracker replacement", async (t) => {
+    if (process.platform === "win32") {
+      t.skip("Windows does not preserve POSIX mode bits");
+      return;
+    }
     const root = makeRoot(t);
     writeConfig(root, "project_name: mode\ntracker: local\n");
     const configPath = path.join(root, "backlog/config.yml");
@@ -807,7 +812,15 @@ describe("setup filesystem behavior", () => {
   it("rejects symlinked backlog/config paths before mutation", async (t) => {
     const root = makeRoot(t);
     const outside = makeRoot(t, "setup-outside-");
-    fs.symlinkSync(outside, path.join(root, "backlog"));
+    try {
+      fs.symlinkSync(outside, path.join(root, "backlog"));
+    } catch (error) {
+      if (process.platform === "win32" && error.code === "EPERM") {
+        t.skip("Windows symlink privilege is unavailable");
+        return;
+      }
+      throw error;
+    }
     await assert.rejects(
       runSetup({ cwd: root, tracker: "local", nonInteractive: true }),
       /unsafe backlog path/
@@ -865,7 +878,7 @@ describe("CLI and compatibility wrapper", () => {
 
   it("init.sh preserves the legacy project-name interface and fresh github meaning", (t) => {
     const root = makeRoot(t);
-    const run = spawnSync("bash", [INIT, "wrapper-demo"], { cwd: root, encoding: "utf8" });
+    const run = spawnBashSync([INIT, "wrapper-demo"], { cwd: root, encoding: "utf8" });
     assert.equal(run.status, 0, run.stderr);
     const raw = fs.readFileSync(path.join(root, "backlog/config.yml"), "utf8");
     assert.match(raw, /^project_name: "wrapper-demo"$/m);
@@ -879,7 +892,7 @@ describe("CLI and compatibility wrapper", () => {
       fs.mkdirSync(path.join(root, "backlog", name));
     }
     const before = snapshotTree(path.join(root, "backlog"));
-    const run = spawnSync("bash", [INIT, "ignored-new-name"], {
+    const run = spawnBashSync([INIT, "ignored-new-name"], {
       cwd: root,
       encoding: "utf8",
     });

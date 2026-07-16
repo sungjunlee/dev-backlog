@@ -17,7 +17,7 @@ const {
 const { parseMarkerMonth } = require("../../dev-backlog/scripts/progress-sync-render");
 const { executeGithub } = require("./triage-github.js");
 
-const CONFIG_PATH = path.join("backlog", "triage-config.yml");
+const CONFIG_PATH = path.posix.join("backlog", "triage-config.yml");
 const SNAPSHOT_DIR = path.join("backlog", "triage", ".cache");
 const TRIAGE_DEFAULT_FETCH_LIMIT = 2147483647;
 const GRAPHQL_PAGE_SIZE = 100;

@@ -124,6 +124,14 @@ describe("analyzeCapabilities", () => {
     assert.equal(hasHardFailures(result), false);
   });
 
+  it("serializes a Windows-style capabilities path with forward slashes", () => {
+    const result = analyzeCapabilities({
+      capabilitiesPath: "C:\\repo\\spec\\capabilities.md",
+      fileExists: () => false,
+    });
+    assert.equal(result.capabilitiesPath, "C:/repo/spec/capabilities.md");
+  });
+
   it("accepts a compact clean capabilities file", () => {
     const dir = makeTempDir();
     try {

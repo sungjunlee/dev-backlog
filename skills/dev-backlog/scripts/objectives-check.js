@@ -23,6 +23,7 @@ const {
   CANONICAL_CHARTER_PATH,
   resolveCharterPath,
 } = require("./spec-paths.js");
+const { toPortablePath } = require("./portable-path.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
 
@@ -142,9 +143,9 @@ function checkObjectives({
   if (!resolved.found) {
     return {
       charterFound: false,
-      charterPath: resolved.charterPath,
+      charterPath: toPortablePath(resolved.charterPath),
       charterSource: resolved.source,
-      checkedPaths: resolved.checkedPaths,
+      checkedPaths: resolved.checkedPaths.map(toPortablePath),
       drift: [],
       sprintCount: 0,
       omittedObjectiveSprints: [],
@@ -161,13 +162,16 @@ function checkObjectives({
 
   return {
     charterFound: true,
-    charterPath: resolved.charterPath,
+    charterPath: toPortablePath(resolved.charterPath),
     charterSource: resolved.source,
-    checkedPaths: resolved.checkedPaths,
+    checkedPaths: resolved.checkedPaths.map(toPortablePath),
     charterObjectiveIds: [...charterObjectives.keys()].sort(),
     sprintCount: sprintFiles.length,
-    drift,
-    omittedObjectiveSprints,
+    drift: drift.map((entry) => ({
+      ...entry,
+      sprintFile: toPortablePath(entry.sprintFile),
+    })),
+    omittedObjectiveSprints: omittedObjectiveSprints.map(toPortablePath),
   };
 }
 

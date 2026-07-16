@@ -2,6 +2,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { toPortablePath } = require("./portable-path.js");
 
 const ROOT = path.resolve(__dirname, "../../..");
 const SCRIPT_ROOTS = [
@@ -34,7 +35,7 @@ describe("direct gh production ownership", () => {
     const directFiles = SCRIPT_ROOTS
       .flatMap(productionJavascriptFiles)
       .filter((file) => directPattern.test(fs.readFileSync(file, "utf8")))
-      .map((file) => path.relative(ROOT, file))
+      .map((file) => toPortablePath(path.relative(ROOT, file)))
       .sort();
 
     assert.deepEqual(directFiles, [...ALLOWED_DIRECT_GH].sort());

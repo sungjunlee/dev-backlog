@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const CANONICAL_CHARTER_PATH = path.join("spec", "charter.md");
+const CANONICAL_CHARTER_PATH = path.posix.join("spec", "charter.md");
 const LEGACY_CHARTER_PATH = "CHARTER.md";
 
 function resolveRepoPath(repoRoot, candidate) {

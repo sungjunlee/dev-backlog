@@ -12,6 +12,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { toPortablePath } = require("./portable-path.js");
 
 const DEFAULT_CAPABILITIES_PATH = path.join("spec", "capabilities.md");
 const DEFAULT_THRESHOLDS = {
@@ -169,7 +170,7 @@ function analyzeCapabilities({
       found: false,
       structuralOnly: true,
       coverage: "not_assessed",
-      capabilitiesPath,
+      capabilitiesPath: toPortablePath(capabilitiesPath),
       thresholds,
       lineCount: 0,
       capabilityCount: 0,
@@ -226,7 +227,7 @@ function analyzeCapabilities({
     found: true,
     structuralOnly: true,
     coverage: "not_assessed",
-    capabilitiesPath,
+    capabilitiesPath: toPortablePath(capabilitiesPath),
     thresholds,
     lineCount,
     capabilityCount: blocks.length,
