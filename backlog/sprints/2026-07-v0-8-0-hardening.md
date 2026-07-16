@@ -16,7 +16,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 ## Plan
 ### Batch 1 - Platform contract
 
-- [~] #311 fix: make Windows checkout and test execution first-class (~2hr) → PR #314 (reviewing)
+- [x] #311 fix: make Windows checkout and test execution first-class (~2hr) → PR #314 (merged)
 
 ### Batch 2 - Direction check [after:#311]
 
@@ -31,6 +31,9 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   documentation-only WSL escape hatch.
 - Native filesystem paths stay native internally; stable serialized fields and
   Bash process boundaries normalize explicitly.
+- Windows prevents replacing an open lock pathname; keep those POSIX race tests
+  enforced on Ubuntu and document their Windows skip rather than weakening the
+  production lock invariant.
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
@@ -47,3 +50,6 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   exposed three POSIX open-file replacement race tests; Windows now skips those
   impossible filesystem races while Ubuntu continues to enforce them. Full
   local Windows suite: 685 tests, 678 pass, 0 fail, 7 documented skips.
+- 2026-07-16: #311 → PR #314 → independently reviewed twice (Critical/Important
+  0 after fixes) → user-approved squash merge. Issue #311 closed; Batch 1
+  complete and #312 is next.

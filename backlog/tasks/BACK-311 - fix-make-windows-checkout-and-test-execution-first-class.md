@@ -1,7 +1,7 @@
 ---
 id: BACK-311
 title: 'fix: make Windows checkout and test execution first-class'
-status: In Review
+status: Done
 labels:
   - bug
   - enhancement
