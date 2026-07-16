@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { spawnBashSync } = require("./bash-runtime.js");
 
 const SCRIPT = path.join(__dirname, "setup-dev-backlog.js");
 const INIT = path.join(__dirname, "init.sh");
@@ -21,6 +22,9 @@ function providerTrap(t) {
     const executable = path.join(bin, command);
     fs.writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' ${command} >> "${log}"\nexit 91\n`);
     fs.chmodSync(executable, 0o755);
+    if (process.platform === "win32") {
+      fs.writeFileSync(`${executable}.cmd`, `@echo off\r\n>>"${log}" echo ${command}\r\nexit /b 91\r\n`);
+    }
   }
   return {
     env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
@@ -90,7 +94,23 @@ function providerStubs(t, { remote, ghStatus }) {
   fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nexit ${ghStatus}\n`);
   fs.chmodSync(path.join(bin, "git"), 0o755);
   fs.chmodSync(path.join(bin, "gh"), 0o755);
+  if (process.platform === "win32") {
+    fs.writeFileSync(path.join(bin, "git.cmd"), `@echo off\r\necho ${remote}\r\n`);
+    fs.writeFileSync(path.join(bin, "gh.cmd"), `@echo off\r\nexit /b ${ghStatus}\r\n`);
+  }
   const preload = faultPreload(t, [
+    'const childProcess = require("node:child_process");',
+    'const originalExecFileSync = childProcess.execFileSync;',
+    `const remote = ${JSON.stringify(remote)};`,
+    `const ghStatus = ${JSON.stringify(ghStatus)};`,
+    'childProcess.execFileSync = function (command, args, options) {',
+    '  if (command === "git") return remote + "\\n";',
+    '  if (command === "gh") {',
+    '    if (ghStatus === 0) return "";',
+    '    const error = new Error("mock gh auth failure"); error.status = ghStatus; throw error;',
+    '  }',
+    '  return originalExecFileSync(command, args, options);',
+    '};',
     'Object.defineProperty(process.stdin, "isTTY", { value: true });',
     'Object.defineProperty(process.stdout, "isTTY", { value: true });',
   ].join("\n"));
@@ -230,7 +250,15 @@ describe("setup-dev-backlog real process integration", () => {
       const root = makeRoot(t, "setup-dangling-");
       const link = path.join(root, relative);
       fs.mkdirSync(path.dirname(link), { recursive: true });
-      fs.symlinkSync(path.join(root, "missing-target"), link);
+      try {
+        fs.symlinkSync(path.join(root, "missing-target"), link);
+      } catch (error) {
+        if (process.platform === "win32" && error.code === "EPERM") {
+          t.skip("Windows symlink privilege is unavailable");
+          return;
+        }
+        throw error;
+      }
       const before = snapshot(root);
       const run = runCli(root, ["--tracker", "local", "--non-interactive"]);
       assert.notEqual(run.status, 0, `${relative}: ${run.stderr}`);
@@ -245,7 +273,7 @@ describe("setup-dev-backlog real process integration", () => {
         'const fs = require("node:fs");',
         'const original = fs.mkdirSync;',
         'fs.mkdirSync = function (target, options) {',
-        '  if (String(target).endsWith("/backlog/tasks")) throw new Error("injected mkdir failure");',
+        '  if (String(target).replace(/\\\\/g, "/").endsWith("/backlog/tasks")) throw new Error("injected mkdir failure");',
         '  return original.call(this, target, options);',
         '};',
       ].join("\n"),
@@ -264,7 +292,7 @@ describe("setup-dev-backlog real process integration", () => {
         'const fs = require("node:fs");',
         'const original = fs.renameSync;',
         'fs.renameSync = function (from, to) {',
-        '  if (String(to).endsWith("/backlog/config.yml")) throw new Error("injected rename failure");',
+        '  if (String(to).replace(/\\\\/g, "/").endsWith("/backlog/config.yml")) throw new Error("injected rename failure");',
         '  return original.call(this, from, to);',
         '};',
       ].join("\n"),
@@ -436,7 +464,7 @@ describe("setup-dev-backlog real process integration", () => {
       'const fs = require("node:fs");',
       'const original = fs.readFileSync;',
       'fs.readFileSync = function (target, options) {',
-      '  if (String(target).endsWith("/backlog/config.yml") && options === "utf8") {',
+      '  if (String(target).replace(/\\\\/g, "/").endsWith("/backlog/config.yml") && options === "utf8") {',
       '    return "note: \\ud800\\ntracker: local\\n";',
       '  }',
       '  return original.call(this, target, options);',
@@ -497,7 +525,7 @@ describe("setup-dev-backlog real process integration", () => {
   it("keeps init.sh fresh-GitHub compatibility and preserves an existing local choice", (t) => {
     const trap = providerTrap(t);
     const fresh = makeRoot(t, "setup-init-fresh-");
-    const freshRun = spawnSync("bash", [INIT, "wrapper-demo"], {
+    const freshRun = spawnBashSync([INIT, "wrapper-demo"], {
       cwd: fresh, env: trap.env, encoding: "utf8",
     });
     assert.equal(freshRun.status, 0, freshRun.stderr);
@@ -506,12 +534,12 @@ describe("setup-dev-backlog real process integration", () => {
     const existing = makeRoot(t, "setup-init-existing-");
     fs.mkdirSync(path.join(existing, "backlog"));
     fs.writeFileSync(path.join(existing, "backlog/config.yml"), "project_name: stable\ntracker: local\n");
-    const first = spawnSync("bash", [INIT, "ignored"], {
+    const first = spawnBashSync([INIT, "ignored"], {
       cwd: existing, env: trap.env, encoding: "utf8",
     });
     assert.equal(first.status, 0, first.stderr);
     const stable = snapshot(path.join(existing, "backlog"));
-    const second = spawnSync("bash", [INIT, "changed-remote"], {
+    const second = spawnBashSync([INIT, "changed-remote"], {
       cwd: existing, env: trap.env, encoding: "utf8",
     });
     assert.equal(second.status, 0, second.stderr);

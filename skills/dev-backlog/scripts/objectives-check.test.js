@@ -15,6 +15,7 @@ const {
   checkObjectives,
   formatReport,
 } = require("./objectives-check.js");
+const { toPortablePath } = require("./portable-path.js");
 
 const SAMPLE_CHARTER = `---
 last_amended: 2026-05-23
@@ -179,7 +180,7 @@ describe("checkObjectives", () => {
     });
     assert.equal(result.charterFound, false);
     assert.equal(result.charterSource, "absent");
-    assert.ok(result.checkedPaths.some((p) => p.endsWith(path.join("spec", "charter.md"))));
+    assert.ok(result.checkedPaths.some((p) => p.endsWith("spec/charter.md")));
     assert.ok(result.checkedPaths.some((p) => p.endsWith("CHARTER.md")));
     assert.equal(result.drift.length, 0);
   });
@@ -201,7 +202,7 @@ describe("checkObjectives", () => {
       });
       assert.equal(result.charterFound, true);
       assert.equal(result.charterSource, "canonical");
-      assert.equal(result.charterPath, path.join(dir, "spec", "charter.md"));
+      assert.equal(result.charterPath, toPortablePath(path.join(dir, "spec", "charter.md")));
       assert.equal(result.sprintCount, 1);
       assert.equal(result.drift.length, 1);
       assert.deepEqual(result.drift[0].missing, ["O99"]);
@@ -219,7 +220,7 @@ describe("checkObjectives", () => {
       const result = checkObjectives({ sprintsDir, repoRoot: dir });
       assert.equal(result.charterFound, true);
       assert.equal(result.charterSource, "legacy");
-      assert.equal(result.charterPath, path.join(dir, "CHARTER.md"));
+      assert.equal(result.charterPath, toPortablePath(path.join(dir, "CHARTER.md")));
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -234,7 +235,7 @@ describe("checkObjectives", () => {
     assert.equal(result.charterFound, false);
     assert.equal(result.charterSource, "explicit");
     assert.equal(result.checkedPaths.length, 1);
-    assert.equal(result.checkedPaths[0], path.join("/repo", "custom.md"));
+    assert.equal(result.checkedPaths[0], toPortablePath(path.join("/repo", "custom.md")));
   });
 
   it("lists only truly-omitted (not empty) objectives sprints; omission is not drift (B3)", () => {
@@ -249,7 +250,7 @@ describe("checkObjectives", () => {
       fs.writeFileSync(omit, "---\nmilestone: x\nstatus: active\n---\n");
       fs.writeFileSync(empty, "---\nmilestone: y\nobjectives: []\n---\n");
       const result = checkObjectives({ sprintsDir, repoRoot: dir });
-      assert.deepEqual(result.omittedObjectiveSprints, [omit]);
+      assert.deepEqual(result.omittedObjectiveSprints, [toPortablePath(omit)]);
       assert.equal(result.drift.length, 0);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -259,6 +260,21 @@ describe("checkObjectives", () => {
   it("charter-absent result carries an empty omittedObjectiveSprints array", () => {
     const result = checkObjectives({ repoRoot: "/no/such", fileExists: () => false });
     assert.deepEqual(result.omittedObjectiveSprints, []);
+  });
+
+  it("serializes Windows-style public paths with forward slashes", () => {
+    const result = checkObjectives({
+      repoRoot: "C:\\repo",
+      charterPath: "spec\\charter.md",
+      sprintsDir: "C:\\repo\\backlog\\sprints",
+      fileExists: () => true,
+      readdir: () => ["active.md"],
+      readFile: (file) => String(file).includes("charter")
+        ? SAMPLE_CHARTER
+        : "---\nobjectives: [O99]\n---\n",
+    });
+    assert.doesNotMatch(result.charterPath, /\\/);
+    assert.equal(result.drift[0].sprintFile, "C:/repo/backlog/sprints/active.md");
   });
 });
 

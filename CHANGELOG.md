@@ -19,6 +19,10 @@ Headline: multi-track sprints — the global "exactly one active sprint" singlet
 
 ### Fixed
 
+- **Windows checkout and verification**: repository text is pinned to LF,
+  platform-neutral paths serialize with `/`, Node acceptance tests explicitly
+  resolve Git for Windows Bash instead of ambient WSL Bash, and CI now runs the
+  full Node and Bash suites on Windows. Closes [#311](https://github.com/sungjunlee/dev-backlog/issues/311).
 - `sprint-close.sh` now parses flags position-independently: `--dry-run` without a positional backlog-dir works, positional/flags accept any order, and unknown `--*` flags fail loud instead of being treated as a directory; smoke-test coverage added. Closes [#247](https://github.com/sungjunlee/dev-backlog/issues/247) / PR [#251](https://github.com/sungjunlee/dev-backlog/pull/251).
 - `sprint-init.test.js` "produces frontmatter compatible with find_active_sprint" no longer depends on the test runner's cwd containing a `spec/` directory (pre-existing rot from the #258 omission change; pinned with explicit overrides). Fixed in PR [#307](https://github.com/sungjunlee/dev-backlog/pull/307).
 

@@ -26,6 +26,7 @@ const {
   hasHardFailures: hasCapabilityHardFailures,
 } = require("./capabilities-doctor.js");
 const { readConfig, sprintScopeKey, scopesOverlap } = require("./lib.js");
+const { repoDisplayPath, toPortablePath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_BACKLOG_DIR = "backlog";
@@ -366,7 +367,7 @@ function checkObjectiveDrift({ repoRoot, sprintsDir, activePath = null }) {
     // Soft nudge: a charter exists but the ACTIVE sprint dropped the field
     // entirely (an explicit `objectives: []` does not trip this). Warn only;
     // omission is valid for spec-less repos and immutable legacy sprints.
-    if (activePath && (result.omittedObjectiveSprints || []).includes(activePath)) {
+    if (activePath && (result.omittedObjectiveSprints || []).includes(toPortablePath(activePath))) {
       return verdict("objectives_check", "warn", {
         summary: "Active sprint omits objectives: while a charter exists; reference an Objective ID or set objectives: [].",
         charter_found: true,
@@ -409,7 +410,7 @@ function checkComponentRouting({ repoRoot, sprintsDir, capabilitiesPath, activeP
     }
     // Soft nudge: capabilities exist but the ACTIVE sprint dropped the field
     // entirely (an explicit `component: ""` does not trip this).
-    if (activePath && (result.omittedComponentSprints || []).includes(activePath)) {
+    if (activePath && (result.omittedComponentSprints || []).includes(toPortablePath(activePath))) {
       return verdict("component_lint", "warn", {
         summary: "Active sprint omits component: while spec/capabilities.md exists; set one capability slug or an explicit empty value.",
         capabilities_found: true,
@@ -853,9 +854,7 @@ function formatCloseSummary(result) {
 }
 
 function displayPath(repoRoot, filePath) {
-  const relative = path.relative(repoRoot, filePath);
-  if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) return relative;
-  return filePath;
+  return repoDisplayPath(repoRoot, filePath);
 }
 
 function main() {

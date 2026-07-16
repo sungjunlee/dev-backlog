@@ -17,6 +17,7 @@ const {
   hasErrors,
   formatReport,
 } = require("./component-lint.js");
+const { toPortablePath } = require("./portable-path.js");
 
 const SAMPLE_CAPABILITIES = `# Project Capabilities
 
@@ -289,7 +290,7 @@ describe("lintComponents", () => {
       fs.writeFileSync(omit, "---\nstatus: active\n---\nbody");
       fs.writeFileSync(empty, '---\ncomponent: ""\n---\nbody');
       const result = lintComponents({ sprintsDir, capabilitiesPath: capPath });
-      assert.deepEqual(result.omittedComponentSprints, [omit]);
+      assert.deepEqual(result.omittedComponentSprints, [toPortablePath(omit)]);
       assert.deepEqual(result.issues, []);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -303,6 +304,20 @@ describe("lintComponents", () => {
     });
     assert.equal(result.capabilitiesFound, false);
     assert.deepEqual(result.omittedComponentSprints, []);
+  });
+
+  it("serializes Windows-style public paths with forward slashes", () => {
+    const result = lintComponents({
+      sprintsDir: "C:\\repo\\backlog\\sprints",
+      capabilitiesPath: "C:\\repo\\spec\\capabilities.md",
+      fileExists: () => true,
+      readdir: () => ["active.md"],
+      readFile: (file) => String(file).includes("capabilities")
+        ? SAMPLE_CAPABILITIES
+        : "---\ncomponent: unknown\n---\n",
+    });
+    assert.equal(result.capabilitiesPath, "C:/repo/spec/capabilities.md");
+    assert.equal(result.issues[0].sprintFile, "C:/repo/backlog/sprints/active.md");
   });
 });
 

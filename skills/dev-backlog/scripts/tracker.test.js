@@ -48,7 +48,7 @@ describe("configured tracker selection", () => {
   it("persists exactly one top-level github selection in this repository", () => {
     const configPath = path.resolve(__dirname, "../../../backlog/config.yml");
     const raw = fs.readFileSync(configPath, "utf8");
-    assert.deepEqual(raw.match(/^tracker:\s*github\s*$/gm), ["tracker: github"]);
+    assert.deepEqual(raw.split(/\r?\n/).filter((line) => /^tracker:\s*github\s*$/.test(line)), ["tracker: github"]);
   });
 
   it("uses github as the deterministic compatibility default", () => {

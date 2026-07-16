@@ -8,6 +8,7 @@
 const { createGithubAdapter } = require("./github-tracker.js");
 const { createLocalAdapter } = require("./local-tracker.js");
 const path = require("path");
+const { configDisplayPath } = require("./portable-path.js");
 
 const TRACKER_KEYS = Object.freeze(["github", "local"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
@@ -70,7 +71,7 @@ class TrackerUnavailableError extends Error {
 }
 
 class UnsupportedTrackerCapabilityError extends Error {
-  constructor(tracker, capability, configPath = path.join(DEFAULT_BACKLOG_DIR, "config.yml")) {
+  constructor(tracker, capability, configPath = configDisplayPath(DEFAULT_BACKLOG_DIR)) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
     this.code = UNSUPPORTED_CAPABILITY_CODE;
@@ -214,7 +215,7 @@ function resolveConfiguredTracker(config, { execFile, adapters, backlogDir } = {
   const resolved = resolveTracker(config, { adapters: registered });
   return Object.freeze({
     ...resolved,
-    configPath: path.join(backlogDir || DEFAULT_BACKLOG_DIR, "config.yml"),
+    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR),
   });
 }
 

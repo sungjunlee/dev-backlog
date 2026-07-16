@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { spawnBashSync } = require("./bash-runtime.js");
 
 const {
   closeMilestone,
@@ -125,7 +126,7 @@ describe("GitHub optional capability transports", () => {
     fs.writeFileSync(columnPath, "#!/bin/sh\ncat\n");
     fs.chmodSync(columnPath, 0o755);
 
-    const result = spawnSync("bash", [path.join(__dirname, "status.sh"), backlogDir], {
+    const result = spawnBashSync([path.join(__dirname, "status.sh"), backlogDir], {
       cwd: root,
       env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}` },
       encoding: "utf8",
@@ -133,7 +134,7 @@ describe("GitHub optional capability transports", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /=== Tracker Tasks ===/);
-    assert.match(result.stdout, /^BACK-7\.2\t-\tCustom store task\toffline$/m);
+    assert.match(result.stdout, /^BACK-7\.2\s+-\s+Custom store task\s+offline$/m);
     assert.doesNotMatch(result.stdout, /=== GitHub Issues ===/);
   });
 });
@@ -201,7 +202,7 @@ describe("configured-only failure before effects", () => {
       "## Plan", "- [x] #275 Adapter", "", "## Running Context", "", "## Progress", "",
     ].join("\n"));
 
-    const result = spawnSync("bash", [
+    const result = spawnBashSync([
       path.join(__dirname, "sprint-close.sh"),
       backlogDir,
       "--close-milestone",

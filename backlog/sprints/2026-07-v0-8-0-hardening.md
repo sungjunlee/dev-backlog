@@ -36,3 +36,8 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 ## Progress
 - 2026-07-16: Created milestone 15 and issues #311-#313 from the repository
   review. Started #311 on `issue-311-windows-portability`.
+- 2026-07-16: #311 local implementation verified on Windows: Node 685 tests
+  (681 pass, 0 fail, 4 platform skips), Git for Windows Bash smoke exit 0,
+  backlog doctor 8/8 pass. Independent review found four Important portability
+  gaps; all were fixed and re-review returned Critical/Important 0. Awaiting
+  Ubuntu + Windows Actions evidence before marking complete.

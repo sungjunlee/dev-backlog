@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { resolveBashExecutable, toBashArgs } = require("./bash-runtime.js");
 
 const trackerModule = require("./tracker.js");
 
@@ -25,7 +26,9 @@ function makeRoot(t, prefix) {
 }
 
 function run(command, args, { cwd, env = process.env } = {}) {
-  return spawnSync(command, args, { cwd, env, encoding: "utf8" });
+  const executable = command === "bash" ? resolveBashExecutable({ env }) : command;
+  const commandArgs = command === "bash" ? toBashArgs(args) : args;
+  return spawnSync(executable, commandArgs, { cwd, env, encoding: "utf8" });
 }
 
 function expectSuccess(result, context) {
@@ -202,10 +205,23 @@ process.stderr.write("unhandled fake gh argv: " + JSON.stringify(args) + "\\n");
 process.exit(93);
 `);
   fs.chmodSync(ghPath, 0o755);
+  if (process.platform === "win32") {
+    fs.writeFileSync(`${ghPath}.cmd`, `@echo off\r\n"${process.execPath}" "${ghPath}" %*\r\n`);
+  }
+  const preloadPath = path.join(root, "mock-gh-preload.cjs");
+  fs.writeFileSync(preloadPath, `
+const childProcess = require("node:child_process");
+const original = childProcess.execFileSync;
+childProcess.execFileSync = function (command, args, options) {
+  if (command === "gh") return original(process.execPath, [${JSON.stringify(ghPath)}, ...args], options);
+  return original(command, args, options);
+};
+`);
   return {
     env: {
       ...process.env,
       PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
+      NODE_OPTIONS: `--require=${preloadPath}`,
       FAKE_GH_STATE: statePath,
       FAKE_GH_LOG: logPath,
     },

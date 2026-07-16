@@ -1,7 +1,7 @@
 ---
 id: BACK-311
 title: 'fix: make Windows checkout and test execution first-class'
-status: To Do
+status: In Progress
 labels:
   - bug
   - enhancement
@@ -22,14 +22,14 @@ Observed on Windows at `9d2aa02`:
 
 ## Acceptance Criteria
 
-- [ ] Repository line-ending policy keeps shell scripts LF in a default Windows checkout.
-- [ ] Machine-readable/public path fields use stable forward-slash repo-relative paths where the contract is platform-neutral.
-- [ ] Tests that launch Bash convert native Windows paths to Bash-readable paths at the process boundary.
-- [ ] The full Node test command passes on Windows.
-- [ ] The Bash smoke command passes from the Windows checkout.
-- [ ] CI includes a Windows job that locks the supported Windows execution path.
+- [x] Repository line-ending policy keeps shell scripts LF in a default Windows checkout.
+- [x] Machine-readable/public path fields use stable forward-slash repo-relative paths where the contract is platform-neutral.
+- [x] Tests that launch Bash convert native Windows paths to Bash-readable paths at the process boundary.
+- [x] The full Node test command passes on Windows.
+- [x] The Bash smoke command passes from the Windows checkout.
+- [x] CI includes a Windows job that locks the supported Windows execution path.
 - [ ] Existing Ubuntu CI remains green.
-- [ ] Documentation states the verified Windows execution contract without weakening cross-platform support.
+- [x] Documentation states the verified Windows execution contract without weakening cross-platform support.
 
 ## Done Criteria
 

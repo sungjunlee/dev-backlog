@@ -23,6 +23,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { toPortablePath } = require("./portable-path.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
 const DEFAULT_CAPABILITIES_PATH = path.join("spec", "capabilities.md");
@@ -187,7 +188,7 @@ function lintComponents({
       capabilitiesFound: false,
       structuralOnly: true,
       coverage: "not_assessed",
-      capabilitiesPath,
+      capabilitiesPath: toPortablePath(capabilitiesPath),
       issues: [],
       sprintCount: 0,
       checkedSprintCount: 0,
@@ -212,12 +213,15 @@ function lintComponents({
     capabilitiesFound: true,
     structuralOnly: true,
     coverage: "not_assessed",
-    capabilitiesPath,
+    capabilitiesPath: toPortablePath(capabilitiesPath),
     declaredCapabilities: [...declared].sort(),
     sprintCount: sprintFiles.length,
     ...routingStats,
-    issues,
-    omittedComponentSprints,
+    issues: issues.map((issue) => ({
+      ...issue,
+      sprintFile: toPortablePath(issue.sprintFile),
+    })),
+    omittedComponentSprints: omittedComponentSprints.map(toPortablePath),
   };
 }
 

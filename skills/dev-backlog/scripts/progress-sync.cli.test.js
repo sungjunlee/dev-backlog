@@ -58,6 +58,19 @@ if (joined.includes("pr list") && joined.includes("merged")) {
 process.stdout.write("{}");
 `);
   fs.chmodSync(ghPath, 0o755);
+  if (process.platform === "win32") {
+    fs.writeFileSync(`${ghPath}.cmd`, `@echo off\r\n"${process.execPath}" "${ghPath}" %*\r\n`);
+  }
+  const preloadPath = path.join(binDir, "mock-gh-preload.cjs");
+  fs.writeFileSync(preloadPath, `
+const childProcess = require("node:child_process");
+const original = childProcess.execFileSync;
+childProcess.execFileSync = function (command, args, options) {
+  if (command === "gh") return original(process.execPath, [${JSON.stringify(ghPath)}, ...args], options);
+  return original(command, args, options);
+};
+`);
+  return preloadPath;
 }
 
 describe("progress-sync CLI", () => {
@@ -70,7 +83,7 @@ describe("progress-sync CLI", () => {
   it("runs the real command with a mocked gh binary", () => {
     const workspaceDir = makeWorkspace();
     const binDir = path.join(workspaceDir, "bin");
-    writeMockGh(binDir);
+    const preloadPath = writeMockGh(binDir);
 
     const result = spawnSync(
       process.execPath,
@@ -80,7 +93,8 @@ describe("progress-sync CLI", () => {
         encoding: "utf-8",
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH || ""}`,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
+          NODE_OPTIONS: `--require=${preloadPath}`,
         },
       }
     );
@@ -103,7 +117,7 @@ describe("progress-sync CLI", () => {
   it("refuses an exact-title issue without the managed marker in dry-run", () => {
     const workspaceDir = makeWorkspace();
     const binDir = path.join(workspaceDir, "bin");
-    writeMockGh(binDir, [{
+    const preloadPath = writeMockGh(binDir, [{
       number: 50,
       title: "Progress: April 2026",
       body: "Human-owned issue without a marker",
@@ -117,7 +131,8 @@ describe("progress-sync CLI", () => {
         encoding: "utf-8",
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH || ""}`,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
+          NODE_OPTIONS: `--require=${preloadPath}`,
         },
       }
     );
@@ -134,7 +149,7 @@ describe("progress-sync CLI", () => {
   it("keeps marker-owned dry-run update output compatible", () => {
     const workspaceDir = makeWorkspace();
     const binDir = path.join(workspaceDir, "bin");
-    writeMockGh(binDir, [{
+    const preloadPath = writeMockGh(binDir, [{
       number: 50,
       title: "Progress: April 2026",
       body: "<!-- dev-backlog:progress-issue month=2026-04 -->\nOld body",
@@ -148,7 +163,8 @@ describe("progress-sync CLI", () => {
         encoding: "utf-8",
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH || ""}`,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
+          NODE_OPTIONS: `--require=${preloadPath}`,
         },
       }
     );

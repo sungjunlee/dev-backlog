@@ -21,3 +21,22 @@ jobs:
 
       - name: Bash smoke tests
         run: bash skills/dev-backlog/scripts/smoke-test.sh
+
+  windows-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Node tests
+        shell: pwsh
+        run: |
+          $tests = Get-ChildItem skills -Recurse -Filter *.test.js | ForEach-Object FullName
+          node --test $tests
+
+      - name: Bash smoke tests
+        shell: bash
+        run: bash skills/dev-backlog/scripts/smoke-test.sh
