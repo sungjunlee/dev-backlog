@@ -16,7 +16,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 ## Plan
 ### Batch 1 - Platform contract
 
-- [~] #311 fix: make Windows checkout and test execution first-class (~2hr) → PR #314 (draft)
+- [~] #311 fix: make Windows checkout and test execution first-class (~2hr) → PR #314 (reviewing)
 
 ### Batch 2 - Direction check [after:#311]
 
@@ -43,3 +43,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   Ubuntu + Windows Actions evidence before marking complete.
 - 2026-07-16: Opened draft PR #314; monitoring Ubuntu and Windows Actions before
   moving it to ready-for-review.
+- 2026-07-16: PR #314 Ubuntu and Windows Actions green. The first Windows run
+  exposed three POSIX open-file replacement race tests; Windows now skips those
+  impossible filesystem races while Ubuntu continues to enforce them. Full
+  local Windows suite: 685 tests, 678 pass, 0 fail, 7 documented skips.

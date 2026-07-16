@@ -1,7 +1,7 @@
 ---
 id: BACK-311
 title: 'fix: make Windows checkout and test execution first-class'
-status: In Progress
+status: In Review
 labels:
   - bug
   - enhancement
@@ -28,7 +28,7 @@ Observed on Windows at `9d2aa02`:
 - [x] The full Node test command passes on Windows.
 - [x] The Bash smoke command passes from the Windows checkout.
 - [x] CI includes a Windows job that locks the supported Windows execution path.
-- [ ] Existing Ubuntu CI remains green.
+- [x] Existing Ubuntu CI remains green.
 - [x] Documentation states the verified Windows execution contract without weakening cross-platform support.
 
 ## Done Criteria
