@@ -16,7 +16,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 ## Plan
 ### Batch 1 - Platform contract
 
-- [~] #311 fix: make Windows checkout and test execution first-class (~2hr) [branch:issue-311-windows-portability]
+- [~] #311 fix: make Windows checkout and test execution first-class (~2hr) → PR #314 (draft)
 
 ### Batch 2 - Direction check [after:#311]
 
@@ -41,3 +41,5 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   backlog doctor 8/8 pass. Independent review found four Important portability
   gaps; all were fixed and re-review returned Critical/Important 0. Awaiting
   Ubuntu + Windows Actions evidence before marking complete.
+- 2026-07-16: Opened draft PR #314; monitoring Ubuntu and Windows Actions before
+  moving it to ready-for-review.
