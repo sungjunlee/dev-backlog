@@ -24,7 +24,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 
 ### Batch 3 - Release [after:#311,#312]
 
-- [ ] #315 spec: amend system-map stale O8/O9 evidence status (~20min)
+- [x] #315 spec: amend system-map stale O8/O9 evidence status (~20min) → PR #317
 - [ ] #313 release: prepare and cut v0.8.0 (~45min)
 
 ## Running Context
@@ -63,3 +63,11 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   candidates stay recorded in the report only: charter O1 wording (human-gated),
   `tracker-task-truth` setup-idempotency grill line, optional Windows invariant
   line (can ride the #315 pass).
+- 2026-07-20: #315 amend applied. `spec-system-map` skill is installed but
+  `disable-model-invocation: true` blocks the Skill tool, so its documented
+  amend contract (re-read map + evidence, project-wide-only edits, no
+  capability/charter leakage) was followed by hand. `system-map.md:79`
+  reworded to record the proof merged as PR #303 (2026-07-12) and O8/O9
+  validated; added one Project-Wide Invariants line for Windows-first-class
+  execution per the reassess System Map Candidates. `docs/tracker-adapter-design.md`
+  twin fixed as a plain docs edit. `backlog-doctor` reverified green.

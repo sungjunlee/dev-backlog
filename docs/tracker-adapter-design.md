@@ -3,8 +3,8 @@
 Status: implemented foundation with dual-mode acceptance proof on issue #278's
 implementation branch. Runtime evidence was originally inventoried at commit
 `019a6ec`; merged issues #273-#277 provide selection, identity, GitHub wiring,
-local persistence, and setup. GitHub remains the compatibility baseline. O8/O9
-stay active until the proof branch is merged and recorded.
+local persistence, and setup. GitHub remains the compatibility baseline. The
+proof branch merged as PR #303 (2026-07-12); O8/O9 are validated.
 
 This document froze the smallest tracker boundary that can support another
 canonical task store without weakening existing GitHub behavior. The #272
