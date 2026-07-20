@@ -25,7 +25,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 ### Batch 3 - Release [after:#311,#312]
 
 - [x] #315 spec: amend system-map stale O8/O9 evidence status (~20min) → PR #317
-- [ ] #313 release: prepare and cut v0.8.0 (~45min)
+- [x] #313 release: prepare and cut v0.8.0 (~45min) → PR #318
 
 ## Running Context
 - Windows support means a normal Git checkout plus Node and Bash, not a
@@ -71,3 +71,13 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   validated; added one Project-Wide Invariants line for Windows-first-class
   execution per the reassess System Map Candidates. `docs/tracker-adapter-design.md`
   twin fixed as a plain docs edit. `backlog-doctor` reverified green.
+- 2026-07-20: #313 release prep → PR #318. Rewrote the changelog
+  `[Unreleased]` into a complete `[0.8.0] — 2026-07-20` section (configured
+  tracker adapters + offline local canonical store O8/O9, idempotent
+  setup/migration, dual-mode acceptance proof, multi-track sprints, Windows
+  first-class verification, spec/reassess items); bumped `VERSION` to `0.8.0`;
+  fixed compare links (`[0.8.0]` + repointed empty `[Unreleased]`). Semver:
+  minor bump — additive, backward-compatible with 0.7.0 GitHub flows.
+  Verification: Node `node --test skills/*/scripts/*.test.js` 685 tests /
+  684 pass / 0 fail / 1 skip; Bash smoke 187/187; `backlog-doctor` 8/8 PASS.
+  Annotated tag `v0.8.0` and the GitHub release follow the PR merge (orchestrator).
