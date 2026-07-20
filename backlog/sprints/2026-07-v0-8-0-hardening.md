@@ -24,7 +24,7 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 
 ### Batch 3 - Release [after:#311,#312]
 
-- [x] #315 spec: amend system-map stale O8/O9 evidence status (~20min) → PR #<PENDING>
+- [x] #315 spec: amend system-map stale O8/O9 evidence status (~20min) → PR #317
 - [ ] #313 release: prepare and cut v0.8.0 (~45min)
 
 ## Running Context
