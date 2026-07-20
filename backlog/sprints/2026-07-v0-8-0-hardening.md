@@ -1,6 +1,6 @@
 ---
 milestone: v0.8.0 hardening and release
-status: active
+status: completed
 started: 2026-07-16
 due: TBD
 objectives: [O8, O9]
@@ -81,3 +81,8 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
   Verification: Node `node --test skills/*/scripts/*.test.js` 685 tests /
   684 pass / 0 fail / 1 skip; Bash smoke 187/187; `backlog-doctor` 8/8 PASS.
   Annotated tag `v0.8.0` and the GitHub release follow the PR merge (orchestrator).
+- 2026-07-20: PR #318 squash-merged (`68e7edc`); annotated tag `v0.8.0` pushed
+  and GitHub release published; issue #313 closed. Running Context Windows
+  invariants were not promoted to `_context.md` — they now live as a
+  spec-governed Project-Wide Invariant in `spec/system-map.md` (#315).
+- 2026-07-20: Sprint closed. 4/4 tasks completed.
