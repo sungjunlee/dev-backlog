@@ -20,10 +20,11 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 
 ### Batch 2 - Direction check [after:#311]
 
-- [ ] #312 docs: run the post-multi-track signal-driven reassessment (~45min)
+- [x] #312 docs: run the post-multi-track signal-driven reassessment (~45min) → report `backlog/triage/2026-07-20-reassess.md` + issue #315
 
 ### Batch 3 - Release [after:#311,#312]
 
+- [ ] #315 spec: amend system-map stale O8/O9 evidence status (~20min)
 - [ ] #313 release: prepare and cut v0.8.0 (~45min)
 
 ## Running Context
@@ -53,3 +54,12 @@ reviewed, and the resulting release is ready to cut as v0.8.0.
 - 2026-07-16: #311 → PR #314 → independently reviewed twice (Critical/Important
   0 after fixes) → user-approved squash merge. Issue #311 closed; Batch 1
   complete and #312 is next.
+- 2026-07-20: #312 reassessment run (analysis delegated to a subagent). Report
+  `backlog/triage/2026-07-20-reassess.md`: backlog-doctor 8/8, capabilities-
+  doctor ok (5 caps/198 lines), component-lint clean. One concrete drift —
+  `system-map.md:79` stale O8/O9 status contradicting validated charter — filed
+  as #315 (milestone 15, clear before/with the v0.8.0 tag). O6 stays
+  `[deferred]` on a negative demand scan. No v0.8.0 blockers found. Deferred
+  candidates stay recorded in the report only: charter O1 wording (human-gated),
+  `tracker-task-truth` setup-idempotency grill line, optional Windows invariant
+  line (can ride the #315 pass).
