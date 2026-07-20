@@ -69,14 +69,16 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 - Unsupported optional capabilities have stable code `TRACKER_CAPABILITY_UNSUPPORTED`, tracker, capability, message, and remediation; JSON and human boundaries share that one serializer contract.
 - Sprint files remain the execution hub and completed sprint files are immutable history.
 - Automation is report-only toward `spec/*`; `spec/charter.md` is canonical and root `CHARTER.md` is legacy fallback only.
+- Helpers run on POSIX and Git-for-Windows Bash; native filesystem paths stay internal while stable serialized fields normalize to `/`; POSIX-only open-lock-replacement race tests are documented Windows skips.
 
 ## Executable Evidence
 
 `skills/dev-backlog/scripts/tracker-cycle.acceptance.test.js` proves both full
 cycles with real temporary files and subprocesses, no network, exact GitHub
 compatibility evidence, local zero-provider evidence, body-preserving updates,
-Done archive/final reads, and every optional-capability failure shape. O8/O9
-remain active until this implementation proof is merged and recorded.
+Done archive/final reads, and every optional-capability failure shape. This
+implementation proof merged as PR #303 (2026-07-12); O8 and O9 are validated
+(`charter.md:43-44`).
 
 ## Accepted Capability Contracts
 
