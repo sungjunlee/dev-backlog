@@ -6,10 +6,19 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
-Headline: multi-track sprints — the global "exactly one active sprint" singleton is replaced by component-partitioned concurrent tracks (epic [#289](https://github.com/sungjunlee/dev-backlog/issues/289), PRD `docs/prd-2026-07-multi-track-sprints.md`); plus the writing-great-skills review batch.
+## [0.8.0] — 2026-07-20
+
+Headline: **configured tracker adapters** — exactly one adapter owns canonical task truth per repo, keeping the existing `github` flow as the frozen compatibility baseline and adding a fully offline `local` canonical store beside it (objectives O8/O9) — and **multi-track sprints**, which retire the global "exactly one active sprint" singleton in favor of component-partitioned concurrent tracks (epic [#289](https://github.com/sungjunlee/dev-backlog/issues/289), PRD `docs/prd-2026-07-multi-track-sprints.md`). Windows also becomes a verified first-class execution path, alongside the writing-great-skills review batch. Semver: the tracker/local-adapter surface and the multi-track model are additive and backward-compatible with 0.7.0 GitHub flows (single-track output and GitHub behavior stay byte-identical), so this is a minor bump — 0.7.0 → 0.8.0.
 
 ### Added
 
+- **Configured tracker adapters — one adapter owns canonical task truth per repo** (O9). A deep, capability-gated tracker seam: the active tracker is chosen only from configuration, defaults to `github` when unset, resolution probes only the configured adapter, and the runtime never silently switches trackers on failure. Required lifecycle and identity stay small; milestones, PR relationships, mirrors, progress issues, comments, and closing semantics are capability-gated and fail closed before mutation. Design frozen in `docs/tracker-adapter-design.md`. Shipped in phases:
+  - `tracker.js` configured-only resolver plus the core adapter seam; the `local` slot stays explicitly unavailable until the local adapter lands. Interface and `gh`-coupling inventory were frozen first. Closes [#272](https://github.com/sungjunlee/dev-backlog/issues/272) / PR [#280](https://github.com/sungjunlee/dev-backlog/pull/280) and [#273](https://github.com/sungjunlee/dev-backlog/issues/273) / PR [#282](https://github.com/sungjunlee/dev-backlog/pull/282).
+  - Tracker-neutral task identity: one exact task-ref seam for GitHub `#N` and local `{PREFIX}-N[.M]`; sprint state exposes additive `tracker`/`id`/`ref` and retains GitHub `issue_number` so existing consumers keep working. Closes [#274](https://github.com/sungjunlee/dev-backlog/issues/274) / PR [#284](https://github.com/sungjunlee/dev-backlog/pull/284).
+  - GitHub behind the seam: the GitHub adapter owns required lifecycle translation and confines direct `gh` calls to itself plus explicit milestone/mirror/progress/PR/comment/triage transports; core callers resolve only the configured tracker. GitHub is now the frozen compatibility baseline. Closes [#275](https://github.com/sungjunlee/dev-backlog/issues/275) / PR [#286](https://github.com/sungjunlee/dev-backlog/pull/286).
+- **Offline local canonical tracker** — a fully offline `local` adapter that owns canonical list/read/create/update/close with `{PREFIX}-N[.M]` refs via the shared exact parser. Allocation inspects both active and completed tasks and never overwrites on collision or concurrency (atomic lock capture, crash recovery, fail-closed filesystem handling). In `local` mode task files are canonical (they stay GitHub mirrors in `github` mode); provider-only features fail with actionable, path-aware capability errors. Closes [#276](https://github.com/sungjunlee/dev-backlog/issues/276) / PR [#298](https://github.com/sungjunlee/dev-backlog/pull/298).
+- **Idempotent tracker-aware setup / migration contract** — `setup-dev-backlog` may detect evidence only to *recommend* an initial tracker choice; the persisted selection is immutable unless the user explicitly changes it, and re-runs preserve every user-authored byte (zero-migration, byte-idempotent re-runs). Closes [#277](https://github.com/sungjunlee/dev-backlog/issues/277) / PR [#301](https://github.com/sungjunlee/dev-backlog/pull/301).
+- **Dual-mode acceptance proof** (O8) — a table-driven end-to-end proof runs the same core sprint cycle in both `github` and `local` mode, asserting exact provider argv, persisted tracker state, decimal local refs, path-aware capability errors, and GitHub backward-compatibility. Closes [#278](https://github.com/sungjunlee/dev-backlog/issues/278) / PR [#303](https://github.com/sungjunlee/dev-backlog/pull/303).
 - **Multi-track sprints**: multiple `status: active` sprints may coexist when their scopes are disjoint (`component:` equality or `scope:` path-glob collision = overlap, decided by the single shared `scopesOverlap` predicate in `lib.js`). Single-track behavior is byte-identical (G4, fixture-verified against the pre-change scripts). Shipped in phases:
   - `sprint-state.js` `schema_version` 2 — `active_sprints[]` portfolio plus retained back-compat single-track fields; `--track`/`--component` selectors; `OVERLAPPING_TRACKS` replaces `MULTIPLE_ACTIVE_SPRINTS` and fires only on scope collision. `next.sh`/`status.sh`/`context-hook.sh` render a portfolio for N>1 disjoint tracks. Closes [#291](https://github.com/sungjunlee/dev-backlog/issues/291) / PR [#300](https://github.com/sungjunlee/dev-backlog/pull/300).
   - `backlog-doctor.js` `active_sprint` check rewritten as scope-disjointness (pass portfolio / fail overlap with `Active tracks overlap on scope` / informational warn for ≥2 scopeless tracks); per-sprint checks fan out per active track with track-tagged verdicts. Closes [#293](https://github.com/sungjunlee/dev-backlog/issues/293) / PR [#305](https://github.com/sungjunlee/dev-backlog/pull/305).
@@ -19,10 +28,13 @@ Headline: multi-track sprints — the global "exactly one active sprint" singlet
 
 ### Fixed
 
-- **Windows checkout and verification**: repository text is pinned to LF,
-  platform-neutral paths serialize with `/`, Node acceptance tests explicitly
-  resolve Git for Windows Bash instead of ambient WSL Bash, and CI now runs the
-  full Node and Bash suites on Windows. Closes [#311](https://github.com/sungjunlee/dev-backlog/issues/311).
+- **Windows first-class verification**: repository text is pinned to LF,
+  platform-neutral paths serialize with `/` (portable-path seam), Node
+  acceptance tests explicitly resolve Git for Windows Bash instead of ambient
+  WSL Bash, and CI now runs the full Node and Bash suites on Windows. The POSIX
+  open-file lock-race tests stay enforced on Ubuntu and are documented as
+  Windows skips rather than weakening the production lock invariant. Closes
+  [#311](https://github.com/sungjunlee/dev-backlog/issues/311) / PR [#314](https://github.com/sungjunlee/dev-backlog/pull/314).
 - `sprint-close.sh` now parses flags position-independently: `--dry-run` without a positional backlog-dir works, positional/flags accept any order, and unknown `--*` flags fail loud instead of being treated as a directory; smoke-test coverage added. Closes [#247](https://github.com/sungjunlee/dev-backlog/issues/247) / PR [#251](https://github.com/sungjunlee/dev-backlog/pull/251).
 - `sprint-init.test.js` "produces frontmatter compatible with find_active_sprint" no longer depends on the test runner's cwd containing a `spec/` directory (pre-existing rot from the #258 omission change; pinned with explicit overrides). Fixed in PR [#307](https://github.com/sungjunlee/dev-backlog/pull/307).
 
@@ -34,6 +46,8 @@ Headline: multi-track sprints — the global "exactly one active sprint" singlet
 - `skills/dev-backlog/SKILL.md` reassess-signal paragraph compressed to defer accounting details to `references/integration-contract.md`; craftkit provenance stated once per SKILL.md; stale "upcoming backlog-doctor" wording moved to present tense. Closes [#246](https://github.com/sungjunlee/dev-backlog/issues/246).
 - `skills/dev-backlog/references/integration-contract.md` component example swapped to the live `sprint-execution` slug. Closes [#248](https://github.com/sungjunlee/dev-backlog/issues/248).
 - `docs/spec-system-design.md` gains a dated provenance note for the 0.7.0 spec-* move; the dead research-survey link now cites git history (pre-`cd31a2b`) with the restore decision tracked in [craftkit#124](https://github.com/sungjunlee/craftkit/issues/124). Closes [#249](https://github.com/sungjunlee/dev-backlog/issues/249).
+- `spec/system-map.md` "Executable Evidence" now records the O8/O9 acceptance proof (PR [#303](https://github.com/sungjunlee/dev-backlog/pull/303)) as merged and both objectives `[validated]`, and adds a Project-Wide Invariant for Windows-first-class execution; the `docs/tracker-adapter-design.md` twin line is synced. Closes [#315](https://github.com/sungjunlee/dev-backlog/issues/315) / PR [#317](https://github.com/sungjunlee/dev-backlog/pull/317).
+- Signal-driven reassess: the post-multi-track reassess cycle ran and found no v0.8.0 release blockers (backlog-doctor 8/8, capabilities-doctor ok, component-lint clean); report `backlog/triage/2026-07-20-reassess.md`. Closes [#312](https://github.com/sungjunlee/dev-backlog/issues/312) / PR [#316](https://github.com/sungjunlee/dev-backlog/pull/316).
 
 ### Removed
 
@@ -117,7 +131,8 @@ Tracked for post-0.4.0 work — not blocking the release.
 
 Initial public release — `dev-backlog` skill with sprint files, task files, progress-sync, sync-pull, and Claude Code + Codex compatibility. See the initial commit (`0df6a1f`) for the baseline scope.
 
-[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/sungjunlee/dev-backlog/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/sungjunlee/dev-backlog/compare/v0.4.0...v0.5.0
