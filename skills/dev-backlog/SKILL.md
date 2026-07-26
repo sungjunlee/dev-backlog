@@ -36,17 +36,18 @@ Related skills (none required for either core cycle): when installed, `spec-char
 ## Core Contracts
 
 ```
-backlog/config.yml (one tracker: github | local)
+backlog/.tracker (one line: github | local)
   github -> GitHub Issues canonical; backlog/tasks/ are explicit mirrors
   local  -> backlog/tasks/ + completed/ are canonical; zero provider calls
 
+backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
 backlog/sprints/ <- shared execution hub in both modes
 ```
 
 - One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
 - Task files are thin mirrors in GitHub mode and canonical records in local mode. In both modes, decisions, progress, and cross-task context stay in the sprint file.
-- A missing `tracker:` key is the zero-migration GitHub compatibility default. Runtime failure never changes the selected tracker.
+- A missing `.tracker` file falls back to a legacy `tracker:` key in `config.yml`, then to the zero-migration GitHub compatibility default. Runtime failure never changes the selected tracker.
 - Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
 - Completed sprints stay as the permanent execution record.
 - Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries and how `objectives:`/`component:` degrade when spec files are absent live in `references/spec-fallback.md` (in-bundle, always resolvable); their durable authoring home is craftkit's `spec-charter` skill, consulted when installed. Sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.

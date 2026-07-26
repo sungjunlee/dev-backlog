@@ -15,7 +15,7 @@ behavior without migration.
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
 ```text
-backlog/config.yml: tracker: github | local
+backlog/.tracker: github | local
         |
         +-- github -> GitHub Issues (canonical) -> tasks/ mirrors
         |
@@ -109,12 +109,14 @@ either mode; the exact procedure and signatures are documented in
 
 ### Upgrade behavior
 
-There is zero automatic migration. A repository whose existing
-`backlog/config.yml` has no `tracker:` key continues in GitHub mode with its
-existing `#N`, numeric `issue_number`, task-mirror, milestone, mirror, progress,
-comment, and closing behavior. Run `setup-dev-backlog.js` to pin that legacy
-GitHub authority before making any later explicit switch. Setup never migrates
-task files and runtime never chooses a tracker from availability or failure.
+There is zero automatic runtime migration. A repository with neither
+`backlog/.tracker` nor a legacy `tracker:` key in `backlog/config.yml` continues
+in GitHub mode with its existing `#N`, numeric `issue_number`, task-mirror,
+milestone, mirror, progress, comment, and closing behavior. When `.tracker` is
+absent, runtime reads a legacy YAML selection as a compatibility fallback.
+Running `setup-dev-backlog.js` migrates that resolved choice to `.tracker`
+without editing `config.yml`; setup never migrates task files and runtime never
+chooses a tracker from availability or failure.
 The implementation-level contract and proof map live in
 [docs/tracker-adapter-design.md](docs/tracker-adapter-design.md).
 

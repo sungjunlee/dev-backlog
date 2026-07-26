@@ -14,6 +14,7 @@ const {
   TrackerUnavailableError,
   UnsupportedTrackerCapabilityError,
   invokeCapability,
+  readTrackerSelection,
   resolveConfiguredTracker,
   resolveTracker,
   selectTracker,
@@ -26,7 +27,8 @@ function makeLocalBacklog(t) {
   const backlogDir = path.join(root, "backlog");
   fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
   fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
-  fs.writeFileSync(path.join(backlogDir, "config.yml"), 'tracker: local\ntask_prefix: "BACK"\n');
+  fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
+  fs.writeFileSync(path.join(backlogDir, "config.yml"), 'task_prefix: "BACK"\n');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return backlogDir;
 }
@@ -45,10 +47,12 @@ function makeAdapter(overrides = {}) {
 }
 
 describe("configured tracker selection", () => {
-  it("persists exactly one top-level github selection in this repository", () => {
+  it("persists the github selection outside config.yml in this repository", () => {
+    const backlogDir = path.resolve(__dirname, "../../../backlog");
+    assert.equal(fs.readFileSync(path.join(backlogDir, ".tracker"), "utf8"), "github\n");
     const configPath = path.resolve(__dirname, "../../../backlog/config.yml");
     const raw = fs.readFileSync(configPath, "utf8");
-    assert.deepEqual(raw.split(/\r?\n/).filter((line) => /^tracker:\s*github\s*$/.test(line)), ["tracker: github"]);
+    assert.deepEqual(raw.split(/\r?\n/).filter((line) => /^tracker:/.test(line)), []);
   });
 
   it("uses github as the deterministic compatibility default", () => {
@@ -59,6 +63,26 @@ describe("configured tracker selection", () => {
   it("accepts explicit github and local selections", () => {
     assert.equal(selectTracker({ tracker: "github" }), "github");
     assert.equal(selectTracker({ tracker: "local" }), "local");
+  });
+
+  it("reads .tracker with trim semantics and gives it precedence over legacy config", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-selection-"));
+    const backlogDir = path.join(root, "backlog");
+    fs.mkdirSync(backlogDir);
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+    assert.equal(readTrackerSelection(backlogDir), undefined);
+    assert.equal(resolveConfiguredTracker({ tracker: "local" }, {
+      backlogDir,
+      adapters: { github: makeAdapter(), local: makeAdapter() },
+    }).tracker, "local");
+
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), " github\r\n");
+    assert.equal(readTrackerSelection(backlogDir), "github");
+    assert.equal(resolveConfiguredTracker({ tracker: "local" }, {
+      backlogDir,
+      adapters: { github: makeAdapter(), local: makeAdapter() },
+    }).tracker, "github");
   });
 
   it("rejects invalid and non-string selections before adapter use", () => {
@@ -340,7 +364,7 @@ describe("local adapter and optional capabilities", () => {
     assert.equal(mutations, 0);
   });
 
-  it("names the selected custom backlog config in unsupported remediation", (t) => {
+  it("names the selected custom backlog tracker file in unsupported remediation", (t) => {
     const backlogDir = makeLocalBacklog(t);
     const resolved = resolveConfiguredTracker({ tracker: "local" }, { backlogDir });
 
@@ -348,8 +372,8 @@ describe("local adapter and optional capabilities", () => {
       () => invokeCapability(resolved, "mirrors", () => undefined),
       (error) => {
         assert.ok(error instanceof UnsupportedTrackerCapabilityError);
-        assert.ok(error.remediation.includes(path.join(backlogDir, "config.yml")));
-        assert.equal(error.remediation.includes("change backlog/config.yml"), false);
+        assert.ok(error.remediation.includes(path.join(backlogDir, ".tracker")));
+        assert.equal(error.remediation.includes("change backlog/.tracker"), false);
         return true;
       }
     );

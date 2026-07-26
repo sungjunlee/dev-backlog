@@ -221,7 +221,7 @@ exactly `code`, `tracker`, `capability`, `message`, and `remediation`. A public
 JSON command wraps that shape once as `{ "error": ... }`, writes it to stdout,
 and exits non-zero. Human commands write the same message and remediation to
 stderr. Capability gates run before provider/filesystem effects and never
-change `backlog/config.yml` or resolve another tracker.
+change `backlog/.tracker` or resolve another tracker.
 
 ### Dual-mode executable proof (#278)
 

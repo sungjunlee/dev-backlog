@@ -397,6 +397,11 @@ function runGithubCycle(fixture) {
   assert.equal(runWorker(fixture, "read", { selector: "#42" }).state, "closed");
 
   assert.equal(fs.readFileSync(configPath, "utf8"), fixture.legacyConfig, "legacy config must not migrate");
+  assert.equal(
+    fs.existsSync(path.join(fixture.backlogDir, ".tracker")),
+    false,
+    "runtime fallback must not migrate"
+  );
   const mergeComment = [
     "<!-- dev-backlog:progress-comment id=2026-06/merge/pr-99 -->",
     "**Merged:** [#99](https://github.test/acme/widgets/pull/99) — Merged cycle PR",
@@ -530,7 +535,7 @@ describe("typed unsupported-capability contract", () => {
         tracker: "local",
         capability,
         message: `Tracker "local" does not support capability "${capability}".`,
-        remediation: `Use tracker "local" without "${capability}", or explicitly change ${path.join(fixture.backlogDir, "config.yml")} to a tracker that supports it before retrying. No tracker switch was attempted.`,
+        remediation: `Use tracker "local" without "${capability}", or explicitly change ${path.join(fixture.backlogDir, ".tracker")} to a tracker that supports it before retrying. No tracker switch was attempted.`,
       });
       assert.deepEqual(fixture.providerCalls(), []);
     });
@@ -539,9 +544,9 @@ describe("typed unsupported-capability contract", () => {
 
 describe("unsupported capability public CLI boundaries", () => {
   const boundaries = [
-    { name: "sprint-init", script: SPRINT_INIT_PATH, args: () => ["blocked", "--json"], capability: "milestones", configPath: () => "backlog/config.yml" },
-    { name: "sprint-mirror", script: SPRINT_MIRROR_PATH, args: (fixture) => [fixture.backlogDir, "--json"], capability: "mirrors", configPath: (fixture) => path.join(fixture.backlogDir, "config.yml") },
-    { name: "progress-sync", script: PROGRESS_SYNC_PATH, args: () => ["--month", "2026-06", "--json"], capability: "progress-issues", configPath: () => "backlog/config.yml" },
+    { name: "sprint-init", script: SPRINT_INIT_PATH, args: () => ["blocked", "--json"], capability: "milestones", configPath: () => "backlog/.tracker" },
+    { name: "sprint-mirror", script: SPRINT_MIRROR_PATH, args: (fixture) => [fixture.backlogDir, "--json"], capability: "mirrors", configPath: (fixture) => path.join(fixture.backlogDir, ".tracker") },
+    { name: "progress-sync", script: PROGRESS_SYNC_PATH, args: () => ["--month", "2026-06", "--json"], capability: "progress-issues", configPath: () => "backlog/.tracker" },
   ];
 
   for (const boundary of boundaries) {
@@ -568,7 +573,7 @@ describe("unsupported capability public CLI boundaries", () => {
       assert.match(human.stderr, new RegExp(escapeRegExp(payload.error.remediation)));
       assert.deepEqual(snapshotFiles(fixture.backlogDir), before, "capability failure must precede side effects");
       assert.deepEqual(fixture.providerCalls(), [], "capability failure must not call gh");
-      assert.match(fs.readFileSync(path.join(fixture.backlogDir, "config.yml"), "utf8"), /^tracker: local$/m);
+      assert.equal(fs.readFileSync(path.join(fixture.backlogDir, ".tracker"), "utf8"), "local\n");
     });
   }
 });

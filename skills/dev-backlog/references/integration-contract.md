@@ -32,8 +32,9 @@ Multiple active tracks are a **portfolio**, not an error; only **overlapping-sco
 
 ## Tracker Selection and Capability Error Surface
 
-`backlog/config.yml` selects exactly one canonical tracker. A missing key is the
-zero-migration GitHub compatibility default; availability probes and operation
+`backlog/.tracker` selects exactly one canonical tracker. When absent, a legacy
+`tracker:` key in `backlog/config.yml` is read as a compatibility fallback; with
+neither, GitHub is the zero-migration default. Availability probes and operation
 failures never select another adapter. Existing GitHub `#N`, numeric
 `issue_number`, filenames, Markdown, argv, and provider behavior remain aliases
 with unchanged values. Local Plan items use `{PREFIX}-N[.M]`, and their
@@ -51,7 +52,7 @@ shape:
     "tracker": "local",
     "capability": "milestones",
     "message": "Tracker \"local\" does not support capability \"milestones\".",
-    "remediation": "Use tracker \"local\" without \"milestones\", or explicitly change backlog/config.yml to a tracker that supports it before retrying. No tracker switch was attempted."
+    "remediation": "Use tracker \"local\" without \"milestones\", or explicitly change backlog/.tracker to a tracker that supports it before retrying. No tracker switch was attempted."
   }
 }
 ```

@@ -7,6 +7,7 @@
 
 const { createGithubAdapter } = require("./github-tracker.js");
 const { createLocalAdapter } = require("./local-tracker.js");
+const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
 
@@ -61,7 +62,7 @@ class TrackerUnavailableError extends Error {
   constructor(tracker, reason, options = {}) {
     super(
       `Configured tracker "${tracker}" is unavailable: ${reason}. ` +
-        "Restore that tracker or change backlog/config.yml explicitly; no fallback was attempted.",
+        "Restore that tracker or change backlog/.tracker explicitly; no fallback was attempted.",
       options
     );
     this.name = "TrackerUnavailableError";
@@ -71,7 +72,11 @@ class TrackerUnavailableError extends Error {
 }
 
 class UnsupportedTrackerCapabilityError extends Error {
-  constructor(tracker, capability, configPath = configDisplayPath(DEFAULT_BACKLOG_DIR)) {
+  constructor(
+    tracker,
+    capability,
+    configPath = configDisplayPath(DEFAULT_BACKLOG_DIR, ".tracker")
+  ) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
     this.code = UNSUPPORTED_CAPABILITY_CODE;
@@ -133,6 +138,16 @@ function selectTracker(config = {}) {
     throw new TrackerConfigurationError(selection);
   }
   return selection;
+}
+
+function readTrackerSelection(backlogDir = DEFAULT_BACKLOG_DIR, { fs: fsApi = fs } = {}) {
+  const trackerPath = path.join(backlogDir, ".tracker");
+  try {
+    return fsApi.readFileSync(trackerPath, "utf8").trim();
+  } catch (error) {
+    if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return undefined;
+    throw error;
+  }
 }
 
 function validateAdapter(tracker, adapter) {
@@ -206,16 +221,27 @@ function resolveTracker(config, { adapters = TRACKER_ADAPTERS } = {}) {
   return Object.freeze({ tracker, adapter, availability });
 }
 
-function resolveConfiguredTracker(config, { execFile, adapters, backlogDir } = {}) {
+function resolveConfiguredTracker(config, {
+  execFile,
+  adapters,
+  backlogDir,
+  fs: fsApi,
+} = {}) {
   const registered = adapters || {
     ...TRACKER_ADAPTERS,
     github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
     local: backlogDir ? createLocalAdapter({ backlogDir }) : TRACKER_ADAPTERS.local,
   };
-  const resolved = resolveTracker(config, { adapters: registered });
+  const storedSelection = backlogDir
+    ? readTrackerSelection(backlogDir, { fs: fsApi || fs })
+    : undefined;
+  const resolved = resolveTracker(
+    storedSelection === undefined ? config : { tracker: storedSelection },
+    { adapters: registered }
+  );
   return Object.freeze({
     ...resolved,
-    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR),
+    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR, ".tracker"),
   });
 }
 
@@ -335,6 +361,7 @@ module.exports = {
   serializeTrackerError,
   writeTrackerCliError,
   selectTracker,
+  readTrackerSelection,
   validateAdapter,
   validateIdentity,
   readCapabilities,

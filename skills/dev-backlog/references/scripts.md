@@ -15,7 +15,7 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 ## Full inventory
 
 - `scripts/setup-dev-backlog.js [project-name] [--tracker github|local] [--non-interactive] [--json]` — persist one canonical tracker and minimum directories without migrating task files; fresh non-interactive setup requires an explicit tracker.
-- `scripts/init.sh [project-name]` — bootstrap `backlog/` with config and directories.
+- `scripts/init.sh [project-name]` — bootstrap `backlog/` with `.tracker` and directories.
 - `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `process.md`.
 - `scripts/next.sh [--json] [--track slug] [backlog-dir]` — show the next actionable batch; N disjoint active tracks render a portfolio, `--track` selects one.
 - `scripts/status.sh [--json] [--track slug] [backlog-dir]` — summarize sprint-file state plus task state from the configured tracker; portfolio/`--track` semantics match `next.sh`.
@@ -33,10 +33,12 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 
 ## Tracker routing
 
-`backlog/config.yml` is the only runtime selection authority. Missing `tracker:`
-retains legacy GitHub behavior without rewriting the config. GitHub mode uses
-`gh` and treats task files as mirrors; local mode uses `local-tracker.json` as
-canonical and derives the same task-file mirrors with zero provider calls.
+`backlog/.tracker` is the runtime selection authority. When it is absent, a
+legacy `tracker:` key read from `config.yml` is the compatibility fallback;
+with neither, GitHub remains the deterministic default. Setup migrates a legacy
+selection to `.tracker` without editing `config.yml`. GitHub mode uses `gh` and
+treats task files as mirrors; local mode uses `local-tracker.json` as canonical
+and derives the same task-file mirrors with zero provider calls.
 `sprint-init`, `sprint-mirror`, and
 `progress-sync` are representative JSON-capable optional-feature boundaries:
 when unsupported, `--json` exits non-zero with the shared `{ "error": ... }`
