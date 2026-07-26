@@ -18,7 +18,7 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 1 - Design gate (blocking)
 
-- [ ] #320 design: re-tier the tracker adapters — local as storage substrate, remotes as translators (~45min)
+- [x] #320 design: re-tier the tracker adapters — local as storage substrate, remotes as translators (~45min) → PR #326 (merged)
 
 ### Batch 2 - Local substrate [after:#320]
 
@@ -87,3 +87,12 @@ and the three Windows lock-race skips are gone.
   implementation proof, not on adoption, so surface accumulates while every health signal stays
   green. Response chosen: keep the generalization direction (more trackers *are* wanted), fix the
   tier model so it stays cheap, and record a 200-line adapter budget as the durable guard.
+- 2026-07-26: Batch 1 done. #320 → PR #326 (merged `150a8fe`). `docs/tracker-adapter-design.md`
+  gains an "Adapter Tiers (v0.9.0)" section: three tiers (seam ~350 / remote translator ≤200 /
+  storage substrate ≤600), the budget rule ("an adapter over 200 lines is not an adapter, it is a
+  substrate — stop and re-tier"), the local JSON canonical shape with a binding co-authoritative
+  rule (a derived mirror is never parsed back as truth), the `backlog/.tracker` selection source
+  with its legacy fallback, the Windows consequence (the lock is the sole divergence cause; the 3
+  skips get deleted, not re-documented), the surviving PR #298 Learnings, and a dated
+  no-migration posture. The `#273-#278` runtime section carries a forward pointer so it cannot be
+  read as current on the two superseded points. Batch 2 (#321) is next.
