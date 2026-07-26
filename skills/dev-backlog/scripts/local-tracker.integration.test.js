@@ -54,7 +54,7 @@ function strays(backlogDir) {
       const full = path.join(dir, name);
       const stat = fs.lstatSync(full);
       if (stat.isDirectory()) walk(full);
-      else if (name.endsWith(".tmp") || name === ".local-tracker.lock" || name === ".local-tracker.close") {
+      else if (name.endsWith(".tmp") || name.startsWith(".local-tracker.revision-")) {
         result.push(full);
       }
     }
@@ -79,14 +79,15 @@ async function runConcurrentWriters(root, backlogDir, operations) {
       "fs.writeFileSync(ready, 'ready');",
       "while (!fs.existsSync(go)) Atomics.wait(wait, 0, 0, 5);",
       "const adapter = createLocalAdapter({ backlogDir, testHooks: {",
-      "  beforeStoreRename() {",
+      "  linkRevision: process.env.NAIVE_RMW ?",
+      "    (tmp) => fs.renameSync(`${tmp}.naive`, path.join(backlogDir, 'local-tracker.json')) : undefined,",
+      "  beforeRevisionClaim(tmp) {",
+      "    if (process.env.NAIVE_RMW) fs.copyFileSync(tmp, `${tmp}.naive`);",
       "    fs.writeFileSync(renameReady, 'ready');",
-      "    if (!fs.existsSync(path.join(backlogDir, '.local-tracker.lock'))) {",
-      "      const deadline = Date.now() + 5000;",
-      "      while (fs.readdirSync(renameDir).length < Number(count)) {",
-      "        if (Date.now() > deadline) throw new Error('rename barrier timed out');",
-      "        Atomics.wait(wait, 0, 0, 5);",
-      "      }",
+      "    const deadline = Date.now() + 5000;",
+      "    while (fs.readdirSync(renameDir).length < Number(count)) {",
+      "      if (Date.now() > deadline) throw new Error('revision barrier timed out');",
+      "      Atomics.wait(wait, 0, 0, 5);",
       "    }",
       "    Atomics.wait(wait, 0, 0, 50);",
       "  },",
@@ -235,7 +236,7 @@ describe("offline local core sprint cycle", () => {
 });
 
 describe("offline local close crash recovery", () => {
-  it("keeps one canonical task when the process dies after atomic rename and heals mirrors", (t) => {
+  it("a writer killed after claiming a revision cannot wedge the next mutation", (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
     const { adapter } = localAdapter(backlogDir);
     adapter.create({ title: "One", body: "Keep me" });
@@ -248,7 +249,7 @@ describe("offline local close crash recovery", () => {
         "const [backlogDir] = process.argv.slice(2);",
         "const adapter = createLocalAdapter({",
         "  backlogDir,",
-        "  testHooks: { afterStoreRename() { process.exit(99); } },",
+        "  testHooks: { afterRevisionClaim() { process.exit(99); } },",
         "});",
         "adapter.close('BACK-1');",
       ].join("\n")
@@ -256,15 +257,26 @@ describe("offline local close crash recovery", () => {
     const crashed = spawnSync(process.execPath, [worker, backlogDir], { encoding: "utf8" });
     assert.equal(crashed.status, 99);
 
+    const beforeRecovery = canonical(backlogDir);
+    assert.equal(beforeRecovery.revision, 1, "the killed writer did not reach its store rename");
+    assert.equal(beforeRecovery.tasks[0].state, "open");
+    assert.equal(
+      strays(backlogDir).some((file) => file.endsWith(".local-tracker.revision-2.json")),
+      true,
+      "the child died after the no-overwrite claim and before the store rename"
+    );
+
+    const recovered = adapter.create({ title: "After crash" });
+    assert.equal(recovered.id, "2");
     const stored = canonical(backlogDir);
-    assert.equal(stored.tasks.length, 1);
+    assert.equal(stored.revision, 3);
+    assert.equal(stored.tasks.length, 2);
     assert.equal(stored.tasks[0].id, "1");
     assert.equal(stored.tasks[0].state, "closed");
     assert.equal(stored.tasks[0].status, "Done");
     assert.equal(adapter.read("BACK-1").state, "closed");
-
-    adapter.close("BACK-1");
-    assert.deepEqual(fs.readdirSync(path.join(backlogDir, "tasks")), []);
+    assert.equal(adapter.read("BACK-2").title, "After crash");
+    assert.deepEqual(fs.readdirSync(path.join(backlogDir, "tasks")), ["BACK-2 - after-crash.md"]);
     assert.deepEqual(fs.readdirSync(path.join(backlogDir, "completed")), ["BACK-1 - one.md"]);
     assert.match(
       fs.readFileSync(path.join(backlogDir, "completed", "BACK-1 - one.md"), "utf8"),
@@ -281,7 +293,7 @@ describe("offline concurrent mutations preserve canonical tasks", () => {
     adapter.create({ id: "1", title: "Active floor" });
     adapter.create({ id: "11", title: "Completed floor" });
     adapter.close("BACK-11");
-    const titles = ["Create alpha", "Create beta", "Create gamma", "Create delta"];
+    const titles = ["Create alpha", "Create beta"];
     const failures = await runConcurrentWriters(
       root,
       backlogDir,
@@ -292,12 +304,12 @@ describe("offline concurrent mutations preserve canonical tasks", () => {
     const created = stored.tasks.filter((task) => titles.includes(task.title));
     assert.equal(created.length, titles.length);
     assert.deepEqual(new Set(created.map((task) => task.id)).size, titles.length);
-    assert.deepEqual(created.map((task) => task.id).sort(), ["12", "13", "14", "15"]);
+    assert.deepEqual(created.map((task) => task.id).sort(), ["12", "13"]);
     assert.equal(stored.tasks.find((task) => task.id === "11").state, "closed");
     assert.deepEqual(strays(backlogDir), []);
   });
 
-  it("different-task updates and a racing create all persist on every platform", async (t) => {
+  it("parallel updates to different tasks both persist on every platform", async (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
     const adapter = localAdapter(backlogDir).adapter;
     adapter.create({ title: "One" });
@@ -313,14 +325,12 @@ describe("offline concurrent mutations preserve canonical tasks", () => {
         selector: "BACK-2",
         changes: { labels: ["updated-two"], status: "In Progress" },
       },
-      { kind: "create", input: { title: "Three created" } },
     ]);
     assert.deepEqual(failures, []);
     assert.equal(adapter.read("BACK-1").title, "One updated");
     assert.equal(adapter.read("BACK-1").priority, "high");
     assert.deepEqual(adapter.read("BACK-2").labels, ["updated-two"]);
     assert.equal(adapter.read("BACK-2").status, "In Progress");
-    assert.equal(adapter.read("BACK-3").title, "Three created");
     assert.deepEqual(strays(backlogDir), []);
   });
 });

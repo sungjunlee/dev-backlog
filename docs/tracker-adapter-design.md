@@ -82,11 +82,13 @@ That single decision is what lets the substrate shrink:
 - a single store file keeps write-temp plus atomic rename for complete,
   non-torn replacement.
 
-The deleted allocation lock had two jobs: atomic replacement prevents partial
-or interleaved store bytes, but it does not serialize ID allocation or any other
-read-modify-write. `local` therefore uses a minimal create-exclusive lock for
-that second job: bounded acquisition retries, then close and unlink by its own
-holder, with no stamps, liveness probing, replacement, or reclamation.
+The deleted allocation lock had two jobs: atomic rename prevents partial or
+interleaved store bytes, but it does not serialize ID allocation or any other
+read-modify-write. `local` handles that second job with revision-based
+compare-and-swap: a complete fsynced candidate claims its next revision through
+no-overwrite `link`, then renames into place; a collision re-reads and retries
+within a bounded budget. A crash leaves only inert revision-identified debris,
+never a lock that another writer must interpret or reclaim.
 
 **Co-authoritative rule (binding).** The derived mirror is never parsed back as
 truth. Every read resolves from the JSON store; a hand-edit to a mirror file is

@@ -58,7 +58,7 @@ function record(id, fields = {}) {
 function seedStore(backlogDir, tasks) {
   fs.writeFileSync(
     storePath(backlogDir),
-    `${JSON.stringify({ version: 1, tasks }, null, 2)}\n`
+    `${JSON.stringify({ version: 1, revision: 1, tasks }, null, 2)}\n`
   );
 }
 
@@ -322,11 +322,12 @@ describe("fail-closed JSON and filesystem validation", () => {
   it("fails availability and every read on malformed or duplicate JSON records", (t) => {
     const { backlogDir } = makeStore(t);
     for (const raw of [
-      "{\"version\":1,\"tasks\":[",
-      JSON.stringify({ version: 2, tasks: [] }),
-      JSON.stringify({ version: 1, tasks: [record("1"), record("1")] }),
-      JSON.stringify({ version: 1, tasks: [{ ...record("1"), state: "lost" }] }),
-      JSON.stringify({ version: 1, tasks: [{ ...record("1"), title: "" }] }),
+      "{\"version\":1,\"revision\":0,\"tasks\":[",
+      JSON.stringify({ version: 2, revision: 0, tasks: [] }),
+      JSON.stringify({ version: 1, revision: -1, tasks: [] }),
+      JSON.stringify({ version: 1, revision: 1, tasks: [record("1"), record("1")] }),
+      JSON.stringify({ version: 1, revision: 1, tasks: [{ ...record("1"), state: "lost" }] }),
+      JSON.stringify({ version: 1, revision: 1, tasks: [{ ...record("1"), title: "" }] }),
     ]) {
       fs.writeFileSync(storePath(backlogDir), raw);
       const adapter = createLocalAdapter({ backlogDir, now: FIXED_NOW });
@@ -371,7 +372,7 @@ describe("fail-closed JSON and filesystem validation", () => {
     const { root, backlogDir } = makeStore(t);
     if (!symlinkSupported(root)) return;
     const external = path.join(root, "outside.json");
-    fs.writeFileSync(external, JSON.stringify({ version: 1, tasks: [] }));
+    fs.writeFileSync(external, JSON.stringify({ version: 1, revision: 0, tasks: [] }));
     fs.symlinkSync(external, storePath(backlogDir));
     let adapter = createLocalAdapter({ backlogDir, now: FIXED_NOW });
     assert.equal(adapter.availability().available, false);
@@ -420,33 +421,6 @@ describe("atomic replacement and all-platform concurrency coverage", () => {
     assert.deepEqual(tempNames(backlogDir), []);
   });
 
-  it("a crash after close rename leaves one readable closed record and heals mirrors on retry", (t) => {
-    const { backlogDir } = makeStore(t);
-    const normal = createLocalAdapter({ backlogDir, now: FIXED_NOW });
-    normal.create({ title: "Crash close", body: "Durable" });
-    const crashing = createLocalAdapter({
-      backlogDir,
-      now: FIXED_NOW,
-      testHooks: {
-        afterStoreRename() {
-          throw new Error("simulated process death after atomic rename");
-        },
-      },
-    });
-    assert.throws(() => crashing.close("BACK-1"), /simulated process death/);
-    const stored = readStore(backlogDir);
-    assert.equal(stored.tasks.length, 1);
-    assert.equal(stored.tasks[0].state, "closed");
-    assert.equal(stored.tasks[0].status, "Done");
-    assert.equal(normal.read("BACK-1").state, "closed");
-
-    normal.close("BACK-1");
-    assert.deepEqual(mirrorNames(backlogDir, "tasks"), []);
-    assert.deepEqual(mirrorNames(backlogDir, "completed"), ["BACK-1 - crash-close.md"]);
-    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), false);
-    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), false);
-  });
-
   it("fsyncs each parent directory after store, mirror, and archive renames", (t) => {
     const { backlogDir } = makeStore(t);
     const attempts = [];
@@ -477,20 +451,29 @@ describe("atomic replacement and all-platform concurrency coverage", () => {
     ]);
   });
 
-  it("fails closed on an occupied write lock without reclaiming it", (t) => {
+  it("fails closed when the bounded compare-and-swap retry budget is exhausted", (t) => {
     const { backlogDir } = makeStore(t);
-    const lockPath = path.join(backlogDir, ".local-tracker.lock");
-    fs.writeFileSync(lockPath, "foreign holder");
+    let claims = 0;
     const adapter = createLocalAdapter({
       backlogDir,
       now: FIXED_NOW,
-      lock: { retries: 1, delayMs: 1 },
+      cas: { retries: 1 },
+      testHooks: {
+        linkRevision() {
+          claims += 1;
+          const error = new Error("revision already claimed");
+          error.code = "EEXIST";
+          throw error;
+        },
+      },
     });
     assert.throws(
-      () => adapter.create({ title: "Blocked" }),
-      (error) => error instanceof LocalStoreError && /remained held.*active writer/.test(error.message)
+      () => adapter.create({ title: "Contended" }),
+      (error) =>
+        error instanceof LocalStoreError &&
+        /compare-and-swap exhausted after 2 attempts.*no unconditional write/.test(error.message)
     );
-    assert.equal(fs.readFileSync(lockPath, "utf8"), "foreign holder");
+    assert.equal(claims, 2);
     assert.equal(fs.existsSync(storePath(backlogDir)), false);
   });
 });

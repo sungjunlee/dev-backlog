@@ -19,39 +19,21 @@ const TASKS_DIR = "tasks";
 const COMPLETED_DIR = "completed";
 const DONE_STATUS = "Done";
 const STORE_VERSION = 1;
-const LOCK_FILE = ".local-tracker.lock";
-const LOCK_WAIT = new Int32Array(new SharedArrayBuffer(4));
+const CAS_RETRIES = 100;
+const REVISION_TEMP_RE = /^\.local-tracker\.revision-(\d+)\..+\.tmp$/;
 
 const CREATE_OPTIONS = Object.freeze([
-  "title",
-  "id",
-  "body",
-  "status",
-  "labels",
-  "priority",
-  "dependencies",
+  "title", "id", "body", "status", "labels", "priority", "dependencies",
 ]);
 const UPDATE_OPTIONS = Object.freeze([
-  "title",
-  "status",
-  "priority",
-  "labels",
-  "dependencies",
-  "body",
-  "updated_date",
+  "title", "status", "priority", "labels", "dependencies", "body", "updated_date",
 ]);
 const LIST_STATES = Object.freeze(["open", "closed", "all"]);
 const SCALAR_FIELDS = Object.freeze([
-  "title",
-  "status",
-  "priority",
-  "milestone",
-  "created_date",
-  "updated_date",
+  "title", "status", "priority", "milestone", "created_date", "updated_date",
 ]);
 const LIST_FIELDS = Object.freeze(["labels", "dependencies"]);
 const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/;
-
 class LocalStoreError extends Error {
   constructor(message, options) {
     super(message, options);
@@ -59,7 +41,6 @@ class LocalStoreError extends Error {
     this.tracker = "local";
   }
 }
-
 function rejectUnsupportedOptions(operation, options, allowed) {
   if (options === null || typeof options !== "object" || Array.isArray(options)) return;
   const extra = Object.keys(options).filter((key) => !allowed.includes(key));
@@ -71,20 +52,16 @@ function rejectUnsupportedOptions(operation, options, allowed) {
     );
   }
 }
-
 function taskPrefixIssue(prefix) {
-  if (typeof prefix !== "string" || !prefix.length) {
-    return "task_prefix must be a non-empty string";
-  }
-  if (/[\s/\\\0]/.test(prefix)) {
-    return `task_prefix ${JSON.stringify(prefix)} must not contain whitespace, path separators, or NUL`;
-  }
-  if (prefix.includes("..")) {
-    return `task_prefix ${JSON.stringify(prefix)} must not contain traversal segments`;
-  }
+  if (typeof prefix !== "string" || !prefix.length) return "task_prefix must be a non-empty string";
+  if (/[\s/\\\0]/.test(prefix)) return (
+    `task_prefix ${JSON.stringify(prefix)} must not contain whitespace, path separators, or NUL`
+  );
+  if (prefix.includes("..")) return (
+    `task_prefix ${JSON.stringify(prefix)} must not contain traversal segments`
+  );
   return null;
 }
-
 function assertNoControlChars(field, value) {
   if (CONTROL_CHAR_RE.test(value)) {
     throw new LocalStoreError(
@@ -93,7 +70,6 @@ function assertNoControlChars(field, value) {
     );
   }
 }
-
 function cleanScalar(field, value, { nonEmpty = false } = {}) {
   const text = String(value);
   assertNoControlChars(field, text);
@@ -102,18 +78,11 @@ function cleanScalar(field, value, { nonEmpty = false } = {}) {
   }
   return text;
 }
-
 function cleanList(field, value) {
-  if (!Array.isArray(value)) {
-    throw new LocalStoreError(`local ${field} must be an array`);
-  }
+  if (!Array.isArray(value)) throw new LocalStoreError(`local ${field} must be an array`);
   return value.map((item) => cleanScalar(`${field} item`, item));
 }
-
-function emptyStore() {
-  return { version: STORE_VERSION, tasks: [] };
-}
-
+function emptyStore() { return { version: STORE_VERSION, revision: 0, tasks: [] }; }
 function compareByParentThenSub(left, right) {
   const key = (id) => {
     const [parent, sub] = id.split(".");
@@ -125,7 +94,6 @@ function compareByParentThenSub(left, right) {
   if (ls !== rs) return ls < rs ? -1 : 1;
   return 0;
 }
-
 function createLocalAdapter(options = {}) {
   const backlogDir = options.backlogDir;
   const now = options.now || (() => new Date());
@@ -136,18 +104,13 @@ function createLocalAdapter(options = {}) {
   const testHooks = options.testHooks || {};
   const refOptions = { taskPrefix };
   const storePath = path.join(backlogDir || "", STORE_FILE);
-  const lockPath = path.join(backlogDir || "", LOCK_FILE);
-  const lockRetries = options.lock?.retries ?? 1000;
-  const lockDelayMs = options.lock?.delayMs ?? 5;
-
-  function identityForId(id) {
-    return parseTaskRef(`${taskPrefix}-${id}`, refOptions);
-  }
-
+  const requestedRetries = options.cas?.retries;
+  const casRetries = Number.isSafeInteger(requestedRetries)
+    ? Math.max(0, Math.min(requestedRetries, CAS_RETRIES)) : CAS_RETRIES;
+  function identityForId(id) { return parseTaskRef(`${taskPrefix}-${id}`, refOptions); }
   function assertUsablePrefix() {
     if (prefixIssue) throw new LocalStoreError(`local tracker ${prefixIssue}`);
   }
-
   function resolveIdentity(selector) {
     if (selector && typeof selector === "object" && !Array.isArray(selector)) {
       if (selector.tracker !== "local") {
@@ -168,7 +131,6 @@ function createLocalAdapter(options = {}) {
     }
     throw new LocalStoreError(`unresolved local task selector: ${String(selector)}`);
   }
-
   function pathIssue(target, kind) {
     let stat;
     try {
@@ -182,7 +144,6 @@ function createLocalAdapter(options = {}) {
     if (kind !== "store" && !stat.isDirectory()) return `local ${kind} path ${target} is not a directory`;
     return null;
   }
-
   function canonicalPathIssue() {
     if (typeof backlogDir !== "string" || !backlogDir.trim()) {
       return "local tracker backlogDir is not configured";
@@ -198,12 +159,10 @@ function createLocalAdapter(options = {}) {
     }
     return null;
   }
-
   function assertCanonicalPaths() {
     const issue = canonicalPathIssue();
     if (issue) throw new LocalStoreError(issue);
   }
-
   function validateRecord(record, seen) {
     if (!record || typeof record !== "object" || Array.isArray(record)) {
       throw new LocalStoreError("local JSON store is malformed: every task must be an object");
@@ -236,21 +195,25 @@ function createLocalAdapter(options = {}) {
     for (const field of LIST_FIELDS) cleanList(field, record[field]);
     return record;
   }
-
   function validateStore(store) {
     if (!store || typeof store !== "object" || Array.isArray(store)) {
       throw new LocalStoreError("local JSON store is malformed: expected an object");
     }
-    if (store.version !== STORE_VERSION || !Array.isArray(store.tasks)) {
+    if (
+      store.version !== STORE_VERSION ||
+      !Number.isSafeInteger(store.revision) ||
+      store.revision < 0 ||
+      !Array.isArray(store.tasks)
+    ) {
       throw new LocalStoreError(
-        `local JSON store is malformed: expected version ${STORE_VERSION} with a tasks array`
+        `local JSON store is malformed: expected version ${STORE_VERSION}, a non-negative ` +
+          "integer revision, and a tasks array"
       );
     }
     const seen = new Set();
     for (const record of store.tasks) validateRecord(record, seen);
     return store;
   }
-
   function readStore() {
     assertCanonicalPaths();
     let raw;
@@ -267,47 +230,12 @@ function createLocalAdapter(options = {}) {
       throw new LocalStoreError(`local JSON store is malformed: ${error.message}`, { cause: error });
     }
   }
-
-  function withWriteLock(operation) {
-    assertCanonicalPaths();
-    fs.mkdirSync(backlogDir, { recursive: true });
-    let fd;
-    for (let attempt = 0; fd === undefined; attempt += 1) {
-      try {
-        fd = fs.openSync(lockPath, "wx");
-      } catch (error) {
-        if (error.code !== "EEXIST") throw new LocalStoreError(
-          `cannot acquire local store lock: ${error.message}`, { cause: error }
-        );
-        if (attempt >= lockRetries) {
-          throw new LocalStoreError(
-            `local store lock ${lockPath} remained held after ${lockRetries + 1} attempts; ` +
-              "wait for the active writer, or remove it only after confirming no writer is running"
-          );
-        }
-        Atomics.wait(LOCK_WAIT, 0, 0, lockDelayMs);
-      }
-    }
-    try {
-      return operation();
-    } finally {
-      let releaseError;
-      try { fs.closeSync(fd); } catch (error) { releaseError = error; }
-      try { fs.unlinkSync(lockPath); } catch (error) { releaseError ||= error; }
-      if (releaseError) throw new LocalStoreError(
-        `local store commit finished but its lock could not be released: ${releaseError.message}`,
-        { cause: releaseError }
-      );
-    }
-  }
-
   function tempPath(dir, label) {
     return path.join(
       dir,
       `.local-tracker.${process.pid}.${label}.${crypto.randomBytes(8).toString("hex")}.tmp`
     );
   }
-
   function writeCompleteTemp(tmp, content, hook) {
     if (hook) return hook(tmp, content);
     const fd = fs.openSync(tmp, "wx", 0o666);
@@ -318,7 +246,6 @@ function createLocalAdapter(options = {}) {
       fs.closeSync(fd);
     }
   }
-
   function fsyncDirectory(dir, target) {
     if (testHooks.beforeDirectoryFsync) testHooks.beforeDirectoryFsync(dir, target);
     let fd;
@@ -333,7 +260,6 @@ function createLocalAdapter(options = {}) {
       try { if (fd !== undefined) fs.closeSync(fd); } catch {}
     }
   }
-
   function replaceAtomic(target, content, hookName) {
     const dir = path.dirname(target);
     const issue = pathIssue(dir, path.basename(dir));
@@ -342,9 +268,6 @@ function createLocalAdapter(options = {}) {
     const tmp = tempPath(dir, path.basename(target).replace(/[^A-Za-z0-9.-]/g, "_"));
     try {
       writeCompleteTemp(tmp, content, testHooks[hookName]);
-      if (hookName === "writeStoreTemp" && testHooks.beforeStoreRename) {
-        testHooks.beforeStoreRename(tmp, target);
-      }
       if (hookName === "writeMirrorTemp" && testHooks.beforeMirrorRename) {
         testHooks.beforeMirrorRename(tmp, target);
       }
@@ -362,13 +285,81 @@ function createLocalAdapter(options = {}) {
       }
     }
   }
+  function revisionPath(revision) {
+    return path.join(backlogDir, `.local-tracker.revision-${revision}.json`);
+  }
 
-  function writeStore(store) {
+  function revisionTempPath(revision) {
+    const token = crypto.randomBytes(8).toString("hex");
+    return path.join(backlogDir, `.local-tracker.revision-${revision}.${process.pid}.${token}.tmp`);
+  }
+  function finishClaim(claimPath, revision) {
+    const currentRevision = readStore().revision;
+    if (currentRevision !== revision - 1) return;
+    try { fs.renameSync(claimPath, storePath); fsyncDirectory(backlogDir, storePath); }
+    catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      // The claimant or another helper already completed this exact revision.
+    }
+  }
+  function cleanRevisionDebris(currentRevision) {
+    for (const name of fs.readdirSync(backlogDir)) {
+      const match = name.match(REVISION_TEMP_RE);
+      if (!match || Number(match[1]) > currentRevision) continue;
+      try { fs.unlinkSync(path.join(backlogDir, name)); }
+      catch (error) {
+        if (!["ENOENT", "EBUSY", "EPERM"].includes(error.code)) throw error;
+      }
+    }
+  }
+  function publishStore(store, baseRevision) {
     validateStore(store);
     assertCanonicalPaths();
     fs.mkdirSync(backlogDir, { recursive: true });
+    const revision = baseRevision + 1;
+    const claimPath = revisionPath(revision);
+    const tmp = revisionTempPath(revision);
     const content = `${JSON.stringify(store, null, 2)}\n`;
-    replaceAtomic(storePath, content, "writeStoreTemp");
+    try {
+      writeCompleteTemp(tmp, content, testHooks.writeStoreTemp);
+      if (testHooks.beforeRevisionClaim) testHooks.beforeRevisionClaim(tmp, claimPath);
+      try {
+        (testHooks.linkRevision || fs.linkSync)(tmp, claimPath);
+      } catch (error) {
+        if (error.code === "EEXIST") {
+          finishClaim(claimPath, revision);
+          return false;
+        }
+        // A winning writer may remove a stale contender's temp during cleanup.
+        if (error.code === "ENOENT") return false;
+        throw error;
+      }
+      if (testHooks.afterRevisionClaim) testHooks.afterRevisionClaim(claimPath, storePath);
+
+      const currentRevision = readStore().revision;
+      if (currentRevision !== baseRevision) {
+        // A helper can publish our complete claim before this recheck. Missing
+        // means that exact candidate won; an extant path is our stale claim.
+        if (!fs.existsSync(claimPath)) return true;
+        fs.unlinkSync(claimPath);
+        return false;
+      }
+      try { fs.renameSync(claimPath, storePath); fsyncDirectory(backlogDir, storePath); }
+      catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        // Another writer helped this content-complete claim across the window.
+      }
+      return true;
+    } catch (error) {
+      throw error instanceof LocalStoreError
+        ? error
+        : new LocalStoreError(
+            `cannot compare-and-swap local store revision ${revision}: ${error.message}`,
+            { cause: error }
+          );
+    } finally {
+      try { fs.unlinkSync(tmp); } catch {}
+    }
   }
 
   function bodyForMirror(body) {
@@ -426,15 +417,24 @@ function createLocalAdapter(options = {}) {
   }
 
   function commitMutation(mutate) {
-    const result = withWriteLock(() => {
+    for (let attempt = 0; attempt <= casRetries; attempt += 1) {
       const store = readStore();
       const outcome = mutate(store);
-      if (outcome.changed) writeStore(store);
-      return outcome;
-    });
-    if (result.changed && testHooks.afterStoreRename) testHooks.afterStoreRename(storePath);
-    withWriteLock(() => refreshMirrors(readStore()));
-    return result.value;
+      if (!outcome.changed) {
+        refreshMirrors(readStore());
+        return outcome.value;
+      }
+      const baseRevision = store.revision;
+      store.revision += 1;
+      if (!publishStore(store, baseRevision)) continue;
+      cleanRevisionDebris(store.revision);
+      refreshMirrors(readStore());
+      return outcome.value;
+    }
+    throw new LocalStoreError(
+      `local store compare-and-swap exhausted after ${casRetries + 1} attempts; ` +
+        "concurrent writers kept claiming newer revisions, so no unconditional write was made"
+    );
   }
 
   function identityResult(id) {
