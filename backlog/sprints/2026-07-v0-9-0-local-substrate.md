@@ -22,7 +22,7 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 2 - Local substrate [after:#320]
 
-- [~] #321 refactor(local-tracker): JSON canonical store + atomic rename; drop the frontmatter YAML round-trip and the allocation lock (~4hr) [run:issue-321-20260726133041404-0f223745] [branch:issue-321]
+- [x] #321 refactor(local-tracker): JSON canonical store + compare-and-swap commits (~4hr) → PR #327 (merged)
 
 ### Batch 3 - Selection file [after:#321]
 
@@ -30,7 +30,7 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 4 - Contract + release [after:#321,#322]
 
-- [ ] #323 docs: align contract surfaces with the local substrate redesign + record the adapter size budget (~1hr)
+- [ ] #323 docs: capability Decisions row + residual-claim sweep (re-scoped — contract prose landed in #321) (~30min)
 - [ ] #324 release: prepare and cut v0.9.0 (~45min)
 
 ## Running Context
@@ -96,3 +96,31 @@ and the three Windows lock-race skips are gone.
   skips get deleted, not re-documented), the surviving PR #298 Learnings, and a dated
   no-migration posture. The `#273-#278` runtime section carries a forward pointer so it cannot be
   read as current on the two superseded points. Batch 2 (#321) is next.
+- 2026-07-26: Batch 2 done. #321 → PR #327 (merged `ab277b5`). `local-tracker.js` 1,391 → 597,
+  test file 1,357 → 511, Windows lock skips 3 → 0. Ubuntu and Windows CI both green; 626 tests /
+  0 fail, dual-mode acceptance 11/11, smoke 187/187.
+  **Three executor rounds, and the second and third both existed because the contract was wrong.**
+  The deleted allocation lock was doing two jobs; atomic rename replaces only the first (torn-write
+  prevention) and not the second (serializing the read-modify-write critical section, including ID
+  allocation). Round 1 shipped rename-only and lost concurrent writers. Round 2 restored a minimal
+  lock, which fixed that but reintroduced the crash-wedge the original 1,391-line version carried
+  pid/token stamps and liveness probing to survive. Round 3 uses revision-based compare-and-swap:
+  a complete fsynced candidate claims `.local-tracker.revision-{N+1}.json` via no-overwrite `link`,
+  a loser helps the existing claim across and retries within a bounded budget, exhaustion fails
+  closed. `finishClaim` is a helping protocol, so crash debris is inert by construction rather than
+  by convention — verified by a test that kills a child inside the commit window and asserts both
+  that the next mutation succeeds and that the dead writer's close is carried across, with zero
+  strays. Issue #321's acceptance criteria were amended (2026-07-26, recorded in the issue) rather
+  than letting the implementation quietly contradict a frozen contract.
+  Process notes: two independent codex reviews ran, both returned `changes_requested`, and both
+  were right. Round 3 hit relay's review cap (`standard` = 2) — the cap counts rounds against a
+  contract that had itself been amended — so the orchestrator verified every amended criterion
+  directly and recorded the reasoning in PR #327 instead of spending a round only to raise the cap.
+  A stale round-2 lock sentence in `docs/tracker-adapter-design.md` was found in that pass and
+  fixed directly (`98fe251`). #323 is re-scoped: the contract prose (README, SKILL.md,
+  `references/*`) landed with #321 because #321 made `SKILL.md`'s "local tasks are canonical" claim
+  false on merge, so shipping code without prose would have created v0.8.0-style drift.
+  Two dev-relay gaps surfaced and are unfiled (that repo has another live session):
+  relay-review passes the review prompt through argv, so a single raw NUL byte anywhere in the diff
+  fails the codex reviewer (worked around with a sanitized `--diff-file`); and a rubric's
+  `task_profile.review_assurance` is ignored — the cap comes from dispatch's `--review-assurance`.
