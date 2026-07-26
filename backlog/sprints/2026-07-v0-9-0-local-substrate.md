@@ -22,7 +22,7 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 2 - Local substrate [after:#320]
 
-- [ ] #321 refactor(local-tracker): JSON canonical store + atomic rename; drop the frontmatter YAML round-trip and the allocation lock (~4hr)
+- [~] #321 refactor(local-tracker): JSON canonical store + atomic rename; drop the frontmatter YAML round-trip and the allocation lock (~4hr) [run:issue-321-20260726133041404-0f223745] [branch:issue-321]
 
 ### Batch 3 - Selection file [after:#321]
 
