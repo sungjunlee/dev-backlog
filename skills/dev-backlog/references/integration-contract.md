@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` have mode-specific authority. With `tracker: github` they are derived issue mirrors; with `tracker: local` they are the canonical active/completed task store. Task files carry bodies and Acceptance Criteria checkboxes; sprint files remain the execution log.
+- `backlog/tasks/` and `backlog/completed/` are derived mirrors in both modes. GitHub Issues are authoritative for `tracker: github`; `backlog/local-tracker.json` is authoritative for `tracker: local`. Local mirrors are never parsed back into task truth. Task files expose bodies and Acceptance Criteria checkboxes; sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -436,7 +436,7 @@ This allows comment upserts to stay idempotent and prevents duplicate machine co
 - **No sprint file**: actors skip sprint tracking entirely. Tasks still work standalone.
 - **No `_context.md`**: ignored silently.
 - **Missing section in sprint**: treated as empty.
-- **No GitHub mirror file**: GitHub-capable actors may read the canonical issue through the configured adapter; local mode must fail a missing canonical file rather than call `gh`.
+- **No task mirror file**: actors read the canonical provider through the configured adapter. A local mirror is regenerated on the next local write and its absence never causes a `gh` call.
 - **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate local state, or switch trackers.
 - **No relay manifest path**: progress reporting stays backlog-only.
 

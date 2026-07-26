@@ -321,9 +321,9 @@ Exactly one explicitly configured tracker owns canonical task truth for a
 repository. Initial configured values are `github` and `local`; an absent new
 key may retain GitHub through the compatibility default frozen for #273, but
 runtime availability never chooses a value. Sprint files remain the canonical
-execution hub, and task files are either canonical local tasks or derived
-GitHub mirrors according to the selected adapter. They are never two canonical
-task stores.
+execution hub. Task files are derived mirrors in both modes; local task truth
+lives only in `backlog/local-tracker.json`, while GitHub task truth remains in
+GitHub Issues. They are never two canonical task stores.
 
 The seam is deep rather than a command wrapper: callers ask for task lifecycle
 operations and stable identity. The GitHub adapter owns GitHub transport and

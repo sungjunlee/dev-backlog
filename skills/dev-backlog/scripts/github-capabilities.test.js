@@ -21,6 +21,7 @@ const { sync: syncMirror } = require("./sprint-mirror.js");
 const { sync: syncProgress } = require("./progress-sync.js");
 const { createSprintFile } = require("./sprint-init.js");
 const { listStatusRows } = require("./tracker-status-list.js");
+const { createLocalAdapter } = require("./local-tracker.js");
 const { collectSnapshot } = require("../../backlog-triage/scripts/triage-collect.js");
 const { execute: applyTriage } = require("../../backlog-triage/scripts/triage-apply.js");
 
@@ -114,14 +115,12 @@ describe("GitHub optional capability transports", () => {
       path.join(backlogDir, "config.yml"),
       "tracker: local\ntask_prefix: BACK\n"
     );
-    fs.writeFileSync(
-      path.join(backlogDir, "tasks", "BACK-7.2 - custom-store-task.md"),
-      [
-        "---", "id: BACK-7.2", "title: Custom store task", "status: To Do",
-        "labels: [offline]", "priority: medium", "created_date: '2026-07-12'", "---",
-        "## Description", "Custom local task", "",
-      ].join("\n")
-    );
+    createLocalAdapter({ backlogDir }).create({
+      id: "7.2",
+      title: "Custom store task",
+      body: "Custom local task",
+      labels: ["offline"],
+    });
     const columnPath = path.join(binDir, "column");
     fs.writeFileSync(columnPath, "#!/bin/sh\ncat\n");
     fs.chmodSync(columnPath, 0o755);

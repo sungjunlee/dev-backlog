@@ -367,7 +367,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 |----------|-----|
 | Exactly one tracker owns task truth | GitHub collaboration and offline local work share one core lifecycle without becoming co-authoritative |
 | Sprint files are the execution hub | One file carries plan, context, and progress across sessions |
-| Task-file authority is mode-specific | Thin mirrors in GitHub mode; canonical active/completed files in local mode |
+| Task files are always mirrors | GitHub Issues or `local-tracker.json` owns task truth; both modes emit the same active/completed Markdown shape |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
 | Task-file format is Backlog.md-compatible | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format; `sprints/` and `gh` sync are dev-backlog additions |
