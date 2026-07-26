@@ -67,18 +67,20 @@ adapter allocates the canonical local ID.
 
 ## Body Structure
 
-Task files are thin GitHub mirrors when `tracker: github` and canonical task
-records when `tracker: local`. Notes, decisions, and cross-task context still go
-in the **sprint file** (`backlog/sprints/`), not here.
+Task files are derived mirrors in both modes: from GitHub Issues when
+`tracker: github`, and from `backlog/local-tracker.json` when `tracker: local`.
+Notes, decisions, and cross-task context still go in the **sprint file**
+(`backlog/sprints/`), not here.
 
 ```markdown
 ## Description
 [Synced from GitHub issue body — includes any checkboxes from the issue]
 ```
 
-`sync-pull.js` wraps a GitHub issue body in `## Description`. Local create stores
-the supplied body directly. Acceptance criteria checkboxes remain human-authored
-bytes in either mode; metadata-only refresh/update preserves them.
+`sync-pull.js` and the local projection wrap a task body in `## Description`.
+In GitHub mode the issue body is authoritative. In local mode the JSON body is
+authoritative, so hand-edited mirror bytes are overwritten on the next local
+write rather than parsed back into task truth.
 
 For manual task files or Backlog.md CLI compatibility, you can optionally add structured AC markers:
 
@@ -128,15 +130,18 @@ it never migrates task files.
 
 ## Local Canonical Storage (`tracker: local`)
 
-In local mode `backlog/tasks/` and `backlog/completed/` are the **canonical**
-task store. Required list/read/create/update/close operations return normalized
-identity `{ tracker: "local", id, ref: "{PREFIX}-{N[.M]}" }` without fabricating
-a URL. Metadata-only updates preserve body/AC bytes; close writes `status: Done`
-and archives the same file. Local reports no optional provider capabilities, so
+In local mode `backlog/local-tracker.json` is the **canonical** task store.
+`backlog/tasks/` and `backlog/completed/` are one-way derived mirrors and are
+never read back as task truth. Required list/read/create/update/close operations
+return normalized identity
+`{ tracker: "local", id, ref: "{PREFIX}-{N[.M]}" }` without fabricating a URL.
+Metadata-only updates preserve the canonical body/AC bytes; close atomically
+changes one JSON record to `state: closed` and projects `status: Done`. Local
+reports no optional provider capabilities, so
 milestones, PR relationships, mirrors, progress issues, comments, and closing
 semantics fail before filesystem or provider effects and never invoke `gh`.
 
-Filesystem allocation, publication, collision, and recovery details have one
+JSON allocation, atomic publication, collision, and recovery details have one
 implementation owner: [Tracker Adapter Design Contract](../../../docs/tracker-adapter-design.md).
 
 dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;

@@ -48,6 +48,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-07-11 | Admit `tracker-task-truth` as a separate capability from `backlog-sync` | canonical ownership and task lifecycle are required in every mode; mirroring and publication are optional transport behaviors | — |
+| 2026-07-26 | Make `backlog/local-tracker.json` the sole local task authority and derive both Markdown directories from it | one atomic JSON store removes Markdown/YAML round-trip and close-compensation machinery while satisfying the no-co-authority constraint directly | canonical local Markdown shape from PR #298 |
 
 ---
 

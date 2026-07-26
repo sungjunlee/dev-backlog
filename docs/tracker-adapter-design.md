@@ -79,9 +79,16 @@ That single decision is what lets the substrate shrink:
 
 - markdown is no longer canonical, so the frontmatter YAML parse/serialize path
   and CRLF byte preservation are deleted;
-- a single store file means concurrent writers are handled by write-temp plus
-  atomic rename (~30 lines) instead of the allocation lock, stamp inspection,
-  retry loop, and close compensation (~350 lines).
+- a single store file keeps write-temp plus atomic rename for complete,
+  non-torn replacement.
+
+The deleted allocation lock had two jobs: atomic rename prevents partial or
+interleaved store bytes, but it does not serialize ID allocation or any other
+read-modify-write. `local` handles that second job with revision-based
+compare-and-swap: a complete fsynced candidate claims its next revision through
+no-overwrite `link`, then renames into place; a collision re-reads and retries
+within a bounded budget. A crash leaves only inert revision-identified debris,
+never a lock that another writer must interpret or reclaim.
 
 **Co-authoritative rule (binding).** The derived mirror is never parsed back as
 truth. Every read resolves from the JSON store; a hand-edit to a mirror file is
@@ -128,18 +135,20 @@ round-trip (task files — deleted).
 
 ### Windows consequence
 
-The allocation lock is the sole cause of the local tracker's Windows
-divergence. Three tests carry:
+Replacing an open allocation-lock pathname during reclamation was the sole
+cause of the local tracker's Windows divergence. Three tests carried:
 
 ```
 t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race")
 ```
 
-Atomic rename behaves identically on both platforms, so the redesign **deletes**
-those skips rather than re-documenting them, and their replacement coverage runs
-everywhere. Windows-specific code stays at 68 lines (`bash-runtime.js` 44 plus
-`portable-path.js` 24) and the `windows-latest` CI job. Windows support gets
-cheaper and more honest, not weaker.
+Compare-and-swap has no lock pathname to reclaim. A writer claims its revision
+through no-overwrite `link` and renames its own complete candidate into place;
+nothing is ever replaced while another process holds it open. The redesign
+therefore **deletes** those skips rather than re-documenting them, and the
+concurrent-writer coverage runs everywhere. Windows-specific code stays at 68
+lines (`bash-runtime.js` 44 plus `portable-path.js` 24) and the
+`windows-latest` CI job.
 
 ### What survives unchanged
 
@@ -321,9 +330,9 @@ Exactly one explicitly configured tracker owns canonical task truth for a
 repository. Initial configured values are `github` and `local`; an absent new
 key may retain GitHub through the compatibility default frozen for #273, but
 runtime availability never chooses a value. Sprint files remain the canonical
-execution hub, and task files are either canonical local tasks or derived
-GitHub mirrors according to the selected adapter. They are never two canonical
-task stores.
+execution hub. Task files are derived mirrors in both modes; local task truth
+lives only in `backlog/local-tracker.json`, while GitHub task truth remains in
+GitHub Issues. They are never two canonical task stores.
 
 The seam is deep rather than a command wrapper: callers ask for task lifecycle
 operations and stable identity. The GitHub adapter owns GitHub transport and

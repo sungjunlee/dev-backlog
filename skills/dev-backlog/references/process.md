@@ -53,7 +53,7 @@ the linked Tracker Adapter Design Contract.
 
 1. Call the configured adapter's required `create` operation.
 2. Use its returned normalized ref in the current sprint Plan when in scope: GitHub `#N`, local `{PREFIX}-N[.M]`.
-3. In GitHub mode, explicitly materialize/refresh the thin task mirror with `sync-pull.js`. In local mode, create already wrote the canonical task file; do not call `gh`.
+3. In GitHub mode, explicitly materialize/refresh the thin task mirror with `sync-pull.js`. In local mode, create already wrote canonical JSON and its derived task mirror; do not call `gh`.
 
 ## Plan — Sprint
 
@@ -111,7 +111,7 @@ effects and never switches trackers.
 ## Quick Fix — Single Task, No Sprint
 
 Read, update, and close the task through the configured adapter. GitHub may use
-its normal issue/closing behavior; local stays entirely in canonical Markdown.
+its normal issue/closing behavior; local stays entirely in its canonical JSON store.
 Create a sprint only when execution context needs to span work or sessions.
 
 ## Unplanned Work — Mid-Sprint Scope Change

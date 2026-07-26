@@ -15,8 +15,8 @@ tracker.js (configured-only resolve, availability, capability gate)
         +-- github-tracker.js -> gh -> GitHub Issues (canonical)
         |                         `-> backlog/tasks/ derived mirrors
         |
-        `-- local-tracker.js  -> backlog/tasks/ active canonical tasks
-                                  backlog/completed/ closed canonical tasks
+        `-- local-tracker.js  -> backlog/local-tracker.json (canonical)
+                                  `-> backlog/tasks/ + completed/ derived mirrors
 
 backlog/sprints/ (canonical execution hub)
         +-> sprint-state.js -> status.sh --json / next.sh --json
@@ -33,7 +33,7 @@ probes or falls back to the other adapter.
 
 - `skills/dev-backlog/scripts/tracker.js` owns configured resolution, the exact seven-operation adapter contract, identity validation, capability discovery/gating, and the shared unsupported-capability error/serializer.
 - `github-tracker.js` owns required GitHub task lifecycle argv/translation. Named GitHub modules own milestones, sprint mirrors, Progress/PR/comments, and other optional transports.
-- `local-tracker.js` owns the canonical local filesystem lifecycle and reports no optional provider capabilities. It never invokes `gh`.
+- `local-tracker.js` owns the canonical local JSON lifecycle and its one-way Markdown projection. It reports no optional provider capabilities and never invokes `gh`.
 - `task-ref.js` owns complete `#N` and `{PREFIX}-N[.M]` parsing/rendering. GitHub keeps numeric `issue_number`; local exposes `null` for that compatibility alias.
 - `sprint-state.js` remains the single machine parser of sprint Markdown; `status.sh --json`, `next.sh --json`, mirror rendering, and doctor projections consume its state.
 - `skills/backlog-triage/` owns advisory grooming. Provider enrichment/mutation remains capability-gated and explicit.
@@ -46,7 +46,7 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 
 1. **Setup:** create minimum directories and persist exactly one tracker; never migrate task files.
 2. **Create/read/update/close:** call the configured adapter's required lifecycle and carry normalized `{ tracker, id, ref, url? }` identity.
-3. **Materialize:** GitHub mode explicitly mirrors canonical issues through `sync-pull.js`; local mode already stores canonical Markdown and has no provider sync.
+3. **Materialize:** GitHub mode explicitly mirrors canonical issues through `sync-pull.js`; local mutations project the canonical JSON store into the same Markdown shape without provider sync.
 4. **Plan/orient:** write normalized refs into the active track's sprint file; consume state via `status.sh --json` / `next.sh --json` (`--track` selects among multiple disjoint-scope tracks).
 5. **Complete:** close the canonical task, check the Plan, run `sprint-close.sh` (`--track` when multiple tracks are active), archive remaining checked task files, and retain sprint history.
 6. **Publish/enrich:** milestones, PR relationships, sprint mirrors, Progress issues, comments, and closing semantics run only when reported. Unsupported requests return the shared typed error before effects.
@@ -56,7 +56,8 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 
 - `backlog/config.yml`: the only tracker-selection authority plus Backlog.md settings.
 - GitHub Issues: canonical task truth only for `tracker: github`.
-- `backlog/tasks/` and `backlog/completed/`: derived GitHub mirrors or canonical local tasks according to the configured mode.
+- `backlog/local-tracker.json`: canonical task truth only for `tracker: local`.
+- `backlog/tasks/` and `backlog/completed/`: derived task mirrors in both tracker modes.
 - `backlog/sprints/`: canonical execution state in both modes, committed at explicit boundaries.
 - `gh`: GitHub-mode bridge only; acceptance tests replace it with an argv recorder and local tests trap it.
 - Git: versioned Markdown, scripts, and durable specs.
@@ -69,7 +70,7 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 - Unsupported optional capabilities have stable code `TRACKER_CAPABILITY_UNSUPPORTED`, tracker, capability, message, and remediation; JSON and human boundaries share that one serializer contract.
 - Sprint files remain the execution hub and completed sprint files are immutable history.
 - Automation is report-only toward `spec/*`; `spec/charter.md` is canonical and root `CHARTER.md` is legacy fallback only.
-- Helpers run on POSIX and Git-for-Windows Bash; native filesystem paths stay internal while stable serialized fields normalize to `/`; POSIX-only open-lock-replacement race tests are documented Windows skips.
+- Helpers run on POSIX and Git-for-Windows Bash; native filesystem paths stay internal while stable serialized fields normalize to `/`; atomic-store replacement coverage runs without platform skips.
 
 ## Executable Evidence
 

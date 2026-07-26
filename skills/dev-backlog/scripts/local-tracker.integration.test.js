@@ -26,7 +26,6 @@ function makeOfflineStore(t) {
   return { root, backlogDir };
 }
 
-/** Install a `gh` that records any invocation and fails, proving no-gh paths. */
 function installFailingGh(t, root) {
   const binDir = path.join(root, "bin");
   fs.mkdirSync(binDir, { recursive: true });
@@ -36,16 +35,95 @@ function installFailingGh(t, root) {
     `#!/bin/sh\necho "gh $*" >> "${marker}"\nexit 97\n`
   );
   fs.chmodSync(path.join(binDir, "gh"), 0o755);
-  const savedPath = process.env.PATH;
-  process.env.PATH = `${binDir}:${savedPath}`;
-  t.after(() => {
-    process.env.PATH = savedPath;
-  });
-  return { binDir, marker, envPath: `${binDir}:${savedPath}` };
+  const envPath = `${binDir}:${process.env.PATH}`;
+  return { marker, envPath };
 }
 
 function localAdapter(backlogDir) {
   return resolveConfiguredTracker({ tracker: "local" }, { backlogDir });
+}
+
+function canonical(backlogDir) {
+  return JSON.parse(fs.readFileSync(path.join(backlogDir, "local-tracker.json"), "utf8"));
+}
+
+function strays(backlogDir) {
+  const result = [];
+  function walk(dir) {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      const stat = fs.lstatSync(full);
+      if (stat.isDirectory()) walk(full);
+      else if (name.endsWith(".tmp") || name.startsWith(".local-tracker.revision-")) {
+        result.push(full);
+      }
+    }
+  }
+  walk(backlogDir);
+  return result;
+}
+
+async function runConcurrentWriters(root, backlogDir, operations) {
+  const worker = path.join(root, `concurrent-worker-${Date.now()}.js`);
+  const gateDir = path.join(root, `concurrent-gate-${Date.now()}`);
+  const renameDir = path.join(gateDir, "rename-ready");
+  fs.mkdirSync(renameDir, { recursive: true });
+  fs.writeFileSync(
+    worker,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});`,
+      "const [backlogDir, ready, go, renameReady, renameDir, count, json] = process.argv.slice(2);",
+      "const wait = new Int32Array(new SharedArrayBuffer(4));",
+      "fs.writeFileSync(ready, 'ready');",
+      "while (!fs.existsSync(go)) Atomics.wait(wait, 0, 0, 5);",
+      "const adapter = createLocalAdapter({ backlogDir, testHooks: {",
+      "  linkRevision: process.env.NAIVE_RMW ?",
+      "    (tmp) => fs.renameSync(`${tmp}.naive`, path.join(backlogDir, 'local-tracker.json')) : undefined,",
+      "  beforeRevisionClaim(tmp) {",
+      "    if (process.env.NAIVE_RMW) fs.copyFileSync(tmp, `${tmp}.naive`);",
+      "    fs.writeFileSync(renameReady, 'ready');",
+      "    const deadline = Date.now() + 5000;",
+      "    while (fs.readdirSync(renameDir).length < Number(count)) {",
+      "      if (Date.now() > deadline) throw new Error('revision barrier timed out');",
+      "      Atomics.wait(wait, 0, 0, 5);",
+      "    }",
+      "    Atomics.wait(wait, 0, 0, 50);",
+      "  },",
+      "} });",
+      "const operation = JSON.parse(json);",
+      "if (operation.kind === 'create') adapter.create(operation.input);",
+      "else adapter.update(operation.selector, operation.changes);",
+    ].join("\n")
+  );
+  const go = path.join(gateDir, "go");
+  const children = operations.map((operation, index) => {
+    const ready = path.join(gateDir, `ready-${index}`);
+    const renameReady = path.join(renameDir, String(index));
+    const child = spawn(
+      process.execPath,
+      [
+        worker, backlogDir, ready, go, renameReady, renameDir,
+        String(operations.length), JSON.stringify(operation),
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] }
+    );
+    return { child, ready };
+  });
+  const started = Date.now();
+  while (!children.every(({ ready }) => fs.existsSync(ready))) {
+    if (Date.now() - started > 5000) throw new Error("concurrent writer start barrier timed out");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const completions = children.map(({ child }) => new Promise((resolve, reject) => {
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => resolve(code === 0 ? null : `exit ${code}: ${stderr}`));
+  }));
+  fs.writeFileSync(go, "go");
+  return (await Promise.all(completions)).filter(Boolean);
 }
 
 describe("offline local core sprint cycle", () => {
@@ -54,22 +132,25 @@ describe("offline local core sprint cycle", () => {
     const { marker, envPath } = installFailingGh(t, root);
     const { adapter } = localAdapter(backlogDir);
 
-    // create three canonical local tasks, offline
     const first = adapter.create({ title: "Design offline adapter" });
-    const second = adapter.create({ title: "Prove core cycle" });
+    const second = adapter.create({
+      title: "Prove core cycle",
+      body: "Human body\n\n## Acceptance Criteria\n- [ ] Keep this AC",
+    });
     const third = adapter.create({ title: "Archive on close" });
-    assert.deepEqual([first, second, third].map((task) => task.ref), ["BACK-1", "BACK-2", "BACK-3"]);
+    assert.deepEqual([first, second, third].map((task) => task.ref), [
+      "BACK-1",
+      "BACK-2",
+      "BACK-3",
+    ]);
     assert.equal([first, second, third].every((task) => !("url" in task)), true);
 
-    // Plan them into an active sprint using their normalized refs
     fs.writeFileSync(
       path.join(backlogDir, "sprints", "cycle.md"),
       [
         "---", "milestone: local cycle", "status: active", "started: 2026-07-11", "---", "",
-        "# Offline Local Cycle", "",
-        "## Goal", "Prove the offline local core cycle.", "",
-        "## Plan", "",
-        "### Batch 1 - core",
+        "# Offline Local Cycle", "", "## Goal", "Prove the offline local core cycle.", "",
+        "## Plan", "", "### Batch 1 - core",
         `- [ ] ${first.ref} Design offline adapter`,
         `- [ ] ${second.ref} Prove core cycle`,
         `- [ ] ${third.ref} Archive on close`,
@@ -77,50 +158,48 @@ describe("offline local core sprint cycle", () => {
       ].join("\n")
     );
 
-    // status orientation: the active sprint reads back normalized local plan items
     const state = readSprintState({ backlogDir });
     assert.equal(state.active_sprint.frontmatter.milestone, "local cycle");
     assert.deepEqual(state.plan_items.map((item) => item.ref), ["BACK-1", "BACK-2", "BACK-3"]);
-    assert.equal(state.plan_items.every((item) => item.tracker === "local" && item.issue_number === null), true);
+    assert.equal(
+      state.plan_items.every((item) => item.tracker === "local" && item.issue_number === null),
+      true
+    );
+    assert.deepEqual(findNextBatch(state.plan_items).items.map((item) => item.ref), [
+      "BACK-1",
+      "BACK-2",
+      "BACK-3",
+    ]);
 
-    // next orientation: the first todo batch is the local batch we planned
-    const nextBatch = findNextBatch(state.plan_items);
-    assert.equal(nextBatch.heading, "### Batch 1 - core");
-    assert.deepEqual(nextBatch.items.map((item) => item.ref), ["BACK-1", "BACK-2", "BACK-3"]);
-
-    // the whole orientation path is gh-free when driven as a subprocess
-    const oriented = spawnSync(process.execPath, [
-      path.join(SCRIPTS_DIR, "sprint-state.js"), "--mode", "next", backlogDir, "--json",
-    ], { encoding: "utf8", env: { ...process.env, PATH: envPath } });
+    const oriented = spawnSync(
+      process.execPath,
+      [path.join(SCRIPTS_DIR, "sprint-state.js"), "--mode", "next", backlogDir, "--json"],
+      { encoding: "utf8", env: { ...process.env, PATH: envPath } }
+    );
     assert.equal(oriented.status, 0);
-    const orientedState = JSON.parse(oriented.stdout);
-    assert.deepEqual(orientedState.plan_items.map((item) => item.ref), ["BACK-1", "BACK-2", "BACK-3"]);
+    assert.deepEqual(JSON.parse(oriented.stdout).plan_items.map((item) => item.ref), [
+      "BACK-1",
+      "BACK-2",
+      "BACK-3",
+    ]);
 
-    // read one task by its normalized ref
-    const readBack = adapter.read(second.ref);
-    assert.equal(readBack.title, "Prove core cycle");
-    assert.equal(readBack.status, "To Do");
-    assert.equal(readBack.state, "open");
+    const body = adapter.read(second).body;
+    adapter.update(second, { status: "In Progress" });
+    assert.equal(adapter.read(second).body, body);
+    assert.match(
+      fs.readFileSync(path.join(backlogDir, "tasks", "BACK-2 - prove-core-cycle.md"), "utf8"),
+      /^status: In Progress$/m
+    );
 
-    // work-state update preserves the human body byte-for-byte
-    const secondFile = path.join(backlogDir, "tasks", "BACK-2 - prove-core-cycle.md");
-    const bodyBefore = fs.readFileSync(secondFile, "utf-8");
-    const humanBody = bodyBefore.slice(bodyBefore.indexOf("\n## Description"));
-    adapter.update(second.ref, { status: "In Progress" });
-    const bodyAfter = fs.readFileSync(secondFile, "utf-8");
-    assert.equal(bodyAfter.slice(bodyAfter.indexOf("\n## Description")), humanBody);
-    assert.match(bodyAfter, /^status: In Progress$/m);
-
-    // checked close archives exactly that task into completed/ as Done
-    adapter.close(second.ref);
-    assert.equal(fs.existsSync(secondFile), false);
-    const archived = fs.readFileSync(path.join(backlogDir, "completed", "BACK-2 - prove-core-cycle.md"), "utf-8");
-    assert.match(archived, /^status: Done$/m);
+    adapter.close(second);
     assert.deepEqual(adapter.list().map((task) => task.ref), ["BACK-1", "BACK-3"]);
     assert.deepEqual(adapter.list({ state: "closed" }).map((task) => task.ref), ["BACK-2"]);
-
-    // the entire cycle never touched gh
-    assert.equal(fs.existsSync(marker), false, `gh must never run offline; invocations: ${fs.existsSync(marker) ? fs.readFileSync(marker, "utf-8") : ""}`);
+    assert.match(
+      fs.readFileSync(path.join(backlogDir, "completed", "BACK-2 - prove-core-cycle.md"), "utf8"),
+      /Keep this AC/
+    );
+    assert.equal(canonical(backlogDir).tasks.length, 3);
+    assert.equal(fs.existsSync(marker), false);
   });
 
   it("fails every optional capability before mutation and never falls back", (t) => {
@@ -133,147 +212,125 @@ describe("offline local core sprint cycle", () => {
         () => invokeCapability(resolved, capability, () => {
           mutated = true;
         }),
-        (error) => {
-          assert.equal(error.tracker, "local");
-          assert.equal(error.capability, capability);
-          return true;
-        }
+        (error) => error.tracker === "local" && error.capability === capability
       );
       assert.equal(mutated, false);
     }
   });
 
-  it("handles malformed input, exact collisions, and decimal identities", (t) => {
+  it("handles malformed input, exact active/completed collisions, and decimal identities", (t) => {
     const { backlogDir } = makeOfflineStore(t);
     const { adapter } = localAdapter(backlogDir);
-
     assert.throws(() => adapter.create({ title: "" }), LocalStoreError);
     assert.throws(() => adapter.create({}), LocalStoreError);
 
-    // seed a BACK-1/BACK-11 collision boundary directly
-    for (const [id, name] of [[1, "one"], [11, "eleven"]]) {
-      fs.writeFileSync(
-        path.join(backlogDir, "tasks", `BACK-${id} - ${name}.md`),
-        `---\nid: BACK-${id}\ntitle: ${name}\nstatus: To Do\nlabels: []\npriority: medium\ncreated_date: '2026-07-01'\n---\n## Description\n${name}\n`
-      );
-    }
-    assert.equal(adapter.read("BACK-1").id, "1");
-    assert.equal(adapter.read("BACK-11").id, "11");
-    assert.equal(adapter.create({ title: "next parent" }).id, "12");
-
-    const sub = adapter.create({ title: "decimal child", id: "1.2" });
+    assert.equal(adapter.create({ id: "1", title: "One" }).id, "1");
+    assert.equal(adapter.create({ id: "11", title: "Eleven" }).id, "11");
+    adapter.close("BACK-11");
+    assert.equal(adapter.create({ title: "Next parent" }).id, "12");
+    const sub = adapter.create({ title: "Decimal child", id: "1.2" });
     assert.deepEqual(sub, { tracker: "local", id: "1.2", ref: "BACK-1.2" });
-    assert.throws(() => adapter.create({ title: "dup decimal", id: "1.2" }), LocalStoreError);
+    assert.throws(() => adapter.create({ title: "Dup completed", id: "11" }), /already exists/);
+    assert.throws(() => adapter.create({ title: "Dup decimal", id: "1.2" }), /already exists/);
   });
 });
 
-describe("offline local close survives a process crash", () => {
-  it("fails closed on the stale lock, then heals to one authority once it is cleared", (t) => {
+describe("offline local close crash recovery", () => {
+  it("a writer killed after claiming a revision cannot wedge the next mutation", (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
-    fs.writeFileSync(
-      path.join(backlogDir, "tasks", "BACK-1 - one.md"),
-      "---\nid: BACK-1\ntitle: One\nstatus: To Do\nlabels: []\npriority: medium\ncreated_date: '2026-07-01'\n---\n## Description\nkeep me\n"
-    );
-
-    // A worker that dies after the completed copy is published but before the
-    // active source is unlinked — the exact window that strands the store with
-    // duplicate canonical copies and a held lock.
-    const workerPath = path.join(root, "crash-worker.js");
-    fs.writeFileSync(
-      workerPath,
-      `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});\n` +
-        "const [backlogDir] = process.argv.slice(2);\n" +
-        "const adapter = createLocalAdapter({ backlogDir, testHooks: { beforeUnlinkSource() { process.exit(99); } } });\n" +
-        "adapter.close('BACK-1');\n"
-    );
-    const crashed = spawnSync(process.execPath, [workerPath, backlogDir], { encoding: "utf8" });
-    assert.equal(crashed.status, 99, "worker crashed mid-close after publishing the completed copy");
-
-    // The crash left both canonical copies, a durable marker, and a stale lock.
-    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), "active source survived the crash");
-    assert.ok(fs.existsSync(path.join(backlogDir, "completed", "BACK-1 - one.md")), "completed copy was published before the crash");
-    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), "recovery marker remains");
-    const lockPath = path.join(backlogDir, ".local-tracker.lock");
-    assert.ok(fs.existsSync(lockPath), "the crashed process left a stale lock");
-    const staleLockBytes = fs.readFileSync(lockPath, "utf-8");
-
-    // Next open must NOT auto-reclaim the dead-PID lock: a path-based reclaim
-    // cannot avoid racing a replacement holder. It fails closed with an actionable
-    // manual-cleanup error and leaves the stale lock byte-for-byte untouched.
     const { adapter } = localAdapter(backlogDir);
-    assert.throws(
-      () => adapter.close("BACK-1"),
-      (error) => error instanceof LocalStoreError && /stale lock|no longer running|manually/i.test(error.message)
+    adapter.create({ title: "One", body: "Keep me" });
+
+    const worker = path.join(root, "crash-worker.js");
+    fs.writeFileSync(
+      worker,
+      [
+        `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});`,
+        "const [backlogDir] = process.argv.slice(2);",
+        "const adapter = createLocalAdapter({",
+        "  backlogDir,",
+        "  testHooks: { afterRevisionClaim() { process.exit(99); } },",
+        "});",
+        "adapter.close('BACK-1');",
+      ].join("\n")
     );
-    assert.equal(fs.readFileSync(lockPath, "utf-8"), staleLockBytes, "the stale lock is never auto-reclaimed");
-    assert.ok(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), "no roll-forward while the lock is held");
-    assert.ok(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), "the marker survives the fail-closed attempt");
+    const crashed = spawnSync(process.execPath, [worker, backlogDir], { encoding: "utf8" });
+    assert.equal(crashed.status, 99);
 
-    // The operator confirms no allocator is running and removes the stale lock.
-    // Recovery then derives the exact Done bytes from the active source, sees the
-    // published copy match, retires the source, and clears the marker.
-    fs.unlinkSync(lockPath);
-    const result = adapter.close("BACK-1");
-    assert.deepEqual(result, { tracker: "local", id: "1", ref: "BACK-1" });
-    assert.equal(fs.existsSync(path.join(backlogDir, "tasks", "BACK-1 - one.md")), false, "duplicate active source retired");
-    assert.deepEqual(adapter.list().map((task) => task.ref), []);
-    assert.deepEqual(adapter.list({ state: "closed" }).map((task) => task.ref), ["BACK-1"]);
-    assert.equal(fs.existsSync(lockPath), false, "the healing close releases its own lock");
-    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), false, "marker cleared after recovery");
+    const beforeRecovery = canonical(backlogDir);
+    assert.equal(beforeRecovery.revision, 1, "the killed writer did not reach its store rename");
+    assert.equal(beforeRecovery.tasks[0].state, "open");
+    assert.equal(
+      strays(backlogDir).some((file) => file.endsWith(".local-tracker.revision-2.json")),
+      true,
+      "the child died after the no-overwrite claim and before the store rename"
+    );
 
-    const archived = fs.readFileSync(path.join(backlogDir, "completed", "BACK-1 - one.md"), "utf-8");
-    assert.match(archived, /^status: Done$/m);
-    assert.ok(archived.includes("keep me"), "the archived body is preserved");
+    const recovered = adapter.create({ title: "After crash" });
+    assert.equal(recovered.id, "2");
+    const stored = canonical(backlogDir);
+    assert.equal(stored.revision, 3);
+    assert.equal(stored.tasks.length, 2);
+    assert.equal(stored.tasks[0].id, "1");
+    assert.equal(stored.tasks[0].state, "closed");
+    assert.equal(stored.tasks[0].status, "Done");
+    assert.equal(adapter.read("BACK-1").state, "closed");
+    assert.equal(adapter.read("BACK-2").title, "After crash");
+    assert.deepEqual(fs.readdirSync(path.join(backlogDir, "tasks")), ["BACK-2 - after-crash.md"]);
+    assert.deepEqual(fs.readdirSync(path.join(backlogDir, "completed")), ["BACK-1 - one.md"]);
+    assert.match(
+      fs.readFileSync(path.join(backlogDir, "completed", "BACK-1 - one.md"), "utf8"),
+      /Keep me/
+    );
+    assert.deepEqual(strays(backlogDir), []);
   });
 });
 
-describe("offline concurrent allocation is atomic", () => {
-  it("assigns distinct ids to parallel allocators with no overwrite or leaked lock/temp", async (t) => {
+describe("offline concurrent mutations preserve canonical tasks", () => {
+  it("parallel creates all survive with distinct ids above active and completed tasks", async (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
-    const workerPath = path.join(root, "alloc-worker.js");
-    fs.writeFileSync(
-      workerPath,
-      `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});\n` +
-        "const [backlogDir, title] = process.argv.slice(2);\n" +
-        "try {\n" +
-        "  const id = createLocalAdapter({ backlogDir }).create({ title });\n" +
-        "  process.stdout.write(JSON.stringify(id));\n" +
-        "  process.exit(0);\n" +
-        "} catch (error) {\n" +
-        "  process.stderr.write(String(error && error.message));\n" +
-        "  process.exit(3);\n" +
-        "}\n"
+    const adapter = localAdapter(backlogDir).adapter;
+    adapter.create({ id: "1", title: "Active floor" });
+    adapter.create({ id: "11", title: "Completed floor" });
+    adapter.close("BACK-11");
+    const titles = ["Create alpha", "Create beta"];
+    const failures = await runConcurrentWriters(
+      root,
+      backlogDir,
+      titles.map((title) => ({ kind: "create", input: { title } }))
     );
+    assert.deepEqual(failures, []);
+    const stored = canonical(backlogDir);
+    const created = stored.tasks.filter((task) => titles.includes(task.title));
+    assert.equal(created.length, titles.length);
+    assert.deepEqual(new Set(created.map((task) => task.id)).size, titles.length);
+    assert.deepEqual(created.map((task) => task.id).sort(), ["12", "13"]);
+    assert.equal(stored.tasks.find((task) => task.id === "11").state, "closed");
+    assert.deepEqual(strays(backlogDir), []);
+  });
 
-    const WORKERS = 8;
-    const results = await Promise.all(
-      Array.from({ length: WORKERS }, (_unused, index) =>
-        new Promise((resolve, reject) => {
-          const child = spawn(process.execPath, [workerPath, backlogDir, `Parallel task ${index}`], {
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          let out = "";
-          let err = "";
-          child.stdout.on("data", (chunk) => { out += chunk; });
-          child.stderr.on("data", (chunk) => { err += chunk; });
-          child.on("close", (code) => {
-            if (code === 0) resolve(JSON.parse(out));
-            else reject(new Error(`worker ${index} exited ${code}: ${err}`));
-          });
-        })
-      )
-    );
-
-    const ids = results.map((identity) => Number(identity.id)).sort((a, b) => a - b);
-    assert.deepEqual(ids, Array.from({ length: WORKERS }, (_unused, index) => index + 1), "ids must be distinct 1..N");
-
-    const files = fs.readdirSync(path.join(backlogDir, "tasks")).filter((name) => name.endsWith(".md"));
-    assert.equal(files.length, WORKERS, "one file per allocation, none overwritten");
-    assert.equal(new Set(files.map((name) => name.split(" - ")[0])).size, WORKERS);
-
-    // no leaked lock or temp files remain
-    assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.lock")), false);
-    const strays = fs.readdirSync(path.join(backlogDir, "tasks")).filter((name) => name.includes(".tmp"));
-    assert.deepEqual(strays, []);
+  it("parallel updates to different tasks both persist on every platform", async (t) => {
+    const { root, backlogDir } = makeOfflineStore(t);
+    const adapter = localAdapter(backlogDir).adapter;
+    adapter.create({ title: "One" });
+    adapter.create({ title: "Two" });
+    const failures = await runConcurrentWriters(root, backlogDir, [
+      {
+        kind: "update",
+        selector: "BACK-1",
+        changes: { title: "One updated", priority: "high" },
+      },
+      {
+        kind: "update",
+        selector: "BACK-2",
+        changes: { labels: ["updated-two"], status: "In Progress" },
+      },
+    ]);
+    assert.deepEqual(failures, []);
+    assert.equal(adapter.read("BACK-1").title, "One updated");
+    assert.equal(adapter.read("BACK-1").priority, "high");
+    assert.deepEqual(adapter.read("BACK-2").labels, ["updated-two"]);
+    assert.equal(adapter.read("BACK-2").status, "In Progress");
+    assert.deepEqual(strays(backlogDir), []);
   });
 });

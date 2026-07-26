@@ -93,7 +93,7 @@ Follow `references/process.md` → `## Create — New Issues`.
 
 Done when the new task exists in the configured canonical store and is added to
 the active sprint Plan when in scope. GitHub mode may explicitly refresh its
-local mirror; local mode already wrote the canonical task file.
+local mirror; local mode writes canonical JSON and refreshes its derived mirror.
 
 ### Plan
 

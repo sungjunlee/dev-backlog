@@ -35,8 +35,9 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 
 `backlog/config.yml` is the only runtime selection authority. Missing `tracker:`
 retains legacy GitHub behavior without rewriting the config. GitHub mode uses
-`gh` and treats task files as mirrors; local mode treats task files as canonical
-and makes zero provider calls. `sprint-init`, `sprint-mirror`, and
+`gh` and treats task files as mirrors; local mode uses `local-tracker.json` as
+canonical and derives the same task-file mirrors with zero provider calls.
+`sprint-init`, `sprint-mirror`, and
 `progress-sync` are representative JSON-capable optional-feature boundaries:
 when unsupported, `--json` exits non-zero with the shared `{ "error": ... }`
 contract from `tracker.js`, while human mode prints the same remediation.
