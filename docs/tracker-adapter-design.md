@@ -142,10 +142,12 @@ cause of the local tracker's Windows divergence. Three tests carried:
 t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race")
 ```
 
-The minimal lock never replaces or reclaims an open pathname: its holder alone
-closes and unlinks it. The redesign therefore still **deletes** those skips, and
-the concurrent-writer replacement coverage runs everywhere. Windows-specific
-code stays at 68 lines (`bash-runtime.js` 44 plus `portable-path.js` 24) and the
+Compare-and-swap has no lock pathname to reclaim. A writer claims its revision
+through no-overwrite `link` and renames its own complete candidate into place;
+nothing is ever replaced while another process holds it open. The redesign
+therefore **deletes** those skips rather than re-documenting them, and the
+concurrent-writer coverage runs everywhere. Windows-specific code stays at 68
+lines (`bash-runtime.js` 44 plus `portable-path.js` 24) and the
 `windows-latest` CI job.
 
 ### What survives unchanged
