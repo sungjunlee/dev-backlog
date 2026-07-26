@@ -6,6 +6,11 @@ implementation branch. Runtime evidence was originally inventoried at commit
 local persistence, and setup. GitHub remains the compatibility baseline. The
 proof branch merged as PR #303 (2026-07-12); O8/O9 are validated.
 
+Amended 2026-07-26 by "Adapter Tiers (v0.9.0)" below, which re-tiers how
+adapters are built. The required interface, identity shape, capability model,
+failure/authority semantics, and every GitHub compatibility row in the frozen
+sections are unchanged by that amendment.
+
 This document froze the smallest tracker boundary that can support another
 canonical task store without weakening existing GitHub behavior. The #272
 freeze itself did not configure a tracker or implement an adapter; the current
@@ -13,7 +18,166 @@ foundation state is recorded separately below. These changes do not persist
 local tasks, alter setup, or rewrite command, Markdown, JSON, sprint, or
 task-mirror compatibility surfaces.
 
+## Adapter Tiers (v0.9.0)
+
+Accepted 2026-07-26 as milestone 16 / issue #320. This section governs how a new
+adapter is built and how large it is allowed to be. It changes no frozen
+contract below.
+
+### The asymmetry this fixes
+
+The seam works. The two adapters behind it are not the same kind of thing:
+
+| Adapter | Lines | What it actually is |
+| --- | --- | --- |
+| `github-tracker.js` | 172 | a translator — build `gh` argv, parse JSON, normalize |
+| `local-tracker.js` | 1,391 | a transactional file database plus a YAML round-trip serializer |
+
+Only a minority of `local-tracker.js` is task lifecycle. The bulk is substrate
+machinery that exists because markdown was chosen as the canonical store:
+roughly 200 lines of frontmatter YAML parse/serialize with verbatim
+human-byte and CRLF preservation, 200 lines of allocation lock
+(`.local-tracker.lock`, `pid:token` stamps, retry loop, live-versus-dead holder
+distinction, deliberate no-reclamation), 150 lines of filesystem-boundary
+guards, and 120 lines of close compensation and split-store detection.
+
+Every tracker that would come next — `gitlab`, `gitea`, `jira`, `linear` — is
+the *first* kind. `local` is the only adapter that must implement storage at
+all. Placing it in the same tier as `github` put a database behind the seam,
+and that, not the seam, is the whole weight of the local axis.
+
+### Three tiers
+
+| Tier | Responsibility | Budget | Members |
+| --- | --- | --- | --- |
+| Seam | Selection, adapter-shape and identity validation, configured-only availability probing, capability gates, typed errors | ~350 lines | `tracker.js` — exactly one, permanent |
+| Remote translator | Build provider CLI/API arguments, parse responses, normalize to `{ tracker, id, ref, url? }`. Holds no durable state of its own | **≤200 lines** | `github` (172); future `gitlab`, `gitea`, `jira`, `linear` |
+| Storage substrate | Implement a task store where no provider exists behind the adapter | ≤600 lines | `local`, and only `local` |
+
+### The adapter size budget
+
+> **A new adapter over 200 lines is not an adapter — it is a substrate. Stop and re-tier.**
+
+Crossing 200 lines means the module has stopped translating and started owning
+state, ordering, or durability. Those belong in the substrate tier, where there
+is exactly one implementation to review, harden, and verify on both platforms.
+The budget is what keeps "support more trackers" a linear cost instead of a
+compounding one.
+
+This is a design-review gate, not a lint rule. It measures the adapter's own
+module, excluding tests and shared helpers.
+
+### Local canonical shape
+
+`local` owns a JSON store under `backlog/`. `backlog/tasks/*.md` and
+`backlog/completed/*.md` become **derived mirrors** — exactly the role they
+already hold in `github` mode. Put differently: `local` becomes a tracker whose
+"provider" is a local JSON file, so it looks like every other adapter from the
+seam's point of view.
+
+That single decision is what lets the substrate shrink:
+
+- markdown is no longer canonical, so the frontmatter YAML parse/serialize path
+  and CRLF byte preservation are deleted;
+- a single store file means concurrent writers are handled by write-temp plus
+  atomic rename (~30 lines) instead of the allocation lock, stamp inspection,
+  retry loop, and close compensation (~350 lines).
+
+**Co-authoritative rule (binding).** The derived mirror is never parsed back as
+truth. Every read resolves from the JSON store; a hand-edit to a mirror file is
+not an input and is overwritten on the next write. This is *stricter* than
+today's arrangement, in which markdown is canonical, hand-editable, and
+arbitrated by a lock — three routes to the same bytes. It satisfies the
+`tracker-task-truth` hard constraint ("never treats two task stores as
+co-authoritative") more cleanly than the shape it replaces.
+
+### Selection source
+
+Tracker selection moves out of `backlog/config.yml` into `backlog/.tracker`, a
+single-line file containing `github` or `local`.
+
+The motivation is the same over-build in a different place:
+`setup-dev-backlog.js` carries ~395 lines of hand-written YAML tokenizer
+(`consumeQuotedToken`, `decodeDoubleQuotedScalar`, `validAnchorOrAliasName`,
+`isBlockScalarHeader`, `tokenizeYamlLine`, `mutateTrackerText`, …) whose entire
+job is writing one key into a user-owned YAML file safely — detecting anchors,
+aliases, block scalars, and quoted keys that could hide a second `tracker:`
+declaration. The repository has no `package.json` by design, since skills must
+run without `npm install`, so a YAML dependency was never an option and the
+parser was written by hand. The correct fix is to stop writing to `config.yml`
+at all, not to write a better parser.
+
+Consequences: reading a selection becomes `readFileSync().trim()`; the PR #301
+Learning "preserve user YAML bytes" is satisfied permanently and trivially,
+because the file is never touched; and `config.yml` continues to be *read* for
+its other fields through the existing `lib.js:parseSimpleYaml` (~80 lines),
+which is unchanged and stays.
+
+Compatibility is preserved exactly: a `tracker:` key already present in
+`config.yml` with no `.tracker` file resolves to the same tracker as before and
+is migrated to `.tracker` on the next setup run without editing `config.yml`; a
+repository with neither still defaults to `github` with zero migration; and
+runtime still never infers a tracker from availability or switches after a
+failure.
+
+Note this repository currently carries **three** YAML implementations. After
+this amendment only the first survives: `lib.js:parseSimpleYaml` (reads
+`config.yml`, used everywhere — keep), the `setup-dev-backlog.js` tokenizer
+(writes the tracker key — deleted), and the `local-tracker.js` frontmatter
+round-trip (task files — deleted).
+
+### Windows consequence
+
+The allocation lock is the sole cause of the local tracker's Windows
+divergence. Three tests carry:
+
+```
+t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race")
+```
+
+Atomic rename behaves identically on both platforms, so the redesign **deletes**
+those skips rather than re-documenting them, and their replacement coverage runs
+everywhere. Windows-specific code stays at 68 lines (`bash-runtime.js` 44 plus
+`portable-path.js` 24) and the `windows-latest` CI job. Windows support gets
+cheaper and more honest, not weaker.
+
+### What survives unchanged
+
+The PR #298 Learnings are durable and survive the format change: exact-ID
+allocation across active and completed tasks, fail-closed control-character and
+injection validation, and crash-recoverable close/archive semantics. Dropping
+any of them is a regression, not a simplification.
+
+Also unchanged: the required interface, the `{ tracker, id, ref, url? }`
+identity, capability reporting, the failure and authority semantics, and every
+GitHub compatibility row in the frozen sections below.
+
+### Migration posture
+
+`local` has zero adopters. Measured 2026-07-26 across the 19 repositories that
+consume dev-backlog: no local store exists in any of them, and exactly one
+`backlog/config.yml` carries a `tracker:` key — this repository's own, set to
+the compatibility default `github`. `scope:` appears in zero sprint files and no
+repository runs two or more active tracks.
+
+Therefore **no migration path for existing local stores ships**. That is a
+deliberate, dated decision taken while the window is open, not an oversight. A
+later adopter starts on the JSON shape.
+
+### Spec impact
+
+The canonical-shape change is an implementation choice; it does not alter an
+Expected Behavior or a Hard Constraint of the `tracker-task-truth` capability.
+A `Decisions` row in `spec/capabilities.md` therefore records it. If review
+finds otherwise, it escalates to a human-gated `spec-grill` pass before the
+implementation merges — an invariant is never amended unattended (the #294
+precedent).
+
 ## Runtime Adapter State (#273-#278)
+
+This section records the runtime as of #278. Selection source and the local
+canonical shape are superseded by "Adapter Tiers (v0.9.0)" above once milestone
+16 lands; everything else here stands.
 
 `backlog/config.yml` selects one `tracker`, initially `github` or `local`.
 Repositories without that key use `github` as a deterministic compatibility
