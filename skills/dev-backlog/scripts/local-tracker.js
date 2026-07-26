@@ -19,6 +19,8 @@ const TASKS_DIR = "tasks";
 const COMPLETED_DIR = "completed";
 const DONE_STATUS = "Done";
 const STORE_VERSION = 1;
+const LOCK_FILE = ".local-tracker.lock";
+const LOCK_WAIT = new Int32Array(new SharedArrayBuffer(4));
 
 const CREATE_OPTIONS = Object.freeze([
   "title",
@@ -134,6 +136,9 @@ function createLocalAdapter(options = {}) {
   const testHooks = options.testHooks || {};
   const refOptions = { taskPrefix };
   const storePath = path.join(backlogDir || "", STORE_FILE);
+  const lockPath = path.join(backlogDir || "", LOCK_FILE);
+  const lockRetries = options.lock?.retries ?? 1000;
+  const lockDelayMs = options.lock?.delayMs ?? 5;
 
   function identityForId(id) {
     return parseTaskRef(`${taskPrefix}-${id}`, refOptions);
@@ -263,6 +268,39 @@ function createLocalAdapter(options = {}) {
     }
   }
 
+  function withWriteLock(operation) {
+    assertCanonicalPaths();
+    fs.mkdirSync(backlogDir, { recursive: true });
+    let fd;
+    for (let attempt = 0; fd === undefined; attempt += 1) {
+      try {
+        fd = fs.openSync(lockPath, "wx");
+      } catch (error) {
+        if (error.code !== "EEXIST") throw new LocalStoreError(
+          `cannot acquire local store lock: ${error.message}`, { cause: error }
+        );
+        if (attempt >= lockRetries) {
+          throw new LocalStoreError(
+            `local store lock ${lockPath} remained held after ${lockRetries + 1} attempts; ` +
+              "wait for the active writer, or remove it only after confirming no writer is running"
+          );
+        }
+        Atomics.wait(LOCK_WAIT, 0, 0, lockDelayMs);
+      }
+    }
+    try {
+      return operation();
+    } finally {
+      let releaseError;
+      try { fs.closeSync(fd); } catch (error) { releaseError = error; }
+      try { fs.unlinkSync(lockPath); } catch (error) { releaseError ||= error; }
+      if (releaseError) throw new LocalStoreError(
+        `local store commit finished but its lock could not be released: ${releaseError.message}`,
+        { cause: releaseError }
+      );
+    }
+  }
+
   function tempPath(dir, label) {
     return path.join(
       dir,
@@ -281,6 +319,21 @@ function createLocalAdapter(options = {}) {
     }
   }
 
+  function fsyncDirectory(dir, target) {
+    if (testHooks.beforeDirectoryFsync) testHooks.beforeDirectoryFsync(dir, target);
+    let fd;
+    try {
+      fd = fs.openSync(dir, "r");
+      fs.fsyncSync(fd);
+    } catch (error) {
+      // Windows and some filesystems refuse directory handles/fsync. The rename
+      // is still atomic there, so degrade durability rather than fail the write.
+      if (!["EACCES", "EBADF", "EISDIR", "EINVAL", "ENOSYS", "ENOTSUP", "EPERM"].includes(error.code)) throw error;
+    } finally {
+      try { if (fd !== undefined) fs.closeSync(fd); } catch {}
+    }
+  }
+
   function replaceAtomic(target, content, hookName) {
     const dir = path.dirname(target);
     const issue = pathIssue(dir, path.basename(dir));
@@ -296,6 +349,7 @@ function createLocalAdapter(options = {}) {
         testHooks.beforeMirrorRename(tmp, target);
       }
       fs.renameSync(tmp, target);
+      fsyncDirectory(dir, target);
     } catch (error) {
       throw error instanceof LocalStoreError
         ? error
@@ -315,7 +369,6 @@ function createLocalAdapter(options = {}) {
     fs.mkdirSync(backlogDir, { recursive: true });
     const content = `${JSON.stringify(store, null, 2)}\n`;
     replaceAtomic(storePath, content, "writeStoreTemp");
-    if (testHooks.afterStoreRename) testHooks.afterStoreRename(storePath);
   }
 
   function bodyForMirror(body) {
@@ -370,6 +423,18 @@ function createLocalAdapter(options = {}) {
     if (testHooks.beforeMirrorRefresh) testHooks.beforeMirrorRefresh();
     refreshMirrorDir(TASKS_DIR, store.tasks.filter((task) => task.state === "open"));
     refreshMirrorDir(COMPLETED_DIR, store.tasks.filter((task) => task.state === "closed"));
+  }
+
+  function commitMutation(mutate) {
+    const result = withWriteLock(() => {
+      const store = readStore();
+      const outcome = mutate(store);
+      if (outcome.changed) writeStore(store);
+      return outcome;
+    });
+    if (result.changed && testHooks.afterStoreRename) testHooks.afterStoreRename(storePath);
+    withWriteLock(() => refreshMirrors(readStore()));
+    return result.value;
   }
 
   function identityResult(id) {
@@ -436,9 +501,7 @@ function createLocalAdapter(options = {}) {
     }
   }
 
-  function capabilities() {
-    return [];
-  }
+  function capabilities() { return []; }
 
   function list({ state = "open" } = {}) {
     if (!LIST_STATES.includes(state)) {
@@ -479,28 +542,19 @@ function createLocalAdapter(options = {}) {
       requestedId = parsed.id;
     }
 
-    const store = readStore();
-    const id = requestedId ?? allocateParentId(store);
-    if (store.tasks.some((task) => task.id === id)) {
-      throw new LocalStoreError(`local task ${taskPrefix}-${id} already exists`);
-    }
-    const created = dateToday();
-    store.tasks.push({
-      id,
-      title,
-      status,
-      labels,
-      priority,
-      dependencies,
-      milestone: "",
-      created_date: created,
-      updated_date: created,
-      body: bodyForMirror(input.body ?? ""),
-      state: "open",
+    return commitMutation((store) => {
+      const id = requestedId ?? allocateParentId(store);
+      if (store.tasks.some((task) => task.id === id)) {
+        throw new LocalStoreError(`local task ${taskPrefix}-${id} already exists`);
+      }
+      const created = dateToday();
+      store.tasks.push({
+        id, title, status, labels, priority, dependencies, milestone: "",
+        created_date: created, updated_date: created,
+        body: bodyForMirror(input.body ?? ""), state: "open",
+      });
+      return { changed: true, value: identityResult(id) };
     });
-    writeStore(store);
-    refreshMirrors(store);
-    return identityResult(id);
   }
 
   function update(selector, changes = {}) {
@@ -508,34 +562,30 @@ function createLocalAdapter(options = {}) {
     assertUsablePrefix();
     const identity = resolveIdentity(selector);
     const updateFields = buildUpdate(changes);
-    const store = readStore();
-    const record = store.tasks.find((task) => task.id === identity.id);
-    if (!record || record.state !== "open") {
-      throw new LocalStoreError(`no active local task to update: ${identity.ref}`);
-    }
-    const changed = Object.entries(updateFields).some(
-      ([key, value]) => JSON.stringify(record[key]) !== JSON.stringify(value)
-    );
-    Object.assign(record, updateFields);
-    if (changed) writeStore(store);
-    refreshMirrors(store);
-    return identityResult(identity.id);
+    return commitMutation((store) => {
+      const record = store.tasks.find((task) => task.id === identity.id);
+      if (!record || record.state !== "open") {
+        throw new LocalStoreError(`no active local task to update: ${identity.ref}`);
+      }
+      const changed = Object.entries(updateFields).some(
+        ([key, value]) => JSON.stringify(record[key]) !== JSON.stringify(value)
+      );
+      Object.assign(record, updateFields);
+      return { changed, value: identityResult(identity.id) };
+    });
   }
 
   function close(selector, closeOptions = {}) {
     rejectUnsupportedOptions("close", closeOptions, []);
     assertUsablePrefix();
     const identity = resolveIdentity(selector);
-    const store = readStore();
-    const record = store.tasks.find((task) => task.id === identity.id);
-    if (!record) throw new LocalStoreError(`local task not found: ${identity.ref}`);
-    if (record.state === "open") {
-      record.state = "closed";
-      record.status = DONE_STATUS;
-      writeStore(store);
-    }
-    refreshMirrors(store);
-    return identityResult(identity.id);
+    return commitMutation((store) => {
+      const record = store.tasks.find((task) => task.id === identity.id);
+      if (!record) throw new LocalStoreError(`local task not found: ${identity.ref}`);
+      const changed = record.state === "open";
+      if (changed) Object.assign(record, { state: "closed", status: DONE_STATUS });
+      return { changed, value: identityResult(identity.id) };
+    });
   }
 
   return Object.freeze({ availability, capabilities, list, read, create, update, close });

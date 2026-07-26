@@ -63,6 +63,68 @@ function strays(backlogDir) {
   return result;
 }
 
+async function runConcurrentWriters(root, backlogDir, operations) {
+  const worker = path.join(root, `concurrent-worker-${Date.now()}.js`);
+  const gateDir = path.join(root, `concurrent-gate-${Date.now()}`);
+  const renameDir = path.join(gateDir, "rename-ready");
+  fs.mkdirSync(renameDir, { recursive: true });
+  fs.writeFileSync(
+    worker,
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});`,
+      "const [backlogDir, ready, go, renameReady, renameDir, count, json] = process.argv.slice(2);",
+      "const wait = new Int32Array(new SharedArrayBuffer(4));",
+      "fs.writeFileSync(ready, 'ready');",
+      "while (!fs.existsSync(go)) Atomics.wait(wait, 0, 0, 5);",
+      "const adapter = createLocalAdapter({ backlogDir, testHooks: {",
+      "  beforeStoreRename() {",
+      "    fs.writeFileSync(renameReady, 'ready');",
+      "    if (!fs.existsSync(path.join(backlogDir, '.local-tracker.lock'))) {",
+      "      const deadline = Date.now() + 5000;",
+      "      while (fs.readdirSync(renameDir).length < Number(count)) {",
+      "        if (Date.now() > deadline) throw new Error('rename barrier timed out');",
+      "        Atomics.wait(wait, 0, 0, 5);",
+      "      }",
+      "    }",
+      "    Atomics.wait(wait, 0, 0, 50);",
+      "  },",
+      "} });",
+      "const operation = JSON.parse(json);",
+      "if (operation.kind === 'create') adapter.create(operation.input);",
+      "else adapter.update(operation.selector, operation.changes);",
+    ].join("\n")
+  );
+  const go = path.join(gateDir, "go");
+  const children = operations.map((operation, index) => {
+    const ready = path.join(gateDir, `ready-${index}`);
+    const renameReady = path.join(renameDir, String(index));
+    const child = spawn(
+      process.execPath,
+      [
+        worker, backlogDir, ready, go, renameReady, renameDir,
+        String(operations.length), JSON.stringify(operation),
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] }
+    );
+    return { child, ready };
+  });
+  const started = Date.now();
+  while (!children.every(({ ready }) => fs.existsSync(ready))) {
+    if (Date.now() - started > 5000) throw new Error("concurrent writer start barrier timed out");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const completions = children.map(({ child }) => new Promise((resolve, reject) => {
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => resolve(code === 0 ? null : `exit ${code}: ${stderr}`));
+  }));
+  fs.writeFileSync(go, "go");
+  return (await Promise.all(completions)).filter(Boolean);
+}
+
 describe("offline local core sprint cycle", () => {
   it("runs create → Plan → status/next → read → work-state update → close/archive with no gh", (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
@@ -212,47 +274,53 @@ describe("offline local close crash recovery", () => {
   });
 });
 
-describe("offline concurrent replacement is atomic", () => {
-  it("parallel writers leave a parseable single-record store with no lock or temp artifact", async (t) => {
+describe("offline concurrent mutations preserve canonical tasks", () => {
+  it("parallel creates all survive with distinct ids above active and completed tasks", async (t) => {
     const { root, backlogDir } = makeOfflineStore(t);
-    localAdapter(backlogDir).adapter.create({ title: "Shared" });
-    const worker = path.join(root, "update-worker.js");
-    fs.writeFileSync(
-      worker,
-      [
-        `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});`,
-        "const [backlogDir, label] = process.argv.slice(2);",
-        "const adapter = createLocalAdapter({ backlogDir });",
-        "for (let i = 0; i < 50; i += 1) {",
-        "  adapter.update('BACK-1', { labels: [label], priority: i % 2 ? 'high' : 'low' });",
-        "}",
-      ].join("\n")
+    const adapter = localAdapter(backlogDir).adapter;
+    adapter.create({ id: "1", title: "Active floor" });
+    adapter.create({ id: "11", title: "Completed floor" });
+    adapter.close("BACK-11");
+    const titles = ["Create alpha", "Create beta", "Create gamma", "Create delta"];
+    const failures = await runConcurrentWriters(
+      root,
+      backlogDir,
+      titles.map((title) => ({ kind: "create", input: { title } }))
     );
-
-    const children = ["one", "two", "three", "four"].map((label) =>
-      spawn(process.execPath, [worker, backlogDir, label], {
-        stdio: ["ignore", "ignore", "pipe"],
-      })
-    );
-    const failures = [];
-    await Promise.all(children.map((child) => new Promise((resolve, reject) => {
-      let stderr = "";
-      child.stderr.on("data", (chunk) => {
-        stderr += chunk;
-      });
-      child.on("error", reject);
-      child.on("close", (code) => {
-        if (code !== 0) failures.push(`exit ${code}: ${stderr}`);
-        resolve();
-      });
-    })));
-
     assert.deepEqual(failures, []);
     const stored = canonical(backlogDir);
-    assert.equal(stored.version, 1);
-    assert.equal(stored.tasks.length, 1);
-    assert.equal(stored.tasks[0].id, "1");
-    assert.ok(["one", "two", "three", "four"].includes(stored.tasks[0].labels[0]));
+    const created = stored.tasks.filter((task) => titles.includes(task.title));
+    assert.equal(created.length, titles.length);
+    assert.deepEqual(new Set(created.map((task) => task.id)).size, titles.length);
+    assert.deepEqual(created.map((task) => task.id).sort(), ["12", "13", "14", "15"]);
+    assert.equal(stored.tasks.find((task) => task.id === "11").state, "closed");
+    assert.deepEqual(strays(backlogDir), []);
+  });
+
+  it("different-task updates and a racing create all persist on every platform", async (t) => {
+    const { root, backlogDir } = makeOfflineStore(t);
+    const adapter = localAdapter(backlogDir).adapter;
+    adapter.create({ title: "One" });
+    adapter.create({ title: "Two" });
+    const failures = await runConcurrentWriters(root, backlogDir, [
+      {
+        kind: "update",
+        selector: "BACK-1",
+        changes: { title: "One updated", priority: "high" },
+      },
+      {
+        kind: "update",
+        selector: "BACK-2",
+        changes: { labels: ["updated-two"], status: "In Progress" },
+      },
+      { kind: "create", input: { title: "Three created" } },
+    ]);
+    assert.deepEqual(failures, []);
+    assert.equal(adapter.read("BACK-1").title, "One updated");
+    assert.equal(adapter.read("BACK-1").priority, "high");
+    assert.deepEqual(adapter.read("BACK-2").labels, ["updated-two"]);
+    assert.equal(adapter.read("BACK-2").status, "In Progress");
+    assert.equal(adapter.read("BACK-3").title, "Three created");
     assert.deepEqual(strays(backlogDir), []);
   });
 });

@@ -79,9 +79,14 @@ That single decision is what lets the substrate shrink:
 
 - markdown is no longer canonical, so the frontmatter YAML parse/serialize path
   and CRLF byte preservation are deleted;
-- a single store file means concurrent writers are handled by write-temp plus
-  atomic rename (~30 lines) instead of the allocation lock, stamp inspection,
-  retry loop, and close compensation (~350 lines).
+- a single store file keeps write-temp plus atomic rename for complete,
+  non-torn replacement.
+
+The deleted allocation lock had two jobs: atomic replacement prevents partial
+or interleaved store bytes, but it does not serialize ID allocation or any other
+read-modify-write. `local` therefore uses a minimal create-exclusive lock for
+that second job: bounded acquisition retries, then close and unlink by its own
+holder, with no stamps, liveness probing, replacement, or reclamation.
 
 **Co-authoritative rule (binding).** The derived mirror is never parsed back as
 truth. Every read resolves from the JSON store; a hand-edit to a mirror file is
@@ -128,18 +133,18 @@ round-trip (task files — deleted).
 
 ### Windows consequence
 
-The allocation lock is the sole cause of the local tracker's Windows
-divergence. Three tests carry:
+Replacing an open allocation-lock pathname during reclamation was the sole
+cause of the local tracker's Windows divergence. Three tests carried:
 
 ```
 t.skip("Windows prevents replacing an open lock pathname; Ubuntu covers this POSIX race")
 ```
 
-Atomic rename behaves identically on both platforms, so the redesign **deletes**
-those skips rather than re-documenting them, and their replacement coverage runs
-everywhere. Windows-specific code stays at 68 lines (`bash-runtime.js` 44 plus
-`portable-path.js` 24) and the `windows-latest` CI job. Windows support gets
-cheaper and more honest, not weaker.
+The minimal lock never replaces or reclaims an open pathname: its holder alone
+closes and unlinks it. The redesign therefore still **deletes** those skips, and
+the concurrent-writer replacement coverage runs everywhere. Windows-specific
+code stays at 68 lines (`bash-runtime.js` 44 plus `portable-path.js` 24) and the
+`windows-latest` CI job.
 
 ### What survives unchanged
 

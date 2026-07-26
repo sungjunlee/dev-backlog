@@ -3,15 +3,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
-
 const { createLocalAdapter, LocalStoreError } = require("./local-tracker.js");
 const { run: renderGithubMirrors } = require("./sync-pull.js");
 
 const FIXED_DATE = "2026-07-26";
 const FIXED_NOW = () => new Date(`${FIXED_DATE}T12:00:00Z`);
 const STORE_FILE = "local-tracker.json";
-const LOCAL_TRACKER_PATH = path.join(__dirname, "local-tracker.js");
 
 function makeStore(t, config = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-tracker-"));
@@ -450,62 +447,50 @@ describe("atomic replacement and all-platform concurrency coverage", () => {
     assert.equal(fs.existsSync(path.join(backlogDir, ".local-tracker.close")), false);
   });
 
-  it("concurrent writers and readers never expose torn JSON or leaked temp files", async (t) => {
-    const { root, backlogDir } = makeStore(t);
-    createLocalAdapter({ backlogDir, now: FIXED_NOW }).create({ title: "Shared" });
-    const worker = path.join(root, "writer.js");
-    fs.writeFileSync(
-      worker,
-      [
-        `const { createLocalAdapter } = require(${JSON.stringify(LOCAL_TRACKER_PATH)});`,
-        "const [backlogDir, label] = process.argv.slice(2);",
-        "const adapter = createLocalAdapter({ backlogDir });",
-        "for (let i = 0; i < 80; i += 1) {",
-        "  adapter.update('BACK-1', { priority: i % 2 ? 'high' : 'low', labels: [label] });",
-        "}",
-      ].join("\n")
-    );
-    const children = ["alpha", "beta", "gamma"].map((label) =>
-      spawn(process.execPath, [worker, backlogDir, label], {
-        stdio: ["ignore", "ignore", "pipe"],
-      })
-    );
-    let reads = 0;
-    const errors = [];
-    await new Promise((resolve, reject) => {
-      const timer = setInterval(() => {
-        try {
-          const store = readStore(backlogDir);
-          assert.equal(store.version, 1);
-          assert.equal(store.tasks.length, 1);
-          assert.equal(store.tasks[0].id, "1");
-          reads += 1;
-        } catch (error) {
-          errors.push(error);
-        }
-      }, 1);
-      let remaining = children.length;
-      for (const child of children) {
-        let stderr = "";
-        child.stderr.on("data", (chunk) => {
-          stderr += chunk;
-        });
-        child.on("error", reject);
-        child.on("close", (code) => {
-          if (code !== 0) errors.push(new Error(`writer exited ${code}: ${stderr}`));
-          remaining -= 1;
-          if (remaining === 0) {
-            clearInterval(timer);
-            resolve();
-          }
-        });
-      }
+  it("fsyncs each parent directory after store, mirror, and archive renames", (t) => {
+    const { backlogDir } = makeStore(t);
+    const attempts = [];
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      testHooks: {
+        beforeDirectoryFsync(dir, target) {
+          attempts.push([dir, target]);
+          assert.equal(fs.existsSync(target), true, "rename completed before directory fsync");
+        },
+      },
     });
-    assert.equal(errors.length, 0, errors.map((error) => error.message).join("\n"));
-    assert.ok(reads > 0, "the canonical file was parsed while writers raced");
-    const final = readStore(backlogDir);
-    assert.equal(final.tasks.length, 1);
-    assert.ok(["alpha", "beta", "gamma"].includes(final.tasks[0].labels[0]));
-    assert.deepEqual(tempNames(backlogDir), []);
+    adapter.create({ title: "Durable" });
+    assert.deepEqual(attempts, [
+      [backlogDir, storePath(backlogDir)],
+      [path.join(backlogDir, "tasks"), path.join(backlogDir, "tasks", "BACK-1 - durable.md")],
+    ]);
+
+    attempts.length = 0;
+    adapter.close("BACK-1");
+    assert.deepEqual(attempts, [
+      [backlogDir, storePath(backlogDir)],
+      [
+        path.join(backlogDir, "completed"),
+        path.join(backlogDir, "completed", "BACK-1 - durable.md"),
+      ],
+    ]);
+  });
+
+  it("fails closed on an occupied write lock without reclaiming it", (t) => {
+    const { backlogDir } = makeStore(t);
+    const lockPath = path.join(backlogDir, ".local-tracker.lock");
+    fs.writeFileSync(lockPath, "foreign holder");
+    const adapter = createLocalAdapter({
+      backlogDir,
+      now: FIXED_NOW,
+      lock: { retries: 1, delayMs: 1 },
+    });
+    assert.throws(
+      () => adapter.create({ title: "Blocked" }),
+      (error) => error instanceof LocalStoreError && /remained held.*active writer/.test(error.message)
+    );
+    assert.equal(fs.readFileSync(lockPath, "utf8"), "foreign holder");
+    assert.equal(fs.existsSync(storePath(backlogDir)), false);
   });
 });
