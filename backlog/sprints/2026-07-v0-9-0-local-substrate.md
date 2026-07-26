@@ -26,7 +26,7 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 3 - Selection file [after:#321]
 
-- [ ] #322 refactor(setup): move tracker selection to backlog/.tracker; delete the config.yml YAML tokenizer (~3hr)
+- [~] #322 refactor(setup): move tracker selection to backlog/.tracker; delete the config.yml YAML tokenizer (~3hr) [run:issue-322-20260726233150638-07a087e1] [branch:issue-322]
 
 ### Batch 4 - Contract + release [after:#321,#322]
 
