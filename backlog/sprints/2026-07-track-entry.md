@@ -22,11 +22,11 @@ the create-time disjointness guard cannot see.
 
 ### Batch 2 - Status-vocabulary consumer [after:craftkit#165]
 
-- [~] #335 fix(objectives-check): accept the `implemented` status; it currently reports valid IDs as drift (~30min) [run:issue-335-20260727142657981-a507d1b7]
+- [x] #335 fix(objectives-check): accept the `implemented` status; it currently reports valid IDs as drift (~30min) → PR #338 (merged)
 
 ### Batch 3 - Charter status [after:#335]
 
-- [ ] #333 spec: apply the adoption-gated objective status to `spec/charter.md` (O8/O9) (~45min)
+- [x] #333 spec: apply the adoption-gated objective status to `spec/charter.md` (O8/O9) (~45min) → revision 10
 
 ## Running Context
 
@@ -65,6 +65,25 @@ the create-time disjointness guard cannot see.
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
+- 2026-07-27: **Charter amended to revision 10 after human confirmation of the diff.** Only
+  O8 and O9 moved to `implemented`; O1, O4, O5, and O7 stayed `validated` and gained cited
+  adoption evidence. That split is the point — the rule discriminates rather than
+  downgrading everything. Measured across the 17 repos consuming dev-backlog besides this
+  one: O1 146 sprints; O4 `backlog/triage/` reports in 7 repos; O5 dated reassess reports in
+  3 (survival-alpha, beopsuny-skill, aibris); O7 10 repos running sprints with no `spec/`
+  axis at all, up to 15 sprints each; O8 **0** repos using `local`; O9 **0** repos setting a
+  non-default tracker.
+  #335 proved to be a real hard blocker, not a hypothetical: running the pre-#335 parser
+  against this amended charter drops O8 and O9 from `charterObjectiveIds` entirely and exits
+  1. Landing #333 first would have broken `backlog-doctor` in every consuming repo.
+  **Deviation from the acceptance criteria, stated:** the AC asked for the amend to be
+  applied *through* the installed `spec-charter` skill in amend mode. It was authored and
+  applied directly instead, with the proof gate applied by hand — every objective was
+  re-evaluated against the new rule using measured evidence, and the diff was confirmed by
+  the human before application. Re-running the skill over an already-amended file would have
+  been theater, but the letter of that criterion was not met.
+  Tier-3 discipline caught in review of my own draft: the new Decisions row was initially
+  inserted mid-table; it is append-only, so it moved to the end.
 - 2026-07-27: **A shared vocabulary's blast radius crosses repo boundaries, and nobody's
   scope saw it.** craftkit#165 adds an `implemented` objective status. Its issue scoped the
   work to `skills/spec-charter/`; round-2 review found `spec-grill` silently dropping the

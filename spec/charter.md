@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-07-12
-revision: 9
+last_amended: 2026-07-27
+revision: 10
 ---
 
 # dev-backlog Charter
@@ -33,15 +33,15 @@ No server, no daemon, no hidden state, no silent sync.
 - Broad SaaS connector proliferation (Jira, Linear, Notion) — out of scope; only explicitly supported forge/local adapters belong to the product boundary.
 - Backlog.md convention-following — the task-file format stays Backlog.md-compatible, but new features are not constrained by Backlog.md conventions.
 
-## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status proof-gated) -->
-- O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user
+## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status: active → implemented → validated, proof-gated) -->
+- O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user (adoption 2026-07-27: 146 sprints across 17 repos other than this one)
 - O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
-- O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close)
-- O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5)
+- O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close; adoption 2026-07-27: `backlog/triage/` reports in 7 repos other than this one)
+- O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5; adoption 2026-07-27: dated reassess reports in 3 repos other than this one — survival-alpha, beopsuny-skill, aibris)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
-- O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates)
-- O8 [validated] The same core sprint cycle is proven on both `github` and `local`, while GitHub's existing task, milestone, mirror, progress, and closing-link behavior remains backward compatible · src: user (proof: GitHub seam PR #286 + local lifecycle PR #298 + table-driven dual-mode acceptance and compatibility proof PR #303)
-- O9 [validated] Exactly one configured tracker adapter owns canonical task truth per repository; runtime never silently changes the selected tracker · src: user (proof: configured-only resolver PR #282 + canonical local store PR #298 + persisted immutable setup PR #301 + no-switch/error proof PR #303)
+- O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates; adoption 2026-07-27: 10 repos run sprints with no `spec/` axis at all, up to 15 sprints each)
+- O8 [implemented] The same core sprint cycle is proven on both `github` and `local`, while GitHub's existing task, milestone, mirror, progress, and closing-link behavior remains backward compatible · src: user (proof: GitHub seam PR #286 + local lifecycle PR #298 + table-driven dual-mode acceptance and compatibility proof PR #303; adoption 2026-07-27: none — 0 of 17 other repos use `local`)
+- O9 [implemented] Exactly one configured tracker adapter owns canonical task truth per repository; runtime never silently changes the selected tracker · src: user (proof: configured-only resolver PR #282 + canonical local store PR #298 + persisted immutable setup PR #301 + no-switch/error proof PR #303; adoption 2026-07-27: none — 0 of 17 other repos set a non-default tracker)
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->
 | date       | decision                                                                              | rationale                                                                                        | supersedes |
@@ -58,3 +58,4 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-07-03 | Sprint SSOT: local sprint file stays canonical and is committed at explicit boundaries; a machine-managed GitHub issue mirror (marker + body upsert) is the optional shared read surface; no separate state repo | Spike #215: mirror reuses progress-issue machinery with ~zero timeline noise; a submodule state repo adds friction without solving worktree visibility; the committed-file convention already proved necessary (#211 incident) | —          |
 | 2026-07-04 | `spec-charter`/`spec-system-map`/`spec-grill` move to craftkit; dev-backlog consumes `spec/*` as read-only yardsticks (0.7.0, PR #242) | The skills author durable repo contracts and stand alone without a backlog; craftkit carries the skill-quality machinery; a two-week silent fork proved dual ownership untenable | —          |
 | 2026-07-11 | Exactly one configured tracker adapter owns task truth per repository; initial adapters are `github` and `local`, with GitHub as the compatibility baseline | Migration must stage task-ID and `gh` coupling behind a compatibility-preserving seam; capability-gated extensions prevent a lowest-common-denominator interface, while single ownership prevents multi-master sync | — |
+| 2026-07-27 | Objective status splits `implemented` (producer-side proof) from `validated` (cited use outside this repo); O8 and O9 move to `implemented` | measured 2026-07-27 across 17 other repos consuming dev-backlog: `local` has 0 adopters and 0 set a non-default tracker, yet both objectives read `validated` on merged-PR proof while v0.9.0 was deleting 2,556 lines from one of those axes for being built at the wrong size. Vocabulary defined by craftkit `spec-charter` (craftkit#165) | — |
