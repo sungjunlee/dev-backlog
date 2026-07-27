@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 adoption gate and track entry
-status: active
+status: completed
 started: 2026-07-27
 due: TBD
 objectives: [O1, O3]
@@ -103,3 +103,4 @@ the create-time disjointness guard cannot see.
   wrong tier) but not the *rule* that let four zero-adopter axes read as validated.
   craftkit#165 owns the rule; #333 applies it here; #331 removes the friction that
   explains why multi-track has no adopters to validate against.
+- 2026-07-27: Sprint closed. 3/3 tasks completed.

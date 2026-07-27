@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 adoption gate and track entry
-status: active
+status: completed
 started: 2026-07-27
 due: TBD
 objectives: [O9]
@@ -75,3 +75,4 @@ CI, instead of shipping to `main` and being caught by a human read three surface
   on `component:` so the two can run concurrently through separate relay worktrees; this
   is the first time this repo has run 2+ active tracks, which is itself the adoption
   evidence craftkit#165 and #333 are about.
+- 2026-07-27: Sprint closed. 1/1 tasks completed.
