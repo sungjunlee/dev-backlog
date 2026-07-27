@@ -407,6 +407,11 @@ function main() {
 
     printResult(result);
   } catch (error) {
+    // Provider-capability failures keep the shared typed error contract from tracker.js
+    // ({error: ...}, four scripts, SKILL.md:52) and are deliberately NOT wrapped in the
+    // component-aware refusal below. Wrapping them would serialize the same tracker
+    // failure two ways depending on whether --component was passed. Issue #331 carries
+    // the amended criterion.
     if (writeTrackerCliError(error, { json: parsed.json })) {
       process.exit(1);
     }
