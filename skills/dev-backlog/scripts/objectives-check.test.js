@@ -143,6 +143,14 @@ describe("listSprintFiles", () => {
 });
 
 describe("findDrift", () => {
+  it("allows sprints to target implemented objectives", () => {
+    const charterObjectives = parseCharterObjectives("- O8 [implemented] adopted outcome\n");
+    const drift = findDrift(["active.md"], charterObjectives, {
+      readFile: () => "---\nobjectives: [O8]\n---\n",
+    });
+    assert.deepEqual(drift, []);
+  });
+
   it("detects missing and deferred references per sprint", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-drift-"));
     try {
