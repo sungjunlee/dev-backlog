@@ -3,15 +3,26 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const {
   parseArgs,
   buildIssueLines,
   buildSpecFrontmatterBlock,
   buildSprintContent,
   detectSpecPresence,
+  resolveComponent,
   listActiveSprintFiles,
   createSprintFile,
 } = require("./sprint-init.js");
+
+function writeCapabilities(repoRoot, slugs = ["sprint-execution"]) {
+  const specDir = path.join(repoRoot, "spec");
+  fs.mkdirSync(specDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(specDir, "capabilities.md"),
+    slugs.map((slug) => `## Capability: ${slug}\n`).join("\n"),
+  );
+}
 
 describe("parseArgs", () => {
   it("parses topic, milestone, dry-run, and json flags", () => {
@@ -54,6 +65,20 @@ describe("parseArgs", () => {
   it("rejects --scope without a value (#292)", () => {
     assert.match(parseArgs(["auth", "--scope"]).error, /Missing value for --scope/);
     assert.match(parseArgs(["auth", "--scope", "--json"]).error, /Missing value for --scope/);
+  });
+
+  it("parses --component as an explicit track axis (#331)", () => {
+    const parsed = parseArgs(["auth", "--component", "sprint-execution"]);
+    assert.equal(parsed.component, "sprint-execution");
+    assert.ok(!("scope" in parsed));
+  });
+
+  it("rejects --component without a value or together with --scope (#331)", () => {
+    assert.match(parseArgs(["auth", "--component"]).error, /Missing value for --component/);
+    assert.match(
+      parseArgs(["auth", "--component", "sprint-execution", "--scope", "src/**"]).error,
+      /cannot be used together/,
+    );
   });
 });
 
@@ -134,6 +159,15 @@ describe("buildSprintContent", () => {
     assert.doesNotMatch(capsOnly, /^objectives:/m);
     assert.match(capsOnly, /^component: ""$/m);
   });
+
+  it("emits the resolved component instead of the compatibility placeholder (#331)", () => {
+    const content = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      component: "sprint-execution", hasCapabilities: true,
+    });
+    assert.match(content, /^component: "sprint-execution"$/m);
+    assert.doesNotMatch(content, /^component: ""$/m);
+  });
 });
 
 describe("buildSpecFrontmatterBlock", () => {
@@ -179,6 +213,7 @@ describe("createSprintFile", () => {
     assert.equal(result.dryRun, false);
     assert.equal(result.issueCount, 1);
     assert.equal(result.placeholderIssue, false);
+    assert.ok(!("component" in result));
     assert.equal(result.sprintFile, path.join(tmpDir, "2026-04-auth-system.md"));
     assert.match(result.content, /OAuth2 flow/);
 
@@ -216,6 +251,51 @@ describe("createSprintFile", () => {
 
     const absent = detectSpecPresence({ repoRoot: "/repo", fileExists: () => false });
     assert.deepEqual(absent, { hasCharter: false, hasCapabilities: false });
+  });
+
+  it("resolves only declared capability slugs and lists known slugs on refusal (#331)", () => {
+    writeCapabilities(tmpDir, ["tracker-task-truth", "sprint-execution"]);
+    assert.equal(resolveComponent({
+      component: "sprint-execution",
+      repoRoot: tmpDir,
+    }), "sprint-execution");
+    assert.throws(() => resolveComponent({
+      component: "unknown",
+      repoRoot: tmpDir,
+    }), /Known components: sprint-execution, tracker-task-truth/);
+  });
+
+  it("refuses --component without spec/capabilities.md before effects (#331)", () => {
+    const sprintsDir = path.join(tmpDir, "backlog", "sprints");
+    let providerCalled = false;
+    assert.throws(() => createSprintFile({
+      topic: "no-axis",
+      milestone: "M",
+      component: "sprint-execution",
+      dryRun: false,
+      sprintsDir,
+      repoRoot: tmpDir,
+      getDue: () => { providerCalled = true; return "TBD"; },
+      getIssues: () => { providerCalled = true; return []; },
+    }), /spec\/capabilities\.md was not found/);
+    assert.equal(providerCalled, false);
+    assert.equal(fs.existsSync(sprintsDir), false);
+  });
+
+  it("refuses direct component + scope input before effects (#331)", () => {
+    const sprintsDir = path.join(tmpDir, "backlog", "sprints");
+    assert.throws(() => createSprintFile({
+      topic: "two-axes",
+      milestone: "M",
+      component: "sprint-execution",
+      scope: ["src/**"],
+      dryRun: false,
+      sprintsDir,
+      repoRoot: tmpDir,
+      getDue: () => "TBD",
+      getIssues: () => [],
+    }), /cannot be used together/);
+    assert.equal(fs.existsSync(sprintsDir), false);
   });
 
   it("lists active sprint files sorted and excludes _context.md", () => {
@@ -289,6 +369,56 @@ describe("createSprintFile", () => {
       getIssues: () => [],
     });
     assert.deepEqual(disjoint.warnings, []);
+  });
+
+  it("refuses equal components and allows distinct ones without a scopeless warning (#331)", () => {
+    writeCapabilities(tmpDir, ["sprint-execution", "tracker-task-truth"]);
+    fs.writeFileSync(
+      path.join(tmpDir, "2026-04-current.md"),
+      '---\nstatus: active\ncomponent: "tracker-task-truth"\n---\n',
+    );
+
+    assert.throws(() => createSprintFile({
+      topic: "duplicate",
+      milestone: "M",
+      component: "tracker-task-truth",
+      dryRun: true,
+      sprintsDir: tmpDir,
+      repoRoot: tmpDir,
+      getDue: () => "TBD",
+      getIssues: () => [],
+    }), /Active track overlaps on scope: 2026-04-current\.md/);
+
+    const result = createSprintFile({
+      topic: "disjoint",
+      milestone: "M",
+      component: "sprint-execution",
+      dryRun: true,
+      sprintsDir: tmpDir,
+      repoRoot: tmpDir,
+      getDue: () => "TBD",
+      getIssues: () => [],
+    });
+    assert.equal(result.component, "sprint-execution");
+    assert.deepEqual(result.warnings, []);
+    assert.match(result.content, /^component: "sprint-execution"$/m);
+  });
+
+  it("returns component and refusal reason in dry-run JSON mode (#331)", () => {
+    writeCapabilities(tmpDir, ["tracker-task-truth", "sprint-execution"]);
+    const cli = path.join(__dirname, "sprint-init.js");
+    const run = spawnSync(process.execPath, [
+      cli, "probe", "--component", "unknown", "--dry-run", "--json",
+    ], { cwd: tmpDir, encoding: "utf-8" });
+
+    assert.equal(run.status, 1);
+    assert.equal(run.stderr, "");
+    const result = JSON.parse(run.stdout);
+    assert.equal(result.dryRun, true);
+    assert.equal(result.component, "unknown");
+    assert.equal(result.created, false);
+    assert.match(result.refusalReason, /Known components: sprint-execution, tracker-task-truth/);
+    assert.equal(fs.existsSync(path.join(tmpDir, "backlog")), false);
   });
 
   it("creates a disjoint-scope second active track without refusal (#292)", () => {

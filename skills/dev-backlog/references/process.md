@@ -60,7 +60,7 @@ the linked Tracker Adapter Design Contract.
 When starting a new sprint:
 
 1. Refuse a new sprint only when its scope overlaps an existing active track (`component:` equality or `scope:` glob collision — `sprint-init.js` checks via the shared `scopesOverlap` predicate); disjoint-scope tracks coexist. Complete a conflicting track rather than flipping `status:` inline. A scopeless sprint next to a scopeless active track warns and allows.
-2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`; declare explicit `scope:` globs (`sprint-init.js --scope "glob[,glob]"`) when opening a concurrent track with no component axis.
+2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`; pass `sprint-init.js --component "slug"` for a declared capability, or mutually exclusive `--scope "glob[,glob]"` when no component axis fits.
 3. List open tasks from the configured adapter.
 4. GitHub mode may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible.
 5. Local mode does not fabricate a milestone. Author the sprint file from normalized local refs returned by the adapter.
