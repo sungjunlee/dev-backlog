@@ -78,6 +78,22 @@ describe("setup-dev-backlog real process integration", () => {
     }
   });
 
+  it("migrates a legacy selection that leads a BOM-prefixed config", (t) => {
+    const root = makeRoot(t, "setup-legacy-bom-first-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const configPath = path.join(root, "backlog/config.yml");
+    // The sibling migration test puts the BOM before project_name, leaving
+    // tracker on line 2 where the key regex still matches. Lead with tracker.
+    const raw = `${String.fromCharCode(0xfeff)}tracker: local\r\nproject_name: legacy\r\n`;
+    fs.writeFileSync(configPath, raw);
+
+    const run = runCli(root, ["--non-interactive", "--json"]);
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).selectionSource, "legacy-migration");
+    assert.equal(fs.readFileSync(path.join(root, "backlog/.tracker"), "utf8"), "local\n");
+    assert.equal(fs.readFileSync(configPath, "utf8"), raw);
+  });
+
   it("refuses an ambiguous legacy config without creating anything", (t) => {
     const root = makeRoot(t, "setup-legacy-ambiguous-");
     fs.mkdirSync(path.join(root, "backlog"));

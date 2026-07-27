@@ -127,6 +127,23 @@ describe("selection readers", () => {
     assert.deepEqual(readLegacyTracker(nested), { found: true, selection: "local" });
   });
 
+  it("reads a legacy selection that sits on the first line of a BOM-prefixed config", (t) => {
+    const root = makeRoot(t);
+    // U+FEFF is neither whitespace nor a key character, so an unstripped BOM
+    // makes the first line invisible to the key regex — the config reads as
+    // "no tracker" and a legacy local repo silently migrates to github.
+    const bom = String.fromCharCode(0xfeff);
+    const first = writeConfig(root, `${bom}tracker: local\nproject_name: legacy\n`);
+    assert.deepEqual(readLegacyTracker(first), { found: true, selection: "local" });
+
+    // The same file must still be refused when its authority is ambiguous.
+    const ambiguous = writeConfig(root, `${bom}tracker: local\ntracker: github\n`);
+    assert.throws(() => readLegacyTracker(ambiguous), (error) => {
+      assert.match(error.message, /Ambiguous tracker authority/);
+      return true;
+    });
+  });
+
   it("uses parseSimpleYaml for the legacy fallback", (t) => {
     const root = makeRoot(t);
     const configPath = writeConfig(root, [
