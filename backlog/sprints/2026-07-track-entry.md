@@ -20,7 +20,11 @@ the create-time disjointness guard cannot see.
 
 - [~] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr) [run:issue-331-20260727134758478-28a5c42c]
 
-### Batch 2 - Charter status [after:craftkit#165]
+### Batch 2 - Status-vocabulary consumer [after:craftkit#165]
+
+- [ ] #335 fix(objectives-check): accept the `implemented` status; it currently reports valid IDs as drift (~30min)
+
+### Batch 3 - Charter status [after:#335]
 
 - [ ] #333 spec: apply the adoption-gated objective status to `spec/charter.md` (O8/O9) (~45min)
 
@@ -61,6 +65,19 @@ the create-time disjointness guard cannot see.
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
+- 2026-07-27: **A shared vocabulary's blast radius crosses repo boundaries, and nobody's
+  scope saw it.** craftkit#165 adds an `implemented` objective status. Its issue scoped the
+  work to `skills/spec-charter/`; round-2 review found `spec-grill` silently dropping the
+  new token, and that scope was amended in the open. Verifying that fix, I checked outside
+  craftkit and found this repo carries the identical hard-coded pattern at
+  `objectives-check.js:101`. Reproduced against a charter with `- O8 [implemented] …` and a
+  sprint declaring `objectives: [O8]`: exit 1, `charterObjectiveIds: ["O1"]`, `O8` reported
+  as `missing` drift. `backlog-doctor` would start failing on a correct repo the moment
+  #333 lands — which is #333's entire purpose. Filed #335; batches renumbered so #333 is
+  blocked on it. Neither craftkit#165 nor #335 could have found the other by reading its
+  own tree. The durable lesson: a skill that defines a vocabulary other repos parse cannot
+  verify its own blast radius. That belongs in `spec-charter`'s guidance, not here — noted
+  on craftkit#165 for a later pass.
 - 2026-07-27: Sprint opened as track A of a two-track portfolio, immediately after the
   v0.9.0 release closed at 0 open issues / 0 open PRs. Filed from the post-release
   reassessment: the v0.9.0 subtraction fixed the *consequence* (`local` built at the

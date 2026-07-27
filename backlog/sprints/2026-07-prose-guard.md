@@ -17,7 +17,7 @@ CI, instead of shipping to `main` and being caught by a human read three surface
 
 ### Batch 1 - Prose guard
 
-- [~] #332 test: canonical-store contract prose must match code (repo-local, not a doctor check) (~1.5hr) [run:issue-332-20260727134805650-be985b27]
+- [~] #332 test: canonical-store contract prose must match code (repo-local, not a doctor check) (~1.5hr) [PR #334, review PASS]
 
 ## Running Context
 
@@ -51,6 +51,26 @@ CI, instead of shipping to `main` and being caught by a human read three surface
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
+- 2026-07-27: **The guard caught a live drift on its first execution — a fourth one, and
+  the first a test found rather than a human read.** Round 1 could not go green because
+  `README.md:22` said `local -> tasks/ + completed/ (canonical, no gh)` and `:38` said
+  `canonical tasks in local`; both false since #321 merged, both shipped on `main`. README
+  was read-only for the task, so the executor correctly left it — the fix landed on `main`
+  as `9228a65` and the branch rebased onto it. Two adjacent stale claims were corrected in
+  the same pass: "One active sprint file" predated multi-track, and two uses of "canonical
+  tasks" were ambiguous in a repo whose contract is that task files are derived.
+  Regression proof run in two variants; the second keeps the correct `.tracker` line and
+  regresses only the canonical claim, failing with `SKILL.md:41 ... contradicts
+  code-derived fact: backlog/local-tracker.json is canonical in local mode`.
+  **Criterion 7 was my authoring error and was amended in the open**: it demanded the
+  failing output "in the PR body", but this run publishes *after* internal review, so it
+  was unsatisfiable at the moment it was checked. Now: recorded in run evidence at internal
+  review, reproduced in the PR body at publication.
+  Process cost worth remembering: I recovered the run to `review_pending` (the
+  post-publication state) when `internal_review_pending` was meant, and there is no edge
+  back — `publish-run` requires `publish_pending` and the whitelist has no reverse. The PR
+  was created by hand to escape. Filed as a third entry point on dev-relay#755.
+  PR #334, review verdict PASS with 0 findings, CI green on Ubuntu and Windows.
 - 2026-07-27: Sprint opened as track B of a two-track portfolio. Partitioned from track A
   on `component:` so the two can run concurrently through separate relay worktrees; this
   is the first time this repo has run 2+ active tracks, which is itself the adoption
