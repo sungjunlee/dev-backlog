@@ -125,8 +125,38 @@ function readTrackerFile(trackerPath, fsApi = fs) {
   return assertAllowedTracker(fsApi.readFileSync(trackerPath, "utf8").trim(), trackerPath);
 }
 
+// `parseSimpleYaml` resolves a repeated top-level key to its last value, and it
+// cannot see a quoted key at all. Either shape used to be refused outright by the
+// setup tokenizer, so accepting them here would turn a previously fail-closed
+// config into a permanent selection file — silently, and possibly under the wrong
+// tracker. Scan the raw text for exactly those two shapes before trusting the
+// parse. This is deliberately not a YAML parser: only column-zero lines can carry
+// top-level authority, so an indented `tracker:` inside a block scalar or a nested
+// mapping is correctly invisible here.
+function assertUnambiguousTrackerAuthority(raw, configPath) {
+  let declarations = 0;
+  for (const line of raw.split(/\r?\n/)) {
+    if (/^\s/.test(line) || !line.trim() || line.trimStart().startsWith("#")) continue;
+    if (/^["']tracker["']\s*:/.test(line)) {
+      throw new SetupError(
+        `Quoted tracker key in ${configPath} obscures tracker authority; ` +
+          "write it as an unquoted top-level `tracker:` key, or remove it and run setup again."
+      );
+    }
+    if (/^tracker\s*:/.test(line)) declarations += 1;
+  }
+  if (declarations > 1) {
+    throw new SetupError(
+      `Ambiguous tracker authority in ${configPath}: ${declarations} top-level tracker declarations. ` +
+        "Leave exactly one, or remove them all and select a tracker explicitly with --tracker."
+    );
+  }
+}
+
 function readLegacyTracker(configPath, fsApi = fs) {
-  const parsed = parseSimpleYaml(fsApi.readFileSync(configPath, "utf8"));
+  const raw = fsApi.readFileSync(configPath, "utf8");
+  assertUnambiguousTrackerAuthority(raw, configPath);
+  const parsed = parseSimpleYaml(raw);
   if (!Object.prototype.hasOwnProperty.call(parsed, "tracker")) {
     return Object.freeze({ found: false, selection: undefined });
   }

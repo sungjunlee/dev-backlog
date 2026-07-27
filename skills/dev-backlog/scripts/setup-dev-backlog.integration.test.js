@@ -78,6 +78,23 @@ describe("setup-dev-backlog real process integration", () => {
     }
   });
 
+  it("refuses an ambiguous legacy config without creating anything", (t) => {
+    const root = makeRoot(t, "setup-legacy-ambiguous-");
+    fs.mkdirSync(path.join(root, "backlog"));
+    const configPath = path.join(root, "backlog/config.yml");
+    const raw = "project_name: legacy\r\ntracker: local\r\ntracker: github\r\n";
+    fs.writeFileSync(configPath, raw);
+    const before = snapshot(root);
+
+    const refused = runCli(root, ["--non-interactive", "--json"]);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Ambiguous tracker authority/);
+    // Fail closed before any effect: no .tracker, no directories, config byte-identical.
+    assert.equal(fs.existsSync(path.join(root, "backlog/.tracker")), false);
+    assert.equal(fs.readFileSync(configPath, "utf8"), raw);
+    assert.deepEqual(snapshot(root), before);
+  });
+
   it("pins a tracker-less legacy config before a local switch", (t) => {
     const root = makeRoot(t);
     fs.mkdirSync(path.join(root, "backlog/tasks"), { recursive: true });

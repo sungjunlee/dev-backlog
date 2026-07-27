@@ -98,6 +98,35 @@ describe("selection readers", () => {
     assert.throws(() => readTrackerFile(trackerPath), SetupError);
   });
 
+  it("refuses ambiguous legacy tracker authority instead of taking the last value", (t) => {
+    const root = makeRoot(t);
+    // parseSimpleYaml resolves a repeated key to its last value; the setup
+    // tokenizer this replaced refused the input outright. Keep refusing.
+    const duplicate = writeConfig(root, ["tracker: local", "tracker: github", ""].join("\n"));
+    assert.throws(() => readLegacyTracker(duplicate), (error) => {
+      assert.ok(error instanceof SetupError);
+      assert.match(error.message, /Ambiguous tracker authority/);
+      assert.match(error.message, /2 top-level tracker declarations/);
+      return true;
+    });
+
+    // A quoted key is invisible to parseSimpleYaml, so accepting the file would
+    // silently fall through to the github default rather than honour the value.
+    const quoted = writeConfig(root, ['"tracker": local', ""].join("\n"));
+    assert.throws(() => readLegacyTracker(quoted), (error) => {
+      assert.ok(error instanceof SetupError);
+      assert.match(error.message, /obscures tracker authority/);
+      return true;
+    });
+
+    // Indented occurrences carry no top-level authority and must stay invisible.
+    const nested = writeConfig(
+      root,
+      ["note: |", "  tracker: github", "settings:", "  tracker: local", "tracker: local", ""].join("\n")
+    );
+    assert.deepEqual(readLegacyTracker(nested), { found: true, selection: "local" });
+  });
+
   it("uses parseSimpleYaml for the legacy fallback", (t) => {
     const root = makeRoot(t);
     const configPath = writeConfig(root, [
