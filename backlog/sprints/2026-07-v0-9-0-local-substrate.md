@@ -1,6 +1,6 @@
 ---
 milestone: v0.9.0 local substrate redesign
-status: active
+status: completed
 started: 2026-07-26
 due: TBD
 objectives: [O8, O9]
@@ -26,12 +26,12 @@ and the three Windows lock-race skips are gone.
 
 ### Batch 3 - Selection file [after:#321]
 
-- [~] #322 refactor(setup): move tracker selection to backlog/.tracker; delete the config.yml YAML tokenizer (~3hr) [run:issue-322-20260726233150638-07a087e1] [branch:issue-322]
+- [x] #322 refactor(setup): move tracker selection to backlog/.tracker; delete the config.yml YAML tokenizer (~3hr) → PR #328 (merged)
 
 ### Batch 4 - Contract + release [after:#321,#322]
 
-- [ ] #323 docs: capability Decisions row + residual-claim sweep (re-scoped — contract prose landed in #321) (~30min)
-- [ ] #324 release: prepare and cut v0.9.0 (~45min)
+- [x] #323 docs: capability Decisions row + residual-claim sweep (re-scoped) (~30min) → PR #329 (merged)
+- [x] #324 release: prepare and cut v0.9.0 (~45min) → PR #330 (merged)
 
 ## Running Context
 
@@ -124,3 +124,29 @@ and the three Windows lock-race skips are gone.
   relay-review passes the review prompt through argv, so a single raw NUL byte anywhere in the diff
   fails the codex reviewer (worked around with a sanitized `--diff-file`); and a rubric's
   `task_profile.review_assurance` is ignored — the cap comes from dispatch's `--review-assurance`.
+- 2026-07-27: Batches 3-4 done and **v0.9.0 released**. #322 → PR #328, #323 → PR #329,
+  #324 → PR #330 (`9170783`); annotated tag `v0.9.0` pushed and the GitHub release published.
+  `setup-dev-backlog.js` 1,007 → 567 with the ~395-line selection tokenizer deleted;
+  `legacy-tracker.js` (125 lines) extracted as a deletable legacy-compat unit. Net across the
+  sprint: **26,984 → 24,428 script+test lines (−2,556)** with no capability removed.
+  Three review rounds on #322 mirrored #321's pattern exactly — each found a narrower
+  authority-obscuring YAML shape the deleted tokenizer refused and the replacement missed
+  (duplicate top-level keys; nested/sequence/flow declarations; escape-encoded and explicit keys).
+  Every premise was checked against the replaced implementation before fixing, and every one held.
+  Rounds 1-2 were fixed outright. Round 3 escalated and was closed as an **owner contract
+  narrowing**, not a defect: decoding those shapes means rebuilding the tokenizer the sprint
+  exists to delete, the tokenizer's original job (safe *writing*) no longer exists, `config.yml`
+  is owner-authored local input, and refusal reaches the same user-visible outcome by a different
+  route. The narrowed guarantee and its two accepted consequences are recorded in
+  `docs/tracker-adapter-design.md` and issue #322 rather than left as an open finding.
+  A live drift was caught while scoping #323: `SKILL.md` Core Contracts still called local task
+  files canonical records — false since #321 merged, and shipped on main. PR #327's body had
+  claimed the contract prose landed; verification had stopped at the diffstat. That makes three
+  contract-prose drifts this cycle (v0.8.0's `system-map.md:79`, #321's stale lock sentence,
+  this one), none of which failed a test. Candidate for a later cycle, not now: teach
+  `backlog-doctor` to check the verifiable claims contract prose makes about which store is
+  canonical. Two more relay gaps confirmed: hardened assurance rejects the executor's default
+  `test_command: "unspecified"` (evidence had to be recorded by the orchestrator), and both
+  advisory reviewers produced zero evidence across six rounds — `opencode` timed out at 600s,
+  `cline` failed with `invalid model format`.
+- 2026-07-27: Sprint closed. 5/5 tasks completed.
