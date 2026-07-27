@@ -17,9 +17,10 @@ README.md is the product overview and human quick start. The agent execution con
 ```text
 backlog/.tracker: github | local
         |
-        +-- github -> GitHub Issues (canonical) -> tasks/ mirrors
+        +-- github -> GitHub Issues (canonical) -> tasks/ derived mirrors
         |
-        `-- local  -> tasks/ + completed/ (canonical, no gh)
+        `-- local  -> backlog/local-tracker.json (canonical, no gh)
+                      -> tasks/ derived mirrors
 
 backlog/sprints/     execution hub: plan, context, progress
         ^
@@ -34,8 +35,8 @@ backlog/sprints/     execution hub: plan, context, progress
 | Capability | What changes |
 |------------|--------------|
 | One canonical tracker | Explicit `github` or fully offline `local`; runtime never switches it |
-| One active sprint file | The human and the agent read the same execution plan |
-| Mode-aware task files | GitHub mirrors in `github`; canonical tasks in `local` |
+| One active sprint file per track | The human and the agent read the same execution plan; disjoint tracks may run concurrently |
+| Derived task files | `backlog/tasks/` mirrors the canonical store in both modes and is never read back as truth |
 | Explicit sync | Pull and refresh when you choose, not behind your back |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
@@ -94,7 +95,7 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
 
 For a fully offline repository, choose `--tracker local` instead. Create and
-update canonical tasks through the configured tracker lifecycle, use normalized
+update tasks in the canonical store through the configured tracker lifecycle, use normalized
 refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
 `sprint-close` commands. Local mode deliberately does not invent milestones,
 PR relationships, sprint/progress mirrors, comments, or closing-keyword links.
@@ -203,7 +204,7 @@ Users can log in and access protected API endpoints.
 ## Daily Workflow
 
 1. Read the configured tracker; in GitHub mode, explicitly pull issues into `backlog/tasks/`.
-2. Create or read canonical tasks and generate the active sprint file.
+2. Create or read tasks in the canonical store and generate the active sprint file.
 3. Read the sprint before you code.
 4. Work batch by batch, not issue by issue across ten tabs.
 5. Update `Running Context` and `Progress` as you learn things.
