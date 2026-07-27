@@ -592,6 +592,7 @@ function createLocalAdapter(options = {}) {
 }
 
 module.exports = {
+  STORE_FILE,
   createLocalAdapter,
   LocalStoreError,
 };

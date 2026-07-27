@@ -32,6 +32,7 @@ const CAPABILITY_NAMES = Object.freeze([
 const UNSUPPORTED_CAPABILITY_CODE = "TRACKER_CAPABILITY_UNSUPPORTED";
 
 const DEFAULT_BACKLOG_DIR = "backlog";
+const TRACKER_SELECTION_FILE = ".tracker";
 
 class TrackerConfigurationError extends Error {
   constructor(value) {
@@ -62,7 +63,8 @@ class TrackerUnavailableError extends Error {
   constructor(tracker, reason, options = {}) {
     super(
       `Configured tracker "${tracker}" is unavailable: ${reason}. ` +
-        "Restore that tracker or change backlog/.tracker explicitly; no fallback was attempted.",
+        `Restore that tracker or change backlog/${TRACKER_SELECTION_FILE} explicitly; ` +
+        "no fallback was attempted.",
       options
     );
     this.name = "TrackerUnavailableError";
@@ -75,7 +77,7 @@ class UnsupportedTrackerCapabilityError extends Error {
   constructor(
     tracker,
     capability,
-    configPath = configDisplayPath(DEFAULT_BACKLOG_DIR, ".tracker")
+    configPath = configDisplayPath(DEFAULT_BACKLOG_DIR, TRACKER_SELECTION_FILE)
   ) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
@@ -141,7 +143,7 @@ function selectTracker(config = {}) {
 }
 
 function readTrackerSelection(backlogDir = DEFAULT_BACKLOG_DIR, { fs: fsApi = fs } = {}) {
-  const trackerPath = path.join(backlogDir, ".tracker");
+  const trackerPath = path.join(backlogDir, TRACKER_SELECTION_FILE);
   try {
     return fsApi.readFileSync(trackerPath, "utf8").trim();
   } catch (error) {
@@ -241,7 +243,7 @@ function resolveConfiguredTracker(config, {
   );
   return Object.freeze({
     ...resolved,
-    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR, ".tracker"),
+    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR, TRACKER_SELECTION_FILE),
   });
 }
 
@@ -352,6 +354,7 @@ module.exports = {
   REQUIRED_ADAPTER_OPERATIONS,
   CAPABILITY_NAMES,
   UNSUPPORTED_CAPABILITY_CODE,
+  TRACKER_SELECTION_FILE,
   TRACKER_ADAPTERS,
   TrackerConfigurationError,
   TrackerContractError,
