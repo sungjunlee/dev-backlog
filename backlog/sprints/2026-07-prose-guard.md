@@ -17,7 +17,7 @@ CI, instead of shipping to `main` and being caught by a human read three surface
 
 ### Batch 1 - Prose guard
 
-- [~] #332 test: canonical-store contract prose must match code (repo-local, not a doctor check) (~1.5hr) → PR #334 (open)
+- [x] #332 test: canonical-store contract prose must match code (repo-local, not a doctor check) (~1.5hr) → PR #334 (merged)
 
 ## Running Context
 

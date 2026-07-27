@@ -18,11 +18,11 @@ the create-time disjointness guard cannot see.
 
 ### Batch 1 - Track entry path
 
-- [~] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr) [run:issue-331-20260727134758478-28a5c42c]
+- [x] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr) → PR #336 (merged)
 
 ### Batch 2 - Status-vocabulary consumer [after:craftkit#165]
 
-- [ ] #335 fix(objectives-check): accept the `implemented` status; it currently reports valid IDs as drift (~30min)
+- [~] #335 fix(objectives-check): accept the `implemented` status; it currently reports valid IDs as drift (~30min) [run:issue-335-20260727142657981-a507d1b7]
 
 ### Batch 3 - Charter status [after:#335]
 
