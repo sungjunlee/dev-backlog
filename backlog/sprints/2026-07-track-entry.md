@@ -18,7 +18,7 @@ the create-time disjointness guard cannot see.
 
 ### Batch 1 - Track entry path
 
-- [ ] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr)
+- [~] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr) [run:issue-331-20260727134758478-28a5c42c]
 
 ### Batch 2 - Charter status [after:craftkit#165]
 
