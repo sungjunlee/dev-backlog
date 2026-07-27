@@ -110,6 +110,10 @@ describe("selection readers", () => {
       ["nested only", "provider:\n  tracker: github\n"],
       ["sequence item only", "- tracker: github\n"],
       ["quoted key", '"tracker": local\n'],
+      // The old lexer decoded these; this reader refuses them instead of
+      // rebuilding the tokenizer that decoding would require.
+      ["escaped quoted key", 'mapping: {"track\\x65r": github}\ntracker: local\n'],
+      ["explicit mapping key", "? tracker\n: github\ntracker: local\n"],
     ];
     for (const [label, raw] of refused) {
       const configPath = writeConfig(root, raw);
@@ -129,6 +133,7 @@ describe("selection readers", () => {
       ["block scalar body", "note: |\n  tracker: github\ntracker: local\n"],
       ["comment", "# tracker: github\ntracker: local\n"],
       ["quoted string", 'note: "see tracker: github"\ntracker: local\n'],
+      ["quoted value without escapes", 'tracker: "local"\n'],
     ];
     for (const [label, raw] of accepted) {
       const configPath = writeConfig(root, raw);

@@ -40,6 +40,21 @@ function countTrackerKeys(text) {
   return (text.match(/(?:^|[\s\[{,]|-\s)tracker\s*:/g) || []).length;
 }
 
+// Two shapes the old lexer decoded and this scan deliberately does not: a
+// double-quoted key carrying escapes (`"track\x65r": github`), and an explicit
+// mapping key (`? tracker`). Decoding either would mean rebuilding the tokenizer
+// this change deleted, so refuse them outright instead. Refusing is safe — these
+// are not shapes a config gets by accident — and it keeps the read path from
+// silently resolving an authority the old setup would have rejected.
+function assertNoUndecodableAuthority(line, refuse) {
+  if (/^\?(\s|$)/.test(line.trim())) {
+    refuse("an explicit mapping key (`?`) can carry tracker authority this reader does not decode");
+  }
+  if (/(["'])(?:[^"'\\]|\\.)*\\(?:[^"'\\]|\\.)*\1\s*:/.test(line)) {
+    refuse("a quoted key contains escape sequences this reader does not decode");
+  }
+}
+
 function assertUnambiguousTrackerAuthority(raw, configPath, SetupError) {
   const refuse = (detail) => {
     throw new SetupError(
@@ -62,6 +77,8 @@ function assertUnambiguousTrackerAuthority(raw, configPath, SetupError) {
       if (!rawLine.trim() || indent > blockScalarIndent) continue;
       blockScalarIndent = null;
     }
+    assertNoUndecodableAuthority(rawLine, refuse);
+
     const line = stripUncountedSpans(rawLine);
     if (!line.trim()) continue;
 
