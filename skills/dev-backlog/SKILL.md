@@ -24,7 +24,7 @@ README covers install and human quick start. This file is the agent execution co
 | "plan sprint", "make sprint", "start work" with no active sprint | `plan` | One active sprint file exists with Goal, ordered Plan, `objectives:`, and `component:`. |
 | "work #N", "work BACK-N", "continue", "do next batch" | `work` | Task AC is verified and configured-tracker plus sprint state are updated. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
-| "sync", "pull issues", "refresh backlog" | `sync` | GitHub mirrors are explicitly refreshed; local canonical files need no provider sync. |
+| "sync", "pull issues", "refresh backlog" | `sync` | GitHub mirrors are explicitly refreshed; the local canonical store needs no provider sync. |
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
 
 If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
@@ -37,16 +37,17 @@ Related skills (none required for either core cycle): when installed, `spec-char
 
 ```
 backlog/.tracker (one line: github | local)
-  github -> GitHub Issues canonical; backlog/tasks/ are explicit mirrors
-  local  -> backlog/tasks/ + completed/ are canonical; zero provider calls
+  github -> GitHub Issues canonical; backlog/tasks/ are derived mirrors
+  local  -> backlog/local-tracker.json canonical; zero provider calls
 
+backlog/tasks/ + completed/ <- derived task mirrors in both modes
 backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
 backlog/sprints/ <- shared execution hub in both modes
 ```
 
 - One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
-- Task files are thin mirrors in GitHub mode and canonical records in local mode. In both modes, decisions, progress, and cross-task context stay in the sprint file.
+- Task files are derived mirrors in both modes and are never read back as truth; canonical task truth is GitHub Issues (`github`) or `backlog/local-tracker.json` (`local`). In both modes, decisions, progress, and cross-task context stay in the sprint file.
 - A missing `.tracker` file falls back to a legacy `tracker:` key in `config.yml`, then to the zero-migration GitHub compatibility default. Runtime failure never changes the selected tracker.
 - Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
 - Completed sprints stay as the permanent execution record.
@@ -136,7 +137,7 @@ Done when there is no stale active sprint or rediscovery-prone context trapped i
 ### Sync
 
 - GitHub: pull canonical issues into mirrors at sprint start and when they change; provider writes remain explicit.
-- Local: task files are already canonical; do not call `gh` or manufacture a push/pull step.
+- Local: `backlog/local-tracker.json` is already canonical and its mirrors are refreshed on every mutation; do not call `gh` or manufacture a push/pull step.
 - Never perform background sync or switch trackers after a failure.
 
 Done when the user can tell which direction changed and what was updated.
