@@ -1,0 +1,69 @@
+---
+milestone: 2026-07 adoption gate and track entry
+status: active
+started: 2026-07-27
+due: TBD
+objectives: [O1, O3]
+component: "sprint-execution"
+---
+
+# track-entry
+
+## Goal
+The charter stops reading green for capabilities nobody uses, and opening a
+component-partitioned track is a flag on `sprint-init.js` rather than a hand edit that
+the create-time disjointness guard cannot see.
+
+## Plan
+
+### Batch 1 - Track entry path
+
+- [ ] #331 feat(sprint-init): `--component <slug>` — create-time entry path for the primary track axis (~2hr)
+
+### Batch 2 - Charter status [after:craftkit#165]
+
+- [ ] #333 spec: apply the adoption-gated objective status to `spec/charter.md` (O8/O9) (~45min)
+
+## Running Context
+
+- **This track is one half of the first real two-track dogfood.** The sibling track is
+  `2026-07-prose-guard.md` (`component: tracker-task-truth`, issue #332). multi-track
+  shipped in v0.8.0 and has had zero adopters across 19 consuming repos; running it here
+  is how it gets its first. Keep the file sets disjoint: this track owns
+  `sprint-init.js`, `sprint-init.test.js`, `spec/charter.md`, and the flag-inventory docs
+  (`references/scripts.md`, `references/process.md`, `SKILL.md` Plan step). The sibling
+  track **reads** `SKILL.md` and must not edit it.
+- **The gap #331 fixes was reproduced while opening these two tracks.** Creating the
+  second sprint emitted, verbatim:
+  `Active track(s) without component:/scope: (2026-07-track-entry.md); cannot prove the
+  new sprint is disjoint.` Both sprints were destined for distinct components, but
+  `checkTrackDisjointness({ sprintsDir, scope })` never sees a component, so it took the
+  scopeless branch (`sprint-init.js:206-213`) — warn, then allow. Both `component:`
+  values below were typed in by hand afterward. That is the entry path #331 adds.
+- **This is a detection delay, not a hole.** A genuinely duplicated `component:` is
+  caught by `backlog-doctor.js:289`/`:309-315` as an `active_sprint` **fail**. #331 moves
+  the refusal to creation time; it does not add a guarantee the repo lacked.
+- **#333 is blocked on craftkit#165 and must stay blocked.** The `implemented` status
+  vocabulary belongs to craftkit's `spec-charter` skill (`SKILL.md:65,104`,
+  `references/amendment.md:30-42`). Inventing the state locally is exactly the dual
+  ownership that caused the 2026-06/07 silent fork. Per the workspace rule, `spec-*`
+  changes are craftkit issues even when found while dogfooding dev-backlog.
+- **#333 is human-gated and not delegatable.** Tier-2 status semantics require the human
+  to confirm the proposed diff. The approval that opened this sprint covers the intent,
+  not an unseen diff.
+- **Do not reword an objective to make its proof look sufficient.** If a predicate can
+  only ever be producer-observable as written, record that in Progress instead.
+- **The measurement that motivated both issues** (2026-07-26, 19 consuming repos):
+  `local` tracker 0 adopters; `tracker:` set in 1 config, to the default; `scope:` in 0
+  files; 0 repos with 2+ active tracks. Every health signal was green throughout.
+- **Size guards are acceptance criteria, not suggestions.** #331 stops at ~120 lines
+  outside tests. Exceeding one is a finding to report, not a budget to spend.
+- Relay/PR review stops at ready-to-merge unless merge is separately approved.
+
+## Progress
+- 2026-07-27: Sprint opened as track A of a two-track portfolio, immediately after the
+  v0.9.0 release closed at 0 open issues / 0 open PRs. Filed from the post-release
+  reassessment: the v0.9.0 subtraction fixed the *consequence* (`local` built at the
+  wrong tier) but not the *rule* that let four zero-adopter axes read as validated.
+  craftkit#165 owns the rule; #333 applies it here; #331 removes the friction that
+  explains why multi-track has no adopters to validate against.
