@@ -98,33 +98,42 @@ describe("selection readers", () => {
     assert.throws(() => readTrackerFile(trackerPath), SetupError);
   });
 
-  it("refuses ambiguous legacy tracker authority instead of taking the last value", (t) => {
+  it("refuses every authority-obscuring legacy config the old tokenizer refused", (t) => {
     const root = makeRoot(t);
-    // parseSimpleYaml resolves a repeated key to its last value; the setup
-    // tokenizer this replaced refused the input outright. Keep refusing.
-    const duplicate = writeConfig(root, ["tracker: local", "tracker: github", ""].join("\n"));
-    assert.throws(() => readLegacyTracker(duplicate), (error) => {
-      assert.ok(error instanceof SetupError);
-      assert.match(error.message, /Ambiguous tracker authority/);
-      assert.match(error.message, /2 top-level tracker declarations/);
-      return true;
-    });
+    // The replaced tokenizer counted a tracker key wherever it appeared and
+    // refused on more than one, or on a lone nested one. parseSimpleYaml cannot
+    // reproduce that, so these must stay fail-closed rather than migrate.
+    const refused = [
+      ["duplicate top-level", "tracker: local\ntracker: github\n"],
+      ["nested plus top-level", "provider:\n  tracker: github\ntracker: local\n"],
+      ["flow sequence plus top-level", "items: [tracker: github]\ntracker: local\n"],
+      ["nested only", "provider:\n  tracker: github\n"],
+      ["sequence item only", "- tracker: github\n"],
+      ["quoted key", '"tracker": local\n'],
+    ];
+    for (const [label, raw] of refused) {
+      const configPath = writeConfig(root, raw);
+      assert.throws(() => readLegacyTracker(configPath), (error) => {
+        assert.ok(error instanceof SetupError, label);
+        assert.match(error.message, /Ambiguous tracker authority/, label);
+        return true;
+      }, label);
+    }
+  });
 
-    // A quoted key is invisible to parseSimpleYaml, so accepting the file would
-    // silently fall through to the github default rather than honour the value.
-    const quoted = writeConfig(root, ['"tracker": local', ""].join("\n"));
-    assert.throws(() => readLegacyTracker(quoted), (error) => {
-      assert.ok(error instanceof SetupError);
-      assert.match(error.message, /obscures tracker authority/);
-      return true;
-    });
-
-    // Indented occurrences carry no top-level authority and must stay invisible.
-    const nested = writeConfig(
-      root,
-      ["note: |", "  tracker: github", "settings:", "  tracker: local", "tracker: local", ""].join("\n")
-    );
-    assert.deepEqual(readLegacyTracker(nested), { found: true, selection: "local" });
+  it("still resolves a real top-level selection past decoy tracker text", (t) => {
+    const root = makeRoot(t);
+    // The old lexer excluded block-scalar bodies and comments, and never counted
+    // a tracker key inside a quoted string. Keep all three accepted.
+    const accepted = [
+      ["block scalar body", "note: |\n  tracker: github\ntracker: local\n"],
+      ["comment", "# tracker: github\ntracker: local\n"],
+      ["quoted string", 'note: "see tracker: github"\ntracker: local\n'],
+    ];
+    for (const [label, raw] of accepted) {
+      const configPath = writeConfig(root, raw);
+      assert.deepEqual(readLegacyTracker(configPath), { found: true, selection: "local" }, label);
+    }
   });
 
   it("reads a legacy selection that sits on the first line of a BOM-prefixed config", (t) => {

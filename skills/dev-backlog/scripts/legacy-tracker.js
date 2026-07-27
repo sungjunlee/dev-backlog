@@ -13,31 +13,72 @@
 const fs = require("node:fs");
 const { parseSimpleYaml } = require("./lib.js");
 
-// `parseSimpleYaml` resolves a repeated top-level key to its last value, and it
-// cannot see a quoted key at all. Either shape used to be refused outright by the
-// setup tokenizer this replaced, so accepting them would turn a previously
-// fail-closed config into a permanent selection file — silently, and possibly
-// under the wrong tracker. Scan the raw text for exactly those two shapes before
-// trusting the parse. This is deliberately not a YAML parser: only column-zero
-// lines can carry top-level authority, so an indented `tracker:` inside a block
-// scalar or a nested mapping is correctly invisible here.
+// The setup tokenizer this replaced counted a `tracker` key wherever it appeared
+// — nested under another key, inside a sequence, inside a flow collection — and
+// refused the config when it found more than one, or when the only one was not a
+// top-level scalar. `parseSimpleYaml` cannot reproduce that: it resolves a
+// repeated top-level key to its last value, ignores nested occurrences entirely,
+// and cannot see a quoted key at all. Trusting it alone would turn configs that
+// previously failed closed into permanent selection files, silently and possibly
+// under the wrong tracker.
+//
+// This scan restores the refusals without restoring the tokenizer. It is
+// deliberately conservative: block-scalar bodies and comments are excluded
+// because the old lexer excluded them, and quoted spans are blanked so a
+// `tracker:` inside a string is not counted. Anything else that looks like a
+// tracker key is counted, so an exotic layout errs toward an actionable refusal
+// rather than a silent selection.
+function stripUncountedSpans(line) {
+  // Blank quoted spans first so a '#' inside a string does not start a comment,
+  // then drop the comment tail. Replacement preserves length, keeping offsets.
+  const blanked = line.replace(/"[^"]*"|'[^']*'/g, (match) => " ".repeat(match.length));
+  const comment = blanked.indexOf("#");
+  return comment === -1 ? blanked : blanked.slice(0, comment);
+}
+
+function countTrackerKeys(text) {
+  return (text.match(/(?:^|[\s\[{,]|-\s)tracker\s*:/g) || []).length;
+}
+
 function assertUnambiguousTrackerAuthority(raw, configPath, SetupError) {
-  let declarations = 0;
-  for (const line of raw.split(/\r?\n/)) {
-    if (/^\s/.test(line) || !line.trim() || line.trimStart().startsWith("#")) continue;
-    if (/^["']tracker["']\s*:/.test(line)) {
-      throw new SetupError(
-        `Quoted tracker key in ${configPath} obscures tracker authority; ` +
-          "write it as an unquoted top-level `tracker:` key, or remove it and run setup again."
-      );
-    }
-    if (/^tracker\s*:/.test(line)) declarations += 1;
-  }
-  if (declarations > 1) {
+  const refuse = (detail) => {
     throw new SetupError(
-      `Ambiguous tracker authority in ${configPath}: ${declarations} top-level tracker declarations. ` +
-        "Leave exactly one, or remove them all and select a tracker explicitly with --tracker."
+      `Ambiguous tracker authority in ${configPath}: ${detail}. ` +
+        "Leave exactly one top-level `tracker:` key, or remove them all and select a tracker explicitly with --tracker."
     );
+  };
+
+  let total = 0;
+  let topLevel = 0;
+  let blockScalarIndent = null;
+
+  // Tolerate a leading BOM here too, so the scan is correct for direct callers
+  // and not only when `readLegacyTracker` has already stripped it. U+FEFF is
+  // neither whitespace nor a key character, so leaving it would make a
+  // first-line `tracker:` look nested.
+  for (const rawLine of raw.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const indent = rawLine.match(/^[ \t]*/)[0].length;
+    if (blockScalarIndent !== null) {
+      if (!rawLine.trim() || indent > blockScalarIndent) continue;
+      blockScalarIndent = null;
+    }
+    const line = stripUncountedSpans(rawLine);
+    if (!line.trim()) continue;
+
+    if (/^["']tracker["']\s*:/.test(rawLine)) {
+      refuse("the tracker key is quoted, which obscures authority");
+    }
+
+    const found = countTrackerKeys(line);
+    total += found;
+    if (found > 0 && /^tracker\s*:/.test(line)) topLevel += 1;
+
+    if (/:\s*[|>][+-]?\d*\s*$/.test(line)) blockScalarIndent = indent;
+  }
+
+  if (total > 1) refuse(`${total} tracker declarations were found`);
+  if (total === 1 && topLevel === 0) {
+    refuse("the only tracker declaration is nested rather than a top-level scalar");
   }
 }
 
@@ -48,7 +89,7 @@ function assertUnambiguousTrackerAuthority(raw, configPath, SetupError) {
  */
 function readLegacyTracker(configPath, { fs: fsApi = fs, assertAllowed, SetupError } = {}) {
   // Strip a leading BOM before both the scan and the parse: neither the key regex
-  // in `parseSimpleYaml` nor the column-zero scan above treats U+FEFF as
+  // in `parseSimpleYaml` nor the scan above treats U+FEFF as
   // whitespace, so a `tracker:` key on the very first line of a BOM-prefixed file
   // would read as "no tracker key" and migrate a legacy `local` repository to
   // `github` without an error.
