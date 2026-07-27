@@ -9,6 +9,8 @@
  *   - missing  : the ID is not in the charter at all (removed; IDs are never reused)
  *   - deferred : the ID exists but is marked [deferred]; sprints should not target
  *                deferred objectives
+ * Charter statuses are [validated], [active], [implemented], and [deferred];
+ * only [deferred] objectives are not targetable by sprints.
  *
  * Graceful no-op when spec/charter.md and legacy CHARTER.md are absent.
  *
@@ -98,7 +100,7 @@ function parseCharterObjectives(content) {
   const objectives = new Map();
   const lines = content.split("\n");
   for (const line of lines) {
-    const match = line.match(/^- (O\d+) \[(validated|active|deferred)\]/);
+    const match = line.match(/^- (O\d+) \[(validated|active|implemented|deferred)\]/);
     if (match) objectives.set(match[1], match[2]);
   }
   return objectives;
