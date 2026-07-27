@@ -291,8 +291,13 @@ function fetchOpenIssues(limit, execFile = execFileSync) {
     .map(stripNormalizedIdentity);
 }
 
-function loadOpenIssues({ limit, execFile = execFileSync, config = {} } = {}) {
-  const resolved = resolveConfiguredTracker(config, { execFile });
+function loadOpenIssues({
+  limit,
+  execFile = execFileSync,
+  config = {},
+  backlogDir,
+} = {}) {
+  const resolved = resolveConfiguredTracker(config, { execFile, backlogDir });
   return resolved.adapter
     .list({ limit, fields: ISSUE_JSON_FIELDS })
     .map(stripNormalizedIdentity);
@@ -309,7 +314,7 @@ function main() {
 
   let issues;
   try {
-    issues = loadOpenIssues({ limit: options.limit, config });
+    issues = loadOpenIssues({ limit: options.limit, config, backlogDir: "backlog" });
   } catch (e) {
     const prefix = e?.tracker ? "tracker error" : "gh error";
     console.error(`${prefix}: ${e.message}`);

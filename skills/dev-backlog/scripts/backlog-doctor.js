@@ -25,7 +25,12 @@ const {
   analyzeCapabilities,
   hasHardFailures: hasCapabilityHardFailures,
 } = require("./capabilities-doctor.js");
-const { readConfig, sprintScopeKey, scopesOverlap } = require("./lib.js");
+const {
+  parseSimpleYaml,
+  readConfig,
+  sprintScopeKey,
+  scopesOverlap,
+} = require("./lib.js");
 const { repoDisplayPath, toPortablePath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
@@ -161,6 +166,10 @@ function runDoctor({
 
   const tracks = loadActiveTracks(sprintsDir);
   const active = checkActiveSprint({ repoRoot: root, sprintsDir, tracks });
+  const staleTrackerSelection = checkStaleTrackerSelection({
+    repoRoot: root,
+    backlogPath,
+  });
 
   // Per-sprint checks fan out per active track (PRD §5.3): 0 or 1 active keeps
   // today's single untagged run; N>1 runs each check once per track and tags
@@ -190,6 +199,7 @@ function runDoctor({
 
   const checks = [
     active,
+    ...(staleTrackerSelection ? [staleTrackerSelection] : []),
     ...perTrack.map((run) => run.objectives),
     ...perTrack.map((run) => run.component_lint),
     checkCapabilities({ repoRoot: root, capabilitiesPath }),
@@ -218,6 +228,27 @@ function runDoctor({
     exit_hint: exitHintFor(checks),
     reassess_signal: reassessSignal,
   };
+}
+
+function checkStaleTrackerSelection({ repoRoot, backlogPath }) {
+  const trackerPath = path.join(backlogPath, ".tracker");
+  const configPath = path.join(backlogPath, "config.yml");
+  if (!fs.existsSync(trackerPath) || !fs.existsSync(configPath)) return null;
+
+  const parsed = parseSimpleYaml(fs.readFileSync(configPath, "utf8"));
+  if (!Object.prototype.hasOwnProperty.call(parsed, "tracker")) return null;
+
+  const displayConfig = displayPath(repoRoot, configPath);
+  const displayTracker = displayPath(repoRoot, trackerPath);
+  const remediation =
+    `Remove the stale top-level tracker: key from ${displayConfig}; ` +
+    `change ${displayTracker} when selecting a different tracker.`;
+  return verdict("tracker_selection", "warn", {
+    summary: `Legacy tracker selection remains in ${displayConfig} after ${displayTracker} became authoritative. ${remediation}`,
+    config_path: displayConfig,
+    tracker_path: displayTracker,
+    remediation,
+  });
 }
 
 function resolvePath(repoRoot, maybeRelative) {
@@ -905,6 +936,7 @@ module.exports = {
   formatHumanSummary,
   formatCloseSummary,
   checkActiveSprint,
+  checkStaleTrackerSelection,
   checkSprintShape,
   findUnparseablePlanLines,
   findLatestReassessReport,

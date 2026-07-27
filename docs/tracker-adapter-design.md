@@ -133,6 +133,37 @@ this amendment only the first survives: `lib.js:parseSimpleYaml` (reads
 (writes the tracker key — deleted), and the `local-tracker.js` frontmatter
 round-trip (task files — deleted).
 
+#### The legacy read guarantee is narrower than the deleted tokenizer, on purpose
+
+The tokenizer existed to *write* one key into a user-owned YAML file safely: it
+had to be certain no second declaration was hiding anywhere, because clobbering
+one would corrupt the user's config. Nothing writes `config.yml` any more, so
+that job is gone. What remains is a read that must either resolve the value the
+old code resolved, or refuse.
+
+`legacy-tracker.js` therefore **refuses without decoding**. It counts `tracker`
+keys wherever the old lexer counted them — nested, sequence, and flow contexts
+included — and excludes what the old lexer excluded: block-scalar bodies,
+comments, and quoted spans. Beyond that it refuses two shapes the old lexer
+decoded, rather than reimplementing the decoder: a quoted key containing escape
+sequences (`"track\x65r": github`) and an explicit mapping key (`? tracker`).
+
+Two accepted consequences, recorded so they are decisions rather than gaps:
+
+- A config using those shapes is **refused with an actionable message** where the
+  old setup would have decoded and then refused it as a duplicate. The outcome —
+  no migration, an error naming the problem — is the same; only the reason text
+  differs.
+- A `tracker:` sequence appearing inside a **multi-line** quoted scalar can be
+  over-counted, producing a refusal where the old lexer accepted the file. This
+  errs toward refusal, never toward a silent selection.
+
+The residual risk is a pre-existing repository whose `config.yml` uses YAML
+escapes or explicit keys around its tracker declaration. Measured 2026-07-26,
+one repository in the world carries a `tracker:` key at all, and this change
+migrates it. Rebuilding the decoder to close that gap would restore the ~395
+lines this issue exists to delete.
+
 ### Windows consequence
 
 Replacing an open allocation-lock pathname during reclamation was the sole
@@ -221,7 +252,7 @@ exactly `code`, `tracker`, `capability`, `message`, and `remediation`. A public
 JSON command wraps that shape once as `{ "error": ... }`, writes it to stdout,
 and exits non-zero. Human commands write the same message and remediation to
 stderr. Capability gates run before provider/filesystem effects and never
-change `backlog/config.yml` or resolve another tracker.
+change `backlog/.tracker` or resolve another tracker.
 
 ### Dual-mode executable proof (#278)
 

@@ -3,14 +3,15 @@
 /**
  * Idempotent, tracker-aware dev-backlog setup.
  *
- * The config file is treated as text. Setup validates and edits only one
- * top-level tracker scalar; it never parses and reserializes user YAML.
+ * Tracker authority lives in backlog/.tracker. backlog/config.yml is read only
+ * as a legacy selection fallback and is never written by this script.
  */
 
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline/promises");
+const { readLegacyTracker: readLegacyTrackerFile } = require("./legacy-tracker.js");
 
 const ALLOWED_TRACKERS = Object.freeze(["github", "local"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints", "tasks", "completed"]);
@@ -33,18 +34,6 @@ class SetupError extends Error {
   }
 }
 
-class ConfigValidationError extends SetupError {
-  constructor(configPath, reason) {
-    super(
-      `Invalid tracker configuration in ${configPath}: ${reason}. ` +
-        `Expected exactly one top-level "tracker: github" or "tracker: local" line. ` +
-        `Repair the file, then rerun: ${setupCommand(["--tracker", "github", "--non-interactive"])}.`
-    );
-    this.name = "ConfigValidationError";
-    this.configPath = configPath;
-  }
-}
-
 function usage() {
   return [
     "Usage: setup-dev-backlog.js [project-name] [options]",
@@ -52,7 +41,7 @@ function usage() {
     "Options:",
     "  --tracker github|local  Select the canonical task tracker",
     "  --non-interactive       Never prompt (required with --tracker when fresh)",
-    "  --project-name NAME     Project name for a fresh config",
+    "  --project-name NAME     Project name reported for compatibility",
     "  --json                  Print structured output",
     "  --help                  Show this help",
   ].join("\n");
@@ -123,448 +112,27 @@ function parseArgs(argv = process.argv.slice(2)) {
   return options;
 }
 
-function lineRecords(raw) {
-  const records = [];
-  const pattern = /([^\r\n]*)(\r\n|\n|\r|$)/g;
-  let match;
-  while ((match = pattern.exec(raw)) !== null) {
-    if (match[0] === "" && match.index === raw.length) break;
-    records.push({
-      text: match[1],
-      newline: match[2],
-      start: match.index,
-      end: match.index + match[1].length,
-    });
-    if (match[2] === "") break;
-  }
-  return records;
-}
-
-function consumeQuotedToken(line, start, quote, initialRaw = "") {
-  let raw = initialRaw;
-  for (let index = start + 1; index < line.length; index += 1) {
-    if (quote === "'" && line[index] === "'" && line[index + 1] === "'") {
-      raw += "''";
-      index += 1;
-    } else if (quote === '"' && line[index] === "\\" && index + 1 < line.length) {
-      raw += line.slice(index, index + 2);
-      index += 1;
-    } else if (line[index] === quote) {
-      return { closed: true, end: index + 1, raw };
-    } else {
-      raw += line[index];
-    }
-  }
-  return { closed: false, end: line.length, raw };
-}
-
-function decodeDoubleQuotedScalar(raw) {
-  const simpleEscapes = Object.freeze({
-    "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f",
-    r: "\r", e: "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
-    N: "\u0085", _: "\u00a0", L: "\u2028", P: "\u2029",
-  });
-  let decoded = "";
-  for (let index = 0; index < raw.length; index += 1) {
-    if (raw[index] !== "\\") {
-      decoded += raw[index];
-      continue;
-    }
-    const escape = raw[index + 1];
-    if (Object.hasOwn(simpleEscapes, escape)) {
-      decoded += simpleEscapes[escape];
-      index += 1;
-      continue;
-    }
-    const width = escape === "x" ? 2 : escape === "u" ? 4 : escape === "U" ? 8 : 0;
-    const digits = raw.slice(index + 2, index + 2 + width);
-    if (!width || digits.length !== width || !/^[0-9A-Fa-f]+$/.test(digits)) return null;
-    const codePoint = Number.parseInt(digits, 16);
-    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
-    decoded += String.fromCodePoint(codePoint);
-    index += width + 1;
-  }
-  return decoded;
-}
-
-function isYamlPrintableCodePoint(codePoint) {
-  return codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d ||
-    (codePoint >= 0x20 && codePoint <= 0x7e) || codePoint === 0x85 ||
-    (codePoint >= 0xa0 && codePoint <= 0xd7ff) ||
-    (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
-    (codePoint >= 0x10000 && codePoint <= 0x10ffff);
-}
-
-function validateYamlPrintable(raw, configPath) {
-  for (let index = 0; index < raw.length; index += 1) {
-    const first = raw.charCodeAt(index);
-    let codePoint = first;
-    if (first >= 0xd800 && first <= 0xdbff) {
-      const second = raw.charCodeAt(index + 1);
-      if (!(second >= 0xdc00 && second <= 0xdfff)) {
-        throw new ConfigValidationError(configPath, "an unpaired raw surrogate is not YAML-printable");
-      }
-      codePoint = ((first - 0xd800) * 0x400) + (second - 0xdc00) + 0x10000;
-      index += 1;
-    } else if (first >= 0xdc00 && first <= 0xdfff) {
-      throw new ConfigValidationError(configPath, "an unpaired raw surrogate is not YAML-printable");
-    }
-    if (!isYamlPrintableCodePoint(codePoint)) {
-      throw new ConfigValidationError(
-        configPath,
-        `character U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} is not YAML-printable`
-      );
-    }
-  }
-}
-
-function validAnchorOrAliasName(name) {
-  return /^[\p{L}\p{N}_.-]+$/u.test(name);
-}
-
-function validTagToken(tag) {
-  if (tag.length <= 1 || /%(?![0-9A-Fa-f]{2})/.test(tag)) return false;
-  return /^!(?:![^\s!,\[\]{}]+|[^\s!,\[\]{}]+(?:![^\s!,\[\]{}]+)?)$/u.test(tag);
-}
-
-function isColonIndicator(line, index) {
-  const next = line[index + 1];
-  return next === undefined || /[ \t\r\n,\[\]{}]/.test(next);
-}
-
-function tokenizeYamlLine(line, state = {}) {
-  const tokens = [];
-  let index = 0;
-  let carriedQuote = state.quote || null;
-  const flowStack = [...(state.flowStack || [])];
-  let nodeBoundary = flowStack.length > 0 ? Boolean(state.nodeBoundary) : true;
-  let keyAllowed = flowStack.length > 0 ? Boolean(state.keyAllowed) : true;
-
-  if (carriedQuote) {
-    let continuationStart = -1;
-    let initialRaw = carriedQuote.raw;
-    if (carriedQuote.char === '"' && initialRaw.endsWith("\\")) {
-      initialRaw = initialRaw.slice(0, -1);
-      while (/[ \t]/.test(line[continuationStart + 1] || "")) continuationStart += 1;
-    } else {
-      initialRaw += " ";
-    }
-    const continuation = consumeQuotedToken(line, continuationStart, carriedQuote.char, initialRaw);
-    if (!continuation.closed) {
-      return {
-        tokens,
-        state: {
-          quote: { char: carriedQuote.char, raw: continuation.raw },
-          flowStack,
-          nodeBoundary: false,
-          keyAllowed: false,
-        },
-      };
-    }
-    const value = carriedQuote.char === "'"
-      ? continuation.raw.replaceAll("''", "'")
-      : decodeDoubleQuotedScalar(continuation.raw);
-    if (value === null) {
-      return { tokens, state: { quote: null, flowStack, error: "invalid double-quoted escape" } };
-    }
-    tokens.push({ type: "scalar", value, quoted: true });
-    index = continuation.end;
-    carriedQuote = null;
-    nodeBoundary = false;
-    keyAllowed = false;
-  }
-
-  while (index < line.length) {
-    if (/[ \t\uFEFF]/.test(line[index])) {
-      index += 1;
-      continue;
-    }
-    if (line[index] === "#") break;
-
-    const char = line[index];
-    if (nodeBoundary && (char === "'" || char === '"')) {
-      const quoted = consumeQuotedToken(line, index, char);
-      if (!quoted.closed) {
-        return {
-          tokens,
-          state: { quote: { char, raw: quoted.raw }, flowStack, nodeBoundary: false, keyAllowed: false },
-        };
-      }
-      const value = char === "'"
-        ? quoted.raw.replaceAll("''", "'")
-        : decodeDoubleQuotedScalar(quoted.raw);
-      if (value === null) {
-        return { tokens, state: { quote: null, flowStack, error: "invalid double-quoted escape" } };
-      }
-      tokens.push({ type: "scalar", value, quoted: true });
-      index = quoted.end;
-      nodeBoundary = false;
-      keyAllowed = false;
-      continue;
-    }
-
-    if (nodeBoundary && (char === "&" || char === "!")) {
-      const start = index;
-      if (char === "!" && line[index + 1] === "<") {
-        const close = line.indexOf(">", index + 2);
-        if (close === -1) {
-          return { tokens, state: { quote: null, flowStack, error: "unterminated verbatim tag" } };
-        }
-        const tag = line.slice(index + 2, close);
-        if (!tag || /[\s<>]/.test(tag) || /%(?![0-9A-Fa-f]{2})/.test(tag)) {
-          return { tokens, state: { quote: null, flowStack, error: "invalid verbatim tag spelling" } };
-        }
-        index = close + 1;
-      } else {
-        while (index < line.length && !/[ \t,\[\]{}]/.test(line[index])) index += 1;
-        const property = line.slice(start, index);
-        const valid = char === "&"
-          ? validAnchorOrAliasName(property.slice(1))
-          : validTagToken(property);
-        if (!valid) {
-          return { tokens, state: { quote: null, flowStack, error: "invalid tag or anchor spelling" } };
-        }
-      }
-      tokens.push({
-        type: "property",
-        value: line.slice(start, index),
-      });
-      continue;
-    }
-
-    if (nodeBoundary && char === "*") {
-      const start = index + 1;
-      index = start;
-      while (index < line.length && !/[ \t,\[\]{}:]/.test(line[index])) index += 1;
-      const name = line.slice(start, index);
-      if (!validAnchorOrAliasName(name)) {
-        return { tokens, state: { quote: null, flowStack, error: "invalid alias spelling" } };
-      }
-      tokens.push({ type: "alias", name });
-      nodeBoundary = false;
-      keyAllowed = false;
-      continue;
-    }
-
-    if (nodeBoundary && (char === "{" || char === "[")) {
-      tokens.push({ type: char });
-      flowStack.push(char);
-      nodeBoundary = true;
-      keyAllowed = true;
-      index += 1;
-      continue;
-    }
-    if (char === "}" || char === "]") {
-      const expected = char === "}" ? "{" : "[";
-      if (flowStack[flowStack.length - 1] !== expected) {
-        return { tokens, state: { quote: null, flowStack, error: "stray or mismatched flow delimiter" } };
-      }
-      tokens.push({ type: char });
-      flowStack.pop();
-      nodeBoundary = false;
-      keyAllowed = false;
-      index += 1;
-      continue;
-    }
-    if (flowStack.length > 0 && char === ",") {
-      tokens.push({ type: "," });
-      nodeBoundary = true;
-      keyAllowed = true;
-      index += 1;
-      continue;
-    }
-    if (char === ":" && isColonIndicator(line, index)) {
-      tokens.push({ type: ":" });
-      nodeBoundary = true;
-      keyAllowed = false;
-      index += 1;
-      continue;
-    }
-    if (nodeBoundary && keyAllowed && char === "?" &&
-        (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
-      tokens.push({ type: "?" });
-      index += 1;
-      continue;
-    }
-    if (nodeBoundary && char === "-" && (line[index + 1] === undefined || /[ \t]/.test(line[index + 1]))) {
-      tokens.push({ type: "-" });
-      index += 1;
-      keyAllowed = true;
-      continue;
-    }
-
-    const start = index;
-    while (index < line.length) {
-      const current = line[index];
-      if (current === "#" || (flowStack.length > 0 && /[{}\[\]]/.test(current))) break;
-      if (flowStack.length > 0 && current === ",") break;
-      if (current === ":" && isColonIndicator(line, index)) break;
-      index += 1;
-    }
-    const value = line.slice(start, index).trim();
-    if (value) tokens.push({ type: "scalar", value, quoted: false });
-    nodeBoundary = false;
-    keyAllowed = false;
-    if (index === start) index += 1;
-  }
-
-  return { tokens, state: { quote: null, flowStack, nodeBoundary, keyAllowed } };
-}
-
-function trackerKeyCount(tokens) {
-  let count = 0;
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (tokens[index].type !== "scalar" || tokens[index].value !== "tracker") continue;
-    const next = tokens[index + 1];
-    if (next && next.type === ":") count += 1;
-  }
-  return count;
-}
-
-function isBlockScalarHeader(tokens) {
-  const last = tokens[tokens.length - 1];
-  if (!last || last.type !== "scalar" || !/^[>|](?:[1-9][+-]?|[+-][1-9]?)?$/.test(last.value)) {
-    return false;
-  }
-  return tokens.some((token) => token.type === ":");
-}
-
-function trackerCandidates(raw, configPath) {
-  const candidates = [];
-  let blockScalarParentIndent = null;
-  let lexicalState = { quote: null, flowStack: [], nodeBoundary: true, keyAllowed: true };
-  let contentSeen = false;
-  let leadingDocumentMarkerSeen = false;
-
-  for (const record of lineRecords(raw)) {
-    const withoutBom = record.text.replace(/^\uFEFF/, "");
-    const trimmed = withoutBom.trim();
-    const indent = withoutBom.match(/^[ \t]*/)[0].length;
-    if (blockScalarParentIndent !== null) {
-      if (!trimmed || indent > blockScalarParentIndent) continue;
-      blockScalarParentIndent = null;
-    }
-    const atDocumentBoundary = !lexicalState.quote && lexicalState.flowStack.length === 0;
-    const documentMarker = atDocumentBoundary
-      ? record.text.match(/^\uFEFF?(---|\.\.\.)(?:[ \t]*(?:#.*)?)?$/)
-      : null;
-    if (documentMarker) {
-      if (documentMarker[1] === "..." || contentSeen || leadingDocumentMarkerSeen) {
-        throw new ConfigValidationError(configPath, "multiple or ended YAML documents are unsupported");
-      }
-      leadingDocumentMarkerSeen = true;
-      continue;
-    }
-    if (!lexicalState.quote && /^\uFEFF?%/.test(record.text)) {
-      throw new ConfigValidationError(configPath, "YAML directives are unsupported");
-    }
-    const scanned = tokenizeYamlLine(record.text, lexicalState);
-    lexicalState = scanned.state;
-    if (lexicalState.error) throw new ConfigValidationError(configPath, lexicalState.error);
-    if (scanned.tokens.length > 0) contentSeen = true;
-
-    if (scanned.tokens.some((token) => token.type === "?")) {
-      throw new ConfigValidationError(
-        configPath,
-        "explicit mapping keys are authority-obscuring and unsupported"
-      );
-    }
-    for (let index = 0; index < scanned.tokens.length; index += 1) {
-      const token = scanned.tokens[index];
-      const next = scanned.tokens[index + 1];
-      if (token.type === "alias" && next && next.type === ":") {
-        throw new ConfigValidationError(
-          configPath,
-          "alias mapping keys are authority-obscuring and unsupported"
-        );
-      }
-      if (token.type === "scalar" && !token.quoted && token.value === "<<" && next && next.type === ":") {
-        throw new ConfigValidationError(
-          configPath,
-          "YAML merge keys are authority-obscuring and unsupported"
-        );
-      }
-    }
-    for (let count = trackerKeyCount(scanned.tokens); count > 0; count -= 1) candidates.push(record);
-    if (!lexicalState.quote && lexicalState.flowStack.length === 0 && isBlockScalarHeader(scanned.tokens)) {
-      blockScalarParentIndent = indent;
-    }
-  }
-  if (lexicalState.quote || lexicalState.flowStack.length !== 0) {
-    throw new ConfigValidationError(configPath, "the YAML lexical structure is incomplete at end of file");
-  }
-  return candidates;
-}
-
-function parseValidTrackerLine(record) {
-  const match = record.text.match(
-    /^\uFEFF?tracker:([ \t]*)(?:(["'])(github|local)\2|(github|local))((?:[ \t]+#.*|[ \t]*))$/
-  );
-  if (!match) return null;
-
-  const tracker = match[3] || match[4];
-  const colon = record.text.indexOf(":");
-  const quoteLength = match[2] ? 1 : 0;
-  const scalarStart = record.start + colon + 1 + match[1].length + quoteLength;
-  return {
-    tracker,
-    scalarStart,
-    scalarEnd: scalarStart + tracker.length,
-    lineStart: record.start,
-    lineEnd: record.end,
-  };
-}
-
-function inspectConfig(raw, configPath = "backlog/config.yml") {
-  if (typeof raw !== "string") {
-    throw new ConfigValidationError(configPath, "the config could not be read as text");
-  }
-  validateYamlPrintable(raw, configPath);
-
-  const candidates = trackerCandidates(raw, configPath);
-  if (candidates.length === 0) {
-    return Object.freeze({ kind: "legacy", tracker: undefined });
-  }
-  if (candidates.length > 1) {
-    throw new ConfigValidationError(configPath, "duplicate or ambiguous tracker declarations were found");
-  }
-
-  const parsed = parseValidTrackerLine(candidates[0]);
-  if (!parsed) {
-    const nested = /^\s+/.test(candidates[0].text) || /^\s*-/.test(candidates[0].text);
-    throw new ConfigValidationError(
-      configPath,
-      nested
-        ? "tracker must be a single top-level scalar, not nested"
-        : "the tracker value is missing, malformed, quoted as a key, or unsupported"
+function assertAllowedTracker(selection, sourcePath) {
+  if (!ALLOWED_TRACKERS.includes(selection)) {
+    throw new SetupError(
+      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected github or local.`
     );
   }
-  return Object.freeze({ kind: "selected", ...parsed });
+  return selection;
 }
 
-function detectNewline(raw) {
-  const match = raw.match(/\r\n|\n|\r/);
-  return match ? match[0] : "\n";
+function readTrackerFile(trackerPath, fsApi = fs) {
+  return assertAllowedTracker(fsApi.readFileSync(trackerPath, "utf8").trim(), trackerPath);
 }
 
-function mutateTrackerText(raw, state, selection) {
-  if (!ALLOWED_TRACKERS.includes(selection)) {
-    throw new SetupError(`Invalid tracker selection ${JSON.stringify(selection)}.`);
-  }
-  if (state.kind === "selected") {
-    if (state.tracker === selection) return raw;
-    return raw.slice(0, state.scalarStart) + selection + raw.slice(state.scalarEnd);
-  }
-  if (state.kind !== "legacy") {
-    throw new SetupError("Cannot mutate an unvalidated tracker config state.");
-  }
-
-  const newline = detectNewline(raw);
-  if (raw.length === 0) return `tracker: ${selection}${newline}`;
-  const hasFinalNewline = /(?:\r\n|\n|\r)$/.test(raw);
-  return hasFinalNewline
-    ? `${raw}tracker: ${selection}${newline}`
-    : `${raw}${newline}tracker: ${selection}`;
+// Legacy `config.yml` selection reading lives in `legacy-tracker.js`: it is a
+// deletable unit that goes away wholesale when legacy support is dropped.
+function readLegacyTracker(configPath, fsApi = fs) {
+  return readLegacyTrackerFile(configPath, {
+    fs: fsApi,
+    assertAllowed: assertAllowedTracker,
+    SetupError,
+  });
 }
 
 function isGithubRemote(remote) {
@@ -680,17 +248,6 @@ function checkGithubAvailability(options) {
   return githubAvailabilityFromEvidence(collectGithubEvidence(options));
 }
 
-function freshConfig(projectName, tracker) {
-  return [
-    `project_name: ${JSON.stringify(projectName)}`,
-    `tracker: ${tracker}`,
-    'task_prefix: "BACK"',
-    'default_status: "To Do"',
-    'statuses: ["To Do", "In Progress", "Done"]',
-    "",
-  ].join("\n");
-}
-
 function tempPathFor(targetPath) {
   const nonce = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.${nonce}.tmp`);
@@ -699,7 +256,7 @@ function tempPathFor(targetPath) {
 function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
   const targetStat = lstatIfPresent(targetPath, fsApi);
   if (targetStat && (targetStat.isSymbolicLink() || !targetStat.isFile())) {
-    throw new SetupError(`Refusing unsafe config path: ${targetPath} must be a regular file.`);
+    throw new SetupError(`Refusing unsafe tracker path: ${targetPath} must be a regular file.`);
   }
   const targetExists = Boolean(targetStat);
   if (targetExists) {
@@ -755,19 +312,21 @@ function lstatIfPresent(targetPath, fsApi) {
   }
 }
 
-function validateExistingStructure(backlogDir, configPath, fsApi) {
+function validateRegularFile(targetPath, label, fsApi) {
+  const stat = lstatIfPresent(targetPath, fsApi);
+  if (stat && (stat.isSymbolicLink() || !stat.isFile())) {
+    throw new SetupError(`Refusing unsafe ${label} path: ${targetPath} must be a regular file.`);
+  }
+  return Boolean(stat);
+}
+
+function validateExistingStructure(backlogDir, configPath, trackerPath, fsApi) {
   const backlogStat = lstatIfPresent(backlogDir, fsApi);
-  if (backlogStat) {
-    if (backlogStat.isSymbolicLink() || !backlogStat.isDirectory()) {
-      throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
-    }
+  if (backlogStat && (backlogStat.isSymbolicLink() || !backlogStat.isDirectory())) {
+    throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
   }
-  const configStat = lstatIfPresent(configPath, fsApi);
-  if (configStat) {
-    if (configStat.isSymbolicLink() || !configStat.isFile()) {
-      throw new SetupError(`Refusing unsafe config path: ${configPath} must be a regular file.`);
-    }
-  }
+  const configExists = validateRegularFile(configPath, "config", fsApi);
+  const trackerExists = validateRegularFile(trackerPath, "tracker", fsApi);
   for (const name of MINIMUM_DIRECTORIES) {
     const directory = path.join(backlogDir, name);
     const stat = lstatIfPresent(directory, fsApi);
@@ -776,7 +335,7 @@ function validateExistingStructure(backlogDir, configPath, fsApi) {
       throw new SetupError(`Refusing unsafe backlog path: ${directory} must be a real directory.`);
     }
   }
-  return { configExists: Boolean(configStat) };
+  return { configExists, trackerExists };
 }
 
 function rollbackCreatedDirectories(backlogDir, structure, fsApi) {
@@ -817,78 +376,78 @@ function legacyLocalRefusalMessage() {
   );
 }
 
+async function chooseFreshTracker(options, dependencies, cwd) {
+  if (options.tracker !== undefined) {
+    return { selection: options.tracker, selectionSource: "explicit" };
+  }
+  const interactive = !options.nonInteractive && (
+    dependencies.isInteractive !== undefined
+      ? dependencies.isInteractive
+      : Boolean(process.stdin.isTTY && process.stdout.isTTY)
+  );
+  if (!interactive) throw new SetupError(refusalMessage());
+
+  const evidence = collectGithubEvidence({
+    cwd,
+    execFileSync: dependencies.execFileSync || childProcess.execFileSync,
+  });
+  if (typeof dependencies.prompt !== "function") {
+    throw new SetupError("Interactive setup requires a prompt boundary.");
+  }
+  const answer = String(await dependencies.prompt({
+    recommendation: evidence.recommendation,
+    evidence,
+  }) || "").trim().toLowerCase();
+  const selection = answer || evidence.recommendation;
+  assertAllowedTracker(selection, "interactive choice");
+  return {
+    selection,
+    selectionSource: selection === evidence.recommendation
+      ? "recommended"
+      : "interactive-choice",
+    evidence,
+  };
+}
+
 async function runSetup(options = {}, dependencies = {}) {
   const fsApi = dependencies.fs || fs;
   const cwd = path.resolve(options.cwd || process.cwd());
   const backlogDir = path.join(cwd, "backlog");
   const configPath = path.join(backlogDir, "config.yml");
-  const structureState = validateExistingStructure(backlogDir, configPath, fsApi);
-  const configExists = structureState.configExists;
-  let raw;
-  let configState;
+  const trackerPath = path.join(backlogDir, ".tracker");
+  const state = validateExistingStructure(backlogDir, configPath, trackerPath, fsApi);
 
-  // The entire tracker situation is read and validated before mkdir or temp creation.
-  if (configExists) {
-    raw = fsApi.readFileSync(configPath, "utf8");
-    configState = inspectConfig(raw, configPath);
-  }
-
-  if (options.tracker !== undefined && !ALLOWED_TRACKERS.includes(options.tracker)) {
-    throw new SetupError(`Invalid tracker selection ${JSON.stringify(options.tracker)}; expected github or local.`);
+  if (options.tracker !== undefined) {
+    assertAllowedTracker(options.tracker, "--tracker");
   }
 
   let selection;
   let selectionSource;
   let recommendationEvidence;
-  if (configState && configState.kind === "legacy" && options.tracker === "local") {
-    throw new SetupError(legacyLocalRefusalMessage());
-  }
-  if (configState && configState.kind === "legacy") {
-    selection = "github";
-    selectionSource = "legacy-pin";
-  } else if (options.tracker !== undefined) {
-    selection = options.tracker;
-    selectionSource = "explicit";
-  } else if (configState && configState.kind === "selected") {
-    selection = configState.tracker;
-    selectionSource = "preserved";
+  if (state.trackerExists) {
+    const current = readTrackerFile(trackerPath, fsApi);
+    selection = options.tracker ?? current;
+    selectionSource = options.tracker === undefined ? "preserved" : "explicit";
+  } else if (state.configExists) {
+    const legacy = readLegacyTracker(configPath, fsApi);
+    if (!legacy.found && options.tracker === "local") {
+      throw new SetupError(legacyLocalRefusalMessage());
+    }
+    selection = options.tracker ?? legacy.selection ?? "github";
+    selectionSource = options.tracker !== undefined
+      ? "explicit"
+      : legacy.found ? "legacy-migration" : "legacy-pin";
   } else {
-    const interactive = !options.nonInteractive && (
-      dependencies.isInteractive !== undefined
-        ? dependencies.isInteractive
-        : Boolean(process.stdin.isTTY && process.stdout.isTTY)
-    );
-    if (!interactive) throw new SetupError(refusalMessage());
-
-    recommendationEvidence = collectGithubEvidence({
-      cwd,
-      execFileSync: dependencies.execFileSync || childProcess.execFileSync,
-    });
-    if (typeof dependencies.prompt !== "function") {
-      throw new SetupError("Interactive setup requires a prompt boundary.");
-    }
-    const answer = String(await dependencies.prompt({
-      recommendation: recommendationEvidence.recommendation,
-      evidence: recommendationEvidence,
-    }) || "").trim().toLowerCase();
-    selection = answer || recommendationEvidence.recommendation;
-    if (!ALLOWED_TRACKERS.includes(selection)) {
-      throw new SetupError(`Invalid tracker choice ${JSON.stringify(answer)}; enter github or local.`);
-    }
-    selectionSource = selection === recommendationEvidence.recommendation
-      ? "recommended"
-      : "interactive-choice";
+    const fresh = await chooseFreshTracker(options, dependencies, cwd);
+    selection = fresh.selection;
+    selectionSource = fresh.selectionSource;
+    recommendationEvidence = fresh.evidence;
   }
-
-  const projectName = options.projectName || defaultProjectName(cwd);
-  const nextRaw = configExists
-    ? mutateTrackerText(raw, configState, selection)
-    : freshConfig(projectName, selection);
 
   const structure = ensureMinimumDirectories(backlogDir, fsApi);
   let publication;
   try {
-    publication = atomicPublish(configPath, nextRaw, { fs: fsApi });
+    publication = atomicPublish(trackerPath, `${selection}\n`, { fs: fsApi });
   } catch (error) {
     rollbackCreatedDirectories(backlogDir, structure, fsApi);
     throw error;
@@ -910,12 +469,12 @@ async function runSetup(options = {}, dependencies = {}) {
 
   return Object.freeze({
     action: "setup-dev-backlog",
-    projectName,
+    projectName: options.projectName || defaultProjectName(cwd),
     selection,
     selectionSource,
-    configPath,
-    configChanged: publication.changed,
-    configCreated: publication.created,
+    trackerPath,
+    trackerChanged: publication.changed,
+    trackerCreated: publication.created,
     createdDirectories: structure.created,
     evidence: recommendationEvidence,
     github,
@@ -928,7 +487,10 @@ function evidenceSummary(evidence) {
 
 function printHumanResult(result, output = process.stdout) {
   output.write(`Tracker: ${result.selection} (${result.selectionSource})\n`);
-  output.write(`${result.configCreated ? "Created" : result.configChanged ? "Updated" : "Preserved"}: ${result.configPath}\n`);
+  output.write(
+    `${result.trackerCreated ? "Created" : result.trackerChanged ? "Updated" : "Preserved"}: ` +
+    `${result.trackerPath}\n`
+  );
   if (result.createdDirectories.length > 0) {
     output.write(`Created directories: ${result.createdDirectories.join(", ")}\n`);
   } else {
@@ -990,18 +552,16 @@ if (require.main === module) {
 module.exports = {
   ALLOWED_TRACKERS,
   MINIMUM_DIRECTORIES,
-  ConfigValidationError,
   SetupError,
   atomicPublish,
   checkGithubAvailability,
   collectGithubEvidence,
-  freshConfig,
   githubAvailabilityFromEvidence,
-  inspectConfig,
   isGithubRemote,
   main,
-  mutateTrackerText,
   parseArgs,
   printHumanResult,
+  readLegacyTracker,
+  readTrackerFile,
   runSetup,
 };

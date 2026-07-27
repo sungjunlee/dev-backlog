@@ -68,7 +68,8 @@ adapter allocates the canonical local ID.
 ## Body Structure
 
 Task files are derived mirrors in both modes: from GitHub Issues when
-`tracker: github`, and from `backlog/local-tracker.json` when `tracker: local`.
+`.tracker` contains `github`, and from `backlog/local-tracker.json` when it
+contains `local`.
 Notes, decisions, and cross-task context still go in the **sprint file**
 (`backlog/sprints/`), not here.
 
@@ -111,24 +112,33 @@ Sprint files (`backlog/sprints/*.md`) carry `objectives:` and `component:` along
 
 `sprint-init.js` emits each field only when its backing spec file is present, so a cold adopter with no `spec/` gets a clean sprint with neither key. An older sprint that still carries an empty `objectives: []` / `component: ""` stays valid — this is omission-on-generate, not a migration. `backlog-doctor.js` warns (soft, non-blocking) only when the **active** sprint omits a field while its spec file exists. Full semantics live in [`spec-fallback.md`](spec-fallback.md); the authoritative contract table is in [SKILL.md](../SKILL.md).
 
+## Tracker Selection
+
+`backlog/.tracker` contains exactly one newline-terminated selection:
+
+```text
+github
+```
+
+The supported values are `github` and `local`. When `.tracker` is missing,
+runtime reads a legacy top-level `tracker:` value from `config.yml`; with
+neither, it deterministically defaults to `github`. Availability never changes
+the selection or falls back to the other adapter. Setup writes `.tracker`
+atomically and never edits `config.yml`.
+
 ## config.yml
 
 ```yaml
 project_name: "my-project"
-tracker: github
 task_prefix: "BACK"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 ```
 
-`tracker` accepts only `github` or `local`. A missing key deterministically
-defaults to `github`; runtime availability never changes that selection or
-falls back to the other adapter. This is a zero-migration upgrade rule: existing
-tracker-less repositories keep GitHub authority and all legacy files unchanged.
-`setup-dev-backlog.js` pins that authority or creates an explicit fresh choice;
-it never migrates task files.
+`config.yml` remains the read-only source for Backlog.md settings such as
+`task_prefix`; setup never creates, rewrites, or removes fields from it.
 
-## Local Canonical Storage (`tracker: local`)
+## Local Canonical Storage (`.tracker` = `local`)
 
 In local mode `backlog/local-tracker.json` is the **canonical** task store.
 `backlog/tasks/` and `backlog/completed/` are one-way derived mirrors and are

@@ -179,6 +179,24 @@ describe("runDoctor", () => {
     assert.ok(report.checks.every((item) => item.track === undefined));
   });
 
+  it("warns with remediation when config.yml keeps a stale tracker key", () => {
+    seedCleanRepo(repoRoot);
+    write(path.join(repoRoot, "backlog", ".tracker"), "local\n");
+    write(
+      path.join(repoRoot, "backlog", "config.yml"),
+      "project_name: fixture\ntracker: github\n"
+    );
+
+    const report = runDoctor({ repoRoot });
+    const selection = check(report, "tracker_selection");
+    assert.equal(selection.status, "warn");
+    assert.match(selection.detail.remediation, /Remove the stale top-level tracker:/);
+    assert.match(selection.detail.remediation, /backlog\/config\.yml/);
+    assert.match(selection.detail.remediation, /backlog\/\.tracker/);
+    assert.equal(report.exit_hint, "warn");
+    assert.equal(exitCodeFor(report), 0);
+  });
+
   it("fails when two active tracks share the same component (scope overlap, #293)", () => {
     seedCleanRepo(repoRoot);
     write(path.join(repoRoot, "backlog", "sprints", "2026-07-second.md"), sprint());

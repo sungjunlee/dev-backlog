@@ -271,8 +271,8 @@ assert_equals "count: todo" "$CB_TODO" "2"
 
 # Configured local refs use the same shell parser, including decimal subtasks.
 mkdir -p "$TEST_DIR/local-backlog/sprints"
+printf 'local\n' > "$TEST_DIR/local-backlog/.tracker"
 cat > "$TEST_DIR/local-backlog/config.yml" << 'EOF'
-tracker: local
 task_prefix: BACK
 EOF
 cat > "$TEST_DIR/local-backlog/sprints/active.md" << 'EOF'
@@ -994,8 +994,8 @@ assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev
 # --- local decimal closeout (BACK-1.2 must not match BACK-1.20) ---
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+printf 'local\n' > "$TEST_DIR/backlog/.tracker"
 cat > "$TEST_DIR/backlog/config.yml" << 'EOF'
-tracker: local
 task_prefix: BACK
 EOF
 cat > "$TEST_DIR/backlog/sprints/2026-03-local.md" << 'EOF'

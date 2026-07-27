@@ -7,7 +7,7 @@ configuration value selects canonical task truth; sprint Markdown remains the
 shared execution hub in both modes.
 
 ```text
-backlog/config.yml: tracker
+backlog/.tracker
         |
         v
 tracker.js (configured-only resolve, availability, capability gate)
@@ -24,10 +24,11 @@ backlog/sprints/ (canonical execution hub)
         `-> capability-gated GitHub mirror/progress transports
 ```
 
-`setup-dev-backlog.js` persists a deliberate `github` or `local` choice. A
-missing key remains GitHub for backward compatibility without rewriting the
-config. Availability failure is never a selection mechanism, and runtime never
-probes or falls back to the other adapter.
+`setup-dev-backlog.js` persists a deliberate `github` or `local` choice in
+`.tracker`. A missing file falls back to a legacy `config.yml` key, then to
+GitHub, without runtime mutation. Setup migrates the resolved legacy choice
+without editing `config.yml`. Availability failure is never a selection
+mechanism, and runtime never probes or falls back to the other adapter.
 
 ## Runtime Boundaries
 
@@ -54,9 +55,10 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 
 ## Storage And External Systems
 
-- `backlog/config.yml`: the only tracker-selection authority plus Backlog.md settings.
-- GitHub Issues: canonical task truth only for `tracker: github`.
-- `backlog/local-tracker.json`: canonical task truth only for `tracker: local`.
+- `backlog/.tracker`: the tracker-selection authority.
+- `backlog/config.yml`: Backlog.md settings plus read-only legacy selection fallback.
+- GitHub Issues: canonical task truth only when `.tracker` selects `github`.
+- `backlog/local-tracker.json`: canonical task truth only when `.tracker` selects `local`.
 - `backlog/tasks/` and `backlog/completed/`: derived task mirrors in both tracker modes.
 - `backlog/sprints/`: canonical execution state in both modes, committed at explicit boundaries.
 - `gh`: GitHub-mode bridge only; acceptance tests replace it with an argv recorder and local tests trap it.

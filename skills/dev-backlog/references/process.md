@@ -1,14 +1,14 @@
 # Process
 
 Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
-the same core cycle through the one tracker selected in `backlog/config.yml`.
+the same core cycle through the one tracker selected in `backlog/.tracker`.
 Adapter mechanics and the compatibility proof have one implementation owner:
 [Tracker Adapter Design Contract](../../../docs/tracker-adapter-design.md).
 
 ## Setup — Choose Canonical Task Truth
 
 1. For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github|local --non-interactive`.
-2. For an existing tracker-less config, keep the deterministic GitHub default. Setup first pins that legacy GitHub authority; any later switch must be explicit.
+2. With no `.tracker`, preserve a legacy `tracker:` value from `config.yml`; with neither, keep the deterministic GitHub default. Setup writes the resolved choice to `.tracker` without editing `config.yml`.
 3. Never infer selection from `gh`, authentication, remotes, existing task files, or an operation failure. Setup does not migrate task files.
 
 ## Required Core Lifecycle Invocation Boundary
@@ -95,8 +95,8 @@ For the whole sprint:
 ## Sync — Explicit and Mode-Specific
 
 - **GitHub:** `sync-pull.js` explicitly refreshes derived task mirrors. Provider writes such as labels, comments, mirrors, and Progress issues are explicit operations.
-- **Local:** task files are canonical; there is no provider pull/push and no background sync.
-- **Both:** an operation failure never changes `tracker:` or makes the other store authoritative.
+- **Local:** `backlog/local-tracker.json` is canonical and its task-file mirrors are refreshed on every mutation; there is no provider pull/push and no background sync.
+- **Both:** an operation failure never changes `.tracker` or makes the other store authoritative.
 
 See `github-sync.md` for GitHub-only command patterns.
 
