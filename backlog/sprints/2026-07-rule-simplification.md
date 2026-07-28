@@ -25,7 +25,7 @@ true form, and O8 stops implying that someone should go find `local` a user.
 
 ### Batch 3 - Charter follow-up [after:#340]
 
-- [ ] #341 spec: state that O8's local adapter is not awaiting adopters + drop the deleted mirror/progress behavior from its predicate (~30min)
+- [x] #341 spec: O8 implemented by design + predicate drops deleted mirror/progress (~30min) → charter revision 11
 
 ## Running Context
 
