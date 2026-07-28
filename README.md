@@ -225,7 +225,7 @@ component: "auth-system"   # primary scope key when a capability axis exists
 scope: ["src/auth/**"]     # explicit path globs otherwise (sprint-init.js --scope)
 ```
 
-**The invariant:** no two active tracks may overlap — same `component:`, or colliding `scope:` globs (nested paths overlap). Overlap fails loud everywhere: `sprint-init.js` refuses to create the track, `backlog-doctor` fails with `Active tracks overlap on scope`, and JSON reads exit with `OVERLAPPING_TRACKS`. Two scopeless active tracks can't be *proven* disjoint, so the doctor warns (informationally) instead.
+**The invariant:** no two active tracks may overlap — same `component:`, or colliding `scope:` globs (nested paths overlap). Overlap fails loud everywhere: `sprint-init.js` refuses to create the track, `backlog-doctor` fails with `Active tracks overlap on scope`, and JSON reads exit with `OVERLAPPING_TRACKS`. Once more than one track is active, any track without a declared axis can't be *proven* disjoint, so the doctor warns (informationally) instead.
 
 **Working a portfolio:**
 
