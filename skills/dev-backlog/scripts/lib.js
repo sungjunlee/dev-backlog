@@ -307,7 +307,7 @@ function globsOverlap(a, b) {
  * sprint-state (OVERLAPPING_TRACKS), sprint-init (refuse), and backlog-doctor.
  * component: exact equality; scope: globs: normalized path-prefix containment.
  * Cross-axis or scopeless pairs return false — "cannot prove overlap" — and the
- * doctor separately warns on two scopeless active tracks.
+ * doctor separately warns when a multi-track portfolio has a scopeless track.
  */
 function scopesOverlap(frontmatterA, frontmatterB) {
   const a = sprintScopeKey(frontmatterA);
