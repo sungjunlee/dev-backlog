@@ -113,7 +113,7 @@ either mode; the exact procedure and signatures are documented in
 There is zero automatic runtime migration. A repository with neither
 `backlog/.tracker` nor a legacy `tracker:` key in `backlog/config.yml` continues
 in GitHub mode with its existing `#N`, numeric `issue_number`, task-mirror,
-milestone, mirror, progress, comment, and closing behavior. When `.tracker` is
+milestone, comment, and closing behavior. When `.tracker` is
 absent, runtime reads a legacy YAML selection as a compatibility fallback.
 Running `setup-dev-backlog.js` migrates that resolved choice to `.tracker`
 without editing `config.yml`; setup never migrates task files and runtime never
