@@ -112,6 +112,10 @@ Sprint files (`backlog/sprints/*.md`) carry `objectives:` and `component:` along
 
 `sprint-init.js` emits each field only when its backing spec file is present, so a cold adopter with no `spec/` gets a clean sprint with neither key. An older sprint that still carries an empty `objectives: []` / `component: ""` stays valid — this is omission-on-generate, not a migration. `backlog-doctor.js` warns (soft, non-blocking) only when the **active** sprint omits a field while its spec file exists. Full semantics live in [`spec-fallback.md`](spec-fallback.md); the authoritative contract table is in [SKILL.md](../SKILL.md).
 
+## Sprint Plan
+
+Order planned tasks into parallel-safe batches. Group small tasks (~30min or less) for one session only when they can run in the same wave. An empty `## Plan` is valid until issues are selected; do not add prose or placeholder checkboxes because every nonblank, non-heading Plan line must parse as a task item.
+
 ## Tracker Selection
 
 `backlog/.tracker` contains exactly one newline-terminated selection:

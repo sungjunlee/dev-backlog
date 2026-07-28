@@ -82,7 +82,7 @@ function parseArgs(args) {
 }
 
 function buildIssueLines(issues) {
-  if (!issues.length) return ["- [ ] (add issues here)"];
+  if (!issues.length) return [];
 
   return issues.map((issue) => {
     const labels = (issue.labels || []).map((l) => l.name);
@@ -141,8 +141,6 @@ ${scopeLine}${specBlock}---
 [One sentence: what's true when this sprint is done]
 
 ## Plan
-[Order into parallel-safe batches. Group small tasks (~30min or less) for one session only when they can run in the same wave.]
-
 ${issueLines.join("\n")}
 
 ## Running Context

@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { checkSprintShape } = require("./backlog-doctor.js");
 const {
   parseArgs,
   buildIssueLines,
@@ -95,8 +96,8 @@ describe("buildIssueLines", () => {
     ]);
   });
 
-  it("returns placeholder when there are no issues", () => {
-    assert.deepEqual(buildIssueLines([]), ["- [ ] (add issues here)"]);
+  it("returns no Plan lines when there are no issues", () => {
+    assert.deepEqual(buildIssueLines([]), []);
   });
 });
 
@@ -220,6 +221,35 @@ describe("createSprintFile", () => {
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
     assert.match(written, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
+  });
+
+  it("generates sprint files that pass the doctor shape check with and without issues (#339)", () => {
+    const cases = [
+      { topic: "empty", issues: [] },
+      { topic: "milestone", issues: [{ number: 42, title: "OAuth2 flow", labels: [] }] },
+    ];
+
+    for (const { topic, issues } of cases) {
+      const repoRoot = path.join(tmpDir, topic);
+      const backlogPath = path.join(repoRoot, "backlog");
+      const result = createSprintFile({
+        topic,
+        milestone: topic,
+        dryRun: false,
+        repoRoot,
+        sprintsDir: path.join(backlogPath, "sprints"),
+        getDue: () => "TBD",
+        getIssues: () => issues,
+      });
+      const shape = checkSprintShape({
+        repoRoot,
+        backlogPath,
+        activePath: result.sprintFile,
+        activeStatus: "pass",
+      });
+
+      assert.equal(shape.status, "pass", shape.detail.summary);
+    }
   });
 
   it("omits spec fields in the written file when no spec files exist (B3)", () => {
@@ -483,7 +513,7 @@ describe("createSprintFile", () => {
     assert.equal(result.placeholderIssue, true);
     assert.equal(result.issueCount, 0);
     assert.equal(fs.existsSync(result.sprintFile), false);
-    assert.match(result.content, /\(add issues here\)/);
+    assert.doesNotMatch(result.content, /Order into parallel-safe batches|add issues here/);
   });
 
   it("reports existing file during dry-run without overwriting it", () => {
