@@ -68,7 +68,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 - Backlog grooming or stale-issue detection (`triage-grooming` capability)
 
 ### Expected Behaviors
-- No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; two scopeless actives cannot be proven disjoint and surface an informational doctor warning.
+- No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
 - Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
 - Closing a sprint via `sprint-close.sh` is atomic: the sprint flips `status: completed` AND its done-checkbox issues move into `backlog/completed/` in one invocation, not in two steps.
 
@@ -87,6 +87,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-07-12 | Replace the single-active-sprint invariant with track-partitioned scope disjointness (epic #289, PRD `docs/prd-2026-07-multi-track-sprints.md`; human-gated pass #294) | disjoint-scope tracks remove the false serialization of unrelated work while overlap stays fail-loud through one shared predicate; single-track behavior is byte-identical (G4) | pre-#289 "exactly one active sprint" behavior |
+| 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | the pair rule under-warned: one scopeless track next to a declared one is exactly the unprovable state the warning exists for, and B is also the shorter rule to state — "when more than one track is active, every track must declare an axis". Verified against all 18 consuming repos: zero `active_sprint` verdict changes, so single-track repos stay silent | 2026-07-12 pair-rule warning |
 
 ---
 
