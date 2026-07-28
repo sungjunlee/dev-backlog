@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 subtraction and rule simplification
-status: active
+status: completed
 started: 2026-07-28
 due: TBD
 scope: ["skills/dev-backlog/scripts/progress-sync*", "skills/dev-backlog/scripts/sprint-mirror*", "skills/dev-backlog/scripts/github-mirrors*"]
@@ -66,3 +66,4 @@ capability lost, because neither has had a user since the week it was built.
   `scope:` rather than `component:` because the track deletes the very capability a
   component handle would point at — the first use of the `scope:` axis in this repo, and
   the case `references/process.md` describes as "no component axis fits".
+- 2026-07-29: Sprint closed. 1/1 tasks completed.

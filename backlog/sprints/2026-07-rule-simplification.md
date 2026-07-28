@@ -1,6 +1,6 @@
 ---
 milestone: 2026-07 subtraction and rule simplification
-status: active
+status: completed
 started: 2026-07-28
 due: TBD
 objectives: [O1, O3, O7]
@@ -95,3 +95,4 @@ true form, and O8 stops implying that someone should go find `local` a user.
   investanza was genuinely dormant, and its sprint is now closed. And the largest
   subtraction candidate in the repo turned out not to be `local` (597 lines) but the
   progress/mirror axis at **3,758**, which the sibling track removes.
+- 2026-07-29: Sprint closed. 3/3 tasks completed.
