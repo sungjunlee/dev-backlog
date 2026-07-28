@@ -21,7 +21,7 @@ tracker.js (configured-only resolve, availability, capability gate)
 backlog/sprints/ (canonical execution hub)
         +-> sprint-state.js -> status.sh --json / next.sh --json
         +-> backlog-doctor.js
-        `-> capability-gated GitHub mirror/progress transports
+        `-> capability-gated GitHub optional transports
 ```
 
 `setup-dev-backlog.js` persists a deliberate `github` or `local` choice in
@@ -33,10 +33,10 @@ mechanism, and runtime never probes or falls back to the other adapter.
 ## Runtime Boundaries
 
 - `skills/dev-backlog/scripts/tracker.js` owns configured resolution, the exact seven-operation adapter contract, identity validation, capability discovery/gating, and the shared unsupported-capability error/serializer.
-- `github-tracker.js` owns required GitHub task lifecycle argv/translation. Named GitHub modules own milestones, sprint mirrors, Progress/PR/comments, and other optional transports.
+- `github-tracker.js` owns required GitHub task lifecycle argv/translation. Named GitHub modules own milestones, PR relationships, comments, and other optional transports.
 - `local-tracker.js` owns the canonical local JSON lifecycle and its one-way Markdown projection. It reports no optional provider capabilities and never invokes `gh`.
 - `task-ref.js` owns complete `#N` and `{PREFIX}-N[.M]` parsing/rendering. GitHub keeps numeric `issue_number`; local exposes `null` for that compatibility alias.
-- `sprint-state.js` remains the single machine parser of sprint Markdown; `status.sh --json`, `next.sh --json`, mirror rendering, and doctor projections consume its state.
+- `sprint-state.js` remains the single machine parser of sprint Markdown; `status.sh --json`, `next.sh --json`, and doctor projections consume its state.
 - `skills/backlog-triage/` owns advisory grooming. Provider enrichment/mutation remains capability-gated and explicit.
 - Craftkit-installed spec authoring skills own human-gated changes to `spec/`; dev-backlog reads those files as optional yardsticks.
 
@@ -50,7 +50,7 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 3. **Materialize:** GitHub mode explicitly mirrors canonical issues through `sync-pull.js`; local mutations project the canonical JSON store into the same Markdown shape without provider sync.
 4. **Plan/orient:** write normalized refs into the active track's sprint file; consume state via `status.sh --json` / `next.sh --json` (`--track` selects among multiple disjoint-scope tracks).
 5. **Complete:** close the canonical task, check the Plan, run `sprint-close.sh` (`--track` when multiple tracks are active), archive remaining checked task files, and retain sprint history.
-6. **Publish/enrich:** milestones, PR relationships, sprint mirrors, Progress issues, comments, and closing semantics run only when reported. Unsupported requests return the shared typed error before effects.
+6. **Publish/enrich:** milestones, PR relationships, comments, and closing semantics run only when reported. Unsupported requests return the shared typed error before effects.
 7. **Groom/spec:** triage stays advisory by default; doctor/reassess may recommend spec work but do not mutate durable specs automatically.
 
 ## Storage And External Systems
@@ -67,7 +67,7 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 ## Project-Wide Invariants
 
 - Exactly one configured adapter owns canonical task truth; no runtime fallback, co-authority, or background sync.
-- Existing tracker-less repositories remain GitHub-backed with zero migration and unchanged `#N`, numeric aliases, mirror bytes, argv, milestones, mirrors, progress, comments, and closing behavior.
+- Existing tracker-less repositories remain GitHub-backed with zero migration and unchanged `#N`, numeric aliases, task-mirror bytes, argv, milestones, comments, and closing behavior.
 - Local mode implements only the core task lifecycle. It never fabricates provider semantics or URLs.
 - Unsupported optional capabilities have stable code `TRACKER_CAPABILITY_UNSUPPORTED`, tracker, capability, message, and remediation; JSON and human boundaries share that one serializer contract.
 - Sprint files remain the execution hub and completed sprint files are immutable history.
@@ -89,7 +89,6 @@ implementation proof merged as PR #303 (2026-07-12); O8 and O9 are validated
 - `tracker-task-truth` — configured ownership, normalized lifecycle/identity, capability discovery, and deterministic degradation.
 - `backlog-sync` — explicit materialization/publication without overwriting human-authored content.
 - `triage-grooming` — advisory classification, relationships, stale signals, Alignment, and Decision Review.
-- `task-progress-reporting` — capability-gated monthly GitHub Progress synchronization/finalization.
 
 ## Open Boundary Questions
 

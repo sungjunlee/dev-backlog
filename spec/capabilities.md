@@ -68,7 +68,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 - Backlog grooming or stale-issue detection (`triage-grooming` capability)
 
 ### Expected Behaviors
-- No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; two scopeless actives cannot be proven disjoint and surface an informational doctor warning.
+- No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
 - Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
 - Closing a sprint via `sprint-close.sh` is atomic: the sprint flips `status: completed` AND its done-checkbox issues move into `backlog/completed/` in one invocation, not in two steps.
 
@@ -87,6 +87,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-07-12 | Replace the single-active-sprint invariant with track-partitioned scope disjointness (epic #289, PRD `docs/prd-2026-07-multi-track-sprints.md`; human-gated pass #294) | disjoint-scope tracks remove the false serialization of unrelated work while overlap stays fail-loud through one shared predicate; single-track behavior is byte-identical (G4) | pre-#289 "exactly one active sprint" behavior |
+| 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | the pair rule under-warned: one scopeless track next to a declared one is exactly the unprovable state the warning exists for, and B is also the shorter rule to state. Verified against all 18 consuming repos: zero `active_sprint` verdict changes, so single-track repos stay silent | 2026-07-12 pair-rule warning |
 
 ---
 
@@ -97,24 +98,21 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 **In-scope:**
 - `sync-pull.js` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
 - AC checkbox preservation in task bodies for non-machine-managed issues
-- `sprint-mirror.js`: explicit publish of one active sprint track (`--track` selects when multiple are active) to a marker-identified (`<!-- dev-backlog:sprint-mirror sprint=<slug> -->`) read-only mirror issue
 - Idempotent re-runs in both directions against unchanged state
 
 **Out-of-scope:**
 - Canonical task ownership and lifecycle (`tracker-task-truth` capability)
 - Writing to human-authored provider content (task bodies without a dev-backlog machine marker, comments, labels, state)
-- Monthly progress-issue lifecycle (`task-progress-reporting` capability)
+- Publishing sprint or progress state to the provider — removed 2026-07-28; the sprint file is the shared read surface
 - Cross-repo mirroring
 
 ### Expected Behaviors
 - `sync-pull` on a fresh checkout produces `backlog/tasks/*.md` with no token prompt beyond `gh auth` already being valid.
 - `sync-pull --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
 - Running `sync-pull` twice against unchanged GitHub state produces byte-identical task files on the second run.
-- Repeated `sprint-mirror` runs resolve to the same marker-identified issue via find-by-marker body upsert — never a duplicate mirror issue; the sprint file stays canonical and untouched.
-- `sprint-mirror` mirrors exactly one track per invocation and never guesses: one active track needs no flag; multiple active tracks require `--track <slug>` and exit non-zero without it (naming the tracks); zero actives or a no-match selector exit non-zero. It renders state only through `sprint-state.js` — no second markdown parser.
 
 ### Hard Constraints
-- The only GitHub writes this capability may perform are creating, and body-editing, issues that carry its own `dev-backlog:sprint-mirror` marker; human-authored issue bodies, comments, labels, and issue state are untouchable.
+- Never write to human-authored provider content: task bodies without a dev-backlog machine marker, comments, labels, and issue state are untouchable.
 - Never overwrite a non-machine-managed task body during `--update`; only frontmatter is replaced.
 
 ### Learnings
@@ -127,6 +125,7 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |
 | 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
 | 2026-07-12 | `sprint-mirror` becomes per-track: `--track` selects among multiple active tracks instead of failing on any second active (epic #289; human-gated pass #294) | the per-slug marker already made mirrors track-idempotent; only selection needed to change, and refusing to guess is preserved | 2026-07-04 single-active mirror selection |
+| 2026-07-28 | `sprint-mirror` is removed; this capability no longer publishes sprint state to the provider | measured 2026-07-28: four mirror issues ever created (#230, #234, #237, #239, all 2026-07-03/04) and none since, in any of the 18 consuming repos; the sprint file is committed at explicit boundaries and already readable directly (#340) | 2026-07-04 bidirectional widening; 2026-07-12 per-track mirror selection |
 
 ---
 
@@ -165,35 +164,3 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 | 2026-05-22 | Alignment Check is prompt-driven inside `backlog-triage`, not a new `triage-*.js` | Issue → Objective mapping is semantic, unlike the deterministic relate/stale scripts | — |
 | 2026-05-31 | Decision Review is prompt-driven and report-only inside `backlog-triage` | Final backlog recommendations need semantic spec evidence; `triage-apply.js` should remain limited to explicit issue mutations | — |
 
----
-
-## Capability: task-progress-reporting
-
-**Goal:** A monthly GitHub Progress issue exists with append-only entries from sprint activity, and closes idempotently at month-end.
-
-**In-scope:**
-- `progress-sync.js` and the github/relay/render helpers
-- Per-month Progress issue body (markers + appended entries)
-- `--finalize` month-end behavior
-
-**Out-of-scope:**
-- Per-PR comments (separate concern, lives in dev-relay)
-- Non-monthly cadences (weekly, quarterly)
-- Reactions, likes, or any non-text engagement
-
-### Expected Behaviors
-- Against unchanged sprint state, two `progress-sync` invocations produce a byte-identical Progress issue body — idempotent within the month.
-- `--finalize` adds the month-end block **and** closes the target month's issue exactly once; a second `--finalize` is a no-op on an already-closed issue.
-- Every appended Progress entry carries a sprint reference and a date; bare prose entries are rejected at write time.
-
-### Hard Constraints
-- Never overwrite an existing Progress entry once appended — corrections land as a new entry that references the original by date.
-- Never `--finalize` a Progress issue whose target month is still the current calendar month.
-
-### Learnings
-<!-- LEARN:BEGIN -->
-<!-- LEARN:END -->
-
-### Decisions
-| date | decision | rationale | supersedes |
-| --- | --- | --- | --- |
