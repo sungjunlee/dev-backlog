@@ -62,7 +62,7 @@ Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` 
 | `status: active` | Marks an active track | No other active sprint overlaps this track's scope. |
 | `objectives: [O1]` | Charter Objective IDs advanced by the sprint | IDs exist and are actionable; omit the field entirely when no charter exists (see `references/spec-fallback.md`). |
 | `component: "slug"` | Primary capability handle, relay-Learnings routing, and the track-scope key | Resolves to one capability whose `## Learnings` block receives relay-merge entries; omit the field entirely when no capabilities file exists. |
-| `scope: ["glob"]` | Explicit path-glob track scope when no component axis fits (one axis per track, never both; never inferred) | Optional; declared via `sprint-init.js --scope`. Two scopeless active tracks draw an informational doctor warn. |
+| `scope: ["glob"]` | Explicit path-glob track scope when no component axis fits (one axis per track, never both; never inferred) | Optional; declared via `sprint-init.js --scope`. When more than one track is active, every track must declare an axis or the doctor draws an informational warn. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and complete `#N` or `{PREFIX}-N[.M]` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |

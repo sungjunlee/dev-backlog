@@ -232,6 +232,15 @@ describe("runDoctor", () => {
     assert.match(formatHumanSummary(report), /\[PASS\] sprint_shape \[2026-07-auth\]/);
   });
 
+  it("passes a single scopeless active track because there is nothing to be disjoint from (#337)", () => {
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    assert.equal(check(report, "active_sprint").status, "pass");
+    assert.equal(report.reassess_signal.fired, false);
+  });
+
   it("tags per-track verdicts so a warn names the track it belongs to (#293)", () => {
     write(
       path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),
@@ -273,7 +282,26 @@ describe("runDoctor", () => {
     assert.equal(exitCodeFor(report), 1);
   });
 
-  it("warns informationally when two or more active tracks are scopeless (cannot prove disjoint, #293)", () => {
+  it("warns informationally when one of two active tracks is scopeless (#337)", () => {
+    write(
+      path.join(repoRoot, "backlog", "sprints", "2026-07-declared.md"),
+      sprintNoSpecFields({ scope: '["src/declared/**"]' }),
+    );
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-scopeless.md"), sprintNoSpecFields());
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    const activeCheck = check(report, "active_sprint");
+    assert.equal(activeCheck.status, "warn");
+    assert.equal(activeCheck.informational, true);
+    assert.deepEqual(activeCheck.detail.scopeless_files, [
+      "backlog/sprints/2026-07-scopeless.md",
+    ]);
+    assert.match(activeCheck.detail.summary, /2026-07-scopeless\.md/);
+    assert.equal(report.reassess_signal.fired, false);
+  });
+
+  it("still warns informationally when both active tracks are scopeless (#293, #337)", () => {
     write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
     write(path.join(repoRoot, "backlog", "sprints", "2026-07-two.md"), sprintNoSpecFields());
 
@@ -283,6 +311,8 @@ describe("runDoctor", () => {
     assert.equal(activeCheck.status, "warn");
     assert.equal(activeCheck.informational, true);
     assert.match(activeCheck.detail.summary, /cannot prove disjoint/);
+    assert.match(activeCheck.detail.summary, /2026-07-one\.md/);
+    assert.match(activeCheck.detail.summary, /2026-07-two\.md/);
     assert.equal(exitCodeFor(report), 0);
   });
 

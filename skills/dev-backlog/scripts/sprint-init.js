@@ -14,8 +14,8 @@
  *
  * Multi-track (#292): a second active sprint is refused only when its scope
  * overlaps an existing active track (shared scopesOverlap from lib.js);
- * disjoint tracks are created without refusal, scopeless-next-to-scopeless
- * warns and allows (cannot prove overlap).
+ * disjoint tracks are created without refusal; any scopeless track in a
+ * multi-track portfolio warns and allows (cannot prove overlap).
  */
 
 const fs = require("fs");
@@ -203,9 +203,9 @@ function loadActiveTrackRecords(sprintsDir) {
 }
 
 // Refusal is per-track overlap (via the ONE shared scopesOverlap predicate),
-// no longer "any second active sprint". Scopeless pairs cannot be proven
-// disjoint — warn-and-allow, matching the doctor's informational stance.
-function checkTrackDisjointness({ sprintsDir, component, scope }) {
+// no longer "any second active sprint". A scopeless track in a multi-track
+// portfolio cannot be proven disjoint — warn-and-allow, matching the doctor.
+function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "new sprint" }) {
   const activeTracks = loadActiveTrackRecords(sprintsDir);
   const newFrontmatter = component
     ? { component }
@@ -221,13 +221,16 @@ function checkTrackDisjointness({ sprintsDir, component, scope }) {
     );
   }
 
-  const scopelessAfterCreate = activeTracks
-    .filter((track) => sprintScopeKey(track.frontmatter).kind === "none")
-    .map((track) => track.file);
-  if (sprintScopeKey(newFrontmatter).kind === "none" && scopelessAfterCreate.length >= 1) {
+  const scopelessAfterCreate = [
+    ...activeTracks
+      .filter((track) => sprintScopeKey(track.frontmatter).kind === "none")
+      .map((track) => track.file),
+    ...(sprintScopeKey(newFrontmatter).kind === "none" ? [newTrackFile] : []),
+  ];
+  if (activeTracks.length >= 1 && scopelessAfterCreate.length >= 1) {
     return [
       `Active track(s) without component:/scope: (${scopelessAfterCreate.join(", ")}); `
-      + "cannot prove the new sprint is disjoint. Declare component: or scope: on each track (backlog-doctor will warn).",
+      + "cannot prove all active tracks are disjoint. Declare component: or scope: on every active track (backlog-doctor will warn).",
     ];
   }
   return [];
@@ -306,7 +309,12 @@ function createSprintFile({
 
   const warnings = existingFile
     ? []
-    : checkTrackDisjointness({ sprintsDir, component: resolvedComponent, scope });
+    : checkTrackDisjointness({
+        sprintsDir,
+        component: resolvedComponent,
+        scope,
+        newTrackFile: path.basename(sprintFile),
+      });
 
   const detected = detectSpecPresence({ repoRoot, fileExists });
   const charterPresent = hasCharter ?? detected.hasCharter;

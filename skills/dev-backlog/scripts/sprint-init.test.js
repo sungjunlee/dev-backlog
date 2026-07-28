@@ -496,6 +496,30 @@ describe("createSprintFile", () => {
     assert.equal(result.warnings.length, 1);
     assert.match(result.warnings[0], /cannot prove/);
     assert.match(result.warnings[0], /2026-04-current\.md/);
+    assert.match(result.warnings[0], /2026-04-next-sprint\.md/);
+  });
+
+  it("warns and creates a component sprint next to a scopeless active track (#337)", () => {
+    writeCapabilities(tmpDir);
+    fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
+
+    const result = createSprintFile({
+      topic: "declared-next",
+      milestone: "Sprint W14",
+      component: "sprint-execution",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      repoRoot: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      getDue: () => "2026-04-12",
+      getIssues: () => [],
+    });
+
+    assert.equal(result.created, true);
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0], /2026-04-current\.md/);
+    assert.doesNotMatch(result.warnings[0], /2026-04-declared-next\.md/);
+    assert.equal(fs.existsSync(result.sprintFile), true);
   });
 
   it("returns placeholder metadata on dry-run when milestone has no issues", () => {
