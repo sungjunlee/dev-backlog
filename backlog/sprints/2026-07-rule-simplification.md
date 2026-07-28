@@ -21,7 +21,7 @@ true form, and O8 stops implying that someone should go find `local` a user.
 
 ### Batch 2 - Scopeless rule [after:#339]
 
-- [~] #337 apply rule B: warn when 2+ tracks are active and any is scopeless (~2hr) [run:issue-337-20260728101836599-9d843e16]
+- [x] #337 apply rule B: warn when 2+ tracks are active and any is scopeless (~2hr) → PR #344 (merged)
 
 ### Batch 3 - Charter follow-up [after:#340]
 
@@ -68,6 +68,25 @@ true form, and O8 stops implying that someone should go find `local` a user.
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
+- 2026-07-29: Milestone complete, 4/4. **The cycle removed a net 4,039 lines and added no
+  capability**, on top of v0.9.0's 2,556. `capabilities.md` went 5 capabilities → 4.
+  Rule B is live and its message names the undeclared track by filename, verified on main:
+  one declared plus one scopeless track warns, and all 18 consuming repos show zero
+  `active_sprint` verdict changes.
+  **Six review findings across the milestone; four were mine, not the executors'.** A
+  criterion that was unsatisfiable in the order I wrote it (#332 round 1), a scope fence
+  that put #337's contract change on #340's branch, and — three separate times — a
+  verification narrower than the claim I drew from it: a grep keyed on script names that
+  missed `README.md:101`, a second one that missed `README.md:116`, and a SKILL.md-only
+  check reported as "the docs are done" while four other surfaces still described the pair
+  rule. The reviewer caught every one. The durable lesson is not "grep harder": when a
+  concept is removed or redefined, the sweep must enumerate **the concept** across every
+  surface, not the token the author happens to remember writing.
+  Two other corrections worth keeping. I claimed the two tracks had disjoint file sets and
+  they did not — both touched `lib.js`; a trial merge proved them compatible, but after the
+  fact. And the reviewer was right that **serializing** the two capability edits, not
+  co-locating them, is what made them conflict-free — #337's edit landed on a different
+  region of `capabilities.md` with zero conflict once #340 was in main.
 - 2026-07-28: Milestone opened after a workspace-wide reassessment under an explicit
   essence-first mandate. Two findings reframed the plan. The "5 stale sprints" cleanup I
   had recommended shrank to **1** on measurement — dear-scene is actively developed (last
