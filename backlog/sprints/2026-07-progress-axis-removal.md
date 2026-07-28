@@ -18,7 +18,7 @@ capability lost, because neither has had a user since the week it was built.
 
 ### Batch 1 - Removal
 
-- [ ] #340 remove the progress-sync and sprint-mirror axis (3,758 lines, zero adopters including here) (~4hr)
+- [~] #340 remove the progress-sync and sprint-mirror axis (3,758 lines, zero adopters including here) (~4hr) [run:issue-340-20260728101633631-75b6bde0]
 
 ## Running Context
 

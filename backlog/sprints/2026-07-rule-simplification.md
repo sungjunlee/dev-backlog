@@ -21,7 +21,7 @@ true form, and O8 stops implying that someone should go find `local` a user.
 
 ### Batch 2 - Scopeless rule [after:#339]
 
-- [ ] #337 apply rule B: warn when 2+ tracks are active and any is scopeless (~2hr)
+- [~] #337 apply rule B: warn when 2+ tracks are active and any is scopeless (~2hr) [run:issue-337-20260728101836599-9d843e16]
 
 ### Batch 3 - Charter follow-up [after:#340]
 
