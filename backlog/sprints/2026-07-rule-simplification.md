@@ -17,15 +17,15 @@ true form, and O8 stops implying that someone should go find `local` a user.
 
 ### Batch 1 - Generator/checker agreement
 
-- [~] #339 fix(sprint-init): generated sprints fail backlog-doctor's own sprint_shape check (~45min) [run:issue-339-20260728065218917-b2ceb334]
+- [x] #339 fix(sprint-init): generated sprints fail backlog-doctor's own sprint_shape check (~45min) → PR #342 (merged)
 
 ### Batch 2 - Scopeless rule [after:#339]
 
 - [ ] #337 apply rule B: warn when 2+ tracks are active and any is scopeless (~2hr)
 
-### Batch 3 - Charter follow-up
+### Batch 3 - Charter follow-up [after:#340]
 
-- [ ] #341 spec: state that O8's local adapter is not awaiting adopters (~30min)
+- [ ] #341 spec: state that O8's local adapter is not awaiting adopters + drop the deleted mirror/progress behavior from its predicate (~30min)
 
 ## Running Context
 
@@ -56,6 +56,15 @@ true form, and O8 stops implying that someone should go find `local` a user.
   **human-gated** (v0.8.0 #294 precedent).
 - **#341 must not quietly undo #333.** O8 stays `[implemented]`; the change states *why*
   adoption is not expected, and does not relabel the goalposts to reach `[validated]`.
+- **#341 now waits on #340, and gained a second job.** O8's predicate reads "GitHub's
+  existing task, milestone, **mirror**, **progress**, and closing-link behavior remains
+  backward compatible" — and #340 deletes the mirror and progress behavior. Landing #341
+  first would leave the charter guaranteeing backward compatibility for code that no longer
+  exists. One human-gated amend covering both the adoption posture and the predicate
+  cleanup, after #340, is cheaper and more honest than two.
+  Dropping those two words is **not** weakening a predicate to fit its proof (which the
+  criteria forbid): it is removing a reference to deleted behavior. State that distinction
+  explicitly in the amend, or the next reader cannot tell the two apart.
 - Relay/PR review stops at ready-to-merge unless merge is separately approved.
 
 ## Progress
