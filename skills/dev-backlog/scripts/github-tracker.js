@@ -92,8 +92,6 @@ function createGithubAdapter({ execFile = execFileSync, listTransport } = {}) {
     capabilities: () => [
       "milestones",
       "pull-request-relationships",
-      "mirrors",
-      "progress-issues",
       "comments",
       "closing-semantics",
     ],

@@ -94,7 +94,7 @@ For the whole sprint:
 
 ## Sync — Explicit and Mode-Specific
 
-- **GitHub:** `sync-pull.js` explicitly refreshes derived task mirrors. Provider writes such as labels, comments, mirrors, and Progress issues are explicit operations.
+- **GitHub:** `sync-pull.js` explicitly refreshes derived task mirrors. Provider mutations such as labels and comments are explicit operations.
 - **Local:** `backlog/local-tracker.json` is canonical and its task-file mirrors are refreshed on every mutation; there is no provider pull/push and no background sync.
 - **Both:** an operation failure never changes `.tracker` or makes the other store authoritative.
 

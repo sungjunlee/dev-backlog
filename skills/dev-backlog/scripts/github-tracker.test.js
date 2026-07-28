@@ -195,13 +195,13 @@ describe("GitHub required lifecycle adapter", () => {
     };
 
     assert.throws(
-      () => invokeCapability(resolved, "mirrors", () => {
+      () => invokeCapability(resolved, "milestones", () => {
         mutations += 1;
       }),
       (error) => {
         assert.ok(error instanceof UnsupportedTrackerCapabilityError);
         assert.equal(error.tracker, "local");
-        assert.equal(error.capability, "mirrors");
+        assert.equal(error.capability, "milestones");
         return true;
       }
     );

@@ -98,7 +98,7 @@ For a fully offline repository, choose `--tracker local` instead. Create and
 update tasks in the canonical store through the configured tracker lifecycle, use normalized
 refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
 `sprint-close` commands. Local mode deliberately does not invent milestones,
-PR relationships, sprint/progress mirrors, comments, or closing-keyword links.
+PR relationships, comments, or closing-keyword links.
 Those requests fail before side effects with actionable remediation; JSON-capable
 commands return the same structured error contract.
 
@@ -233,7 +233,6 @@ scope: ["src/auth/**"]     # explicit path globs otherwise (sprint-init.js --sco
 bash skills/dev-backlog/scripts/next.sh                      # portfolio: one stanza per track
 bash skills/dev-backlog/scripts/next.sh --track 2026-07-auth # one track, deterministic
 bash skills/dev-backlog/scripts/sprint-close.sh --track 2026-07-auth  # close just that track
-node skills/dev-backlog/scripts/sprint-mirror.js --track 2026-07-auth # mirror one track
 ```
 
 `status.sh --json` / `next.sh --json` emit `schema_version: 2` with `active_sprints[]`; the single-track fields are retained and byte-compatible, so existing consumers keep working.

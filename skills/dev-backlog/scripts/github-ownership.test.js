@@ -12,8 +12,6 @@ const SCRIPT_ROOTS = [
 const ALLOWED_DIRECT_GH = new Set([
   "skills/dev-backlog/scripts/github-tracker.js",
   "skills/dev-backlog/scripts/github-milestones.js",
-  "skills/dev-backlog/scripts/github-mirrors.js",
-  "skills/dev-backlog/scripts/progress-sync-github.js",
   // Setup owns only provider recommendation/repair diagnostics (`gh auth status`),
   // never task lifecycle operations.
   "skills/dev-backlog/scripts/setup-dev-backlog.js",
@@ -48,7 +46,6 @@ describe("direct gh production ownership", () => {
       "skills/dev-backlog/scripts/sprint-init.js",
       "skills/dev-backlog/scripts/status.sh",
       "skills/dev-backlog/scripts/sprint-close.sh",
-      "skills/dev-backlog/scripts/sprint-mirror.js",
       "skills/backlog-triage/scripts/triage-collect.js",
       "skills/backlog-triage/scripts/triage-apply.js",
     ];

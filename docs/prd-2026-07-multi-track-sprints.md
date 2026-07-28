@@ -1,5 +1,10 @@
 # PRD: Multi-Track Sprints — Component-Partitioned Concurrent Execution
 
+> **Historical (2026-07-12).** This PRD describes the system as it was when multi-track
+> sprints were designed. `sprint-mirror.js` and the `progress-sync` family were removed in
+> #340 (2026-07-28) after measuring zero adopters; references to them below are a record of
+> the design, not of current behavior.
+
 Status: draft
 Date: 2026-07-11
 Scope: cross-repo — `dev-backlog` (owns the invariant) and `dev-relay` (coordinated consumer). Coordinated change per `references/integration-contract.md` ("Changes to checkbox, annotation, path, or section patterns parsed by `dev-relay` must be coordinated with `dev-relay` before landing").

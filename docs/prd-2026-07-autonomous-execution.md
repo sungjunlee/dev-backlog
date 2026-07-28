@@ -94,7 +94,7 @@ Explicit-sync preservation · worktree/machine accessibility · offline editing 
 
 ### Decision path
 
-"Progress-issue machinery" above means the existing `progress-sync.js` pattern: a GitHub issue whose body is machine-managed behind a `<!-- dev-backlog:progress-issue -->` marker and whose comments are upserted under stable identity keys, giving idempotent re-sync (see `references/integration-contract.md`, Progress Reporting Boundary).
+"Progress-issue machinery" above refers to the now-retired epic #34 pattern: a GitHub issue whose body is machine-managed behind a `<!-- dev-backlog:progress-issue -->` marker and whose comments are upserted under stable identity keys, giving idempotent re-sync.
 
 Leading candidate: **(c)**, because it reuses proven machinery and strengthens rather than bends the charter. But the decision is deliberately deferred to a spike issue that prototypes (c) against a real sprint, measures churn/noise, and compares against (a) as the null option. Outcome lands as a charter Decision row; implementation issues are cut only after that.
 

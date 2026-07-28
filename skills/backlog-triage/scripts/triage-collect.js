@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   GH_EXEC_DEFAULTS,
+  parseMarkerMonth,
   readConfig,
   readTriageConfig,
 } = require("../../dev-backlog/scripts/lib");
@@ -14,7 +15,6 @@ const {
   invokeCapability,
   resolveConfiguredTracker,
 } = require("../../dev-backlog/scripts/tracker.js");
-const { parseMarkerMonth } = require("../../dev-backlog/scripts/progress-sync-render");
 const { executeGithub } = require("./triage-github.js");
 
 const CONFIG_PATH = path.posix.join("backlog", "triage-config.yml");

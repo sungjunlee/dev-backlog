@@ -41,7 +41,7 @@ with unchanged values. Local Plan items use `{PREFIX}-N[.M]`, and their
 `issue_number` is `null`.
 
 Optional provider capabilities are `milestones`, `pull-request-relationships`,
-`mirrors`, `progress-issues`, `comments`, and `closing-semantics`. A configured
+`comments`, and `closing-semantics`. A configured
 tracker that does not report one must fail before effects with this serialized
 shape:
 
@@ -396,42 +396,6 @@ Regex for extraction:
 
 This is optional — items without `[run:...]` are valid when another trace pointer is present. `relay-merge` appends it when a manifest exists.
 
-## Progress Reporting Boundary
-
-Monthly progress reporting is owned by `dev-backlog`, not `dev-relay`. This profile defines how `dev-relay` may enrich the dev-backlog-owned reporting flow.
-
-- Canonical engine: `skills/dev-backlog/scripts/progress-sync.js`
-- Backlog-only mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM`
-- Relay-enriched mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM --relay-manifest /abs/path/to/<run-id>.md`
-- Month finalization mode: `node skills/dev-backlog/scripts/progress-sync.js --month YYYY-MM --finalize`
-
-Boundary rules:
-
-- `dev-backlog` creates or updates the monthly progress issue body.
-- `dev-backlog` may finalize a month's issue by rendering the month-end block from source data and closing the issue idempotently.
-- `dev-backlog` reconciles only its own machine-managed progress comments on that issue.
-- `dev-relay` may pass a relay manifest path to enrich matching merge or stuck entries with `run_id`, grade, rounds, actor/executor/reviewer, and richer stuck-state signals.
-- `dev-relay` must not bypass `progress-sync.js` with a separate direct-to-GitHub reporting implementation.
-- Neighbor links are rendered from the month being synced only. If `Previous` or `Next` month issues already exist, the synced month's body may include both links; syncing one month does not mutate neighboring month issues.
-
-### Progress comment identity
-
-Backlog-only comments use month-scoped keys:
-
-```
-YYYY-MM/merge/pr-<N>
-YYYY-MM/stuck/<task-file>
-```
-
-When relay metadata is present, `dev-backlog` upgrades matching entries to relay-scoped keys while preserving the backlog-only key as an alias for reconciliation:
-
-```
-run/<run-id>/merge
-run/<run-id>/stuck
-```
-
-This allows comment upserts to stay idempotent and prevents duplicate machine comments when a backlog-only entry is later enriched by relay data.
-
 ## Graceful Degradation
 
 - **No sprint file**: actors skip sprint tracking entirely. Tasks still work standalone.
@@ -439,7 +403,6 @@ This allows comment upserts to stay idempotent and prevents duplicate machine co
 - **Missing section in sprint**: treated as empty.
 - **No task mirror file**: actors read the canonical provider through the configured adapter. A local mirror is regenerated on the next local write and its absence never causes a `gh` call.
 - **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate local state, or switch trackers.
-- **No relay manifest path**: progress reporting stays backlog-only.
 
 ## Cross-Project Smoke Test
 

@@ -1,7 +1,7 @@
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|sync|complete] [issue-number]"
-description: Manage configured-tracker-backed sprint execution. Use for GitHub mirrors or offline local tasks, sprint planning or closing, next-work selection, progress sync, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+description: Manage configured-tracker-backed sprint execution. Use for GitHub mirrors or offline local tasks, sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires git and Node.js 18+; GitHub mode also requires gh CLI. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"

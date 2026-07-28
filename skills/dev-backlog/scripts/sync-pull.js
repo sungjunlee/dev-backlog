@@ -18,6 +18,7 @@ const path = require("path");
 const {
   slugify,
   escapeYaml,
+  parseMarkerMonth,
   readConfig,
   getOpenIssueCount: getSharedOpenIssueCount,
 } = require("./lib");
@@ -26,7 +27,6 @@ const {
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
-const { parseMarkerMonth } = require("./progress-sync-render");
 const {
   parseTaskFileName,
   parseTaskRef,

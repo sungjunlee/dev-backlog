@@ -328,12 +328,10 @@ describe("local adapter and optional capabilities", () => {
     assert.equal("url" in created, false);
   });
 
-  it("reports only the six named optional provider capabilities", () => {
+  it("reports only the four named optional provider capabilities", () => {
     assert.deepEqual(CAPABILITY_NAMES, [
       "milestones",
       "pull-request-relationships",
-      "mirrors",
-      "progress-issues",
       "comments",
       "closing-semantics",
     ]);
@@ -369,7 +367,7 @@ describe("local adapter and optional capabilities", () => {
     const resolved = resolveConfiguredTracker({ tracker: "local" }, { backlogDir });
 
     assert.throws(
-      () => invokeCapability(resolved, "mirrors", () => undefined),
+      () => invokeCapability(resolved, "milestones", () => undefined),
       (error) => {
         assert.ok(error instanceof UnsupportedTrackerCapabilityError);
         assert.ok(error.remediation.includes(path.join(backlogDir, ".tracker")));

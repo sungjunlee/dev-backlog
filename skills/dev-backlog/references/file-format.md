@@ -152,7 +152,7 @@ return normalized identity
 Metadata-only updates preserve the canonical body/AC bytes; close atomically
 changes one JSON record to `state: closed` and projects `status: Done`. Local
 reports no optional provider capabilities, so
-milestones, PR relationships, mirrors, progress issues, comments, and closing
+milestones, PR relationships, comments, and closing
 semantics fail before filesystem or provider effects and never invoke `gh`.
 
 JSON allocation, atomic publication, collision, and recovery details have one
