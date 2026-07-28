@@ -98,7 +98,7 @@ For a fully offline repository, choose `--tracker local` instead. Create and
 update tasks in the canonical store through the configured tracker lifecycle, use normalized
 refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
 `sprint-close` commands. Local mode deliberately does not invent milestones,
-PR relationships, sprint/progress mirrors, comments, or closing-keyword links.
+PR relationships, comments, or closing-keyword links.
 Those requests fail before side effects with actionable remediation; JSON-capable
 commands return the same structured error contract.
 
