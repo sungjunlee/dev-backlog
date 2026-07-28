@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+### Removed
+
+- **Monthly Progress sync and sprint issue publication** — removed 3,758 lines of scripts and dedicated tests after their intended adoption windows finished. Only one monthly issue was ever created (`Progress: April 2026`, #46; none in May–July), and the four sprint issues (#230, #234, #237, #239) were all created on 2026-07-03/04 with none since. No core lifecycle script or dev-relay integration invokes either feature, and `task-progress-reporting` accumulated no Learnings. The task mirrors under `backlog/tasks/` remain core and unchanged. Closes [#340](https://github.com/sungjunlee/dev-backlog/issues/340).
+
 ## [0.9.0] — 2026-07-27
 
 Headline: **`local` is re-tiered from a second tracker into one storage substrate.** 0.8.0 shipped the tracker seam and put `github` and `local` behind it as peers, but they were never the same kind of thing: `github-tracker.js` is 172 lines of translator over `gh`, while `local-tracker.js` had grown to 1,391 — a transactional file database plus a YAML round-trip serializer — because Markdown was chosen as its canonical store. Every tracker we would add next (`gitlab`, `gitea`, `jira`, `linear`) is the translator kind. This release fixes the tier model, deletes the machinery that only existed to support the wrong one, and records a size budget so generalization stays linear. Semver: additive-to-neutral for `github`, the only mode in use; breaking for `local`, which has zero adopters and therefore ships no migration path — a deliberate, dated decision taken while that window is open. Minor bump, 0.8.0 → 0.9.0.

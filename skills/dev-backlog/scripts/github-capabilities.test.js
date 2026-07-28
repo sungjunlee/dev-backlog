@@ -11,14 +11,7 @@ const {
   getMilestoneDue,
   getMilestoneIssues,
 } = require("./github-milestones.js");
-const {
-  createMirrorIssue,
-  findMirrorIssue,
-  updateMirrorIssue,
-} = require("./github-mirrors.js");
 const { loadOpenIssues } = require("./sync-pull.js");
-const { sync: syncMirror } = require("./sprint-mirror.js");
-const { sync: syncProgress } = require("./progress-sync.js");
 const { createSprintFile } = require("./sprint-init.js");
 const { listStatusRows } = require("./tracker-status-list.js");
 const { createLocalAdapter } = require("./local-tracker.js");
@@ -64,24 +57,6 @@ describe("GitHub optional capability transports", () => {
     ]);
     assert.equal(calls[0].options.env.MS, "Batch 4");
     assert.equal(calls[2].options.env.MS, "Batch 4");
-  });
-
-  it("preserves mirror find/create/update argv and legacy results", () => {
-    const marker = "<!-- dev-backlog:sprint-mirror sprint=batch-4 -->";
-    const { calls, execFile } = makeExec([
-      JSON.stringify([{ number: 8, body: marker }]),
-      "https://github.com/acme/widgets/issues/9\n",
-      "",
-    ]);
-
-    assert.deepEqual(findMirrorIssue(marker, execFile), { number: 8, body: marker });
-    assert.deepEqual(createMirrorIssue("Sprint mirror: batch-4", marker, execFile), { number: 9 });
-    assert.equal(updateMirrorIssue(9, marker, execFile), undefined);
-    assert.deepEqual(calls.map((call) => call.args), [
-      ["issue", "list", "--state", "all", "--search", "dev-backlog:sprint-mirror in:body", "--json", "number,body", "--limit", "50"],
-      ["issue", "create", "--title", "Sprint mirror: batch-4", "--body", marker],
-      ["issue", "edit", "9", "--body", marker],
-    ]);
   });
 
   it("preserves the human status list argv and row bytes through configured resolution", () => {
@@ -150,10 +125,7 @@ describe("configured-only failure before effects", () => {
       throw new Error("must not execute");
     };
 
-    // Optional-capability GitHub flows stay fail-closed for explicit local:
-    // they raise the tracker+capability error before any GitHub execution.
-    assert.throws(() => syncMirror({ backlogDir, execFile }), /local/);
-    assert.throws(() => syncProgress({ month: "2026-07", backlogDir, execFile }), /local/);
+    // Optional-capability GitHub flows stay fail-closed for explicit local.
     assert.throws(() => createSprintFile({
       topic: "blocked",
       milestone: "blocked",
@@ -213,28 +185,4 @@ describe("configured-only failure before effects", () => {
     assert.doesNotMatch(fs.readFileSync(sprintPath, "utf8"), /Sprint closed/);
   });
 
-  it("refuses to overwrite an exact-title progress issue without the owned marker", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "github-progress-marker-"));
-    const backlogDir = path.join(root, "backlog");
-    fs.mkdirSync(backlogDir);
-    let searches = 0;
-    const calls = [];
-    const execFile = (_command, args) => {
-      calls.push(args);
-      if (args[0] === "pr") return "[]";
-      if (args[0] === "issue" && args[1] === "list") {
-        searches += 1;
-        return searches === 1
-          ? JSON.stringify([{ number: 88, title: "Progress: July 2026", body: "Human notes" }])
-          : "[]";
-      }
-      throw new Error(`unexpected mutation: ${args.join(" ")}`);
-    };
-
-    assert.throws(
-      () => syncProgress({ month: "2026-07", backlogDir, execFile }),
-      /missing managed progress marker/
-    );
-    assert.equal(calls.some((args) => ["create", "edit", "comment"].includes(args[1])), false);
-  });
 });

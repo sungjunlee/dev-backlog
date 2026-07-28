@@ -22,13 +22,11 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 - `scripts/sprint-state.js [--mode status|next] [--track slug | --component slug] [backlog-dir]` — the single sprint-markdown parser behind the `--json` surfaces; emits `schema_version: 2` with `active_sprints[]` plus retained single-track fields.
 - `scripts/sync-pull.js [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — pull open GitHub issues into `backlog/tasks/`.
 - `scripts/sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"] [--dry-run] [--json]` — create an active sprint skeleton; refuses only a track whose scope overlaps an existing active track (scopeless next to scopeless warns and allows). `--component` validates and emits one `spec/capabilities.md` slug; `--scope` emits explicit globs when no component axis fits. The flags are mutually exclusive, and spec-backed fields otherwise follow `spec-fallback.md`.
-- `scripts/progress-sync.js [--month YYYY-MM] [--dry-run] [--json] [--relay-manifest PATH] [--finalize]` — sync monthly progress issue.
 - `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]` — close an active sprint and print the doctor/reassess signal summary; `--track` picks the track when several are active, otherwise an unambiguous single active needs no flag.
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
 - `scripts/component-lint.js [--sprints-dir PATH] [--capabilities PATH] [--json]` — verify sprint `component:` handles.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
 - `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn. JSON includes top-level `reassess_signal`.
-- `scripts/sprint-mirror.js [backlog-dir] [--track slug] [--dry-run] [--json]` — publish one active sprint track to a read-only GitHub issue mirror; a portfolio requires `--track`, and sync stays explicit only.
 - `scripts/context-hook.sh [backlog-dir]` — one-line active-sprint summary for a Claude Code PreToolUse hook (portfolio line for N tracks); silent when no active sprint.
 
 ## Tracker routing
@@ -39,10 +37,6 @@ with neither, GitHub remains the deterministic default. Setup migrates a legacy
 selection to `.tracker` without editing `config.yml`. GitHub mode uses `gh` and
 treats task files as mirrors; local mode uses `local-tracker.json` as canonical
 and derives the same task-file mirrors with zero provider calls.
-`sprint-init`, `sprint-mirror`, and
-`progress-sync` are representative JSON-capable optional-feature boundaries:
-when unsupported, `--json` exits non-zero with the shared `{ "error": ... }`
-contract from `tracker.js`, while human mode prints the same remediation.
 
 Detailed adapter mechanics and compatibility evidence are single-sourced in
 [`docs/tracker-adapter-design.md`](../../../docs/tracker-adapter-design.md).

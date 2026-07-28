@@ -229,8 +229,8 @@ identity validation, configured-only availability probing, and optional
 capability gates. An unavailable or throwing configured adapter fails with no
 probe or fallback to the other slot. The GitHub slot now delegates its required
 task lifecycle to `github-tracker.js`; generic sync and orientation callers use
-configured-only resolution. Milestone, mirror, progress/PR/comment, and triage
-GitHub transports live in explicitly named provider modules and are reached only
+configured-only resolution. Milestone and triage GitHub transports live in
+explicitly named provider modules and are reached only
 after their declared capability gates. Legacy helper exports remain compatibility
 shims over those owners, including their injected execution seams. The local slot
 is now implemented by `local-tracker.js` (#276): it owns the seven required
@@ -260,12 +260,12 @@ change `backlog/.tracker` or resolve another tracker.
 proof. Its table-driven `github` and `local` rows cross real temporary-file and
 CLI/subprocess boundaries without network access. The GitHub row starts with a
 tracker-less legacy config, records fake-`gh` argv, and freezes `#N`, numeric
-`issue_number`, task mirror bytes/body preservation, milestone, sprint mirror,
-progress/PR/comment, close, and final read/list behavior without rewriting the
+`issue_number`, task mirror bytes/body preservation, milestone, close, and
+final read/list behavior without rewriting the
 config. The local row performs explicit setup, canonical create, normalized
 Plan orientation, read/update/body preservation, Done archive, sprint close,
 and final read/list with an execution-trap `gh` that records zero calls. A
-capability table covers all six optional features plus representative JSON and
+capability table covers all four optional features plus representative JSON and
 human public boundaries.
 
 ## Pre-Seam Baseline Inventory
@@ -287,7 +287,7 @@ rg -l --glob '!*.test.js' --glob '!smoke-test.sh' \
 
 ### Direct `gh` invocation inventory
 
-These are all nine production files that directly invoke `gh`. Test and smoke
+These were the seven remaining production files in the frozen inventory. Test and smoke
 fixtures are evidence for compatibility, but are not production callers.
 
 | Production file | Direct current behavior | Current owner | Target seam or capability | Later issue |
@@ -297,8 +297,6 @@ fixtures are evidence for compatibility, but are not production callers.
 | `skills/dev-backlog/scripts/sprint-init.js` | `getMilestoneDue` runs `gh api .../milestones`; `getMilestoneIssues` runs `gh issue list --milestone`. | Sprint planning | Optional `milestones`; issue results still enter the required task identity seam. | #275 |
 | `skills/dev-backlog/scripts/status.sh` | Human mode runs `gh issue list` for the “GitHub Issues” table. JSON mode does not call GitHub; it delegates to `sprint-state.js`. | Sprint orientation | Required `list` for the configured tracker; current GitHub table/output is the baseline. | #275 |
 | `skills/dev-backlog/scripts/sprint-close.sh` | `--close-milestone` lists GitHub milestones and PATCHes the matching milestone closed. | Sprint closeout | Optional `milestones`; local sprint completion remains owned by `sprint-execution`. | #275 |
-| `skills/dev-backlog/scripts/sprint-mirror.js` | `findMirrorIssue`, `createMirrorIssue`, and `updateMirrorIssue` list/create/edit marker-owned GitHub issues. | Explicit sprint publication | Optional `mirrors`; never part of required task lifecycle. | #275 |
-| `skills/dev-backlog/scripts/progress-sync-github.js` | Searches, creates, edits, and closes Progress issues; lists open/merged PRs and closing issue relationships; GETs/POSTs/PATCHes/DELETEs managed comments. | Monthly progress GitHub transport | Optional `progress issues`, `pull-request relationships`, and `comments`; closing the managed Progress issue is provider-specific. | #275 |
 | `skills/backlog-triage/scripts/triage-collect.js` | GraphQL-fetches open issues and optional recent closed issues; optionally REST-fetches comments per issue. | Triage evidence collection | Required `list`/`read` for core task evidence; optional `pull-request relationships` and `comments` for enrichment. | #275 |
 | `skills/backlog-triage/scripts/triage-apply.js` | `runGh` executes generated issue view/comment/edit/close commands for accepted anchors. | Explicit triage mutation | Required `update`/`close` for neutral task changes; optional `comments` and `milestones` for GitHub-only actions. | #275 |
 
@@ -313,9 +311,6 @@ or consumers spawn a real `gh` process unexpectedly.
 | `lib.js`: `GH_EXEC_DEFAULTS`, `OPEN_ISSUE_COUNT_QUERY`, `OPEN_ISSUE_JSON_FIELDS`, `getOpenIssueCount({ repo, execFile })`, `fetchOpenIssues({ repo, limit, defaultLimit, execFile })` | GitHub query shapes and injected `execFile` are exported. | GitHub adapter internals, with compatibility exports or shims at the old module boundary. | #273 declares the shim rule; #275 preserves argv/results. |
 | `sync-pull.js`: `getOpenIssueCount(execFile)`, `fetchOpenIssues(limit, execFile)`, `loadOpenIssues({ limit, execFile })`, `run({ issues, ... })` | CLI transport and filesystem materialization are separable today. | Adapter supplies required `list`; sync-pull retains its materializer and existing exports. | #275 |
 | `sprint-init.js`: `createSprintFile({ getDue, getIssues, ... })` | Tests inject milestone due and issue collection even though the default functions call `gh`. | Optional milestone capability supplies those values; file construction remains sprint-owned. | #275 |
-| `sprint-mirror.js`: exported `findMirrorIssue`, `createMirrorIssue`, `updateMirrorIssue`, and `sync({ execFile, sprintStatePath, ... })` | GitHub transport and sprint-state dependency are injectable. | Optional mirror capability or an explicitly GitHub-scoped module; old exports stay callable. | #275 |
-| `progress-sync-github.js`: all exported issue, PR, close, and comment helpers | The module is GitHub-only and every transport function accepts `execFile`. | Explicit GitHub implementations of optional progress/PR/comment capabilities. | #275 |
-| `progress-sync.js`: exported `readTaskFiles`, `readActiveSprintSummary`, re-exported GitHub helpers, and `sync({ execFile, readFs, fetchComments, ... })` | The orchestrator exposes transport and local-reader injection seams; `sync` defaults `readFs.readActiveSprintSummary` to the exported independent sprint Markdown reader. | Capability-gated orchestration; keep the current exports/signatures, default readers, or compatibility shims. | #273 shim policy, #274 reader grammar, #275 behavior. |
 | `triage-collect.js`: exported `fetchOpenIssuesGraphql`, `fetchIssueComments`, `fetchClosedIssues`, `collectSnapshot`, and repo parsers | Collection accepts injected execution and stores GitHub-shaped snapshot v2 data. | Core list/read plus optional relationship/comment enrichment; GitHub remote parsing remains provider-scoped. | #275 |
 | `triage-apply.js`: exported `toGhCommands`, `runGh`, `parseGhLabels`, and `execute(..., deps)` | Command generation, execution, and `deps.runGh`/`deps.execFile` are observable seams. | Neutral mutations call required lifecycle methods; provider actions remain capability-gated; compatibility helpers remain. | #275 |
 
@@ -335,11 +330,6 @@ Rows group symbols only when they share one owner and one migration boundary.
 | `sprint-state.js` | `CHECKBOX_RE` accepts only `#(\d+)`; `PR_RE` parses `PR #N`; `parsePlanItem` stores `issue_number`; `computeAge` matches exact `#N` in Progress. | Single machine sprint parser | Parse normalized task `ref`, add normalized identity fields, preserve GitHub `issue_number`, PR annotation, age matching, batches, and schema compatibility. PR data remains optional provider metadata. | #274 |
 | `backlog-doctor.js` | Consumes `sprint-state.js` and republishes `issue_number` in `publicPlanItem` for in-flight checks. | Sprint health reporting | Consume normalized identity additively while retaining the current public GitHub field. | #274 |
 | `sprint-close.sh` | Extracts digits from checked `#N` lines, then finds exactly `/[A-Z]+-{N} - ` before moving the task mirror. | Sprint closeout | Use the single normalized ref/identity implementation; preserve exact-match protection (`1` must not select `11`) and GitHub move behavior. | #274 |
-| `sprint-mirror.js` | Consumes `item.issue_number`, renders Plan items as `#N`, parses created issue URLs, and emits mirror result `issue_number`. | `backlog-sync` mirror publication | Render task identity `ref` while preserving GitHub mirror Markdown/JSON; mirror issue identity is optional-provider output. | #274 renderer, #275 mirror capability |
-| `progress-sync-render.js` | `parseTaskIssueNumber` parses leading alphabetic `{PREFIX}-N`; body/comment renderers emit task `#N`, PR `#N`, previous/next issue `#N`; entry keys use numeric PR/issue identity. | Progress rendering | Use normalized task identities for task matching; retain GitHub Progress body, comment markers, PR refs, aliases, and keys. | #274 task refs, #275 provider features |
-| `progress-sync-relay.js` | Reads numeric `data.issue.number` and `data.git.pr_number` from relay manifests into `issueNumber`/`prNumber`. | Relay metadata bridge | Accept additive normalized task identity without removing numeric GitHub manifest compatibility. PR metadata stays optional. | #274 |
-| `progress-sync.js` | `readTaskFiles` reads task filenames into `issueNumber`; exported `readActiveSprintSummary` independently reads active sprint Markdown without `sprint-state.js` and counts only `- [x] #`, `- [~] #`, and `- [ ] #`; `sync` uses both as default `readFs` readers, matches relay tasks numerically, stores Progress issue `issueNumber`, and renders GitHub `#N` output. | `task-progress-reporting` orchestration | Use normalized task identity/ref parsing for local task matching and the independent sprint reader while preserving its export/injection seam and exact GitHub checkbox counts; optional Progress issue/comment/PR capabilities own publication. | #274 parsers/matching, #275 publication |
-| `progress-sync-github.js` | Parses numeric issue-create URLs; all issue/comment endpoints take numbers; merged PR records contain numeric `number` and `closingIssuesReferences`. | GitHub progress transport | GitHub-only optional capability implementation; normalized core identities must not erase GitHub numbers from legacy results. | #275 |
 | `triage-collect.js` snapshot v2 | Stores numeric `issues[].number`, `closing_prs[].number`, optional `closed_issues[].number`, and comments; repo detection accepts GitHub remotes only. | `triage-grooming` evidence store | Core list/read identities at collection boundary; GitHub snapshot schema remains compatible, with optional PR/comment enrichment. | #275 |
 | `triage-relate.js` | `extractIssueRefs`, body/comment phrase scanners, `blocks`/`closes`/`depends on` regexes, numeric edge endpoints, and renderers use `#N`; merged PR evidence uses PR numbers. | Triage relationship analysis | Core task identities for relationships; GitHub `#N` snapshot/report compatibility remains, and PR links are optional. | #275 |
 | `triage-stale.js` | Validates numeric snapshot issues; emits `#N`, `merge-into:#N`, merged closing PR labels, and numeric duplicate targets. | Triage stale analysis | Core task identities for candidates; closing-PR evidence and provider closing action stay optional. | #275 |
@@ -411,7 +401,7 @@ Every lifecycle operation carries or returns this normalized identity:
 | `ref` | Stable display/reference string used at human and compatibility boundaries, such as GitHub `#42` or local `BACK-42`. |
 | `url?` | Optional provider link. Absence is valid and must not be fabricated. |
 
-No milestone, PR, mirror, progress, comment, or closing-keyword method belongs
+No milestone, PR-relationship, comment, or closing-keyword method belongs
 in this required set. Callers may translate their existing payloads to the
 provider-neutral task content/state needed by these operations, but this design
 does not freeze internal classes, transport objects, or call order.
@@ -425,11 +415,9 @@ the required task lifecycle.
 | Optional capability | Existing GitHub behavior it contains | Current owner |
 | --- | --- | --- |
 | Milestones | Milestone due/issue selection in `sprint-init`, accepted triage assignment, and `sprint-close --close-milestone`. | Sprint planning/close and triage; GitHub implementation in #275. |
-| Pull-request relationships | Open/merged PR queries, `closingIssuesReferences`, merged-closing-PR triage evidence, PR annotations/links. | Progress reporting and triage; GitHub implementation in #275. |
-| Mirrors | Marker-identified, explicit sprint mirror issue find/create/body-update. | `backlog-sync`; GitHub implementation in #275. |
-| Progress issues | Monthly marker-owned Progress issue find/create/update/finalize/close. | `task-progress-reporting`; GitHub implementation in #275. |
-| Comments | Progress managed-comment reconciliation and accepted triage comments. | Progress reporting and triage; GitHub implementation in #275. |
-| Closing semantics | `Fixes #N`, provider close keywords/PR auto-linkage, duplicate-close reason, and provider-specific managed-issue finalization. | Workflow guidance, triage, and progress; GitHub implementation in #275. |
+| Pull-request relationships | Merged-closing-PR triage evidence and PR annotations/links. | Triage; GitHub implementation in #275. |
+| Comments | Accepted triage comments. | Triage; GitHub implementation in #275. |
+| Closing semantics | `Fixes #N`, provider close keywords/PR auto-linkage, and duplicate-close reason. | Workflow guidance and triage; GitHub implementation in #275. |
 
 Provider labels, assignees, and other metadata are not additional required
 operations. The GitHub adapter may map provider-neutral task fields internally
@@ -450,10 +438,9 @@ Consequences:
   configuration rule, not failure detection and not fallback.
 - Optional capability calls fail before mutation with the configured tracker
   and unsupported capability identified. Callers do not fabricate an empty
-  milestone, relationship, mirror, comment, or close-link result.
+  milestone, relationship, comment, or close-link result.
 - Canonical writes go only to the selected adapter. Derived mirrors may be
-  written explicitly under their existing marker/ownership rules, but never
-  become a second authority.
+  written from canonical task state, but never become a second authority.
 - Partial or transient provider failure remains a failure of that operation;
   it cannot change selection for the next operation.
 
@@ -474,8 +461,6 @@ removing or silently changing an existing field is not.
 | `next.sh --json` | Continue delegating to `sprint-state.js --mode next`; preserve the same full JSON document, next-batch wave semantics, field aliases, and ambiguous-active failure. Human Plan output remains compatible. | #274 |
 | `sprint-state.js` fields, including `issue_number` | Preserve top-level `schema_version`, `active_sprint`, `plan_items`, `next_batch`, `latest_progress`, and `in_flight`; preserve every current item/age/pointer field. For GitHub entries `issue_number` remains the same integer wherever it currently appears; normalized identity is additive. | #274 |
 | `sprint-close` | Preserve doctor-before-close, status/progress mutation, checked-task move, exact numeric filename match, context reminder, dry-run, and current output. GitHub milestone closure remains available only through the declared milestone capability and never runs for unsupported adapters. | #274 task ref; #275 milestone |
-| `sprint-mirror` | Preserve exact marker identity, sprint-state-only parsing, ambiguity refusal, body shape, idempotent find/create/update, dry-run safety, CLI text, and JSON `issue_number` for GitHub. This command fails clearly when mirrors are unsupported. | #274 rendering; #275 mirror capability |
-| `progress-sync` | Preserve monthly/body/comment markers, issue discovery, body recomputation, previous/next links, PR/task refs, relay aliases, managed-comment create/update/dedup/repair, finalize idempotency, CLI/JSON, and marker-gated ownership. Unsupported Progress/PR/comment capabilities fail clearly rather than approximating behavior. | #274 task matching; #275 optional capabilities |
 | `backlog-triage` | Preserve GitHub snapshot v2 fields, `#N` relationship and anchor grammar, advisory-by-default behavior, explicit apply/`--yes`, accepted-action dedupe, argv, JSONL audit logs, JSON fields, and protection of active-sprint issues. Core list/read may use the seam; comments, milestones, PR evidence, and GitHub close reasons remain capability-gated. | #275 |
 | Exported helper injection seams | Every helper listed in “GitHub-specific helpers and injection seams” remains exported with compatible inputs/results, or an explicit compatibility shim preserves it. Injected `execFile`, `runGh`, filesystem readers, milestone readers, comment readers, and sprint-state paths must remain effective; tests must not cross the seam into real network/process calls. | #273 shim rule; #275 transport/argv proof |
 
@@ -486,8 +471,8 @@ This map records the implemented foundation leaves and their proof ownership.
 | Later issue | Frozen sections it must satisfy | Required verification evidence |
 | --- | --- | --- |
 | #273 — configured selection and core seam | “Accepted Target Design”, “Required Tracker Interface”, exact “Failure and authority semantics”, and the exported-helper row of the Compatibility Matrix. | Unit tests for `github`/`local`/invalid/absent selection, unavailable configured adapter, capability report, unsupported capability error, no transient fallback, and compatibility exports. Assert the required operation set contains only availability, capabilities, list/read/create/update/close and identity exactly includes `{ tracker, id, ref, url? }`. Do not implement local storage or setup. |
-| #274 — tracker-neutral task references | “Numeric reference, renderer, and storage inventory”, normalized identity in “Required Tracker Interface”, and the task-file/Plan/status/next/sprint-state/close/mirror/progress rows of the Compatibility Matrix. | Parser/renderer golden tests for legacy `#N`, additive local `{PREFIX}-N`, exact-match collisions, invalid/mixed fixtures, byte-compatible GitHub Plan/mirror output, additive JSON identity, and retained GitHub `issue_number`. No historical rewrite and no local persistence. |
-| #275 — GitHub behavior behind the seam | “Direct `gh` invocation inventory”, “GitHub-specific helpers and injection seams”, “Optional Capabilities”, failure rules, and every GitHub behavior row of the Compatibility Matrix. | A source scan proving core callers no longer own direct GitHub task lifecycle calls; mocked golden argv/results for every inventoried call family; existing marker/content safety tests; triage/progress/mirror regression tests; full Node and smoke suites. Explicitly GitHub-scoped optional modules may still execute `gh`; capability absence must fail clearly. |
+| #274 — tracker-neutral task references | “Numeric reference, renderer, and storage inventory”, normalized identity in “Required Tracker Interface”, and the task-file/Plan/status/next/sprint-state/close rows of the Compatibility Matrix. | Parser/renderer golden tests for legacy `#N`, additive local `{PREFIX}-N`, exact-match collisions, invalid/mixed fixtures, byte-compatible GitHub Plan output, additive JSON identity, and retained GitHub `issue_number`. No historical rewrite and no local persistence. |
+| #275 — GitHub behavior behind the seam | “Direct `gh` invocation inventory”, “GitHub-specific helpers and injection seams”, “Optional Capabilities”, failure rules, and every GitHub behavior row of the Compatibility Matrix. | A source scan proving core callers no longer own direct GitHub task lifecycle calls; mocked golden argv/results for every inventoried call family; existing marker/content safety tests; triage regression tests; full Node and smoke suites. Explicitly GitHub-scoped optional modules may still execute `gh`; capability absence must fail clearly. |
 | #276 — local canonical persistence | Required lifecycle, identity, and authority/failure semantics. | Offline lifecycle, exact identity, collision-safe allocation, body preservation, fail-closed storage, recovery, and archive tests with no GitHub calls. |
 | #277 — explicit setup | Persisted selection and zero-migration authority rules. | Fresh/legacy setup process tests, byte-idempotent config mutation, provider isolation, atomic publication, and explicit-switch refusal/repair evidence. |
 | #278 — dual-mode release proof | Compatibility Matrix, shared unsupported-capability boundary, and documentation/runtime alignment. | `tracker-cycle.acceptance.test.js` table rows, fake/trapped `gh`, exact GitHub argv/bytes/aliases, offline local lifecycle, all-capability typed errors, representative public JSON/human errors, plus repository-wide gates. |

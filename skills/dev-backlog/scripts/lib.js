@@ -14,12 +14,24 @@ const {
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
 
+const PROGRESS_MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
+const MARKER_SUFFIX = " -->";
+
 function slugify(text) {
   return text
     .replace(/[^a-zA-Z0-9]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase();
+}
+
+function parseMarkerMonth(body) {
+  if (!body) return null;
+  const start = body.indexOf(PROGRESS_MARKER_PREFIX);
+  if (start === -1) return null;
+  const valueStart = start + PROGRESS_MARKER_PREFIX.length;
+  const end = body.indexOf(MARKER_SUFFIX, valueStart);
+  return end === -1 ? null : body.slice(valueStart, end).trim();
 }
 
 function escapeYaml(text) {
@@ -310,6 +322,7 @@ function scopesOverlap(frontmatterA, frontmatterB) {
 module.exports = {
   slugify,
   escapeYaml,
+  parseMarkerMonth,
   parseSimpleYaml,
   sprintScopeKey,
   scopesOverlap,

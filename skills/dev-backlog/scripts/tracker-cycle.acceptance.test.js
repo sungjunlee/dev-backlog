@@ -14,8 +14,6 @@ const SETUP_PATH = path.join(SCRIPTS_DIR, "setup-dev-backlog.js");
 const SYNC_PATH = path.join(SCRIPTS_DIR, "sync-pull.js");
 const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
 const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
-const SPRINT_MIRROR_PATH = path.join(SCRIPTS_DIR, "sprint-mirror.js");
-const PROGRESS_SYNC_PATH = path.join(SCRIPTS_DIR, "progress-sync.js");
 const STATUS_PATH = path.join(SCRIPTS_DIR, "status.sh");
 const NEXT_PATH = path.join(SCRIPTS_DIR, "next.sh");
 
@@ -79,9 +77,6 @@ function writeGhFixture(root) {
   fs.writeFileSync(statePath, JSON.stringify({
     nextIssue: 42,
     issues: [],
-    mirror: null,
-    progress: {},
-    comments: [],
     milestoneClosed: false,
   }));
   const ghPath = path.join(binDir, "gh");
@@ -104,32 +99,18 @@ const exactBodyCall = (head) =>
 if (exactBodyCall(["issue", "create", "--title", args[3]]) && args[3]) {
   const title = valueAfter("--title");
   const body = valueAfter("--body") || "";
-  if (title.startsWith("Sprint mirror:")) {
-    state.mirror = { number: 84, title, body };
-    save(); out("https://github.test/acme/widgets/issues/84\\n");
-  } else if (title.startsWith("Progress:")) {
-    state.progress[title] = { number: 90, title, body, state: "open" };
-    save(); out("https://github.test/acme/widgets/issues/90\\n");
-  } else {
-    const number = state.nextIssue++;
-    state.issues.push({
-      number, title, body, state: "open", url: "https://github.test/acme/widgets/issues/" + number,
-      labels: [{ name: "priority:high" }], milestone: { title: "Cycle Milestone" }, assignees: [],
-    });
-    save(); out("https://github.test/acme/widgets/issues/" + number + "\\n");
-  }
+  const number = state.nextIssue++;
+  state.issues.push({
+    number, title, body, state: "open", url: "https://github.test/acme/widgets/issues/" + number,
+    labels: [{ name: "priority:high" }], milestone: { title: "Cycle Milestone" }, assignees: [],
+  });
+  save(); out("https://github.test/acme/widgets/issues/" + number + "\\n");
   process.exit(0);
 }
 
 if (args[0] === "issue" && args[1] === "list") {
   if (exact(["issue", "list", "--milestone", "Cycle Milestone", "--state", "open", "--json", "number,title,labels"])) {
     out(state.issues.filter((issue) => issue.state === "open").map(({ number, title, labels }) => ({ number, title, labels })));
-  } else if (exact(["issue", "list", "--state", "all", "--search", "dev-backlog:sprint-mirror in:body", "--json", "number,body", "--limit", "50"])) {
-    out(state.mirror ? [state.mirror] : []);
-  } else if (/^Progress: (May|June|July) 2026$/.test(String(valueAfter("--search")).replace(/^\"|\" in:title$/g, "")) &&
-      exact(["issue", "list", "--state", "all", "--search", valueAfter("--search"), "--json", "number,title,body", "--limit", "50"])) {
-    const title = String(valueAfter("--search")).replace(/^\"|\" in:title$/g, "");
-    out(state.progress[title] ? [state.progress[title]] : []);
   } else if (exact(["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"]) ||
       exact(["issue", "list", "--state", "closed", "--limit", "20", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"])) {
     out(state.issues.filter((issue) => {
@@ -148,18 +129,10 @@ if (exact(["issue", "view", "42", "--json", "number,title,body,labels,milestone,
   out(issue); process.exit(0);
 }
 
-if (exact(["issue", "edit", "42", "--title", "Cycle task renamed"]) ||
-    exactBodyCall(["issue", "edit", "84"]) || exactBodyCall(["issue", "edit", "90"])) {
+if (exact(["issue", "edit", "42", "--title", "Cycle task renamed"])) {
   const number = Number(args[2]);
-  if (number === 84 && state.mirror) state.mirror.body = valueAfter("--body");
-  else if (number === 90) {
-    const entry = Object.values(state.progress).find((candidate) => candidate.number === number);
-    if (entry) entry.body = valueAfter("--body");
-  } else {
-    const issue = state.issues.find((candidate) => candidate.number === number);
-    if (issue && args.includes("--title")) issue.title = valueAfter("--title");
-    if (issue && args.includes("--body")) issue.body = valueAfter("--body");
-  }
+  const issue = state.issues.find((candidate) => candidate.number === number);
+  if (issue) issue.title = valueAfter("--title");
   save(); process.exit(0);
 }
 
@@ -167,15 +140,6 @@ if (exact(["issue", "close", "42"])) {
   const issue = state.issues.find((candidate) => String(candidate.number) === args[2]);
   if (issue) issue.state = "closed";
   save(); process.exit(0);
-}
-
-if (exact(["pr", "list", "--state", "open", "--json", "number,title", "--limit", "100"])) {
-  out([{ number: 98, title: "Open cycle PR" }]); process.exit(0);
-}
-if (exact(["pr", "list", "--state", "merged", "--search", "merged:>=2026-06-01 merged:<2026-07-01", "--json", "number,title,url,mergedAt,closingIssuesReferences", "--limit", "200"])) {
-  out([{ number: 99, title: "Merged cycle PR", url: "https://github.test/acme/widgets/pull/99",
-    mergedAt: "2026-06-15T00:00:00Z", closingIssuesReferences: [{ number: 42 }] }]);
-  process.exit(0);
 }
 
 if (exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on']) ||
@@ -187,20 +151,6 @@ if (exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.titl
 if (exact(["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"])) {
   state.milestoneClosed = true; save(); process.exit(0);
 }
-if (exact(["api", "repos/{owner}/{repo}/issues/90/comments", "--paginate"])) {
-  out(state.comments); process.exit(0);
-}
-if (args.length === 6 && exact(["api", "repos/{owner}/{repo}/issues/90/comments", "--method", "POST", "--field", args[5]]) &&
-    String(args[5]).startsWith("body=")) {
-  state.comments.push({ id: 501, body: valueAfter("--field").slice("body=".length) });
-  save(); process.exit(0);
-}
-if (exact(["api", "repos/{owner}/{repo}/issues/90", "--method", "PATCH", "--field", "state=closed"])) {
-  const entry = Object.values(state.progress).find((candidate) => candidate.number === 90);
-  if (entry) entry.state = "closed";
-  save(); process.exit(0);
-}
-
 process.stderr.write("unhandled fake gh argv: " + JSON.stringify(args) + "\\n");
 process.exit(93);
 `);
@@ -341,7 +291,6 @@ function runGithubCycle(fixture) {
     SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone", "--json",
   ], fixture), "github sprint-init");
   const sprintPath = path.join(fixture.root, init.sprintFile);
-  const sprintSlug = path.basename(init.sprintFile, ".md");
   assert.match(fs.readFileSync(sprintPath, "utf8"), /^due: 2026-06-30$/m);
   assert.match(fs.readFileSync(sprintPath, "utf8"), /^- \[ \] #42 Cycle task$/m);
 
@@ -351,35 +300,6 @@ function runGithubCycle(fixture) {
   ]);
   assert.equal(next.next_batch.items[0].ref, "#42");
   assert.equal(runWorker(fixture, "read", { selector: "#42" }).title, "Cycle task");
-
-  const mirrorCreate = parseJsonResult(
-    run(process.execPath, [SPRINT_MIRROR_PATH, fixture.backlogDir, "--json"], fixture),
-    "github sprint mirror create"
-  );
-  const mirrorUpdate = parseJsonResult(
-    run(process.execPath, [SPRINT_MIRROR_PATH, fixture.backlogDir, "--json"], fixture),
-    "github sprint mirror update"
-  );
-  assert.deepEqual([mirrorCreate.action, mirrorUpdate.action], ["created", "updated"]);
-  assert.deepEqual([mirrorCreate.issue_number, mirrorUpdate.issue_number], [84, 84]);
-
-  const progress = parseJsonResult(run(process.execPath, [
-    PROGRESS_SYNC_PATH, "--month", "2026-06", "--finalize", "--json",
-  ], fixture), "github progress finalize");
-  assert.equal(progress.issueNumber, 90);
-  assert.equal(progress.summary.merged, 1);
-  assert.equal(progress.summary.inFlight, 1);
-  assert.equal(progress.comments.created, 1);
-  assert.equal(progress.closed, true);
-  assert.equal(progress.body, [
-    "<!-- dev-backlog:progress-issue month=2026-06 -->", "",
-    "# Progress: June 2026", "", "## Summary", "",
-    "| Metric | Count |", "| --- | --- |", "| Merged PRs (month) | 1 |",
-    "| In-flight (open PRs) | 1 |", "| Stuck candidates | 0 |", "",
-    "## Month End", "", `- Finalized on: ${progress.finalizedAt}`,
-    "- State: closed", "", "## Active Sprint", "",
-    `**${sprintSlug}.md** — 0/1 done, 0 in-flight, 1 remaining`, "",
-  ].join("\n"));
 
   const originalBody = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
   runWorker(fixture, "update", { selector: "#42", changes: { title: "Cycle task renamed" } });
@@ -402,47 +322,13 @@ function runGithubCycle(fixture) {
     false,
     "runtime fallback must not migrate"
   );
-  const mergeComment = [
-    "<!-- dev-backlog:progress-comment id=2026-06/merge/pr-99 -->",
-    "**Merged:** [#99](https://github.test/acme/widgets/pull/99) — Merged cycle PR",
-    "- Task: #42",
-    "- Landed: 2026-06-15 00:00 UTC",
-  ].join("\n");
   const calls = fixture.providerCalls();
-  const mirrorCreateBody = calls[6]?.[5];
-  const mirrorUpdateBody = calls[8]?.[4];
-  const mirrorBodyPrefix = [
-    `<!-- dev-backlog:sprint-mirror sprint=${sprintSlug} -->`, "",
-    "> The local sprint file is canonical. This mirror is read-only — it is",
-    "> not edited by hand — and sync is always explicit; there is no daemon.", "",
-    "## Goal", "", "[One sentence: what's true when this sprint is done]", "",
-    "## Plan", "", "- [ ] #42 Cycle task", "", "## Latest Progress", "",
-    "_No progress recorded yet._", "", "Last explicit sync: ",
-  ].join("\n");
-  const mirrorBodyPattern = new RegExp(
-    `^${escapeRegExp(mirrorBodyPrefix)}\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$`
-  );
-  assert.match(mirrorCreateBody, mirrorBodyPattern);
-  assert.match(mirrorUpdateBody, mirrorBodyPattern);
   assert.deepEqual(calls, [
     ["issue", "create", "--title", "Cycle task", "--body", body],
     ["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"],
     ["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on'],
     ["issue", "list", "--milestone", "Cycle Milestone", "--state", "open", "--json", "number,title,labels"],
     ["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"],
-    ["issue", "list", "--state", "all", "--search", "dev-backlog:sprint-mirror in:body", "--json", "number,body", "--limit", "50"],
-    ["issue", "create", "--title", `Sprint mirror: ${mirrorCreate.sprint}`, "--body", mirrorCreateBody],
-    ["issue", "list", "--state", "all", "--search", "dev-backlog:sprint-mirror in:body", "--json", "number,body", "--limit", "50"],
-    ["issue", "edit", "84", "--body", mirrorUpdateBody],
-    ["pr", "list", "--state", "open", "--json", "number,title", "--limit", "100"],
-    ["pr", "list", "--state", "merged", "--search", "merged:>=2026-06-01 merged:<2026-07-01", "--json", "number,title,url,mergedAt,closingIssuesReferences", "--limit", "200"],
-    ["issue", "list", "--state", "all", "--search", '"Progress: June 2026" in:title', "--json", "number,title,body", "--limit", "50"],
-    ["issue", "list", "--state", "all", "--search", '"Progress: May 2026" in:title', "--json", "number,title,body", "--limit", "50"],
-    ["issue", "list", "--state", "all", "--search", '"Progress: July 2026" in:title', "--json", "number,title,body", "--limit", "50"],
-    ["issue", "create", "--title", "Progress: June 2026", "--body", progress.body],
-    ["api", "repos/{owner}/{repo}/issues/90/comments", "--paginate"],
-    ["api", "repos/{owner}/{repo}/issues/90/comments", "--method", "POST", "--field", `body=${mergeComment}`],
-    ["api", "repos/{owner}/{repo}/issues/90", "--method", "PATCH", "--field", "state=closed"],
     ["issue", "edit", "42", "--title", "Cycle task renamed"],
     ["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"],
     ["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .number'],
@@ -458,13 +344,6 @@ function runGithubCycle(fixture) {
       url: "https://github.test/acme/widgets/issues/42",
       labels: [{ name: "priority:high" }], milestone: { title: "Cycle Milestone" }, assignees: [],
     }],
-    mirror: { number: 84, title: `Sprint mirror: ${mirrorCreate.sprint}`, body: mirrorUpdateBody },
-    progress: {
-      "Progress: June 2026": {
-        number: 90, title: "Progress: June 2026", body: progress.body, state: "closed",
-      },
-    },
-    comments: [{ id: 501, body: mergeComment }],
     milestoneClosed: true,
   });
 }
@@ -545,8 +424,6 @@ describe("typed unsupported-capability contract", () => {
 describe("unsupported capability public CLI boundaries", () => {
   const boundaries = [
     { name: "sprint-init", script: SPRINT_INIT_PATH, args: () => ["blocked", "--json"], capability: "milestones", configPath: () => "backlog/.tracker" },
-    { name: "sprint-mirror", script: SPRINT_MIRROR_PATH, args: (fixture) => [fixture.backlogDir, "--json"], capability: "mirrors", configPath: (fixture) => path.join(fixture.backlogDir, ".tracker") },
-    { name: "progress-sync", script: PROGRESS_SYNC_PATH, args: () => ["--month", "2026-06", "--json"], capability: "progress-issues", configPath: () => "backlog/.tracker" },
   ];
 
   for (const boundary of boundaries) {

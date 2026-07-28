@@ -24,8 +24,6 @@ const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
 const CAPABILITY_NAMES = Object.freeze([
   "milestones",
   "pull-request-relationships",
-  "mirrors",
-  "progress-issues",
   "comments",
   "closing-semantics",
 ]);

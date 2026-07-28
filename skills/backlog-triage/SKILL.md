@@ -83,7 +83,7 @@ Full section examples and rubric details live in `references/classification.md`,
 | Concern | Owner |
 | --- | --- |
 | Sprint files, execution plan, Running Context | `dev-backlog` |
-| Milestone lifecycle and monthly progress issue | `dev-backlog` |
+| Milestone lifecycle | `dev-backlog` |
 | AC checkboxes inside issue bodies (`AC:BEGIN` / `AC:END`) | `dev-backlog` |
 | Open-issue classification, relationships, stale flags | `backlog-triage` |
 | Charter alignment of open issues | `backlog-triage` report; mutations route to `spec-charter` |

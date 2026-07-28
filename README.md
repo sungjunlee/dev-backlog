@@ -233,7 +233,6 @@ scope: ["src/auth/**"]     # explicit path globs otherwise (sprint-init.js --sco
 bash skills/dev-backlog/scripts/next.sh                      # portfolio: one stanza per track
 bash skills/dev-backlog/scripts/next.sh --track 2026-07-auth # one track, deterministic
 bash skills/dev-backlog/scripts/sprint-close.sh --track 2026-07-auth  # close just that track
-node skills/dev-backlog/scripts/sprint-mirror.js --track 2026-07-auth # mirror one track
 ```
 
 `status.sh --json` / `next.sh --json` emit `schema_version: 2` with `active_sprints[]`; the single-track fields are retained and byte-compatible, so existing consumers keep working.
