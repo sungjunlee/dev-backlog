@@ -97,7 +97,8 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
   let fence = null;
   let listBaseIndent = null;
   for (const line of normalizeText(markdown).split("\n")) {
-    const fenceMatch = line.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+    const leading = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
+    const fenceMatch = line.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
     if (fence) {
       if (
         fenceMatch &&
@@ -110,7 +111,9 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       visible.push("");
       continue;
     }
-    if (fenceMatch) {
+    const fenceBelongsToList =
+      listBaseIndent !== null && leading > listBaseIndent;
+    if (fenceMatch && (leading <= 3 || fenceBelongsToList)) {
       fence = {
         character: fenceMatch[1][0],
         length: fenceMatch[1].length,
@@ -123,7 +126,6 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       continue;
     }
 
-    const leading = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
     const listItem = line.match(LIST_ITEM_LINE_RE);
     const isListContinuation =
       listBaseIndent !== null && leading > listBaseIndent;

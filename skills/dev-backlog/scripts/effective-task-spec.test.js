@@ -301,6 +301,21 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     }]);
   });
 
+  it("masks fenced task examples nested under ordinary list items", () => {
+    assert.deepEqual(parseAcceptanceCriteria([
+      "## Acceptance Criteria",
+      "",
+      "- Documentation:",
+      "    ```markdown",
+      "    - [ ] Example only",
+      "    ```",
+      "- [ ] Real criterion",
+    ].join("\n")), [{
+      text: "Real criterion",
+      checked: false,
+    }]);
+  });
+
   it("loads only repository-contained explicit specs", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "effective-spec-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
