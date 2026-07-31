@@ -19,7 +19,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 
 ### Batch 2 — Resolver and independent evidence tracks
 - [x] #346 Resolve effective task specs without GitHub task mirrors (8d) → PR #352 (merged)
-- [~] #349 Validate GitHub Projects as an optional planning projection (3d) [branch:codex/projects-projection-pilot]
+- [~] #349 Validate GitHub Projects as an optional planning projection (3d) → PR #355 (open) [branch:codex/projects-projection-pilot]
 
 ### Batch 3 — Mirrorless execution pilot
 - [x] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (merged)
@@ -57,3 +57,4 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: After explicit informed approval, added the persistent `project` OAuth scope and created private pilot Project #5. CLI covered Project/item/field discovery plus Priority/Date creation and field updates; GraphQL was required to create the Iteration field.
 - 2026-07-31: #349 Project #5 added real Issues #345–#350 and read back 18/18 Priority, Iteration, and Target Date values. A second planning cycle updated only four changed values. Invalid-token and invalid-iteration writes both failed non-zero with identical local sprint hash, Git status, canonical Issue snapshot, and Project snapshot.
 - 2026-07-31: #349 evidence shows no repeated value: Project cycle 2 required four writes plus one read-back (45.8 s), while milestones + labels read the same six Issues in one call (4.0 s) and sprint Plan already held execution order. Decision: retain milestones + labels; add no Project profile or abstraction.
+- 2026-07-31: Opened #349 PR #355 after core absence 3/3, contract prose 8/8, exact external read-back, and an independent no-findings review.
