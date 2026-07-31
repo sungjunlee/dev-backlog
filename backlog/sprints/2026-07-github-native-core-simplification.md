@@ -15,7 +15,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 ## Plan
 
 ### Batch 1 — Authority gate
-- [ ] #345 Define the GitHub-native authority contract and reduced product boundary (3d)
+- [~] #345 Define the GitHub-native authority contract and reduced product boundary (3d) — branch codex/github-native-core-simplification
 
 ### Batch 2 — Resolver and independent evidence tracks
 - [ ] #346 Resolve effective task specs without GitHub task mirrors (8d)
@@ -40,3 +40,4 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 
 ## Progress
 - 2026-07-31: Opened the milestone execution track from GitHub issues #345–#350. Doctor reported no pre-existing active sprint and no blocking repository health failures.
+- 2026-07-31: Started #345 on `codex/github-native-core-simplification`; authority-contract document and spec amendments are under implementation review.
