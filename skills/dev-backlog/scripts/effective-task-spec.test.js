@@ -10,6 +10,7 @@ const {
   SPEC_REF_UNAVAILABLE_CODE,
   EffectiveTaskSpecError,
   digestText,
+  explicitSpecRef,
   parseCli,
   parseAcceptanceCriteria,
   resolveEffectiveTaskSpec,
@@ -141,6 +142,28 @@ describe("effective task spec selection", () => {
       updated_at: "2026-07-31",
     });
   });
+
+  it("ignores spec_ref examples in fenced, indented, and inline code", () => {
+    const task = {
+      tracker: "github",
+      ref: "#42",
+      body: [
+        "Use `<!-- dev-backlog:spec_ref docs/inline.md -->` when needed.",
+        "",
+        "```markdown",
+        "<!-- dev-backlog:spec_ref docs/fenced.md -->",
+        "```still-code",
+        "<!-- dev-backlog:spec_ref docs/still-fenced.md -->",
+        "```",
+        "",
+        "    <!-- dev-backlog:spec_ref docs/indented.md -->",
+        "",
+        "The canonical Issue body remains authoritative.",
+      ].join("\n"),
+    };
+
+    assert.equal(explicitSpecRef(task), null);
+  });
 });
 
 describe("fail-closed authority boundary", () => {
@@ -226,6 +249,17 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     ].join("\n")), [{ text: "Inside", checked: true }]);
     assert.deepEqual(parseAcceptanceCriteria("- [ ] Legacy task list"), [
       { text: "Legacy task list", checked: false },
+    ]);
+    assert.deepEqual(parseAcceptanceCriteria([
+      "## Acceptance Criteria",
+      "1. [ ] First ordered `criterion`",
+      "```markdown",
+      "- [ ] Example only",
+      "```",
+      "2) [x] Second ordered criterion",
+    ].join("\n")), [
+      { text: "First ordered `criterion`", checked: false },
+      { text: "Second ordered criterion", checked: true },
     ]);
   });
 

@@ -19,7 +19,8 @@ const GITHUB_RESOLUTION_FIELDS =
   "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url";
 const SPEC_REF_MARKER_RE =
   /<!--\s*dev-backlog:spec_ref\s+([^\r\n]*?)\s*-->/gi;
-const TASK_LIST_RE = /^\s*[-*+]\s+\[([ xX])\]\s+(.+?)\s*$/gm;
+const TASK_LIST_RE =
+  /^\s*(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\]\s+(.+?)\s*$/gm;
 
 const SOURCE_UNAVAILABLE_CODE = "TASK_SPEC_SOURCE_UNAVAILABLE";
 const SPEC_REF_UNAVAILABLE_CODE = "TASK_SPEC_REF_UNAVAILABLE";
@@ -49,6 +50,40 @@ function normalizeText(value) {
 
 function digestText(value) {
   return crypto.createHash("sha256").update(normalizeText(value), "utf8").digest("hex");
+}
+
+function markdownOutsideCode(markdown, { stripInline = false } = {}) {
+  const visible = [];
+  let fence = null;
+  for (const line of normalizeText(markdown).split("\n")) {
+    const fenceMatch = line.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+    if (fence) {
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence.character &&
+        fenceMatch[1].length >= fence.length &&
+        !fenceMatch[2].trim()
+      ) {
+        fence = null;
+      }
+      visible.push("");
+      continue;
+    }
+    if (fenceMatch) {
+      fence = {
+        character: fenceMatch[1][0],
+        length: fenceMatch[1].length,
+      };
+      visible.push("");
+      continue;
+    }
+    if (/^(?: {4}|\t)/.test(line)) {
+      visible.push("");
+      continue;
+    }
+    visible.push(stripInline ? line.replace(/(`+).*?\1/g, "") : line);
+  }
+  return visible.join("\n");
 }
 
 function explicitSpecRef(task, requestedSpecRef) {
@@ -83,7 +118,10 @@ function explicitSpecRef(task, requestedSpecRef) {
     }
     candidates.push(task.spec_ref.trim());
   } else {
-    for (const match of normalizeText(task.body).matchAll(SPEC_REF_MARKER_RE)) {
+    for (
+      const match of markdownOutsideCode(task.body, { stripInline: true })
+        .matchAll(SPEC_REF_MARKER_RE)
+    ) {
       const markerRef = match[1].trim();
       if (!markerRef) {
         throw new EffectiveTaskSpecError(
@@ -119,7 +157,7 @@ function explicitSpecRef(task, requestedSpecRef) {
 }
 
 function acceptanceCriteriaSection(markdown) {
-  const text = normalizeText(markdown);
+  const text = markdownOutsideCode(markdown);
   const marked = text.match(
     /<!--\s*AC:BEGIN\s*-->([\s\S]*?)<!--\s*AC:END\s*-->/i
   );
@@ -355,6 +393,7 @@ module.exports = {
   digestText,
   explicitSpecRef,
   loadRepositorySpec,
+  markdownOutsideCode,
   normalizeLifecycle,
   parseCli,
   parseAcceptanceCriteria,
