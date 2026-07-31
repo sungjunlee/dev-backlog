@@ -25,7 +25,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - [x] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (merged)
 
 ### Batch 4 — Subtract unused compatibility machinery
-- [~] #348 Subtract zero-adopter tracker and compatibility machinery (5d) [branch:codex/compatibility-subtraction]
+- [~] #348 Subtract zero-adopter tracker and compatibility machinery (5d) → PR #354 (open) [branch:codex/compatibility-subtraction]
 
 ### Batch 5 — Evidence-gated memory decision
 - [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31]
@@ -49,5 +49,6 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: #347 completed via PR #353 after Linux/Windows CI, focused 67/67, smoke 191/191, and a final independent no-findings review. Started #348 on `codex/compatibility-subtraction`.
 - 2026-07-31: #348 removed the zero-adopter local tracker and generic/local design surface: four whole files and 1,909 exact lines. GitHub-only setup, no-fallback behavior, one-way Backlog.md import/export, and optional-integration absence are covered; focused regression tests passed 30/30 and the full Node suite passed.
 - 2026-07-31: #348 independent review restored retained GitHub seam safety coverage for setup atomicity, public no-effect gates, availability/adapter/identity/capability contracts, and typed CLI errors. The final review reported no findings; focused tracker tests passed 18/18 and shell smoke passed 191/191.
+- 2026-07-31: Opened #348 PR #354 from `codex/compatibility-subtraction`; awaiting GitHub CI and PR review.
 - 2026-07-31: #350 shadow benchmark started with 20 pre-registered historical-retrieval questions across dev-backlog, dev-relay, and consumer repositories. The earliest four-week go/no-go date is 2026-08-28.
 - 2026-07-31: #349 Projects scope escalation was refused pending explicit informed approval for persistent organization Project read/write access. No Project resource or local state was created.
