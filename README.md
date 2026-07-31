@@ -11,7 +11,9 @@ sessions.
 dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
 
 No new server. No hidden state. No automatic memory writes. Existing GitHub
-repositories keep their current behavior without migration.
+repositories retain their tracker selection and Issue identities without data
+migration; the legacy export CLI has the intentional opt-in change documented
+under Upgrade behavior.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
@@ -46,7 +48,7 @@ backlog/sprints/     execution hub: plan, context, progress
 | Live task reads | Work resolves Issue intent and AC directly; no pull step or background sync |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
-| `sprint-close.sh` | Close the loop: mark sprint complete, archive tasks, optionally close the milestone |
+| `sprint-close.sh` | Close the loop: mark sprint complete, archive checked legacy mirrors only when present, optionally close the milestone |
 | Plain Markdown + Bash + Node built-ins | No database, no daemon, no mystery |
 
 ## Install
@@ -128,14 +130,19 @@ either mode; the exact procedure and signatures are documented in
 
 ### Upgrade behavior
 
-There is zero automatic runtime migration. A repository with neither
+There is zero automatic tracker-selection migration. A repository with neither
 `backlog/.tracker` nor a legacy `tracker:` key in `backlog/config.yml` continues
-in GitHub mode with its existing `#N`, numeric `issue_number`, task-mirror,
-milestone, comment, and closing behavior. When `.tracker` is
+in GitHub mode with its existing `#N`, numeric `issue_number`, milestone,
+comment, and closing behavior. When `.tracker` is
 absent, runtime reads a legacy YAML selection as a compatibility fallback.
 Running `setup-dev-backlog.js` migrates that resolved choice to `.tracker`
 without editing `config.yml`; setup never migrates task files and runtime never
 chooses a tracker from availability or failure.
+Existing automation that invokes `sync-pull.js` without a flag must add
+`--legacy-export`; otherwise the command refuses before provider access or task
+materialization. This opt-in preserves rollback/diagnostic exports without
+putting them back on the normal workflow. It is an intentional CLI migration,
+not an automatic tracker or task-data migration.
 The implementation-level contract and proof map live in
 [docs/tracker-adapter-design.md](docs/tracker-adapter-design.md).
 

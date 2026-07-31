@@ -227,4 +227,7 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - "Fresh online session with no task mirror." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; an explicit `spec_ref` wins when present.
 - "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: recover execution continuity and every in-flight `[~]` owner/pointer from `status.sh --json`/`next.sh --json`, but stop before task execution or AC/lifecycle claims because the live task cannot resolve; never read a legacy mirror as fallback.
 - "Close a sprint with Running Context that applies to future work and no task mirrors." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
-- "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.
+- "GitHub Issue changed during work." Expected: re-run the live effective
+  task-spec resolver and review a changed source revision; do not create a task
+  mirror. Only an explicit rollback/diagnostic request runs
+  `sync-pull.js --legacy-export`, with no background mutation.

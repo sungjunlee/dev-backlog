@@ -22,7 +22,7 @@
 ## Known Gotchas
 - Resolve `progress-sync` metric semantics in `#49` before doing structural refactors in `#50`
 - `progress-sync` and the bash helpers both parse sprint/task markdown, so contract drift needs explicit coverage
-- `sync-pull.js --update` refreshes task frontmatter and, for machine-managed issues whose **incoming GitHub body** starts with the `<!-- dev-backlog:progress-issue month=` marker, also refreshes the markdown body; every other task mirror keeps its existing body so local AC checkbox state is preserved
+- Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision; it does not refresh a task mirror. Rollback/diagnostic export is explicit via `sync-pull.js --legacy-export --update`: it refreshes task frontmatter and, for machine-managed issues whose **incoming GitHub body** starts with the `<!-- dev-backlog:progress-issue month=` marker, also refreshes the markdown body; every other exported mirror keeps its existing body.
 - Backlog triage snapshot enrichments stay explicit and bounded: `--with-comments` and `--with-closed-issues` are opt-in, while downstream scanners must gracefully gate on optional fields instead of assuming they exist.
 - `triage-relate` relationship edges are advisory context. Even a `merged-pr-link` edge must not become a close recommendation unless `triage-stale` implements a separate conservative obsolete signal.
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.

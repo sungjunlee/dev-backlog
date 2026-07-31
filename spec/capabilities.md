@@ -81,7 +81,12 @@ does not widen these capability contracts.
 - The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, milestone membership, and Relay presence alone never trigger one.
 - No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
 - Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
-- Closing a sprint via `sprint-close.sh` is atomic: the sprint flips `status: completed` AND its done-checkbox issues move into `backlog/completed/` in one invocation, not in two steps.
+- One successful `sprint-close.sh` invocation flips the sprint to
+  `status: completed` and appends final Progress. Mirrorless GitHub requires no
+  task directories; checked legacy GitHub mirrors are archived only when
+  present. Local tasks are closed separately through the configured adapter,
+  which updates canonical JSON and its completed projection before sprint
+  close finalizes the sprint.
 
 ### Hard Constraints
 - Never mutate a sprint's `status: completed` back to `active`; completed sprints are immutable history.

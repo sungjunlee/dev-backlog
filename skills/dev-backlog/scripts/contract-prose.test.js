@@ -50,7 +50,7 @@ function assertDerived(file, mode, section, block) {
 }
 function assertMirrorlessGithub(file, section) {
   const claim = section.find(({ text }) =>
-    /(?:no .*task|optional .*export|mirrorless)/i.test(text)
+    /(?:\bno\s+(?:required\s+)?task(?:-file)?\s+(?:mirror|directory)\b|\btask(?:-file)?\s+(?:mirror|directory)\s+(?:is\s+)?(?:not\s+)?required\b|\boptional\s+legacy\s+export\b)/i.test(text)
   );
   assert.ok(claim, diagnostic(
     file,

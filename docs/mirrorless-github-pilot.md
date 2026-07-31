@@ -89,15 +89,12 @@ summary must include:
 
 Completion requires two real sprint execution episodes across two or three
 repositories, zero failed loss checks, and no transition where a normal
-contributor updates the Issue, mirror, and sprint for the same state. The
-observed sprints may remain active; the pilot measures recoverability during
-real execution rather than requiring unrelated sprint closure.
+contributor updates the Issue, mirror, and sprint for the same state.
 
 ## Pilot Observations — 2026-07-31
 
-The two real-repository observations exercised fresh-session orientation inside
-active sprints. They satisfy the recovery baseline but do not yet satisfy the
-state-transition portion of the pilot.
+The first observations exercised fresh-session orientation inside existing
+active sprints and established the recovery baseline.
 
 | Repository | Active sprint / task | Orientation (base/post) | Calls (base/post) | AC / task spec / lifecycle / handoff | Mirror writes | Resolver blockers |
 | --- | --- | ---: | ---: | --- | ---: | ---: |
@@ -127,10 +124,34 @@ No resolver-related blocking incident occurred. The dear-scene authority drift
 is positive evidence for removing mirrors from orientation, not a reason to
 restore mirror fallback. Both observations were read-only orientation episodes,
 so they performed no lifecycle state transition and wrote neither a mirror nor
-a sprint. The default workflow and CLI gate prevent a normal contributor from
-adding a mirror write to later Issue/sprint transitions, but two controlled
-real-repository state-transition episodes remain required before declaring
-#347 complete.
+a sprint.
+
+## Controlled State-Transition Episodes
+
+With explicit owner approval, each consumer repository received one dedicated
+documentation-only Issue and sprint. Each episode resolved the live Issue,
+recorded an in-flight branch, completed the sprint through `sprint-close.sh`,
+merged a closing PR, and re-resolved the canonical lifecycle as `closed`.
+
+| Repository | Issue → PR | Live orientation | AC after completion | Sprint close | Lifecycle | Manual Issue writes | Sprint writes | Mirror writes | Blocking incidents |
+| --- | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: |
+| `sungjunlee/aibris` | [#171](https://github.com/sungjunlee/aibris/issues/171) → [#172](https://github.com/sungjunlee/aibris/pull/172) | 0.69 s | 5/5 | exit 0 | open → closed | 2 | 2 commits | 0 | 0 |
+| `sungjunlee/dear-scene` | [#293](https://github.com/sungjunlee/dear-scene/issues/293) → [#294](https://github.com/sungjunlee/dear-scene/pull/294) | 0.71 s | 5/5 | exit 0 | open → closed | 2 | 2 commits | 0 | 0 |
+
+- aibris passed every pilot-track doctor check. Its portfolio emitted only the
+  informational warning caused by the pre-existing scopeless active sprint.
+- dear-scene passed every pilot-track doctor check. Its overall doctor failure
+  and two warnings belonged to the pre-existing M5 sprint and were unchanged
+  by the pilot.
+- Both closing PRs merged, both Issues closed through their PR relationship,
+  and both fresh clones remained clean outside the dedicated sprint file.
+- Existing `backlog/tasks/` and `backlog/completed/` content had zero diff
+  throughout both episodes. The only state surfaces written were the live
+  Issue/PR and the dedicated sprint file, so no Issue + mirror + sprint triple
+  write occurred.
+
+The recovery observations and two controlled transitions satisfy the pilot
+completion rule with zero failed loss checks and zero blocking incidents.
 
 ## Rollback
 
