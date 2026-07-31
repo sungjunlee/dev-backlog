@@ -42,3 +42,4 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: Opened the milestone execution track from GitHub issues #345–#350. Doctor reported no pre-existing active sprint and no blocking repository health failures.
 - 2026-07-31: Started #345 on `codex/github-native-core-simplification`; authority-contract document and spec amendments are under implementation review.
 - 2026-07-31: #345 completed via PR #351 after Node 379/379, smoke 187/187, Linux/Windows CI, Codex, and CodeRabbit review. Started #346 on `codex/effective-task-spec-resolver`.
+- 2026-07-31: #346 implementation verified: live Issue #346 resolved without a mirror (7 AC, stable SHA-256 source revision), focused resolver/local concurrency tests passed 14/14, smoke passed 191/191, and backlog doctor passed. One pre-existing 6-second process-start barrier flaked only under the 7-minute full serial suite and passed both isolated reruns.

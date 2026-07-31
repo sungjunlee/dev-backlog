@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are derived mirrors in both modes. GitHub Issues are authoritative for `tracker: github`; `backlog/local-tracker.json` is authoritative for `tracker: local`. Local mirrors are never parsed back into task truth. Task files expose bodies and Acceptance Criteria checkboxes; sprint files remain the execution log.
+- `backlog/tasks/` and `backlog/completed/` are derived mirrors in both modes. GitHub Issues are authoritative for `tracker: github`; `backlog/local-tracker.json` is authoritative for `tracker: local`. Actors resolve effective task specs and AC through `effective-task-spec.js`; mirror bodies and checkboxes are diagnostic/export bytes only. Sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -281,7 +281,24 @@ Non-human `## Progress` entries must include an actor tag:
 
 `<actor-id>` matches `[A-Za-z0-9][A-Za-z0-9._/-]{0,79}`. The actor tag is a strictly additive bracketed annotation compatible with the existing `[run:...]` grammar. When both tags are present, place `[actor:...]` before trailing `[run:...]` so the existing run-id extraction remains valid.
 
-## Task File Structure
+## Effective Task-Spec Read Surface
+
+Actors resolve Work/Complete input through `effective-task-spec.js`. Its JSON
+contains `effective_spec`, `acceptance_criteria`, `lifecycle`, `source_ref`,
+and stable SHA-256 `source_revision`/`source_digest`. The live canonical task
+body is selected unless that body explicitly contains:
+
+```markdown
+<!-- dev-backlog:spec_ref path/to/spec.md -->
+```
+
+The explicit repository-relative source then wins completely. Resolution
+failure is terminal: actors must not consult task mirrors, sprint prose, Agent
+Briefs, or ecosystem documents as implicit authority. Optional candidates may
+be reported for a human to adopt through `spec_ref`, but discovery alone never
+changes the selected source.
+
+## Transition Task File Structure
 
 ```yaml
 ---
@@ -304,9 +321,16 @@ created_date: 'YYYY-MM-DD'
 <!-- AC:END -->
 ```
 
-dev-relay reads AC via LLM context from whatever structure the body provides. The `<!-- AC:BEGIN/END -->` markers are a convention, not machine-parsed by dev-relay.
+dev-relay reads canonical AC from the effective task-spec result. The
+`<!-- AC:BEGIN/END -->` markers are parsed by the resolver when present and
+remain compatible with legacy task-file rendering.
 
-Task-file AC is the issue mirror and local progress surface. It is not the relay review anchor by itself. relay-plan freezes Done Criteria and rubrics in the relay run artifacts, and relay-review evaluates against that frozen snapshot. `spec/*` files may read task AC or frozen Done Criteria as evidence for durable rules, but must not copy issue-specific AC, rubrics, or review notes into charter, system-map, or capability specs.
+Task-file AC is only a transition projection. It is not a Work authorization or
+relay review anchor by itself. relay-plan freezes Done Criteria and rubrics in
+the relay run artifacts, and relay-review evaluates against that frozen
+snapshot. `spec/*` files may read canonical task AC or frozen Done Criteria as
+evidence for durable rules, but must not copy issue-specific AC, rubrics, or
+review notes into charter, system-map, or capability specs.
 
 ## Cross-Sprint Context (`_context.md`) Sections
 
@@ -401,7 +425,8 @@ This is optional — items without `[run:...]` are valid when another trace poin
 - **No sprint file**: actors skip sprint tracking entirely. Tasks still work standalone.
 - **No `_context.md`**: ignored silently.
 - **Missing section in sprint**: treated as empty.
-- **No task mirror file**: actors read the canonical provider through the configured adapter. A local mirror is regenerated on the next local write and its absence never causes a `gh` call.
+- **No task mirror file**: normal path; actors use the effective task-spec resolver and sprint close proceeds without an archive move.
+- **No GitHub access**: sprint JSON may recover execution continuity and in-flight pointers, but task intent, AC, and lifecycle are unresolved. Stop before execution; do not read a task mirror.
 - **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate local state, or switch trackers.
 
 ## Cross-Project Smoke Test

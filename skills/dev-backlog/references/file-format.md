@@ -83,6 +83,28 @@ In GitHub mode the issue body is authoritative. In local mode the JSON body is
 authoritative, so hand-edited mirror bytes are overwritten on the next local
 write rather than parsed back into task truth.
 
+## Effective Task Specification
+
+Work and completion resolve task input through `effective-task-spec.js`, never
+through this mirror format. The canonical task body is the default selected
+specification. To select a repository document explicitly, put exactly one
+marker in the canonical task body:
+
+```markdown
+<!-- dev-backlog:spec_ref docs/tasks/oauth-rollout.md -->
+```
+
+`spec_ref` is repository-relative. The resolver fails closed when it is
+missing, unreadable, outside the repository, or duplicated with a conflicting
+value; it does not fall back to the Issue body or a task mirror. Agent Briefs
+and ecosystem documents may be proposed as candidates, but they become
+authoritative only through this explicit marker.
+
+The resolver returns the selected content as `effective_spec`, task-list items
+from `AC:BEGIN/END` (preferred), an Acceptance Criteria heading, or a legacy
+body-wide fallback, plus normalized `lifecycle`, `source_ref`, and stable
+SHA-256 `source_revision`/`source_digest`.
+
 For manual task files or Backlog.md CLI compatibility, you can optionally add structured AC markers:
 
 ```markdown

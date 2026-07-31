@@ -128,7 +128,10 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 
 ### Work
 
-1. Read the live GitHub Issue specification and AC. If that read fails, stop clearly; a legacy mirror may be inspected only as diagnostic/rollback evidence and cannot authorize execution or lifecycle changes.
+1. Resolve the live task with `effective-task-spec.js TASK_REF`. Its
+   `effective_spec`, AC, lifecycle, `source_ref`, and content digest are the
+   execution input: one explicit `spec_ref` wins, otherwise the live GitHub
+   Issue body wins. If resolution fails, stop clearly; a legacy mirror may be inspected only as diagnostic/rollback evidence and cannot authorize execution or lifecycle changes.
 2. If the work has an admitted sprint, read its current batch and Running Context.
 3. Mark meaningful GitHub status before work when useful.
 4. Implement directly or optionally delegate through dev-relay.
@@ -148,7 +151,9 @@ For a whole sprint:
 
 1. Run `sprint-close.sh`; it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary.
 2. Set `status: completed` and write a final Progress entry.
-3. Move completed task files from `backlog/tasks/` to `backlog/completed/`.
+3. If legacy task mirrors exist, archive matching checked mirrors as a
+   compatibility cleanup only. Their absence is the normal mirrorless path and
+   never blocks close; task lifecycle remains in GitHub.
 4. Promote project-level Running Context entries to `_context.md`.
 5. Leave the sprint file in place as the permanent record.
 
@@ -186,6 +191,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 - `scripts/init.sh` — bootstrap `backlog/`.
 - `scripts/setup-dev-backlog.js` — persist the explicit canonical tracker without migrating task files.
+- `scripts/effective-task-spec.js` — resolve live task specification, AC,
+  lifecycle, source, and stable digest without consulting task mirrors.
 - `scripts/sync-pull.js` — materialize configured open tasks; in GitHub mode, preserve legacy mirrors.
 - `scripts/sprint-init.js` — create a milestone-backed sprint when supported; local plans are authored from normalized refs.
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
@@ -212,7 +219,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically; `backlog-doctor` passes because scopes are disjoint.
 - "Cold adopter: a repo with open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
 - "Cold adopter: a repo with one self-contained GitHub issue but no `backlog/`, no spec axis, and no Relay." Expected: use the Issue → PR path without requiring a sprint, mirror, Projects board, generated memory, or optional skill.
-- "Work issue #42 whose live Issue has three AC checkboxes." Expected: verify each AC before checking it off, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
-- "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: use `status.sh --json` and `next.sh --json` to name the active sprint, next actionable batch, and every in-flight `[~]` item with its owner/pointer (PR, branch, or run-id); if `--json` is unavailable, read the sprint file directly.
-- "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.
+- "Work issue #42 with no task mirror and three live Issue AC checkboxes." Expected: run the effective task-spec resolver, verify its source digest and every AC, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
+- "Fresh online session with no task mirror." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; an explicit `spec_ref` wins when present.
+- "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: recover execution continuity and every in-flight `[~]` owner/pointer from `status.sh --json`/`next.sh --json`, but stop before task execution or AC/lifecycle claims because the live task cannot resolve; never read a legacy mirror as fallback.
+- "Close a sprint with Running Context that applies to future work and no task mirrors." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
 - "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.

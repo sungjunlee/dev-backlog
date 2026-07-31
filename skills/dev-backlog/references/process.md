@@ -38,6 +38,20 @@ API; shell/Node scripts such as `status.sh`, `sync-pull.js`, and
 create/read/update/close. Low-level storage and provider argv remain owned by
 the linked Tracker Adapter Design Contract.
 
+For Work and AC verification, use the higher-level read boundary:
+
+```bash
+node "$skillDir/scripts/effective-task-spec.js" "#42" --repo OWNER/REPO
+```
+
+It performs exactly one canonical adapter read and returns
+`effective_spec`, normalized `acceptance_criteria`, `lifecycle`, `source_ref`,
+and a stable SHA-256 `source_revision`/`source_digest`. An explicit repository
+relative `spec_ref` wins when the Issue contains
+`<!-- dev-backlog:spec_ref path/to/spec.md -->`; otherwise the live Issue body
+is selected. A failed Issue read or explicit-spec load stops execution. The
+resolver never reads `backlog/tasks/` or `backlog/completed/`.
+
 ## Orient — Starting a Session
 
 1. If `backlog/` does not exist, complete **Setup**.
@@ -68,11 +82,16 @@ When starting a new sprint:
 
 ## Work — Execute a Batch
 
-1. Read the current batch and each canonical/mirrored task's Description and AC.
-2. Update neutral task state through the configured adapter.
-3. Do the work and verify every AC before checking it off.
-4. Update the sprint Plan, Progress, and reusable Running Context.
-5. In GitHub mode, comments, PR relationships, milestones, and closing keywords are optional provider capabilities. Invoke them only after their capability gate succeeds. Local mode reports none of them and must continue with the core lifecycle without provider calls.
+1. Resolve each task through `effective-task-spec.js`; record or retain its
+   `source_ref` and `source_revision` in the work handoff. Do not read a task
+   mirror. A live-read failure is a stop condition.
+2. Read the current batch and Running Context only when the work has an
+   admitted sprint.
+3. Update neutral task state through the configured adapter.
+4. Do the work and verify every returned AC before checking it off.
+5. Update the sprint Plan, Progress, and reusable Running Context only for
+   admitted work.
+6. In GitHub mode, comments, PR relationships, milestones, and closing keywords are optional provider capabilities. Invoke them only after their capability gate succeeds. Local mode reports none of them and must continue with the core lifecycle without provider calls.
 
 Delegated work follows the relay Plan → Dispatch → Review → Merge flow; the
 same normalized Plan refs remain the sprint anchor in either tracker mode.
@@ -81,7 +100,9 @@ same normalized Plan refs remain the sprint anchor in either tracker mode.
 
 Per task:
 
-1. Verify all AC.
+1. Re-resolve the effective task spec and verify all returned AC against the
+   recorded source revision. If the source changed, review the new effective
+   spec before completion.
 2. Commit or merge the implementation and check the Plan item.
 3. Call required `close`: GitHub closes the issue; local writes `status: Done` and archives the canonical file under `backlog/completed/`.
 4. Use `Fixes #N`, comments, or closing relationships only when GitHub capability semantics are intentionally in scope.
@@ -89,7 +110,9 @@ Per task:
 For the whole sprint:
 
 1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
-2. The command sets `status: completed`, appends final Progress, archives checked active task files that remain, and prints the doctor/reassess summary.
+2. The command sets `status: completed`, appends final Progress, optionally
+   archives checked legacy mirrors that happen to exist, and prints the
+   doctor/reassess summary. No `backlog/tasks/` file or move is required.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
 ## Sync — Explicit and Mode-Specific

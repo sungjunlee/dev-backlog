@@ -959,6 +959,36 @@ assert_equals "close: tasks dir has 1 left" "$(ls "$TEST_DIR/backlog/tasks/" | w
 assert_equals "close: unrelated stayed" "$(ls "$TEST_DIR/backlog/tasks/")" "BACK-99 - unrelated.md"
 assert_equals "close: completed has 2" "$(ls "$TEST_DIR/backlog/completed/" | wc -l | tr -d ' ')" "2"
 
+# --- mirrorless GitHub close (#346): no task file or archive directory required ---
+rm -rf "$TEST_DIR/backlog"
+mkdir -p "$TEST_DIR/backlog/sprints"
+printf 'github\n' > "$TEST_DIR/backlog/.tracker"
+cat > "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md" << 'EOF'
+---
+status: active
+---
+
+# Mirrorless Sprint
+
+## Goal
+Close from live task lifecycle and sprint continuity only.
+
+## Plan
+- [x] #404 Mirrorless task
+
+## Running Context
+
+## Progress
+EOF
+
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+assert_contains "close mirrorless: set completed" "$OUT" "status: completed"
+assert_contains "close mirrorless: reports no mirror requirement" "$OUT" "No legacy task mirrors required"
+assert_equals "close mirrorless: does not create tasks directory" \
+  "$(test -d "$TEST_DIR/backlog/tasks" && echo yes || echo no)" "no"
+assert_equals "close mirrorless: sprint completed" \
+  "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md")" "status: completed"
+
 # --- ambiguous issue number test (#1 must not match #11) ---
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"

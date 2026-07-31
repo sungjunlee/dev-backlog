@@ -10,7 +10,7 @@ set -uo pipefail
 # Steps:
 #   1. Run backlog-doctor pre-close and compute the text-only reassess signal
 #   2. Set sprint status: completed + add Progress entry
-#   3. Move checked-off task files to backlog/completed/
+#   3. Archive checked legacy task mirrors when they happen to exist
 #   4. Show Running Context entries (remind to promote to _context.md)
 #   5. Optionally close GitHub milestone (--close-milestone)
 
@@ -152,6 +152,8 @@ if [ -d "$TASKS_DIR" ] && [ -n "$DONE_FILE_REFS" ]; then
       fi
     fi
   done
+else
+  echo "No legacy task mirrors required for sprint close."
 fi
 
 # --- Step 4: Show Running Context entries ---
