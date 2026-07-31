@@ -1,9 +1,8 @@
 # GitHub-native authority and routing contract
 
-This is the target product contract for the 2026-08 GitHub-native core
-simplification milestone. During the staged migration, code may still expose
-local-tracker and task-mirror compatibility paths, but those paths must not
-gain features or become a second authority.
+This is the product contract for the 2026-08 GitHub-native core simplification
+milestone. The zero-adopter local tracker has been removed. Task files remain
+only as an explicit one-way legacy import/export boundary.
 
 The contract is based on the 2026-07-27 adoption review: all 17 observed
 consumer repositories used the default GitHub path, and 0 of 17 selected a
@@ -20,7 +19,7 @@ easier to view or retrieve, but it never accepts an independent write.
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
 | Task specification | GitHub Issue body and acceptance criteria | Create or amend the Issue, then read the live Issue | Legacy `backlog/tasks/` files, sprint Plan text, GitHub Projects |
-| Task lifecycle | GitHub Issue state and native metadata | Update the Issue state, labels, milestone, assignees, and native relationships | Sprint checkboxes, local task files, project-board fields |
+| Task lifecycle | GitHub Issue state and native metadata | Update the Issue state, labels, milestone, assignees, and native relationships | Sprint checkboxes, legacy task files, project-board fields |
 | Planning fields | GitHub Issue native metadata | Use labels, milestone, assignees, and Issue relationships; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
@@ -66,10 +65,9 @@ The core product excludes:
   dependencies;
 - a second task-spec or lifecycle authority outside GitHub Issues.
 
-Until this milestone completes, do not add tracker adapters, local-tracker
-features, bidirectional compatibility machinery, task-mirror features, or a
-committed memory/compiler layer. Removal work must follow the staged resolver
-and mirrorless pilot rather than deleting recovery paths prematurely.
+Do not add tracker providers, bidirectional compatibility machinery,
+task-mirror lifecycle features, or a committed memory/compiler layer without
+new measured adoption evidence and an explicit authority-contract amendment.
 
 ## Optional boundaries
 
@@ -78,7 +76,7 @@ and mirrorless pilot rather than deleting recovery paths prematurely.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Optional format compatibility | Existing compatible Markdown may remain import/export material; its conventions and runtime are not product dependencies |
+| Backlog.md | Optional one-way legacy format compatibility | Human-reviewed Markdown may be imported into a GitHub Issue; `--legacy-export` may emit diagnostic/rollback snapshots; task files are never read as runtime authority and Backlog.md tooling is not required |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | Must remain reproducible projections until the separate benchmark meets its quantitative go/no-go gate |
 

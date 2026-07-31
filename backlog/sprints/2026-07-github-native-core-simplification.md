@@ -22,13 +22,13 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - [ ] #349 Validate GitHub Projects as an optional planning projection (3d)
 
 ### Batch 3 — Mirrorless execution pilot
-- [~] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (open)
+- [x] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (merged)
 
 ### Batch 4 — Subtract unused compatibility machinery
-- [ ] #348 Subtract zero-adopter tracker and compatibility machinery (5d)
+- [~] #348 Subtract zero-adopter tracker and compatibility machinery (5d) [branch:codex/compatibility-subtraction]
 
 ### Batch 5 — Evidence-gated memory decision
-- [ ] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period)
+- [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31]
 
 ## Running Context
 - GitHub Issues are canonical task definitions and lifecycle state for this milestone; sprint files carry only complex execution continuity.
@@ -46,3 +46,8 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: #346 completed via PR #352. Final resolver coverage passed 16/16 plus Linux/Windows CI; iterative review fixed code examples, ordered/nested/lazy AC, HTML comments, and nested fence/list-container boundaries, ending with an independent no-findings review. Started #347 on `codex/mirrorless-pilot`.
 - 2026-07-31: #347 pilot evidence captured from active sprint execution in `sungjunlee/aibris` and `sungjunlee/dear-scene`. Both recovered live AC, task intent, lifecycle, and in-flight pointers with zero resolver blockers or mirror writes; dear-scene exposed a stale 7-AC mirror against the live 8-AC Issue. GitHub setup now creates only `.tracker` plus `sprints/`, `sync-pull` requires `--legacy-export`, and mirrorless doctor/close coverage passes.
 - 2026-07-31: #347 controlled transitions completed in aibris Issue #171 → PR #172 and dear-scene Issue #293 → PR #294. Both dedicated sprints closed through the real close script, both PRs merged and closed their Issues, live lifecycle re-resolved as `closed`, all 5/5 episode AC were checked, and existing task/completed mirrors had zero diff.
+- 2026-07-31: #347 completed via PR #353 after Linux/Windows CI, focused 67/67, smoke 191/191, and a final independent no-findings review. Started #348 on `codex/compatibility-subtraction`.
+- 2026-07-31: #348 removed the zero-adopter local tracker and generic/local design surface: four whole files and 1,909 exact lines. GitHub-only setup, no-fallback behavior, one-way Backlog.md import/export, and optional-integration absence are covered; focused regression tests passed 30/30 and the full Node suite passed.
+- 2026-07-31: #348 independent review restored retained GitHub seam safety coverage for setup atomicity, public no-effect gates, availability/adapter/identity/capability contracts, and typed CLI errors. The final review reported no findings; focused tracker tests passed 18/18 and shell smoke passed 191/191.
+- 2026-07-31: #350 shadow benchmark started with 20 pre-registered historical-retrieval questions across dev-backlog, dev-relay, and consumer repositories. The earliest four-week go/no-go date is 2026-08-28.
+- 2026-07-31: #349 Projects scope escalation was refused pending explicit informed approval for persistent organization Project read/write access. No Project resource or local state was created.

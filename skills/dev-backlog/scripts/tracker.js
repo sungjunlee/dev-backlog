@@ -6,12 +6,11 @@
  */
 
 const { createGithubAdapter } = require("./github-tracker.js");
-const { createLocalAdapter } = require("./local-tracker.js");
 const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
 
-const TRACKER_KEYS = Object.freeze(["github", "local"]);
+const TRACKER_KEYS = Object.freeze(["github"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
   "availability",
   "capabilities",
@@ -230,7 +229,6 @@ function resolveConfiguredTracker(config, {
   const registered = adapters || {
     ...TRACKER_ADAPTERS,
     github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
-    local: backlogDir ? createLocalAdapter({ backlogDir }) : TRACKER_ADAPTERS.local,
   };
   const storedSelection = backlogDir
     ? readTrackerSelection(backlogDir, { fs: fsApi || fs })
@@ -344,7 +342,6 @@ function invokeCapability(resolved, capability, operation, ...args) {
 
 const TRACKER_ADAPTERS = Object.freeze({
   github: createGithubAdapter(),
-  local: createLocalAdapter({ backlogDir: DEFAULT_BACKLOG_DIR }),
 });
 
 module.exports = {
@@ -370,5 +367,4 @@ module.exports = {
   resolveConfiguredTracker,
   invokeCapability,
   createGithubAdapter,
-  createLocalAdapter,
 };

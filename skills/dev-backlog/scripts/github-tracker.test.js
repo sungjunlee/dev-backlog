@@ -170,28 +170,22 @@ describe("GitHub required lifecycle adapter", () => {
     assert.deepEqual(closed, identity);
   });
 
-  it("resolves only the configured adapter and never falls back after transport failure", () => {
-    let localReads = 0;
+  it("propagates configured GitHub transport failure without retrying another provider", () => {
     const { execFile } = recordingExec([new Error("gh transport failed")]);
     const github = createGithubAdapter({ execFile });
-    const local = {
-      ...TRACKER_ADAPTERS.local,
-      availability: () => {
-        localReads += 1;
-        return { available: true };
-      },
-    };
-    const resolved = resolveTracker({ tracker: "github" }, { adapters: { github, local } });
+    const resolved = resolveTracker({ tracker: "github" }, { adapters: { github } });
 
     assert.throws(() => resolved.adapter.list({ limit: 1 }), /gh transport failed/);
-    assert.equal(localReads, 0);
   });
 
   it("fails an unsupported capability before the supplied mutation", () => {
     let mutations = 0;
     const resolved = {
-      tracker: "local",
-      adapter: TRACKER_ADAPTERS.local,
+      tracker: "github",
+      adapter: {
+        ...TRACKER_ADAPTERS.github,
+        capabilities: () => [],
+      },
     };
 
     assert.throws(
@@ -200,7 +194,7 @@ describe("GitHub required lifecycle adapter", () => {
       }),
       (error) => {
         assert.ok(error instanceof UnsupportedTrackerCapabilityError);
-        assert.equal(error.tracker, "local");
+        assert.equal(error.tracker, "github");
         assert.equal(error.capability, "milestones");
         return true;
       }

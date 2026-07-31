@@ -17,18 +17,15 @@ under Upgrade behavior.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
-The implementation still exposes local-tracker and task-export compatibility
-while the 2026-08 migration is staged. Those paths are frozen, are not the
-target product boundary, and never become co-authoritative. See the
+The zero-adopter local tracker has been removed. GitHub is the only runtime
+task authority. Backlog.md-compatible files remain an explicit one-way legacy
+import/export boundary and never become co-authoritative. See the
 [authority and routing contract](skills/dev-backlog/references/authority-contract.md).
 
 ```text
-backlog/.tracker: github | local
+backlog/.tracker: github
         |
-        +-- github -> GitHub Issues (canonical) -> no required task mirror
-        |
-        `-- local  -> backlog/local-tracker.json (canonical, no gh)
-                      -> tasks/ derived compatibility projections
+        `-- GitHub Issues (canonical) -> no required task mirror
 
 backlog/sprints/     execution hub: plan, context, progress
         ^
@@ -110,22 +107,16 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 Fresh GitHub setup creates only `backlog/.tracker` and `backlog/sprints/`;
 `backlog/tasks/` and `backlog/completed/` are not required or created.
 
-Transition compatibility only: an existing fully offline repository may still
-choose `--tracker local`. In that explicitly selected legacy mode,
-`backlog/local-tracker.json` remains its sole task authority; `backlog/tasks/`
-and `backlog/completed/` are derived read-only projections. Mutate the JSON
-authority only through the configured tracker lifecycle, use normalized refs
-such as `BACK-1` in the Plan, and run the same `status`, `next`, and
-`sprint-close` commands. This is separate from the GitHub-native core. Local
-mode deliberately does not invent milestones, PR relationships, comments, or closing-keyword links.
-Those requests fail before side effects with actionable remediation; JSON-capable
-commands return the same structured error contract. Do not adopt local mode for
-new repositories or add features to it during the GitHub-native migration.
+Backlog.md compatibility is a one-way legacy boundary. Import means a
+human-reviewed compatible Markdown record is used to create or amend a GitHub
+Issue. Export is the explicit `sync-pull.js --legacy-export` diagnostic or
+rollback snapshot. Runtime execution never reads task files as task truth, and
+the Backlog.md CLI or runtime is never required.
 
 For task `list`, `read`, `create`, `update`, and `close`, the stable invocation
 boundary is the configured adapter exported by `scripts/tracker.js`. Operators
 and agents resolve it with the target `backlogDir` and call those methods in
-either mode; the exact procedure and signatures are documented in
+the GitHub mode; the exact procedure and signatures are documented in
 [the process guide](skills/dev-backlog/references/process.md#required-core-lifecycle-invocation-boundary).
 
 ### Upgrade behavior
@@ -135,7 +126,8 @@ There is zero automatic tracker-selection migration. A repository with neither
 in GitHub mode with its existing `#N`, numeric `issue_number`, milestone,
 comment, and closing behavior. When `.tracker` is
 absent, runtime reads a legacy YAML selection as a compatibility fallback.
-Running `setup-dev-backlog.js` migrates that resolved choice to `.tracker`
+Only the legacy value `github` is accepted. Running `setup-dev-backlog.js`
+pins that resolved choice to `.tracker`
 without editing `config.yml`; setup never migrates task files and runtime never
 chooses a tracker from availability or failure.
 Existing automation that invokes `sync-pull.js` without a flag must add
@@ -143,8 +135,8 @@ Existing automation that invokes `sync-pull.js` without a flag must add
 materialization. This opt-in preserves rollback/diagnostic exports without
 putting them back on the normal workflow. It is an intentional CLI migration,
 not an automatic tracker or task-data migration.
-The implementation-level contract and proof map live in
-[docs/tracker-adapter-design.md](docs/tracker-adapter-design.md).
+The retained compatibility seams, consumer evidence, and subtraction proof
+live in [docs/compatibility-subtraction.md](docs/compatibility-subtraction.md).
 
 Then use the skill during your coding session:
 

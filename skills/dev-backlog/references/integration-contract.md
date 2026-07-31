@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are derived mirrors in both modes. GitHub Issues are authoritative for `tracker: github`; `backlog/local-tracker.json` is authoritative for `tracker: local`. Actors resolve effective task specs and AC through `effective-task-spec.js`; mirror bodies and checkboxes are diagnostic/export bytes only. Sprint files remain the execution log.
+- `backlog/tasks/` and `backlog/completed/` are explicit one-way legacy exports. GitHub Issues are authoritative. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.

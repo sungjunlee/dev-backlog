@@ -1,8 +1,8 @@
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|sync|complete] [issue-number]"
-description: Manage configured-tracker-backed sprint execution. Use for GitHub mirrors or offline local tasks, sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
-compatibility: Requires git and Node.js 18+; GitHub mode also requires gh CLI. Works on Claude Code and Codex.
+description: Manage GitHub-backed sprint execution and explicit legacy exports. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires git, Node.js 18+, and gh CLI. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
@@ -28,35 +28,29 @@ README covers install and human quick start. This file is the agent execution co
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
 
 If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
-github|local --non-interactive`; see `references/file-format.md`. Never infer a
+github --non-interactive`; see `references/file-format.md`. Never infer a
 tracker from availability.
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md`), `spec-system-map` (`spec/system-map.md`), and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
-The target state ownership, migration freeze, and optional-integration boundary
+The state ownership, compatibility, and optional-integration boundary
 are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
-Compatibility code for local trackers and task mirrors may remain during the
-staged migration, but it is not permission to expand the target product.
 
 ## Core Contracts
 
-The runtime still exposes this transition implementation contract while the
-live resolver and compatibility subtraction are staged:
-
 ```
-backlog/.tracker (one line: github | local)
-  github -> GitHub Issues canonical; no task-file directory required
-  local  -> backlog/local-tracker.json canonical; zero provider calls
+backlog/.tracker (one line: github)
+  -> GitHub Issues canonical; no task-file directory required
 
-backlog/tasks/ + completed/ <- optional GitHub exports / derived local compatibility projections
+backlog/tasks/ + completed/ <- optional one-way legacy exports
 backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
-backlog/sprints/ <- shared execution hub in both modes
+backlog/sprints/ <- optional complex-execution hub
 ```
 
 - One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
-- Task files are derived mirrors in both modes and are never read back as truth; canonical task truth is GitHub Issues (`github`) or `backlog/local-tracker.json` (`local`). In both modes, decisions, progress, and cross-task context stay in the sprint file.
-- A missing `.tracker` file falls back to a legacy `tracker:` key in `config.yml`, then to the zero-migration GitHub compatibility default. Runtime failure never changes the selected tracker.
+- Task files are one-way legacy exports and are never read back as truth. GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file.
+- A missing `.tracker` file accepts only the legacy value `github` from `config.yml`, then uses the zero-migration GitHub compatibility default. Any other value fails; runtime failure never changes selection.
 - Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
 - Completed sprints stay as the permanent execution record.
 - Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries and how `objectives:`/`component:` degrade when spec files are absent live in `references/spec-fallback.md` (in-bundle, always resolvable); their durable authoring home is craftkit's `spec-charter` skill, consulted when installed. Sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
@@ -113,14 +107,13 @@ current state and next actionable batch.
 Follow `references/process.md` → `## Create — New Issues`.
 
 Done when the new task exists in GitHub and, only when the work was admitted to
-a sprint, is added to the active Plan. Transition compatibility modes keep
-their existing behavior until their staged retirement.
+a sprint, is added to the active Plan.
 
 ### Plan
 
 1. Confirm that the work meets a Sprint Admission trigger. Otherwise keep the Issue → PR path sprint-free.
 2. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
-3. List/inspect open tasks. Use milestone selection only when the configured adapter reports `milestones`; local planning writes normalized refs directly and does not fabricate one.
+3. List/inspect open Issues. Use milestone selection only when the GitHub adapter reports `milestones`.
 4. Create the active sprint file with Goal, ordered Plan batches, estimates, and dependencies. Include `objectives:` and `component:` only when their backing spec files exist; use `sprint-init.js --component "slug"` when a capability axis exists, or mutually exclusive `--scope` globs when no component axis fits. Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
 5. A second active track is refused only when its scope overlaps an existing active track; declare a disjoint `component:`/`scope:` to run tracks concurrently. Once more than one track is active, any track without a declared axis warns and allows (disjointness cannot be proven against an undeclared scope).
 
@@ -167,7 +160,6 @@ Done when there is no stale active sprint or rediscovery-prone context trapped i
   the Issue changes.
 - GitHub rollback/diagnostics: `sync-pull.js --legacy-export` may explicitly
   export non-authoritative mirrors. Never use them as execution input.
-- Local: `backlog/local-tracker.json` is already canonical and its mirrors are refreshed on every mutation; do not call `gh` or manufacture a push/pull step.
 - Never perform background sync or switch trackers after a failure.
 
 Done when the user can tell which direction changed and what was updated.
@@ -193,12 +185,12 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 Core scripts (full flag inventory in `references/scripts.md`):
 
 - `scripts/init.sh` — bootstrap `backlog/`.
-- `scripts/setup-dev-backlog.js` — persist the explicit canonical tracker without migrating task files.
+- `scripts/setup-dev-backlog.js` — persist `github` without migrating task files.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC,
   lifecycle, source, and stable digest without consulting task mirrors.
 - `scripts/sync-pull.js --legacy-export` — opt-in rollback/diagnostic export;
   never part of setup, orient, plan, work, or complete.
-- `scripts/sprint-init.js` — create a milestone-backed sprint when supported; local plans are authored from normalized refs.
+- `scripts/sprint-init.js` — create a milestone-backed sprint when supported.
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
 - `scripts/backlog-doctor.js` — aggregate health checks; JSON includes `reassess_signal`.

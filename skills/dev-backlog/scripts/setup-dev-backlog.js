@@ -13,14 +13,11 @@ const path = require("node:path");
 const readline = require("node:readline/promises");
 const { readLegacyTracker: readLegacyTrackerFile } = require("./legacy-tracker.js");
 
-const ALLOWED_TRACKERS = Object.freeze(["github", "local"]);
+const ALLOWED_TRACKERS = Object.freeze(["github"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
-const LOCAL_COMPATIBILITY_DIRECTORIES = Object.freeze(["tasks", "completed"]);
 
-function requiredDirectories(selection) {
-  return selection === "local"
-    ? [...MINIMUM_DIRECTORIES, ...LOCAL_COMPATIBILITY_DIRECTORIES]
-    : [...MINIMUM_DIRECTORIES];
+function requiredDirectories() {
+  return [...MINIMUM_DIRECTORIES];
 }
 
 function shellQuote(value) {
@@ -46,7 +43,7 @@ function usage() {
     "Usage: setup-dev-backlog.js [project-name] [options]",
     "",
     "Options:",
-    "  --tracker github|local  Select the canonical task tracker",
+    "  --tracker github        Pin the GitHub task authority",
     "  --non-interactive       Never prompt (required with --tracker when fresh)",
     "  --project-name NAME     Project name reported for compatibility",
     "  --json                  Print structured output",
@@ -110,7 +107,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 
   if (options.tracker !== undefined && !ALLOWED_TRACKERS.includes(options.tracker)) {
     throw new SetupError(
-      `Invalid --tracker value ${JSON.stringify(options.tracker)}; expected github or local.`
+      `Invalid --tracker value ${JSON.stringify(options.tracker)}; expected github.`
     );
   }
   if (options.projectName !== undefined && options.projectName.length === 0) {
@@ -122,7 +119,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 function assertAllowedTracker(selection, sourcePath) {
   if (!ALLOWED_TRACKERS.includes(selection)) {
     throw new SetupError(
-      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected github or local.`
+      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected github.`
     );
   }
   return selection;
@@ -214,9 +211,7 @@ function collectGithubEvidence({
     }
   }
 
-  const recommendation = remote === "github" && auth === "authenticated"
-    ? "github"
-    : "local";
+  const recommendation = "github";
   return Object.freeze({ recommendation, remote, cli, auth });
 }
 
@@ -289,14 +284,14 @@ function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
   return Object.freeze({ changed: true, created: !targetExists });
 }
 
-function ensureMinimumDirectories(backlogDir, fsApi, selection) {
+function ensureMinimumDirectories(backlogDir, fsApi) {
   const structure = { backlogCreated: false, created: [] };
   try {
     if (!lstatIfPresent(backlogDir, fsApi)) {
       fsApi.mkdirSync(backlogDir);
       structure.backlogCreated = true;
     }
-    for (const name of requiredDirectories(selection)) {
+    for (const name of requiredDirectories()) {
       const directory = path.join(backlogDir, name);
       if (!lstatIfPresent(directory, fsApi)) {
         fsApi.mkdirSync(directory);
@@ -334,10 +329,7 @@ function validateExistingStructure(backlogDir, configPath, trackerPath, fsApi) {
   }
   const configExists = validateRegularFile(configPath, "config", fsApi);
   const trackerExists = validateRegularFile(trackerPath, "tracker", fsApi);
-  // Validate every recognized compatibility directory even when the selected
-  // tracker would not create it. Existing legacy paths must not bypass the
-  // same symlink/non-directory safety boundary during a GitHub setup.
-  for (const name of requiredDirectories("local")) {
+  for (const name of requiredDirectories()) {
     const directory = path.join(backlogDir, name);
     const stat = lstatIfPresent(directory, fsApi);
     if (!stat) continue;
@@ -372,17 +364,7 @@ function defaultProjectName(cwd) {
 function refusalMessage() {
   return (
     "Fresh non-interactive setup requires an explicit tracker. " +
-    `Recommended safe rerun: ${setupCommand(["--tracker", "local", "--non-interactive"])}`
-  );
-}
-
-function legacyLocalRefusalMessage() {
-  const pin = setupCommand(["--non-interactive"]);
-  const switchTracker = setupCommand(["--tracker", "local", "--non-interactive"]);
-  return (
-    "Existing tracker-less config has legacy GitHub authority and cannot switch directly to local. " +
-    `First pin compatibility with ${pin}; then explicitly switch with ${switchTracker}. ` +
-    "This setup does not migrate task files."
+    `Recommended safe rerun: ${setupCommand(["--tracker", "github", "--non-interactive"])}`
   );
 }
 
@@ -440,9 +422,6 @@ async function runSetup(options = {}, dependencies = {}) {
     selectionSource = options.tracker === undefined ? "preserved" : "explicit";
   } else if (state.configExists) {
     const legacy = readLegacyTracker(configPath, fsApi);
-    if (!legacy.found && options.tracker === "local") {
-      throw new SetupError(legacyLocalRefusalMessage());
-    }
     selection = options.tracker ?? legacy.selection ?? "github";
     selectionSource = options.tracker !== undefined
       ? "explicit"
@@ -454,7 +433,7 @@ async function runSetup(options = {}, dependencies = {}) {
     recommendationEvidence = fresh.evidence;
   }
 
-  const structure = ensureMinimumDirectories(backlogDir, fsApi, selection);
+  const structure = ensureMinimumDirectories(backlogDir, fsApi);
   let publication;
   try {
     publication = atomicPublish(trackerPath, `${selection}\n`, { fs: fsApi });
@@ -524,7 +503,7 @@ async function promptForTracker({ recommendation, evidence }) {
   const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     return await terminal.question(
-      `Tracker [github/local] (default: ${recommendation}): `
+      `Tracker [github] (default: ${recommendation}): `
     );
   } finally {
     terminal.close();
@@ -561,7 +540,6 @@ if (require.main === module) {
 
 module.exports = {
   ALLOWED_TRACKERS,
-  LOCAL_COMPATIBILITY_DIRECTORIES,
   MINIMUM_DIRECTORIES,
   SetupError,
   atomicPublish,
