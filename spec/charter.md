@@ -16,8 +16,8 @@ across sessions is rebuilt from scratch each time.
 Use GitHub Issues as the sole task-definition and lifecycle authority. Simple
 Issue → PR work needs no sprint. When dependency, delegation, cross-session
 context, or parallel-track complexity requires execution continuity, add one
-thin, explicit, markdown-only sprint file that humans and agents both read and
-update. Companion skill `backlog-triage` grooms GitHub state — it never creates
+thin, explicit, markdown-only sprint file per admitted track that humans and
+agents both read and update. Companion skill `backlog-triage` grooms GitHub state — it never creates
 a parallel task truth. The spec axis
 (`spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md`) is authored by
 craftkit's `spec-charter`/`spec-system-map`/`spec-grill` skills and consumed
@@ -44,7 +44,7 @@ No server, no daemon, no hidden state, no silent sync.
 - O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates; adoption 2026-07-27: 10 repos run sprints with no `spec/` axis at all, up to 15 sprints each)
 - O8 [implemented] Historical proof: the same core sprint cycle was demonstrated on `github` and `local` without silent switching. Retained so completed sprint references remain resolvable; superseded as product direction by O10 on 2026-07-31 · src: user (proof: PRs #286/#298/#303; adoption premise absent: all 18 known consumers had a GitHub remote)
 - O9 [implemented] Historical proof: exactly one configured adapter owned task truth during the tracker-seam phase. Retained so completed sprint references remain resolvable; superseded as product direction by O10 on 2026-07-31 · src: user (proof: PRs #282/#298/#301/#303; adoption 2026-07-27: 0 of 17 other repos selected a non-default tracker)
-- O10 [active] GitHub Issues are the standalone task-definition and lifecycle authority; simple Issue → PR work is sprint-free, while complex work preserves continuity in one admitted sprint without task mirrors, dual writes, or required ecosystem integrations · src: user (adoption evidence 2026-07-27: 0 of 17 other consumer repos selected a non-default tracker; 2026-07-28: all 18 known consumer repos had a GitHub remote)
+- O10 [active] GitHub Issues are the standalone task-definition and lifecycle authority; simple Issue → PR work is sprint-free, while complex work preserves continuity in one admitted sprint per track without task mirrors, dual writes, or required ecosystem integrations · src: user (adoption evidence 2026-07-27: 0 of 17 other consumer repos selected a non-default tracker; 2026-07-28: all 18 known consumer repos had a GitHub remote)
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->
 | date       | decision                                                                              | rationale                                                                                        | supersedes |

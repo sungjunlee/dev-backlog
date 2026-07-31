@@ -73,3 +73,24 @@ it("keeps both no-spec/no-Relay cold-adopter paths explicit", () => {
   assert.match(markdown, /complete a simple Issue → PR path without creating a sprint/);
   assert.match(markdown, /create, resume, and close it using only\s+this bundle/);
 });
+
+it("keeps sprint admission and migration boundaries aligned across public docs", () => {
+  const read = (relativePath) =>
+    fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+  const readme = read("README.md");
+  const skill = read("skills/dev-backlog/SKILL.md");
+  const capabilities = read("spec/capabilities.md");
+  const charter = read("spec/charter.md");
+  const sprint = read(
+    "backlog/sprints/2026-07-github-native-core-simplification.md"
+  );
+
+  assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
+  assert.match(readme, /`backlog\/local-tracker\.json` remains its sole task authority/);
+  assert.match(skill, /`objectives:`\/`component:` are present only when their backing spec files exist/);
+  assert.match(skill, /legacy mirror may be inspected only as diagnostic\/rollback evidence/);
+  assert.match(capabilities, /If that read fails, execution stops/);
+  assert.match(charter, /one admitted sprint per track/);
+  assert.match(sprint, /objectives: \[O10\]/);
+  assert.doesNotMatch(sprint, /read-only fallback/);
+});

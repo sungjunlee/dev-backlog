@@ -33,7 +33,7 @@ does not widen these capability contracts.
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
-- Task work resolves the effective specification from the live GitHub Issue; a legacy mirror may be an explicitly identified read-only recovery source during migration, never the default authority.
+- Task work resolves the effective specification from the live GitHub Issue. If that read fails, execution stops; a legacy mirror may be inspected only as diagnostic/rollback evidence and must be human-verified against GitHub before work resumes.
 - Create, plan, work, and complete operations use the Issue's stable `#N` identity and update lifecycle state only through GitHub.
 - Optional features report their availability explicitly; absence of Relay, Projects, Backlog.md, or the spec axis does not block the core Issue → PR path.
 
@@ -141,7 +141,7 @@ does not widen these capability contracts.
 | 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
 | 2026-07-12 | `sprint-mirror` becomes per-track: `--track` selects among multiple active tracks instead of failing on any second active (epic #289; human-gated pass #294) | the per-slug marker already made mirrors track-idempotent; only selection needed to change, and refusing to guess is preserved | 2026-07-04 single-active mirror selection |
 | 2026-07-28 | `sprint-mirror` is removed; this capability no longer publishes sprint state to the provider | measured 2026-07-28: four mirror issues ever created (#230, #234, #237, #239, all 2026-07-03/04) and none since, in any of the 18 consuming repos; the sprint file is committed at explicit boundaries and already readable directly (#340) | 2026-07-04 bidirectional widening; 2026-07-12 per-track mirror selection |
-| 2026-07-31 | Freeze task projections as migration-only, read-only fallback pending the live resolver and mirrorless pilot | a projection cannot remain harmless if new behavior depends on writing or reading it as truth; retirement must remain staged and recoverable | task mirrors as a continuing product capability |
+| 2026-07-31 | Freeze task projections as migration-only diagnostic/export material pending the live resolver and mirrorless pilot | a projection cannot remain harmless if runtime behavior depends on writing or reading it as truth; rollback remains possible by restoring the legacy path, not by silently consulting stale files | task mirrors as a continuing product capability |
 
 ---
 

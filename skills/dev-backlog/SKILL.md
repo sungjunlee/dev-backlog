@@ -21,7 +21,7 @@ README covers install and human quick start. This file is the agent execution co
 | --- | --- | --- |
 | "where are we?", "orient", "status" | `orient` | Any admitted sprint state is identified; otherwise the next live Issue is named without manufacturing a sprint. |
 | "create issue", "new issue", "이슈 만들어" | `create` | A GitHub Issue is created and added to an active sprint Plan only when that work was admitted. |
-| "plan sprint", "make sprint", or complex work with no active sprint | `plan` | One active sprint file exists with Goal, ordered Plan, `objectives:`, and `component:`. |
+| "plan sprint", "make sprint", or complex work with no active sprint | `plan` | One active sprint file exists with Goal and ordered Plan; `objectives:`/`component:` are present only when their backing spec files exist. |
 | "work #N", "continue", "do next batch" | `work` | Live Issue AC is verified and lifecycle is updated; an admitted sprint is also updated when present. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
 | "sync", "pull issues", "refresh backlog" | `sync` | GitHub mirrors are explicitly refreshed; the local canonical store needs no provider sync. |
@@ -121,14 +121,14 @@ their existing behavior until their staged retirement.
 1. Confirm that the work meets a Sprint Admission trigger. Otherwise keep the Issue → PR path sprint-free.
 2. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
 3. List/inspect open tasks. Use milestone selection only when the configured adapter reports `milestones`; local planning writes normalized refs directly and does not fabricate one.
-4. Create the active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:` via `sprint-init.js --component "slug"` (or mutually exclusive `--scope` globs when no component axis fits). Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
+4. Create the active sprint file with Goal, ordered Plan batches, estimates, and dependencies. Include `objectives:` and `component:` only when their backing spec files exist; use `sprint-init.js --component "slug"` when a capability axis exists, or mutually exclusive `--scope` globs when no component axis fits. Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
 5. A second active track is refused only when its scope overlaps an existing active track; declare a disjoint `component:`/`scope:` to run tracks concurrently. Once more than one track is active, any track without a declared axis warns and allows (disjointness cannot be proven against an undeclared scope).
 
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
 
-1. Read the live GitHub Issue specification and AC. During migration, identify any mirror use explicitly as read-only recovery.
+1. Read the live GitHub Issue specification and AC. If that read fails, stop clearly; a legacy mirror may be inspected only as diagnostic/rollback evidence and cannot authorize execution or lifecycle changes.
 2. If the work has an admitted sprint, read its current batch and Running Context.
 3. Mark meaningful GitHub status before work when useful.
 4. Implement directly or optionally delegate through dev-relay.

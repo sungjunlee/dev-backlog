@@ -93,6 +93,7 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 - GitHub Issues own task truth; no runtime fallback, co-authority, dual write, or background sync.
 - Existing tracker-less repositories remain GitHub-backed with zero migration and unchanged `#N`, numeric aliases, task-mirror bytes, argv, milestones, comments, and closing behavior.
 - Local compatibility is frozen pending staged retirement. It never fabricates provider semantics or URLs.
+- Task projections are diagnostic/export material only. A failed live Issue read stops execution; stale projection bytes cannot authorize task work or lifecycle changes.
 - Unsupported optional capabilities have stable code `TRACKER_CAPABILITY_UNSUPPORTED`, tracker, capability, message, and remediation; JSON and human boundaries share that one serializer contract.
 - A sprint is triggered by execution complexity, never duration alone; the
   no-spec/no-Relay cold-adopter paths work both sprint-free and, when admitted,

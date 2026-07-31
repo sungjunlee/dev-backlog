@@ -42,7 +42,7 @@ backlog/sprints/     execution hub: plan, context, progress
 |------------|--------------|
 | One task authority | Live GitHub Issues own specification, native planning metadata, and lifecycle |
 | Complexity-triggered sprint | Simple work stays Issue → PR; admitted complex tracks share one execution plan and may run concurrently when disjoint |
-| Non-authoritative compatibility | Transition task files are derived/read-only fallback material and are never read back as truth |
+| Non-authoritative compatibility | Transition task files are derived diagnostic/export material and are never read back as runtime truth |
 | Explicit sync | Pull and refresh when you choose, not behind your back |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
@@ -108,11 +108,13 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
 
 Transition compatibility only: an existing fully offline repository may still
-choose `--tracker local`. Create and update tasks in the compatibility store
-through the configured tracker lifecycle, use normalized
-refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
-`sprint-close` commands. Local mode deliberately does not invent milestones,
-PR relationships, comments, or closing-keyword links.
+choose `--tracker local`. In that explicitly selected legacy mode,
+`backlog/local-tracker.json` remains its sole task authority; `backlog/tasks/`
+and `backlog/completed/` are derived read-only projections. Mutate the JSON
+authority only through the configured tracker lifecycle, use normalized refs
+such as `BACK-1` in the Plan, and run the same `status`, `next`, and
+`sprint-close` commands. This is separate from the GitHub-native core. Local
+mode deliberately does not invent milestones, PR relationships, comments, or closing-keyword links.
 Those requests fail before side effects with actionable remediation; JSON-capable
 commands return the same structured error contract. Do not adopt local mode for
 new repositories or add features to it during the GitHub-native migration.
@@ -221,9 +223,9 @@ Users can log in and access protected API endpoints.
 1. Read the live GitHub Issue.
 2. If execution complexity meets a sprint-admission trigger, create the active sprint file; otherwise continue directly to its PR.
 3. For admitted work, read the sprint before you code.
-4. Work batch by batch, not issue by issue across ten tabs.
-5. Update `Running Context` and `Progress` as you learn things.
-6. Close the sprint explicitly when the work is really done.
+4. For admitted work, execute its ordered batches; otherwise implement the Issue directly.
+5. Update `Running Context` and `Progress` only for admitted work.
+6. Close the sprint explicitly only when a sprint was admitted.
 
 GitHub handles task truth. An admitted sprint file handles only complex
 execution continuity.
@@ -387,7 +389,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 |----------|-----|
 | GitHub Issues own task truth | Task specification, native planning fields, and lifecycle have one standalone authority |
 | Sprint files are complexity-triggered | One file carries plan, context, and progress only when continuity extends beyond one Issue/PR |
-| Task files are transition projections | Legacy mirrors are fallback material pending staged retirement, never authority or a new feature surface |
+| Task files are transition projections | Legacy mirrors are diagnostic/export material pending staged retirement, never runtime fallback, authority, or a new feature surface |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
 | Backlog.md is optional compatibility | Existing task Markdown follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) shape, but its runtime and conventions are not dependencies |

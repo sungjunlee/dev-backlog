@@ -3,7 +3,7 @@ milestone: 2026-08 GitHub-native core simplification
 status: active
 started: 2026-07-31
 due: TBD
-objectives: [O3]
+objectives: [O10]
 component: "tracker-task-truth"
 ---
 
@@ -36,7 +36,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - #349 remains an optional planning-projection experiment and must not enter the core Issue → PR or sprint path.
 - Start #350 evidence collection after #345 so its 4–6 week clock overlaps implementation. Any productization decision waits for #347 pilot evidence.
 - Stop #347 and repair #346 if mirrorless execution cannot recover acceptance criteria, task intent, lifecycle, or in-flight handoff state.
-- Existing mirrors remain read-only fallback during the pilot. Do not introduce new dual writes or committed automatic memory artifacts.
+- Existing mirrors remain diagnostic and rollback material during the pilot, never runtime task-spec or lifecycle fallback. If the live Issue cannot resolve, stop and repair #346. Do not introduce new dual writes or committed automatic memory artifacts.
 
 ## Progress
 - 2026-07-31: Opened the milestone execution track from GitHub issues #345–#350. Doctor reported no pre-existing active sprint and no blocking repository health failures.
