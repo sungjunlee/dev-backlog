@@ -24,7 +24,7 @@ const AC_MARKER_RE =
 const TASK_LIST_LINE_RE =
   /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\]\s+(.+?)\s*$/;
 const LIST_ITEM_LINE_RE =
-  /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+/;
+  /^(\s*)((?:[-*+]|\d{1,9}[.)])[ \t]+)/;
 
 const SOURCE_UNAVAILABLE_CODE = "TASK_SPEC_SOURCE_UNAVAILABLE";
 const SPEC_REF_UNAVAILABLE_CODE = "TASK_SPEC_REF_UNAVAILABLE";
@@ -130,6 +130,7 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
   const visible = [];
   let fence = null;
   let listBaseIndent = null;
+  let listContentIndent = null;
   for (const line of normalizeText(markdown).split("\n")) {
     const leading = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
     const fenceMatch = line.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
@@ -138,7 +139,8 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
         fenceMatch &&
         fenceMatch[1][0] === fence.character &&
         fenceMatch[1].length >= fence.length &&
-        Math.abs(leading - fence.indent) <= 3 &&
+        leading >= fence.containerIndent &&
+        leading <= fence.containerIndent + 3 &&
         !fenceMatch[2].trim()
       ) {
         fence = null;
@@ -147,12 +149,14 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       continue;
     }
     const fenceBelongsToList =
-      listBaseIndent !== null && leading > listBaseIndent;
+      listBaseIndent !== null &&
+      listContentIndent !== null &&
+      leading >= listContentIndent;
     if (fenceMatch && (leading <= 3 || fenceBelongsToList)) {
       fence = {
         character: fenceMatch[1][0],
         length: fenceMatch[1].length,
-        indent: leading,
+        containerIndent: fenceBelongsToList ? listContentIndent : 0,
       };
       visible.push("");
       continue;
@@ -167,6 +171,8 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       listBaseIndent !== null && leading > listBaseIndent;
     if (listItem && (leading < 4 || isListContinuation)) {
       if (leading < 4) listBaseIndent = leading;
+      listContentIndent =
+        leading + listItem[2].replace(/\t/g, "    ").length;
       visible.push(line);
       continue;
     }
@@ -175,6 +181,7 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       continue;
     }
     listBaseIndent = null;
+    listContentIndent = null;
     if (leading >= 4) {
       visible.push("");
       continue;
