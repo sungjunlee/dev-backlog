@@ -12,6 +12,13 @@ Use `spec-charter` for `charter.md`, `spec-system-map` for `system-map.md`, and 
 
 ## Boundary
 
-`spec/*` files hold durable project, system, and capability contracts. Task acceptance criteria stay in GitHub Issues and `backlog/tasks/` mirrors; sprint execution context stays in `backlog/sprints/`; relay Done Criteria, rubrics, and review notes stay in dev-relay run artifacts.
+`spec/*` files hold durable project, system, and capability contracts. Task
+acceptance criteria stay in GitHub Issues; legacy `backlog/tasks/` files are
+non-authoritative migration fallbacks. Complex execution context stays in
+`backlog/sprints/`; Relay Done Criteria, rubrics, and review notes stay in
+dev-relay run artifacts.
 
 Spec skills may read task AC and sprint evidence to understand current reality, but they must not copy issue-specific AC, frozen Done Criteria, or review notes into durable specs.
+
+The complete state routing and optional-integration boundary is
+[`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).

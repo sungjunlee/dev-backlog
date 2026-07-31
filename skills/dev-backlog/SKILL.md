@@ -9,9 +9,9 @@ metadata:
 
 # Dev Backlog
 
-Real job: keep exactly one configured tracker as canonical task truth while
-using `backlog/sprints/` as the local execution hub for planning, context,
-progress, and handoff.
+Real job: keep GitHub Issues as task-definition and lifecycle truth while using
+`backlog/sprints/` only when complex execution needs a shared continuity,
+progress, or handoff record.
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, must-do steps, and completion criteria.
 
@@ -19,10 +19,10 @@ README covers install and human quick start. This file is the agent execution co
 
 | User intent | Mode | Completion boundary |
 | --- | --- | --- |
-| "where are we?", "orient", "status" | `orient` | Active sprint, latest progress, and next unchecked batch are identified. |
-| "create issue", "new issue", "이슈 만들어" | `create` | A task is created in the configured canonical tracker and added to the current sprint Plan when in scope. |
-| "plan sprint", "make sprint", "start work" with no active sprint | `plan` | One active sprint file exists with Goal, ordered Plan, `objectives:`, and `component:`. |
-| "work #N", "work BACK-N", "continue", "do next batch" | `work` | Task AC is verified and configured-tracker plus sprint state are updated. |
+| "where are we?", "orient", "status" | `orient` | Any admitted sprint state is identified; otherwise the next live Issue is named without manufacturing a sprint. |
+| "create issue", "new issue", "이슈 만들어" | `create` | A GitHub Issue is created and added to an active sprint Plan only when that work was admitted. |
+| "plan sprint", "make sprint", or complex work with no active sprint | `plan` | One active sprint file exists with Goal and ordered Plan; `objectives:`/`component:` are present only when their backing spec files exist. |
+| "work #N", "continue", "do next batch" | `work` | Live Issue AC is verified and lifecycle is updated; an admitted sprint is also updated when present. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
 | "sync", "pull issues", "refresh backlog" | `sync` | GitHub mirrors are explicitly refreshed; the local canonical store needs no provider sync. |
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
@@ -33,7 +33,15 @@ tracker from availability.
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md`), `spec-system-map` (`spec/system-map.md`), and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
+The target state ownership, migration freeze, and optional-integration boundary
+are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
+Compatibility code for local trackers and task mirrors may remain during the
+staged migration, but it is not permission to expand the target product.
+
 ## Core Contracts
+
+The runtime still exposes this transition implementation contract while the
+live resolver and compatibility subtraction are staged:
 
 ```
 backlog/.tracker (one line: github | local)
@@ -52,6 +60,16 @@ backlog/sprints/ <- shared execution hub in both modes
 - Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
 - Completed sprints stay as the permanent execution record.
 - Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries and how `objectives:`/`component:` degrade when spec files are absent live in `references/spec-fallback.md` (in-bundle, always resolvable); their durable authoring home is craftkit's `spec-charter` skill, consulted when installed. Sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
+
+## Sprint Admission
+
+The default path is sprint-free Issue → implementation → PR → Issue closure.
+Create a sprint only when execution complexity requires continuity beyond one
+Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
+cross-Issue/session context, or concurrent track coordination. Duration,
+estimate, milestone membership, and Relay presence alone do not trigger a
+sprint. Once admitted, the sprint owns execution continuity only; the Issue
+continues to own task specification and lifecycle.
 
 ## Sprint File Contract
 
@@ -83,38 +101,42 @@ Full sprint and task-file examples live in `references/file-format.md`.
 ### Orient
 
 1. Read `_context.md` if present.
-2. Find the active sprint(s); if none exists, list open tasks through the configured adapter and route to `plan`.
+2. Find the active sprint(s). If none exists, list live open Issues; route to `plan` only when the selected work meets a Sprint Admission trigger.
 3. One active track: read its Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `next.sh`/`status.sh` render a portfolio (one stanza per track); use `--track <slug>` to work one track.
-4. Identify the next unchecked Plan item (per track) or route to `complete` when all items are done.
+4. Identify the next unchecked Plan item per admitted track, or name the next live Issue for sprint-free work.
 
-Done when you can name the current sprint state and the next actionable batch — per track when a portfolio is active.
+Done when you can name the next live Issue and, when a sprint exists, its
+current state and next actionable batch.
 
 ### Create
 
 Follow `references/process.md` → `## Create — New Issues`.
 
-Done when the new task exists in the configured canonical store and is added to
-the active sprint Plan when in scope. GitHub mode may explicitly refresh its
-local mirror; local mode writes canonical JSON and refreshes its derived mirror.
+Done when the new task exists in GitHub and, only when the work was admitted to
+a sprint, is added to the active Plan. Transition compatibility modes keep
+their existing behavior until their staged retirement.
 
 ### Plan
 
-1. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
-2. List/inspect open tasks. Use milestone selection only when the configured adapter reports `milestones`; local planning writes normalized refs directly and does not fabricate one.
-3. Create the active sprint file with Goal, ordered Plan batches, estimates, dependencies, `objectives:`, and `component:` via `sprint-init.js --component "slug"` (or mutually exclusive `--scope` globs when no component axis fits). Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
-4. A second active track is refused only when its scope overlaps an existing active track; declare a disjoint `component:`/`scope:` to run tracks concurrently. Once more than one track is active, any track without a declared axis warns and allows (disjointness cannot be proven against an undeclared scope).
+1. Confirm that the work meets a Sprint Admission trigger. Otherwise keep the Issue → PR path sprint-free.
+2. Resolve Objectives from `spec/charter.md`; fall back to legacy root `CHARTER.md`; omit the `objectives:` field entirely when both are absent (see `references/spec-fallback.md`).
+3. List/inspect open tasks. Use milestone selection only when the configured adapter reports `milestones`; local planning writes normalized refs directly and does not fabricate one.
+4. Create the active sprint file with Goal, ordered Plan batches, estimates, and dependencies. Include `objectives:` and `component:` only when their backing spec files exist; use `sprint-init.js --component "slug"` when a capability axis exists, or mutually exclusive `--scope` globs when no component axis fits. Plan batches are execution waves: intra-batch items MUST be mutually parallel-safe (disjoint files, no ordering between them), dependent items MUST go in a later batch, and batch order is execution order.
+5. A second active track is refused only when its scope overlaps an existing active track; declare a disjoint `component:`/`scope:` to run tracks concurrently. Once more than one track is active, any track without a declared axis warns and allows (disjointness cannot be proven against an undeclared scope).
 
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
 
-1. Read the current batch and each task file's Description and AC.
-2. Mark meaningful GitHub/local status before work when useful.
-3. Implement or delegate through dev-relay.
-4. Verify every AC item before checking it off.
-5. Update Plan checkbox, Running Context, Progress, and neutral task state. Use comments/PR relationships only after their capability gates succeed.
+1. Read the live GitHub Issue specification and AC. If that read fails, stop clearly; a legacy mirror may be inspected only as diagnostic/rollback evidence and cannot authorize execution or lifecycle changes.
+2. If the work has an admitted sprint, read its current batch and Running Context.
+3. Mark meaningful GitHub status before work when useful.
+4. Implement directly or optionally delegate through dev-relay.
+5. Verify every AC item before checking it off.
+6. Update GitHub lifecycle and, only for admitted work, Plan checkbox, Running Context, and Progress. Use comments/PR relationships only after their capability gates succeed.
 
-Done when verified work is reflected in task AC, sprint progress, and the configured canonical task state.
+Done when verified work is reflected in GitHub Issue AC/lifecycle and, when
+admitted, sprint progress.
 
 ### Complete
 
@@ -144,7 +166,9 @@ Done when the user can tell which direction changed and what was updated.
 
 ### Next
 
-Read the active sprint and return the first unchecked actionable batch. If no active sprint exists or the sprint is done, say whether to plan the next sprint or inspect unplanned configured-tracker work.
+Read any active sprint and return its first unchecked actionable batch. If no
+active sprint exists or it is done, inspect live Issues and recommend a sprint
+only when the selected work meets a Sprint Admission trigger.
 
 ## Script Resolution
 
@@ -179,6 +203,7 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.
 - `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
+- `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 
 ## Eval Prompts (fresh-session recovery)
 
@@ -186,7 +211,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - "Plan a sprint whose scope overlaps a track that is already `status: active`." Expected: refuse, naming the conflicting track — declare a disjoint `component:`/`scope:` or complete the conflicting track first. Disjoint scopes are NOT refused; they open a second track.
 - "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically; `backlog-doctor` passes because scopes are disjoint.
 - "Cold adopter: a repo with open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
-- "Work issue #42 whose task file has three AC checkboxes." Expected: verify each AC before checking it off, then update Plan, Progress, and GitHub state.
+- "Cold adopter: a repo with one self-contained GitHub issue but no `backlog/`, no spec axis, and no Relay." Expected: use the Issue → PR path without requiring a sprint, mirror, Projects board, generated memory, or optional skill.
+- "Work issue #42 whose live Issue has three AC checkboxes." Expected: verify each AC before checking it off, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
 - "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: use `status.sh --json` and `next.sh --json` to name the active sprint, next actionable batch, and every in-flight `[~]` item with its owner/pointer (PR, branch, or run-id); if `--json` is unavailable, read the sprint file directly.
 - "Close a sprint with Running Context that applies to future work." Expected: promote durable context to `_context.md`, set sprint completed, and move completed task files.
 - "Sync local backlog after GitHub issues changed." Expected: run explicit pull/update logic and report what changed; no background mutation.

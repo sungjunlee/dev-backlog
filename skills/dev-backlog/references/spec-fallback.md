@@ -31,3 +31,11 @@ This is a **reference, not a spec**. It does not author spec-axis semantics — 
 ## When craftkit is installed (enhancement, never required)
 
 Authoring semantics and the durable spec-axis boundaries live in craftkit's `spec-charter` skill. When craftkit is installed alongside this skill, its `references/spec-axis.md` (file boundaries) and `references/alignment.md` (work→objective mapping and drift severity) **deepen** the rules above. They are never required: everything a cold adopter needs to reach a first closed sprint is on this page.
+
+## Cold-adopter execution invariant
+
+Spec absence never creates work. A self-contained GitHub Issue follows the
+sprint-free Issue → PR path. If execution complexity requires a sprint, a cold
+adopter can still create, resume, and close it with `objectives:` and
+`component:` omitted. Neither path may require craftkit, Relay, GitHub
+Projects, task mirrors, generated memory, or Backlog.md.
