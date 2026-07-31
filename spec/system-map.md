@@ -31,7 +31,7 @@ backlog/.tracker
 tracker.js (configured-only resolve, availability, capability gate)
         |
         +-- github-tracker.js -> gh -> GitHub Issues (canonical)
-        |                         `-> backlog/tasks/ derived mirrors
+        |                         `-> optional legacy export
         |
         `-- local-tracker.js  -> backlog/local-tracker.json (canonical)
                                   `-> backlog/tasks/ + completed/ derived mirrors

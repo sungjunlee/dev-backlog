@@ -9,12 +9,15 @@ const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
 
 const {
+  LOCAL_COMPATIBILITY_DIRECTORIES,
+  MINIMUM_DIRECTORIES,
   SetupError,
   collectGithubEvidence,
   isGithubRemote,
   parseArgs,
   readLegacyTracker,
   readTrackerFile,
+  requiredDirectories,
   runSetup,
 } = require("./setup-dev-backlog.js");
 
@@ -245,7 +248,7 @@ describe("provider evidence", () => {
 });
 
 describe("setup filesystem behavior", () => {
-  it("creates only .tracker and the minimum directories for a fresh explicit setup", async (t) => {
+  it("creates a mirrorless GitHub minimum and preserves local compatibility directories", async (t) => {
     for (const tracker of ["github", "local"]) {
       const root = makeRoot(t, `setup-fresh-${tracker}-`);
       const result = await runSetup(
@@ -257,11 +260,19 @@ describe("setup filesystem behavior", () => {
       assert.equal(result.trackerCreated, true);
       assert.equal(fs.readFileSync(path.join(backlogDir, ".tracker"), "utf8"), `${tracker}\n`);
       assert.equal(fs.existsSync(path.join(backlogDir, "config.yml")), false);
-      assert.deepEqual(fs.readdirSync(backlogDir).sort(), [
-        ".tracker", "completed", "sprints", "tasks",
-      ]);
+      const expected = tracker === "github"
+        ? [".tracker", "sprints"]
+        : [".tracker", "completed", "sprints", "tasks"];
+      assert.deepEqual(fs.readdirSync(backlogDir).sort(), expected);
       assert.equal(resolveConfiguredTracker(readConfig(backlogDir), { backlogDir }).tracker, tracker);
     }
+  });
+
+  it("declares task projection directories as local-only compatibility", () => {
+    assert.deepEqual(MINIMUM_DIRECTORIES, ["sprints"]);
+    assert.deepEqual(LOCAL_COMPATIBILITY_DIRECTORIES, ["tasks", "completed"]);
+    assert.deepEqual(requiredDirectories("github"), ["sprints"]);
+    assert.deepEqual(requiredDirectories("local"), ["sprints", "tasks", "completed"]);
   });
 
   it("refuses fresh non-interactive setup without a deliberate choice", async (t) => {

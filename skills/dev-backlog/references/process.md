@@ -67,7 +67,9 @@ resolver never reads `backlog/tasks/` or `backlog/completed/`.
 
 1. Call the configured adapter's required `create` operation.
 2. Use its returned normalized ref in the current sprint Plan when in scope: GitHub `#N`, local `{PREFIX}-N[.M]`.
-3. In GitHub mode, explicitly materialize/refresh the thin task mirror with `sync-pull.js`. In local mode, create already wrote canonical JSON and its derived task mirror; do not call `gh`.
+3. In GitHub mode, continue directly from the created Issue; do not create a
+   task mirror. In local compatibility mode, create already wrote canonical
+   JSON and its derived projection; do not call `gh`.
 
 ## Plan — Sprint
 
@@ -104,20 +106,30 @@ Per task:
    recorded source revision. If the source changed, review the new effective
    spec before completion.
 2. Commit or merge the implementation and check the Plan item.
-3. Call required `close`: GitHub closes the issue; local writes `status: Done` and archives the canonical file under `backlog/completed/`.
+3. Call required `close`: GitHub closes the Issue; local marks the canonical
+   JSON record closed/`Done` and publishes its derived projection under
+   `backlog/completed/`.
 4. Use `Fixes #N`, comments, or closing relationships only when GitHub capability semantics are intentionally in scope.
 
 For the whole sprint:
 
 1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
-2. The command sets `status: completed`, appends final Progress, optionally
-   archives checked legacy mirrors that happen to exist, and prints the
-   doctor/reassess summary. No `backlog/tasks/` file or move is required.
+2. The command sets `status: completed`, appends final Progress, and prints the
+   doctor/reassess summary. In mirrorless GitHub mode it neither requires nor
+   creates task directories. When checked legacy GitHub mirrors happen to
+   exist, it archives only those compatibility files. In local compatibility
+   mode, each task must already have been closed through the configured adapter;
+   that task close updates canonical JSON and its completed projection, while
+   sprint close only finalizes the sprint.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
-## Sync — Explicit and Mode-Specific
+## Sync / Legacy Export — Explicit and Mode-Specific
 
-- **GitHub:** `sync-pull.js` explicitly refreshes derived task mirrors. Provider mutations such as labels and comments are explicit operations.
+- **GitHub core:** there is no pull step. Re-run `effective-task-spec.js` when
+  Issue content changes and review a changed source revision.
+- **GitHub rollback/diagnostics:** `sync-pull.js --legacy-export` explicitly
+  writes non-authoritative projections. It is outside setup, orient, plan,
+  work, and complete.
 - **Local:** `backlog/local-tracker.json` is canonical and its task-file mirrors are refreshed on every mutation; there is no provider pull/push and no background sync.
 - **Both:** an operation failure never changes `.tracker` or makes the other store authoritative.
 

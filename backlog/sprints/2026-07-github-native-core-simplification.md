@@ -18,11 +18,11 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - [x] #345 Define the GitHub-native authority contract and reduced product boundary (3d) → PR #351 (merged)
 
 ### Batch 2 — Resolver and independent evidence tracks
-- [~] #346 Resolve effective task specs without GitHub task mirrors (8d) [branch:codex/effective-task-spec-resolver]
+- [x] #346 Resolve effective task specs without GitHub task mirrors (8d) → PR #352 (merged)
 - [ ] #349 Validate GitHub Projects as an optional planning projection (3d)
 
 ### Batch 3 — Mirrorless execution pilot
-- [ ] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories)
+- [~] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (open)
 
 ### Batch 4 — Subtract unused compatibility machinery
 - [ ] #348 Subtract zero-adopter tracker and compatibility machinery (5d)
@@ -43,3 +43,6 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: Started #345 on `codex/github-native-core-simplification`; authority-contract document and spec amendments are under implementation review.
 - 2026-07-31: #345 completed via PR #351 after Node 379/379, smoke 187/187, Linux/Windows CI, Codex, and CodeRabbit review. Started #346 on `codex/effective-task-spec-resolver`.
 - 2026-07-31: #346 implementation verified: live Issue #346 resolved without a mirror (7 AC, stable SHA-256 source revision), focused resolver/local concurrency tests passed 14/14, smoke passed 191/191, and backlog doctor passed. One pre-existing 6-second process-start barrier flaked only under the 7-minute full serial suite and passed both isolated reruns.
+- 2026-07-31: #346 completed via PR #352. Final resolver coverage passed 16/16 plus Linux/Windows CI; iterative review fixed code examples, ordered/nested/lazy AC, HTML comments, and nested fence/list-container boundaries, ending with an independent no-findings review. Started #347 on `codex/mirrorless-pilot`.
+- 2026-07-31: #347 pilot evidence captured from active sprint execution in `sungjunlee/aibris` and `sungjunlee/dear-scene`. Both recovered live AC, task intent, lifecycle, and in-flight pointers with zero resolver blockers or mirror writes; dear-scene exposed a stale 7-AC mirror against the live 8-AC Issue. GitHub setup now creates only `.tracker` plus `sprints/`, `sync-pull` requires `--legacy-export`, and mirrorless doctor/close coverage passes.
+- 2026-07-31: #347 controlled transitions completed in aibris Issue #171 → PR #172 and dear-scene Issue #293 → PR #294. Both dedicated sprints closed through the real close script, both PRs merged and closed their Issues, live lifecycle re-resolved as `closed`, all 5/5 episode AC were checked, and existing task/completed mirrors had zero diff.

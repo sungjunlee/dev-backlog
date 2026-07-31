@@ -16,6 +16,7 @@ const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
 const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
 const STATUS_PATH = path.join(SCRIPTS_DIR, "status.sh");
 const NEXT_PATH = path.join(SCRIPTS_DIR, "next.sh");
+const EFFECTIVE_TASK_SPEC_PATH = path.join(SCRIPTS_DIR, "effective-task-spec.js");
 
 function makeRoot(t, prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -123,7 +124,8 @@ if (args[0] === "issue" && args[1] === "list") {
   process.exit(0);
 }
 
-if (exact(["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"])) {
+if (exact(["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"]) ||
+    exact(["issue", "view", "42", "--json", "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url"])) {
   const issue = state.issues.find((candidate) => String(candidate.number) === args[2]);
   if (!issue) process.exit(4);
   out(issue); process.exit(0);
@@ -216,6 +218,18 @@ function prepareGithub(t) {
   };
 }
 
+function prepareMirrorlessGithub(t) {
+  const root = makeRoot(t, "tracker-cycle-github-mirrorless-");
+  const backlogDir = path.join(root, "backlog");
+  fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
+  fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
+  const gh = writeGhFixture(root);
+  return {
+    tracker: "github", root, cwd: root, backlogDir, worker: writeWorker(root),
+    env: gh.env, providerCalls: gh.calls, providerState: gh.state,
+  };
+}
+
 function prepareLocal(t) {
   const root = makeRoot(t, "tracker-cycle-local-");
   const trap = writeGhTrap(root);
@@ -275,7 +289,7 @@ function runGithubCycle(fixture) {
   });
 
   const pulled = parseJsonResult(
-    run(process.execPath, [SYNC_PATH, "--limit", "1", "--json"], fixture),
+    run(process.execPath, [SYNC_PATH, "--legacy-export", "--limit", "1", "--json"], fixture),
     "github sync-pull"
   );
   assert.equal(pulled.createdFiles[0], "BACK-42 - cycle-task.md");
@@ -303,7 +317,9 @@ function runGithubCycle(fixture) {
 
   const originalBody = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
   runWorker(fixture, "update", { selector: "#42", changes: { title: "Cycle task renamed" } });
-  parseJsonResult(run(process.execPath, [SYNC_PATH, "--limit", "1", "--update", "--json"], fixture), "github update mirror");
+  parseJsonResult(run(process.execPath, [
+    SYNC_PATH, "--legacy-export", "--limit", "1", "--update", "--json",
+  ], fixture), "github update mirror");
   const updatedMirror = fs.readFileSync(taskPath, "utf8");
   assert.match(updatedMirror, /^title: Cycle task renamed$/m);
   assert.equal(updatedMirror.slice(updatedMirror.indexOf("\n## Description")), originalBody);
@@ -346,6 +362,55 @@ function runGithubCycle(fixture) {
     }],
     milestoneClosed: true,
   });
+}
+
+function runMirrorlessGithubCycle(fixture) {
+  const assertNoTaskDirectories = () => {
+    assert.equal(fs.existsSync(path.join(fixture.backlogDir, "tasks")), false);
+    assert.equal(fs.existsSync(path.join(fixture.backlogDir, "completed")), false);
+  };
+  const body = "Live Issue body\n\n## Acceptance Criteria\n- [ ] Preserve live AC";
+  const created = runWorker(fixture, "create", { title: "Cycle task", body });
+  assert.equal(created.ref, "#42");
+  assertNoTaskDirectories();
+
+  const sprintPath = path.join(fixture.backlogDir, "sprints", "2026-07-github-cycle.md");
+  fs.writeFileSync(sprintPath, [
+    "---", "status: active", "started: 2026-07-31", "---", "",
+    "# GitHub mirrorless cycle", "", "## Goal", "Prove live task execution without mirrors.", "",
+    "## Plan", "", "### Batch 1 - live", "- [ ] #42 Cycle task", "",
+    "## Running Context", "Live GitHub is task authority.", "", "## Progress", "",
+  ].join("\n"));
+
+  const { status, next } = orient(fixture);
+  assert.equal(status.plan_items[0].ref, "#42");
+  assert.equal(next.next_batch.items[0].ref, "#42");
+  assertNoTaskDirectories();
+
+  const effective = parseJsonResult(run(process.execPath, [
+    EFFECTIVE_TASK_SPEC_PATH, "#42", "--backlog-dir", fixture.backlogDir,
+    "--root", fixture.root,
+  ], fixture), "github effective task read");
+  assert.equal(effective.source_ref, "https://github.test/acme/widgets/issues/42#issue-body");
+  assert.equal(effective.lifecycle.state, "open");
+  assert.equal(effective.acceptance_criteria.length, 1);
+  assert.equal(effective.acceptance_criteria[0].text, "Preserve live AC");
+  assertNoTaskDirectories();
+
+  runWorker(fixture, "update", {
+    selector: "#42",
+    changes: { title: "Cycle task renamed" },
+  });
+  const updated = runWorker(fixture, "read", { selector: "#42" });
+  assert.equal(updated.title, "Cycle task renamed");
+  assertNoTaskDirectories();
+
+  runWorker(fixture, "close", { selector: "#42" });
+  finishSprint(fixture, sprintPath);
+  assert.equal(runWorker(fixture, "read", { selector: "#42" }).state, "closed");
+  assert.equal(runWorker(fixture, "list", { state: "closed", limit: 20 })[0].ref, "#42");
+
+  assertNoTaskDirectories();
 }
 
 function runLocalCycle(fixture) {
@@ -392,6 +457,12 @@ describe("tracker core cycle acceptance matrix", () => {
       else runLocalCycle(fixture);
     });
   }
+});
+
+describe("mirrorless GitHub core acceptance", () => {
+  it("runs create → Plan → orient/effective read → update → complete with no task directories", (t) => {
+    runMirrorlessGithubCycle(prepareMirrorlessGithub(t));
+  });
 });
 
 describe("typed unsupported-capability contract", () => {

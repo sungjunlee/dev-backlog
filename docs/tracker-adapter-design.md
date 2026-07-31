@@ -446,14 +446,15 @@ Consequences:
 
 ## Compatibility Matrix
 
-GitHub behavior is the baseline. “Preserve” includes arguments, mutation
+GitHub behavior is the baseline except where a later product-boundary decision
+is explicitly recorded. “Preserve” includes arguments, mutation
 safety, Markdown and filenames, JSON aliases, human output where asserted, and
 existing dependency-injection seams. Additive normalized fields are allowed;
 removing or silently changing an existing field is not.
 
 | Command or data/helper surface | Frozen GitHub compatibility promise | Implementation issue |
 | --- | --- | --- |
-| `sync-pull` | Same flags/results; all open issues when limit is omitted; same `--update` frontmatter refresh and AC/body preservation, including marker-owned Progress-body exception; idempotent filenames/content; no hidden write. | #275, using #273 seam and #274 identity |
+| `sync-pull` | #347 deliberately replaces no-flag compatibility with a required `--legacy-export` gate (no flag exits 2 before materialization). Behind that gate, preserve all open issues when limit is omitted, `--update` frontmatter refresh and AC/body preservation including the marker-owned Progress-body exception, idempotent filenames/content, and no hidden write. | #275 foundation; #347 boundary change |
 | Task file format and filenames | Preserve `backlog/tasks/{PREFIX}-{N} - {slug}.md`, frontmatter `id: {PREFIX}-{N}`, title/status/labels/priority/milestone/date fields, body structure, and `backlog/completed/` names for GitHub. No historical rename. | #274 |
 | `sprint-init` | Preserve CLI/JSON, active-sprint refusal, milestone due/date behavior, milestone issue selection, estimates, and GitHub Plan lines `- [ ] #N ...`. Missing/failed GitHub milestone queries continue their current `TBD`/empty degradation for GitHub; another adapter does not inherit milestone semantics. | #275, with #274 rendering |
 | Sprint Plan grammar | Existing `- [ ] #N`, `- [~] #N`, `- [x] #N`, batch headings, `[run:...]`, `[branch:...]`, and `→ PR #N (state)` remain accepted/rendered exactly. Local refs are additive; historical sprints are not rewritten. Exact matching prevents `#1`/`#11` and `BACK-1`/`BACK-11` collisions. | #274 |

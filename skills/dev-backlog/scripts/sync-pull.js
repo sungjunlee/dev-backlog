@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Pull open GitHub issues to local backlog/tasks/.
+ * Legacy/export-only projection of open GitHub issues to backlog/tasks/.
  *
- * Usage: ./scripts/sync-pull.js [PREFIX]
- *        node scripts/sync-pull.js [PREFIX]
+ * This is not part of setup, orient, plan, work, or complete. New GitHub
+ * repositories should not run it. The CLI requires --legacy-export so an
+ * operator cannot accidentally reintroduce task mirrors on the core path.
+ *
+ * Usage: node scripts/sync-pull.js --legacy-export [PREFIX]
  *
  * Options:
  *   --update    Update existing files (frontmatter only; preserves local AC checkboxes)
@@ -76,6 +79,7 @@ function parseArgs(args, defaultPrefix) {
     dryRun: false,
     json: false,
     limit: undefined,
+    legacyExport: false,
   };
   let prefixSet = false;
 
@@ -94,6 +98,11 @@ function parseArgs(args, defaultPrefix) {
 
     if (arg === "--json") {
       options.json = true;
+      continue;
+    }
+
+    if (arg === "--legacy-export") {
+      options.legacyExport = true;
       continue;
     }
 
@@ -131,6 +140,7 @@ function parseArgs(args, defaultPrefix) {
 function makeResult({ tasksDir, prefix, update, dryRun, issueCount }) {
   return {
     action: "sync-pull",
+    mode: "legacy-export",
     dryRun,
     update,
     prefix,
@@ -270,13 +280,90 @@ function printResult(result) {
 
 // --- Core logic (testable) ---
 
+function lstatIfPresent(targetPath) {
+  try {
+    return fs.lstatSync(targetPath);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function assertRealDirectory(targetPath, label) {
+  const stat = lstatIfPresent(targetPath);
+  if (!stat || stat.isSymbolicLink() || !stat.isDirectory()) {
+    throw new Error(`Unsafe task export ${label}: ${targetPath} must be a real directory.`);
+  }
+  return stat;
+}
+
+function cleanupCreatedDirectories(tasksDir, parentDir, { tasksCreated, parentCreated }) {
+  if (tasksCreated) {
+    try {
+      fs.rmdirSync(tasksDir);
+    } catch {
+      // Only an empty directory created by this invocation is removable.
+    }
+  }
+  if (parentCreated) {
+    try {
+      fs.rmdirSync(parentDir);
+    } catch {
+      // Preserve pre-existing, non-empty, replaced, or concurrently used paths.
+    }
+  }
+}
+
+function assertSafeTasksDirectory(tasksDir, { dryRun = false } = {}) {
+  const parentDir = path.dirname(tasksDir);
+  const containerDir = path.dirname(parentDir);
+  assertRealDirectory(containerDir, "parent container");
+
+  let parentCreated = false;
+  let tasksCreated = false;
+  try {
+    const parentStat = lstatIfPresent(parentDir);
+    if (!parentStat) {
+      if (dryRun) return { parentCreated: false, tasksCreated: false };
+      fs.mkdirSync(parentDir);
+      parentCreated = true;
+      assertRealDirectory(parentDir, "parent");
+    } else if (parentStat.isSymbolicLink() || !parentStat.isDirectory()) {
+      throw new Error(
+        `Unsafe task export parent: ${parentDir} must be a real directory.`
+      );
+    }
+
+    const tasksStat = lstatIfPresent(tasksDir);
+    if (!tasksStat) {
+      if (!dryRun) {
+        fs.mkdirSync(tasksDir);
+        tasksCreated = true;
+        assertRealDirectory(tasksDir, "path");
+      }
+    } else if (tasksStat.isSymbolicLink() || !tasksStat.isDirectory()) {
+      throw new Error(`Unsafe task export path: ${tasksDir} must be a real directory.`);
+    }
+    return { parentCreated, tasksCreated };
+  } catch (error) {
+    cleanupCreatedDirectories(tasksDir, parentDir, { tasksCreated, parentCreated });
+    throw error;
+  }
+}
+
 function run({ issues, tasksDir, prefix, update, dryRun }) {
-  if (!dryRun) fs.mkdirSync(tasksDir, { recursive: true });
+  const created = assertSafeTasksDirectory(tasksDir, { dryRun });
+  const parentDir = path.dirname(tasksDir);
   const result = makeResult({ tasksDir, prefix, update, dryRun, issueCount: issues.length });
-  issues.forEach((issue) => {
-    syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result });
-  });
-  return result;
+  try {
+    issues.forEach((issue) => {
+      syncIssueToTaskFile({ issue, tasksDir, prefix, update, dryRun, result });
+    });
+    return result;
+  } catch (error) {
+    cleanupCreatedDirectories(tasksDir, parentDir, created);
+    throw error;
+  }
 }
 
 // --- CLI entry point ---
@@ -303,13 +390,36 @@ function loadOpenIssues({
     .map(stripNormalizedIdentity);
 }
 
+function printCliError({ code, message, remediation, json }) {
+  if (json) {
+    console.log(JSON.stringify({ error: { code, message, remediation } }, null, 2));
+  } else {
+    console.error(`${message}${remediation ? ` ${remediation}` : ""}`);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
+  const jsonRequested = args.includes("--json");
   const config = readConfig();
   const options = parseArgs(args, config.task_prefix);
   if (options.error) {
-    console.error(options.error);
+    printCliError({
+      code: "INVALID_ARGUMENT",
+      message: options.error,
+      remediation: "Correct the arguments and retry.",
+      json: jsonRequested,
+    });
     process.exit(1);
+  }
+  if (!options.legacyExport) {
+    printCliError({
+      code: "LEGACY_EXPORT_OPT_IN_REQUIRED",
+      message: "sync-pull is legacy/export-only and is not part of the GitHub core path.",
+      remediation: "Use live Issues through effective-task-spec.js, or rerun with --legacy-export for a deliberate diagnostic export.",
+      json: jsonRequested,
+    });
+    process.exit(2);
   }
 
   let issues;
@@ -317,7 +427,15 @@ function main() {
     issues = loadOpenIssues({ limit: options.limit, config, backlogDir: "backlog" });
   } catch (e) {
     const prefix = e?.tracker ? "tracker error" : "gh error";
-    console.error(`${prefix}: ${e.message}`);
+    const stableCode = typeof e?.code === "string" && e.code.includes("_")
+      ? e.code
+      : "TASK_EXPORT_SOURCE_UNAVAILABLE";
+    printCliError({
+      code: stableCode,
+      message: `${prefix}: ${e.message}`,
+      remediation: e?.remediation || "Verify the configured tracker and provider authentication, then retry.",
+      json: jsonRequested,
+    });
     process.exit(1);
   }
 
@@ -336,13 +454,24 @@ function main() {
     process.exit(0);
   }
 
-  const result = run({
-    issues,
-    tasksDir: path.join("backlog", "tasks"),
-    prefix: options.prefix,
-    update: options.update,
-    dryRun: options.dryRun,
-  });
+  let result;
+  try {
+    result = run({
+      issues,
+      tasksDir: path.join("backlog", "tasks"),
+      prefix: options.prefix,
+      update: options.update,
+      dryRun: options.dryRun,
+    });
+  } catch (e) {
+    printCliError({
+      code: "TASK_EXPORT_MATERIALIZATION_FAILED",
+      message: `task export materialization failed: ${e.message}`,
+      remediation: "Inspect backlog/tasks path safety and write permissions, then retry the explicit legacy export.",
+      json: jsonRequested,
+    });
+    process.exit(1);
+  }
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -365,5 +494,6 @@ module.exports = {
   fetchOpenIssues,
   loadOpenIssues,
   isMachineManagedIssueBody,
+  assertSafeTasksDirectory,
   run,
 };

@@ -1,6 +1,7 @@
 # GitHub Sync Reference
 
-`gh` CLI patterns for syncing GitHub Issues with local backlog files.
+`gh` CLI patterns for operating the live GitHub authority. The historical
+task-file projection is documented last as rollback/diagnostic export only.
 
 ## Label Setup (once per repo)
 
@@ -36,7 +37,7 @@ gh issue create -t "Title" -F backlog/tasks/draft.md -l "labels" -m "milestone"
 gh issue create -t "Title" -l "labels" --json number -q .number
 ```
 
-## Pulling Issues to Local
+## Reading Issues Live
 
 ```bash
 # List open issues as JSON
@@ -45,17 +46,21 @@ gh issue list --state open --json number,title,body,labels,milestone,assignees
 # View single issue
 gh issue view 42 --json number,title,body,labels,milestone,assignees,comments
 
-# Pull all open issues (script pattern)
-TOTAL=$(gh api graphql -F owner={owner} -F name={repo} \
-  -f query='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }' \
-  --jq '.data.repository.issues.totalCount')
+# Resolve the selected body/spec_ref, normalized AC, lifecycle, and digest
+node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
+  "#42" --repo OWNER/REPO
+```
 
-gh issue list --state open --limit "$TOTAL" --json number,title,body,labels,milestone,assignees | \
-  jq -c '.[]' | while read -r issue; do
-    num=$(echo "$issue" | jq -r '.number')
-    title=$(echo "$issue" | jq -r '.title')
-    # Write to backlog/tasks/{PREFIX}-{num} - {slug}.md
-  done
+## Legacy Mirror Export
+
+Use only when rehearsing rollback or collecting diagnostic bytes. Exported
+files are non-authoritative and must never authorize work or lifecycle changes.
+
+```bash
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
+  --legacy-export --dry-run
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
+  --legacy-export
 ```
 
 ## Pushing Updates to GitHub

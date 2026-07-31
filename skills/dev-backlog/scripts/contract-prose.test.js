@@ -48,6 +48,16 @@ function assertDerived(file, mode, section, block) {
     file, offender, `task mirrors are derived in ${mode} mode`
   ));
 }
+function assertMirrorlessGithub(file, section) {
+  const claim = section.find(({ text }) =>
+    /(?:\bno\s+(?:required\s+)?task(?:-file)?\s+(?:mirror|directory)\b|\btask(?:-file)?\s+(?:mirror|directory)\s+(?:is\s+)?(?:not\s+)?required\b|\boptional\s+legacy\s+export\b)/i.test(text)
+  );
+  assert.ok(claim, diagnostic(
+    file,
+    section[0],
+    "github mode must not require task mirrors",
+  ));
+}
 function assertNoCanonicalMirrors(file, block) {
   const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split(/\r?\n/);
   const subject = "(?:task files?|(?:backlog/)?tasks/?(?:\\s*\\+\\s*(?:backlog/)?completed/?)?|mirrors?)";
@@ -79,7 +89,7 @@ function assertContract(file) {
     "GitHub Issues are canonical in github mode");
   requireLine(file, local[0], new RegExp(`${escape(`backlog/${STORE_FILE}`)}.*canonical`, "i"),
     `backlog/${STORE_FILE} is canonical in local mode`);
-  assertDerived(file, "github", github, block);
+  assertMirrorlessGithub(file, github);
   assertDerived(file, "local", local, block);
   assertNoCanonicalMirrors(file, block);
 }
