@@ -190,7 +190,7 @@ describe("retained adapter portability seam", () => {
 
   it("retains capability gates for injected transports without adding providers", () => {
     const noProjects = adapter({ capabilities: () => [] });
-    const resolved = { tracker: "github", adapter: noProjects, configPath: "backlog/.tracker" };
+    const resolved = { tracker: "github", adapter: noProjects };
     assert.deepEqual(readCapabilities("github", TRACKER_ADAPTERS.github), [...CAPABILITY_NAMES]);
     assert.throws(
       () => invokeCapability(resolved, "milestones", () => "effect"),
@@ -199,11 +199,7 @@ describe("retained adapter portability seam", () => {
   });
 
   it("serializes unsupported capability errors for JSON and human CLIs", () => {
-    const error = new UnsupportedTrackerCapabilityError(
-      "github",
-      "comments",
-      "custom/backlog/.tracker",
-    );
+    const error = new UnsupportedTrackerCapabilityError("github", "comments");
     const serialized = serializeTrackerError(error);
     assert.deepEqual(serialized, {
       code: "TRACKER_CAPABILITY_UNSUPPORTED",
@@ -211,9 +207,9 @@ describe("retained adapter portability seam", () => {
       capability: "comments",
       message: 'Tracker "github" does not support capability "comments".',
       remediation:
-        'Use tracker "github" without "comments", or explicitly change ' +
-        "custom/backlog/.tracker to a tracker that supports it before retrying. " +
-        "No tracker switch was attempted.",
+        'Use tracker "github" without "comments", or restore that ' +
+        "tracker's capability transport before retrying. " +
+        "No tracker switch or fallback was attempted.",
     });
     assert.equal(serializeTrackerError(new Error("other")), null);
 

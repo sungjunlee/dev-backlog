@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are explicit one-way legacy exports. GitHub Issues are authoritative. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
+- `backlog/tasks/` and `backlog/completed/` are optional legacy exports with one-way flow from GitHub. GitHub Issues are the sole task authority. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -32,27 +32,26 @@ Multiple active tracks are a **portfolio**, not an error; only **overlapping-sco
 
 ## Tracker Selection and Capability Error Surface
 
-`backlog/.tracker` selects exactly one canonical tracker. When absent, a legacy
-`tracker:` key in `backlog/config.yml` is read as a compatibility fallback; with
-neither, GitHub is the zero-migration default. Availability probes and operation
-failures never select another adapter. Existing GitHub `#N`, numeric
-`issue_number`, filenames, Markdown, argv, and provider behavior remain aliases
-with unchanged values. Local Plan items use `{PREFIX}-N[.M]`, and their
-`issue_number` is `null`.
+`backlog/.tracker` accepts exactly one runtime authority: `github`. When absent,
+the legacy `tracker:` key in `backlog/config.yml` is read only when its value is
+also `github`; with neither, GitHub is the zero-migration default. Every other
+selection fails before provider calls or local mutation. Availability probes
+and operation failures never select another adapter. Existing GitHub `#N`,
+numeric `issue_number`, filenames, Markdown, argv, and provider behavior remain
+aliases with unchanged values.
 
 Optional provider capabilities are `milestones`, `pull-request-relationships`,
-`comments`, and `closing-semantics`. A configured
-tracker that does not report one must fail before effects with this serialized
-shape:
+`comments`, and `closing-semantics`. A GitHub transport that does not report one
+must fail before effects with this serialized shape:
 
 ```json
 {
   "error": {
     "code": "TRACKER_CAPABILITY_UNSUPPORTED",
-    "tracker": "local",
+    "tracker": "github",
     "capability": "milestones",
-    "message": "Tracker \"local\" does not support capability \"milestones\".",
-    "remediation": "Use tracker \"local\" without \"milestones\", or explicitly change backlog/.tracker to a tracker that supports it before retrying. No tracker switch was attempted."
+    "message": "Tracker \"github\" does not support capability \"milestones\".",
+    "remediation": "Use tracker \"github\" without \"milestones\", or restore that tracker's capability transport before retrying. No tracker switch or fallback was attempted."
   }
 }
 ```
@@ -89,10 +88,10 @@ Top-level schema:
 | `line` | string | Original plan line. |
 | `checkbox_state` | string | Exact marker content: `" "`, `"~"`, or `"x"`. |
 | `state` | string | Normalized state: `todo`, `in_flight`, or `done`. |
-| `tracker` | string | Identity owner: `github` for `#N`, or `local` for a configured-prefix ref. |
-| `id` | string | Stable tracker-owned ID. GitHub uses the decimal issue number as a string; local decimal subtask IDs such as `42.1` stay lossless. Treat this field as opaque. |
-| `ref` | string | Complete display ref, byte-compatible `#N` for GitHub or `{PREFIX}-N[.M]` for local. |
-| `issue_number` | integer or `null` | Compatibility alias. It remains the exact integer for GitHub items and is `null` for local items; a local numeric suffix is never coerced into a GitHub issue number. |
+| `tracker` | string | `github` for current `#N` work. Historical `{PREFIX}-N[.M]` Plan lines may parse as `local` for file-only orientation; that value is not a selectable runtime provider. |
+| `id` | string | Stable opaque ID. GitHub uses the decimal issue number as a string; a historical decimal subtask ID such as `42.1` remains lossless for file-only orientation. |
+| `ref` | string | Complete display ref: byte-compatible `#N` for current GitHub work, or a preserved historical `{PREFIX}-N[.M]` ref. |
+| `issue_number` | integer or `null` | Compatibility alias. It is the exact integer for GitHub items and `null` for historical configured-prefix refs, which are never coerced into GitHub issue numbers. |
 | `title` | string | Plan title after removing parsed PR, branch, and run annotations. |
 | `batch_heading` | string or `null` | Current `### Batch...` heading, if any. |
 | `pr` | object or `null` | `{ "number": N, "state": "..." }` from `→ PR #N (state)` when present. |
@@ -168,12 +167,14 @@ The doctor's own JSON schema stays at `1`; it is independent of the actor read-s
 
 | What | Pattern | Example |
 |------|---------|---------|
-| Task files | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
+| Legacy task exports | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
 | Active sprint | `backlog/sprints/*.md` with `status: active` | `backlog/sprints/2026-03-auth-system.md` |
 | Cross-sprint context | `backlog/sprints/_context.md` | (always this exact name) |
-| Completed tasks | `backlog/completed/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
+| Legacy completed exports | `backlog/completed/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
 
-**PREFIX** defaults to `BACK` and is configurable via `backlog/config.yml` → `task_prefix`.
+These task paths exist only when an operator requests a legacy export. **PREFIX**
+defaults to `BACK` and is configurable via `backlog/config.yml` →
+`task_prefix`; it does not select or identify a runtime provider.
 
 ## Sprint File Sections
 
@@ -233,26 +234,36 @@ Sprint plan items use this format:
 - [ ] #42 OAuth2 flow (~2hr)
 - [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
 - [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)
-- [ ] BACK-42 Local task
-- [~] BACK-42.1 Local subtask [branch:local-42.1]
 ```
 
 | Marker | Meaning | Regex | Set by |
 |--------|---------|-------|--------|
-| `[ ]` | Not started | complete `#N` or `{PREFIX}-N[.M]` after the marker | sprint-init.js, manual |
-| `[~]` | In-flight (PR open/reviewing) | complete `#N` or `{PREFIX}-N[.M]` after the marker | dev-relay dispatch |
-| `[x]` | Done (merged/completed) | complete `#N` or `{PREFIX}-N[.M]` after the marker | dev-relay merge, manual |
+| `[ ]` | Not started | complete `#N` after the marker | sprint-init.js, manual |
+| `[~]` | In-flight (PR open/reviewing) | complete `#N` after the marker | dev-relay dispatch |
+| `[x]` | Done (merged/completed) | complete `#N` after the marker | dev-relay merge, manual |
 
 ### Task reference and compatibility aliases
 
 `skills/dev-backlog/scripts/task-ref.js` is the grammar owner. It accepts only complete positive refs:
 
 - GitHub: `#N`, where `N` is a positive decimal integer. Identity is `{ tracker: "github", id: "N", ref: "#N" }`.
-- Local: `{PREFIX}-N` or `{PREFIX}-N.M`, where `PREFIX` is the exact `backlog/config.yml` `task_prefix` and both numeric components are positive integers. Identity is `{ tracker: "local", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`.
+- Historical compatibility only: `{PREFIX}-N` or `{PREFIX}-N.M`, where
+  `PREFIX` is the exact `backlog/config.yml` `task_prefix` and both numeric
+  components are positive integers. File-only orientation preserves identity
+  `{ tracker: "local", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`; this does not
+  make `local` a valid `.tracker` selection or permit lifecycle operations.
 
-Zero, negative, partial, foreign-prefix, whitespace-suffixed, and malformed refs are rejected. Decimal notation is supported for local Backlog.md subtasks, not GitHub issue refs. GitHub Plan lines and mirror Markdown continue to render byte-for-byte as `#N`.
+Zero, negative, partial, foreign-prefix, whitespace-suffixed, and malformed refs
+are rejected. Decimal notation is preserved only for historical Backlog.md
+subtasks, not current GitHub Issue refs. New Plan lines use `#N`.
 
-The shell `RE_CB_*` variables remain GitHub-only compatibility aliases for external consumers. Core `status.sh`, `next.sh`, checkbox counting, and closeout delegate task-ref recognition to the shared module. Machine actors should consume `tracker`/`id`/`ref`; `issue_number` remains an unchanged GitHub alias and is `null` for local entries in `plan_items`, `next_batch.items`, `in_flight`, and doctor projections.
+The shell `RE_CB_*` variables remain GitHub-only compatibility aliases for
+external consumers. Core `status.sh`, `next.sh`, checkbox counting, and closeout
+delegate task-ref recognition to the shared module. Machine actors should
+consume `tracker`/`id`/`ref`; `issue_number` remains an unchanged GitHub alias.
+Historical configured-prefix entries may still appear with `tracker: "local"`
+and `issue_number: null` in file-only projections, but actors must not dispatch
+or mutate them through the retired provider.
 
 ### PR annotation (appended by dev-relay)
 
@@ -298,7 +309,7 @@ Briefs, or ecosystem documents as implicit authority. Optional candidates may
 be reported for a human to adopt through `spec_ref`, but discovery alone never
 changes the selected source.
 
-## Transition Task File Structure
+## Legacy Export File Structure
 
 ```yaml
 ---
@@ -325,7 +336,7 @@ dev-relay reads canonical AC from the effective task-spec result. The
 `<!-- AC:BEGIN/END -->` markers are parsed by the resolver when present and
 remain compatible with legacy task-file rendering.
 
-Task-file AC is only a transition projection. It is not a Work authorization or
+Task-file AC is only a legacy export projection. It is not a Work authorization or
 relay review anchor by itself. relay-plan freezes Done Criteria and rubrics in
 the relay run artifacts, and relay-review evaluates against that frozen
 snapshot. `spec/*` files may read canonical task AC or frozen Done Criteria as
@@ -427,7 +438,7 @@ This is optional — items without `[run:...]` are valid when another trace poin
 - **Missing section in sprint**: treated as empty.
 - **No task mirror file**: normal path; actors use the effective task-spec resolver and sprint close proceeds without an archive move.
 - **No GitHub access**: sprint JSON may recover execution continuity and in-flight pointers, but task intent, AC, and lifecycle are unresolved. Stop before execution; do not read a task mirror.
-- **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate local state, or switch trackers.
+- **Unsupported optional capability**: return the typed error above; do not fabricate an empty provider result, mutate sprint or provider state, or switch/fallback trackers.
 
 ## Cross-Project Smoke Test
 

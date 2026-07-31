@@ -9,6 +9,7 @@ const SURFACES = [
   "README.md",
   "CLAUDE.md",
   "spec/system-map.md",
+  "skills/dev-backlog/references/integration-contract.md",
 ];
 
 for (const file of SURFACES) {
@@ -36,4 +37,17 @@ it("records compatibility subtraction in current decisions and release notes", (
   assert.match(changelog, /Required task mirrors/);
   assert.match(changelog, /Zero-adopter local tracker/);
   assert.doesNotMatch(changelog, /task mirrors under `backlog\/tasks\/` remain core/);
+});
+
+it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {
+  const markdown = fs.readFileSync(
+    path.join(ROOT, "skills/dev-backlog/references/integration-contract.md"),
+    "utf8",
+  );
+  assert.match(markdown, /accepts exactly one runtime authority: `github`/);
+  assert.match(markdown, /Historical compatibility only:/);
+  assert.match(markdown, /does not\s+make `local` a valid `\.tracker` selection/);
+  assert.doesNotMatch(markdown, /Local Plan items use/);
+  assert.doesNotMatch(markdown, /"tracker": "local",\s*\n\s*"capability"/);
+  assert.doesNotMatch(markdown, /explicitly change backlog\/\.tracker to a tracker/);
 });
