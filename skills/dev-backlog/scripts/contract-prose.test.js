@@ -51,3 +51,15 @@ it("keeps the actor contract GitHub-only while preserving historical ref parsing
   assert.doesNotMatch(markdown, /"tracker": "local",\s*\n\s*"capability"/);
   assert.doesNotMatch(markdown, /explicitly change backlog\/\.tracker to a tracker/);
 });
+
+it("records the measured Projects decision without adding a core profile", () => {
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+  const pilot = read("docs/github-projects-projection-pilot.md");
+  const sync = read("skills/dev-backlog/references/github-sync.md");
+
+  assert.match(pilot, /Retain milestones, labels, and sprint Plan ordering/);
+  assert.match(pilot, /18\/18 field values/);
+  assert.match(pilot, /HTTP 401, no state change/);
+  assert.match(sync, /Projects are therefore not an\s+adopted dev-backlog profile/);
+  assert.match(sync, /Milestones \+ labels remain the planning default/);
+});

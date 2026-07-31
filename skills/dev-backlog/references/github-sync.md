@@ -126,7 +126,14 @@ gh issue view 42 --json comments --jq '.comments[-3:][] | "\(.author.login): \(.
 
 ## Projects v2 (optional)
 
-If using GitHub Projects for Kanban board:
+The measured #349 pilot confirmed that Priority, Iteration, and Target Date
+projection works, but required more writes and reconciliation than the existing
+milestone + labels + sprint Plan workflow. Projects are therefore not an
+adopted dev-backlog profile. See
+[`docs/github-projects-projection-pilot.md`](../../../docs/github-projects-projection-pilot.md)
+for the capability matrix, failure evidence, and decision.
+
+An operator may still use a manually configured Project as an external view:
 
 ```bash
 # Add issue to project
@@ -136,4 +143,6 @@ gh project item-add <PROJECT_NUMBER> --owner @me --url <ISSUE_URL>
 gh project item-list <PROJECT_NUMBER> --owner @me --format json
 ```
 
-Most users won't need Projects v2 — milestones + labels are simpler and sufficient for solo/small team work.
+Do not require Projects in setup, task resolution, sprint execution, or the
+Issue to PR path. Do not automatically synchronize Project-only fields back to
+Issues or sprint files. Milestones + labels remain the planning default.
