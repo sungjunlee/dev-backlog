@@ -19,7 +19,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 
 ### Batch 2 — Resolver and independent evidence tracks
 - [x] #346 Resolve effective task specs without GitHub task mirrors (8d) → PR #352 (merged)
-- [~] #349 Validate GitHub Projects as an optional planning projection (3d) → PR #355 (open) [branch:codex/projects-projection-pilot]
+- [x] #349 Validate GitHub Projects as an optional planning projection (3d) → PR #355 (merged)
 
 ### Batch 3 — Mirrorless execution pilot
 - [x] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (merged)
@@ -28,7 +28,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - [x] #348 Subtract zero-adopter tracker and compatibility machinery (5d) → PR #354 (merged)
 
 ### Batch 5 — Evidence-gated memory decision
-- [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31]
+- [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31] [branch:codex/historical-retrieval-shadow]
 
 ## Running Context
 - GitHub Issues are canonical task definitions and lifecycle state for this milestone; sprint files carry only complex execution continuity.
@@ -58,3 +58,6 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: #349 Project #5 added real Issues #345–#350 and read back 18/18 Priority, Iteration, and Target Date values. A second planning cycle updated only four changed values. Invalid-token and invalid-iteration writes both failed non-zero with identical local sprint hash, Git status, canonical Issue snapshot, and Project snapshot.
 - 2026-07-31: #349 evidence shows no repeated value: Project cycle 2 required four writes plus one read-back (45.8 s), while milestones + labels read the same six Issues in one call (4.0 s) and sprint Plan already held execution order. Decision: retain milestones + labels; add no Project profile or abstraction.
 - 2026-07-31: Opened #349 PR #355 after core absence 3/3, contract prose 8/8, exact external read-back, and an independent no-findings review.
+- 2026-07-31: #349 completed via PR #355. All 6 AC are checked, Linux/Windows CI passed, and private pilot Project #5 was closed without deletion after preserving 6/6 Issues and 18/18 final values. Started #350 implementation support on `codex/historical-retrieval-shadow`; the real reuse gate still cannot complete before 2026-08-28.
+- 2026-07-31: #350 Day-0 froze 20 gold questions across dev-backlog, dev-relay, and consumer repositories. Legacy mirrors cover only 2/20; live sources returned 20/20 top-3 hits with zero major errors at a 5.952 s / 2-call median.
+- 2026-07-31: #350's non-committed Arm C compiled 34 sources in 19.111 s, returned 20/20 question hits and 37/41 exact gold pointers with zero major errors, and projected 6.27 min/month maintenance. A missing-source probe exited non-zero with identical report SHA-256, mtime, and size. These synthetic results do not replace the 4–6 week organic reuse gate.
