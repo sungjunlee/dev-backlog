@@ -339,6 +339,23 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     }), "docs/real.md");
   });
 
+  it("pops an inner list on an outer lazy continuation before opening a fence", () => {
+    const body = [
+      "- Outer",
+      "  - Inner",
+      "  Back at outer",
+      "    ```markdown",
+      "    code",
+      "  ```",
+      "<!-- dev-backlog:spec_ref docs/real.md -->",
+    ].join("\n");
+    assert.equal(explicitSpecRef({
+      tracker: "github",
+      ref: "#42",
+      body,
+    }), "docs/real.md");
+  });
+
   it("masks retired criteria in HTML comments and preserves lazy continuation text", () => {
     assert.deepEqual(parseAcceptanceCriteria([
       "## Acceptance Criteria",

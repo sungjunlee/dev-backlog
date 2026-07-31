@@ -189,6 +189,8 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       continue;
     }
     if (listContainer) {
+      const containerIndex = listStack.indexOf(listContainer);
+      listStack.length = containerIndex + 1;
       visible.push(line);
       continue;
     }
