@@ -323,6 +323,22 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     }]);
   });
 
+  it("returns from an inner list to the outer fence container", () => {
+    const body = [
+      "- Outer",
+      "  - Inner",
+      "  ```markdown",
+      "  code",
+      "    ```",
+      "<!-- dev-backlog:spec_ref docs/real.md -->",
+    ].join("\n");
+    assert.equal(explicitSpecRef({
+      tracker: "github",
+      ref: "#42",
+      body,
+    }), "docs/real.md");
+  });
+
   it("masks retired criteria in HTML comments and preserves lazy continuation text", () => {
     assert.deepEqual(parseAcceptanceCriteria([
       "## Acceptance Criteria",
