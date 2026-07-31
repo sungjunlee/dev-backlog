@@ -3,7 +3,7 @@
 ## System Shape
 
 dev-backlog is a skill suite plus deterministic Node/Bash helpers. The target
-core reads task definition and lifecycle from GitHub Issues. Sprint Markdown is
+core reads task definition and lifecycle from GitHub Issues. There is no required task mirror. Sprint Markdown is
 created only for complex execution continuity; optional projections never
 accept independent writes.
 
@@ -21,8 +21,7 @@ GitHub repository history (historical evidence)
 retrieval / Projects / Relay / Backlog.md (optional, non-authoritative)
 ```
 
-The following is the transition implementation shape, retained while the live
-resolver, mirrorless pilot, and compatibility subtraction land:
+The implementation shape is GitHub-only:
 
 ```text
 backlog/.tracker
@@ -30,11 +29,8 @@ backlog/.tracker
         v
 tracker.js (configured-only resolve, availability, capability gate)
         |
-        +-- github-tracker.js -> gh -> GitHub Issues (canonical)
-        |                         `-> optional legacy export
-        |
-        `-- local-tracker.js  -> backlog/local-tracker.json (canonical)
-                                  `-> backlog/tasks/ + completed/ derived mirrors
+        `-- github-tracker.js -> gh -> GitHub Issues (canonical)
+                                  `-> explicit one-way legacy export
 
 backlog/sprints/ (canonical execution hub)
         +-> sprint-state.js -> status.sh --json / next.sh --json
@@ -42,13 +38,10 @@ backlog/sprints/ (canonical execution hub)
         `-> capability-gated GitHub optional transports
 ```
 
-`setup-dev-backlog.js` persists a deliberate `github` or `local` choice in
-`.tracker`. A missing file falls back to a legacy `config.yml` key, then to
-GitHub, without runtime mutation. Setup migrates the resolved legacy choice
-without editing `config.yml`. Availability failure is never a selection
-mechanism, and runtime never probes or falls back to the other adapter.
-These compatibility paths are frozen; they do not alter the target authority
-contract.
+`setup-dev-backlog.js` persists `github` in `.tracker`. A missing file accepts
+only a legacy `tracker: github` config key, then defaults to GitHub without
+runtime mutation. Any other selection fails. Availability failure is never a
+selection mechanism or fallback trigger.
 
 ## Runtime Boundaries
 
@@ -59,14 +52,14 @@ contract.
   work has no separate sprint state.
 - `skills/dev-backlog/scripts/tracker.js` owns configured resolution, the exact seven-operation adapter contract, identity validation, capability discovery/gating, and the shared unsupported-capability error/serializer.
 - `github-tracker.js` owns required GitHub task lifecycle argv/translation. Named GitHub modules own milestones, PR relationships, comments, and other optional transports.
-- `local-tracker.js` owns the canonical local JSON lifecycle and its one-way Markdown projection. It reports no optional provider capabilities and never invokes `gh`.
-- `task-ref.js` owns complete `#N` and `{PREFIX}-N[.M]` parsing/rendering. GitHub keeps numeric `issue_number`; local exposes `null` for that compatibility alias.
+- `task-ref.js` owns complete `#N` runtime parsing/rendering plus historical Backlog.md filename parsing for explicit import/export. GitHub keeps numeric `issue_number`.
 - `sprint-state.js` remains the single machine parser of sprint Markdown; `status.sh --json`, `next.sh --json`, and doctor projections consume its state.
 - `skills/backlog-triage/` owns advisory grooming. Provider enrichment/mutation remains capability-gated and explicit.
 - Craftkit-installed spec authoring skills own human-gated changes to `spec/`; dev-backlog reads those files as optional yardsticks.
 
-Detailed adapter mechanics, the pre-seam inventory, and the compatibility matrix
-are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter-design.md).
+The retained seam inventory and compatibility subtraction evidence are
+single-sourced in
+[`docs/compatibility-subtraction.md`](../docs/compatibility-subtraction.md).
 
 ## Core Flows
 
@@ -83,16 +76,16 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 - `backlog/sprints/`: admitted complex execution state, committed at explicit boundaries.
 - `spec/*`: human-gated durable project, system, and capability decisions.
 - GitHub repository history: original historical evidence.
-- `backlog/.tracker`, `backlog/config.yml`, and `backlog/local-tracker.json`: frozen transition compatibility.
-- `backlog/tasks/` and `backlog/completed/`: non-authoritative transition projections.
-- `gh`: GitHub-mode bridge only; acceptance tests replace it with an argv recorder and local tests trap it.
+- `backlog/.tracker` and `backlog/config.yml`: GitHub selection and frozen legacy Backlog.md settings.
+- `backlog/tasks/` and `backlog/completed/`: non-authoritative one-way legacy exports.
+- `gh`: GitHub bridge; acceptance tests replace it with an argv recorder.
 - Git: versioned Markdown, scripts, and durable specs.
 
 ## Project-Wide Invariants
 
 - GitHub Issues own task truth; no runtime fallback, co-authority, dual write, or background sync.
 - Existing tracker-less repositories remain GitHub-backed with zero migration and unchanged `#N`, numeric aliases, task-mirror bytes, argv, milestones, comments, and closing behavior.
-- Local compatibility is frozen pending staged retirement. It never fabricates provider semantics or URLs.
+- Unknown tracker selections fail explicitly; GitHub unavailability never falls back to another store.
 - Task projections are diagnostic/export material only. A failed live Issue read stops execution; stale projection bytes cannot authorize task work or lifecycle changes.
 - Unsupported optional capabilities have stable code `TRACKER_CAPABILITY_UNSUPPORTED`, tracker, capability, message, and remediation; JSON and human boundaries share that one serializer contract.
 - A sprint is triggered by execution complexity, never duration alone; the
@@ -105,18 +98,16 @@ are single-sourced in [`docs/tracker-adapter-design.md`](../docs/tracker-adapter
 
 ## Executable Evidence
 
-`skills/dev-backlog/scripts/tracker-cycle.acceptance.test.js` proves both full
-cycles with real temporary files and subprocesses, no network, exact GitHub
-compatibility evidence, local zero-provider evidence, body-preserving updates,
-Done archive/final reads, and every optional-capability failure shape. This
-implementation proof merged as PR #303 (2026-07-12). It is transition evidence,
-not a current objective or a reason to expand generic tracker compatibility.
+`skills/dev-backlog/scripts/tracker-cycle.acceptance.test.js` proves the full
+GitHub lifecycle and mirrorless cycle with real temporary files and
+subprocesses, no network, exact argv, live effective-spec reads, and no
+Relay/Matt/craftkit/Projects/Backlog.md runtime dependency.
 
 ## Accepted Capability Contracts
 
 - `sprint-execution` — plan state, context, progress, and active/completed sprint invariants.
-- `tracker-task-truth` — live GitHub Issue ownership and lifecycle, with frozen transition compatibility.
-- `backlog-sync` — safe, non-authoritative transition projection pending retirement.
+- `tracker-task-truth` — live GitHub Issue ownership and lifecycle.
+- `backlog-sync` — explicit, one-way, non-authoritative legacy export.
 - `triage-grooming` — advisory classification, relationships, stale signals, Alignment, and Decision Review.
 
 ## Optional Boundaries
@@ -133,4 +124,4 @@ milestone.
 - Capability contracts: [`capabilities.md`](capabilities.md)
 - Sprint execution contract: [`../skills/dev-backlog/SKILL.md`](../skills/dev-backlog/SKILL.md)
 - Actor/JSON contract: [`../skills/dev-backlog/references/integration-contract.md`](../skills/dev-backlog/references/integration-contract.md)
-- Adapter compatibility/proof: [`../docs/tracker-adapter-design.md`](../docs/tracker-adapter-design.md)
+- Compatibility subtraction/proof: [`../docs/compatibility-subtraction.md`](../docs/compatibility-subtraction.md)

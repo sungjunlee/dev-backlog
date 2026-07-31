@@ -1,6 +1,8 @@
 # File Format Reference
 
-Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format.
+Task files are explicit legacy exports compatible with the
+[Backlog.md](https://github.com/MrLesk/Backlog.md) task format. Runtime never
+reads them as task specification or lifecycle authority.
 
 ## Frontmatter Fields
 
@@ -8,7 +10,7 @@ Task files are compatible with the [Backlog.md](https://github.com/MrLesk/Backlo
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | string | Yes | Storage ref `{PREFIX}-{N[.M]}`; a GitHub mirror derives `N` from the issue number, while local owns the ref directly |
+| `id` | string | Yes | Legacy export ref `{PREFIX}-{N}` derived from the GitHub issue number |
 | `title` | string | Yes | Brief, action-oriented description |
 | `status` | string | Yes | Current state (see Status Values below) |
 
@@ -61,15 +63,13 @@ Examples:
 - `PROJ-7 - Fix-login-timeout.md`
 - `BACK-100.2 - Create-HTTP-server-module.md` (sub-task)
 
-The prefix comes from `config.yml` (`task_prefix`). In GitHub mode, the numeric
-part is the issue number and the file is a mirror. In local mode, the configured
-adapter allocates the canonical local ID.
+The prefix comes from `config.yml` (`task_prefix`). The integer part is the
+GitHub issue number. Decimal IDs are accepted only when parsing historical
+Backlog.md files; they are not runtime task identities.
 
 ## Body Structure
 
-Task files are derived mirrors in both modes: from GitHub Issues when
-`.tracker` contains `github`, and from `backlog/local-tracker.json` when it
-contains `local`.
+Task files are one-way legacy exports from GitHub Issues.
 Notes, decisions, and cross-task context still go in the **sprint file**
 (`backlog/sprints/`), not here.
 
@@ -78,10 +78,9 @@ Notes, decisions, and cross-task context still go in the **sprint file**
 [Synced from GitHub issue body — includes any checkboxes from the issue]
 ```
 
-`sync-pull.js` and the local projection wrap a task body in `## Description`.
-In GitHub mode the issue body is authoritative. In local mode the JSON body is
-authoritative, so hand-edited mirror bytes are overwritten on the next local
-write rather than parsed back into task truth.
+`sync-pull.js --legacy-export` wraps an Issue body in `## Description`. The
+Issue body is authoritative; hand-edited export bytes are never parsed back
+into task truth.
 
 ## Effective Task Specification
 
@@ -105,7 +104,7 @@ from `AC:BEGIN/END` (preferred), an Acceptance Criteria heading, or a legacy
 body-wide fallback, plus normalized `lifecycle`, `source_ref`, and stable
 SHA-256 `source_revision`/`source_digest`.
 
-For manual task files or Backlog.md CLI compatibility, you can optionally add structured AC markers:
+For a human-reviewed Backlog.md import or export, you can optionally add structured AC markers:
 
 ```markdown
 ## Acceptance Criteria
@@ -117,11 +116,10 @@ For manual task files or Backlog.md CLI compatibility, you can optionally add st
 
 The `<!-- AC:BEGIN/END -->` markers enable machine parsing by the Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
 
-Configured-adapter operations may update supported frontmatter fields, and an
-explicit body update may change task-body content. Metadata-only updates
-preserve body and AC bytes. During normal execution, keep human task-body edits
-to AC checkboxes; notes, technical decisions, and running context belong in the
-sprint file.
+Import is intentionally manual and one-way: review compatible Markdown, then
+create or amend a GitHub Issue. No runtime command treats a file edit as an
+Issue update. Notes, technical decisions, and running context belong in an
+admitted sprint file.
 
 ## Sprint Frontmatter (spec-axis fields)
 
@@ -146,11 +144,11 @@ Order planned tasks into parallel-safe batches. Group small tasks (~30min or les
 github
 ```
 
-The supported values are `github` and `local`. When `.tracker` is missing,
-runtime reads a legacy top-level `tracker:` value from `config.yml`; with
-neither, it deterministically defaults to `github`. Availability never changes
-the selection or falls back to the other adapter. Setup writes `.tracker`
-atomically and never edits `config.yml`.
+The only supported value is `github`. When `.tracker` is missing, runtime
+accepts only a legacy top-level `tracker: github` value from `config.yml`; with
+neither, it deterministically defaults to `github`. Any other value fails.
+Availability never changes selection. Setup writes `.tracker` atomically and
+never edits `config.yml`.
 
 ## config.yml
 
@@ -163,22 +161,6 @@ statuses: ["To Do", "In Progress", "Done"]
 
 `config.yml` remains the read-only source for Backlog.md settings such as
 `task_prefix`; setup never creates, rewrites, or removes fields from it.
-
-## Local Canonical Storage (`.tracker` = `local`)
-
-In local mode `backlog/local-tracker.json` is the **canonical** task store.
-`backlog/tasks/` and `backlog/completed/` are one-way derived mirrors and are
-never read back as task truth. Required list/read/create/update/close operations
-return normalized identity
-`{ tracker: "local", id, ref: "{PREFIX}-{N[.M]}" }` without fabricating a URL.
-Metadata-only updates preserve the canonical body/AC bytes; close atomically
-changes one JSON record to `state: closed` and projects `status: Done`. Local
-reports no optional provider capabilities, so
-milestones, PR relationships, comments, and closing
-semantics fail before filesystem or provider effects and never invoke `gh`.
-
-JSON allocation, atomic publication, collision, and recovery details have one
-implementation owner: [Tracker Adapter Design Contract](../../../docs/tracker-adapter-design.md).
 
 dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;
 `project_name` is retained as metadata. Other Backlog.md config fields are not
@@ -193,8 +175,12 @@ Hierarchical IDs use decimal notation:
 
 Sub-tasks get their own files: `BACK-42.1 - Subtask-title.md`
 
-## Backlog.md CLI Compatibility
+## Backlog.md One-Way Legacy Compatibility
 
-The `backlog/tasks/` and `backlog/completed/` directories use a Backlog.md-compatible task-file format, so the CLI will recognize them.
+`sync-pull.js --legacy-export` may write `backlog/tasks/` in a
+Backlog.md-compatible shape for diagnosis or rollback. The Backlog.md CLI may
+recognize those files, but it is not installed, invoked, or required by
+dev-backlog. To import historical compatible Markdown, a human must review it
+and explicitly create or amend the corresponding GitHub Issue.
 
 The `backlog/sprints/` directory is a custom addition for sprint execution tracking. Backlog.md CLI ignores it (only scans `tasks/`, `completed/`, `drafts/`, `decisions/`, `docs/`). This is safe — sprints/ won't interfere with CLI operations.

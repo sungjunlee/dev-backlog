@@ -1,99 +1,53 @@
-// This is repo-local because the prose ships byte-identically to every consumer;
-// running the same authoring check in backlog-doctor would add no coverage.
-
 const { it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { STORE_FILE } = require("./local-tracker.js");
-const { TRACKER_SELECTION_FILE } = require("./tracker.js");
-const ROOT = path.resolve(__dirname, "../../..");
-const SURFACES = ["skills/dev-backlog/SKILL.md", "README.md", "spec/system-map.md"];
-const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function contractBlock(file) {
-  const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split(/\r?\n/);
-  let start = -1;
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!/^```/.test(lines[index])) continue;
-    if (start < 0) {
-      start = index + 1;
-      continue;
-    }
-    const block = lines.slice(start, index);
-    if (/\bgithub\b/i.test(block.join("\n")) && /\blocal\b/i.test(block.join("\n"))) {
-      return block.map((text, offset) => ({ text, number: start + offset + 1 }));
-    }
-    start = -1;
-  }
-  assert.fail(`${file}:1: no delimited canonical-store contract block found`);
-}
 
-function diagnostic(file, line, fact) {
-  return `${file}:${line.number}: ${line.text.trim()}\ncontradicts code-derived fact: ${fact}`;
-}
-function requireLine(file, line, pattern, fact) {
-  assert.ok(pattern.test(line.text), diagnostic(file, line, fact));
-}
-function modeSection(file, block, mode) {
-  const start = block.findIndex(({ text }) => new RegExp(`\\b${mode}\\b.*->`, "i").test(text));
-  assert.notEqual(start, -1, diagnostic(file, block[0], `${mode} mode must name canonical truth`));
-  const next = block.findIndex(({ text }, index) => index > start && /\b(?:github|local)\b.*->/i.test(text));
-  return block.slice(start, next < 0 ? block.length : next);
-}
-function assertDerived(file, mode, section, block) {
-  const global = block.find(({ text }) => /derived .*mirrors? in both modes/i.test(text));
-  const claim = section.find(({ text }) => /derived/i.test(text) && /tasks?|mirrors?/i.test(text));
-  const offender = section.find(({ text }) => /tasks?|completed|mirrors?/i.test(text)) || section[0];
-  assert.ok(global || claim, diagnostic(
-    file, offender, `task mirrors are derived in ${mode} mode`
-  ));
-}
-function assertMirrorlessGithub(file, section) {
-  const claim = section.find(({ text }) =>
-    /(?:\bno\s+(?:required\s+)?task(?:-file)?\s+(?:mirror|directory)\b|\btask(?:-file)?\s+(?:mirror|directory)\s+(?:is\s+)?(?:not\s+)?required\b|\boptional\s+legacy\s+export\b)/i.test(text)
-  );
-  assert.ok(claim, diagnostic(
-    file,
-    section[0],
-    "github mode must not require task mirrors",
-  ));
-}
-function assertNoCanonicalMirrors(file, block) {
-  const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split(/\r?\n/);
-  const subject = "(?:task files?|(?:backlog/)?tasks/?(?:\\s*\\+\\s*(?:backlog/)?completed/?)?|mirrors?)";
-  const forbidden = new RegExp(
-    `${subject}\\s+(?:(?:are|is)\\s+(?:the\\s+)?canonical|\\(canonical)`, "i"
-  );
-  lines.forEach((text, index) => {
-    if (forbidden.test(text) || /task files?.*\bcanonical records?\b/i.test(text) ||
-        /\bcanonical\s+(?:task files?|tasks|mirrors?)\b/i.test(text)) {
-      assert.fail(diagnostic(file, { text, number: index + 1 },
-        `only GitHub Issues or backlog/${STORE_FILE} can be canonical task truth`));
-    }
-  });
-  const approved = new RegExp(
-    `(?:GitHub Issues|${escape(`backlog/${STORE_FILE}`)})\\s*\\(?canonical\\)?`, "ig");
-  block.forEach((line) => {
-    const rest = line.text.replace(approved, "");
-    if (/\bcanonical\b/i.test(rest) && !/sprints\/.*canonical execution hub/i.test(rest))
-      assert.fail(diagnostic(file, line, "no other store can be canonical task truth"));
-  });
-}
-function assertContract(file) {
-  const block = contractBlock(file);
-  const github = modeSection(file, block, "github");
-  const local = modeSection(file, block, "local");
-  requireLine(file, block[0], new RegExp(escape(`backlog/${TRACKER_SELECTION_FILE}`)),
-    `tracker selection lives in backlog/${TRACKER_SELECTION_FILE}`);
-  requireLine(file, github[0], /GitHub Issues.*canonical/i,
-    "GitHub Issues are canonical in github mode");
-  requireLine(file, local[0], new RegExp(`${escape(`backlog/${STORE_FILE}`)}.*canonical`, "i"),
-    `backlog/${STORE_FILE} is canonical in local mode`);
-  assertMirrorlessGithub(file, github);
-  assertDerived(file, "local", local, block);
-  assertNoCanonicalMirrors(file, block);
-}
+const ROOT = path.resolve(__dirname, "../../..");
+const SURFACES = [
+  "skills/dev-backlog/SKILL.md",
+  "README.md",
+  "CLAUDE.md",
+  "spec/system-map.md",
+  "skills/dev-backlog/references/integration-contract.md",
+];
 
 for (const file of SURFACES) {
-  it(`${file} matches canonical-store code`, () => assertContract(file));
+  it(`${file} states the standalone GitHub authority`, () => {
+    const markdown = fs.readFileSync(path.join(ROOT, file), "utf8");
+    assert.match(markdown, /GitHub Issues[^\n]*(?:canonical|authority|source of truth)/i);
+    assert.match(
+      markdown,
+      /(?:no required task mirror|no task-file directory required|optional legacy export)/i,
+    );
+    assert.doesNotMatch(markdown, /local-tracker\.json\s*\(canonical/i);
+    assert.doesNotMatch(markdown, /local-tracker\.js\s*->/i);
+  });
 }
+
+it("records compatibility subtraction in current decisions and release notes", () => {
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+  const capabilities = read("spec/capabilities.md");
+  const charter = read("spec/charter.md");
+  const changelog = read("CHANGELOG.md").split("## [0.9.0]")[0];
+
+  assert.match(capabilities, /Remove the zero-adopter local tracker/);
+  assert.match(capabilities, /2026-07-26 local JSON authority/);
+  assert.match(charter, /Remove the zero-adopter local tracker/);
+  assert.match(changelog, /Required task mirrors/);
+  assert.match(changelog, /Zero-adopter local tracker/);
+  assert.doesNotMatch(changelog, /task mirrors under `backlog\/tasks\/` remain core/);
+});
+
+it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {
+  const markdown = fs.readFileSync(
+    path.join(ROOT, "skills/dev-backlog/references/integration-contract.md"),
+    "utf8",
+  );
+  assert.match(markdown, /accepts exactly one runtime authority: `github`/);
+  assert.match(markdown, /Historical compatibility only:/);
+  assert.match(markdown, /does not\s+make `local` a valid `\.tracker` selection/);
+  assert.doesNotMatch(markdown, /Local Plan items use/);
+  assert.doesNotMatch(markdown, /"tracker": "local",\s*\n\s*"capability"/);
+  assert.doesNotMatch(markdown, /explicitly change backlog\/\.tracker to a tracker/);
+});

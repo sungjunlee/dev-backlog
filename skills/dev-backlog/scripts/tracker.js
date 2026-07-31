@@ -6,12 +6,11 @@
  */
 
 const { createGithubAdapter } = require("./github-tracker.js");
-const { createLocalAdapter } = require("./local-tracker.js");
 const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
 
-const TRACKER_KEYS = Object.freeze(["github", "local"]);
+const TRACKER_KEYS = Object.freeze(["github"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
   "availability",
   "capabilities",
@@ -72,20 +71,16 @@ class TrackerUnavailableError extends Error {
 }
 
 class UnsupportedTrackerCapabilityError extends Error {
-  constructor(
-    tracker,
-    capability,
-    configPath = configDisplayPath(DEFAULT_BACKLOG_DIR, TRACKER_SELECTION_FILE)
-  ) {
+  constructor(tracker, capability) {
     super(`Tracker "${tracker}" does not support capability "${capability}".`);
     this.name = "UnsupportedTrackerCapabilityError";
     this.code = UNSUPPORTED_CAPABILITY_CODE;
     this.tracker = tracker;
     this.capability = capability;
     this.remediation =
-      `Use tracker "${tracker}" without "${capability}", or explicitly change ` +
-      `${configPath} to a tracker that supports it before retrying. ` +
-      "No tracker switch was attempted.";
+      `Use tracker "${tracker}" without "${capability}", or restore that ` +
+      "tracker's capability transport before retrying. " +
+      "No tracker switch or fallback was attempted.";
   }
 }
 
@@ -230,7 +225,6 @@ function resolveConfiguredTracker(config, {
   const registered = adapters || {
     ...TRACKER_ADAPTERS,
     github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
-    local: backlogDir ? createLocalAdapter({ backlogDir }) : TRACKER_ADAPTERS.local,
   };
   const storedSelection = backlogDir
     ? readTrackerSelection(backlogDir, { fs: fsApi || fs })
@@ -241,7 +235,6 @@ function resolveConfiguredTracker(config, {
   );
   return Object.freeze({
     ...resolved,
-    configPath: configDisplayPath(backlogDir || DEFAULT_BACKLOG_DIR, TRACKER_SELECTION_FILE),
   });
 }
 
@@ -333,18 +326,13 @@ function invokeCapability(resolved, capability, operation, ...args) {
 
   const supported = readCapabilities(resolved.tracker, resolved.adapter);
   if (!supported.includes(capability)) {
-    throw new UnsupportedTrackerCapabilityError(
-      resolved.tracker,
-      capability,
-      resolved.configPath
-    );
+    throw new UnsupportedTrackerCapabilityError(resolved.tracker, capability);
   }
   return operation(...args);
 }
 
 const TRACKER_ADAPTERS = Object.freeze({
   github: createGithubAdapter(),
-  local: createLocalAdapter({ backlogDir: DEFAULT_BACKLOG_DIR }),
 });
 
 module.exports = {
@@ -370,5 +358,4 @@ module.exports = {
   resolveConfiguredTracker,
   invokeCapability,
   createGithubAdapter,
-  createLocalAdapter,
 };

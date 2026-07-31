@@ -11,8 +11,8 @@ The former `spec-charter`, `spec-system-map`, and `spec-grill` capability blocks
 The 2026-08 target authority boundary is
 [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
 The human-confirmed 2026-07-31 amendment makes GitHub Issues the sole task and
-lifecycle authority. Compatibility code retained during the staged migration
-does not widen these capability contracts.
+lifecycle authority. The zero-adopter local tracker is removed; one-way legacy
+import/export does not widen these capability contracts.
 
 ---
 
@@ -24,7 +24,7 @@ does not widen these capability contracts.
 - Live GitHub Issue list/read/create/update/close lifecycle
 - Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships
 - Fail-loud GitHub availability and authentication errors
-- Read-only compatibility during the staged retirement of local-tracker and task-mirror paths
+- Read-only compatibility for explicit one-way Backlog.md import/export
 
 **Out-of-scope:**
 - Synchronizing multiple canonical trackers
@@ -59,6 +59,7 @@ does not widen these capability contracts.
 | 2026-07-26 | Make `backlog/local-tracker.json` the sole local task authority and derive both Markdown directories from it | one atomic JSON store removes Markdown/YAML round-trip and close-compensation machinery while satisfying the no-co-authority constraint directly | canonical local Markdown shape from PR #298 |
 | 2026-07-27 | Move tracker selection to `backlog/.tracker`; `config.yml` becomes a read-only legacy fallback that is never written | the selection tokenizer existed only to write one key into user-owned YAML safely, so not writing removes its reason to exist and preserves user bytes permanently; the legacy read refuses authority-obscuring shapes rather than decoding them | tracker key in `config.yml` from PR #301 |
 | 2026-07-31 | Narrow the target capability to live GitHub Issue authority and freeze adapter/mirror expansion | 0 of 17 observed consumers selected a non-default tracker, and all 18 known consumers had a GitHub remote; compatibility remains only long enough to stage resolver and mirrorless pilots safely | 2026-07-11 generic configured-tracker target |
+| 2026-07-31 | Remove the zero-adopter local tracker and retain Backlog.md only as one-way legacy import/export | the mirrorless GitHub pilot and optional-integration absence tests preserve the complete core path while deleting an unmeasured storage substrate | 2026-07-26 local JSON authority; staged local compatibility in the preceding 2026-07-31 decision |
 
 ---
 
@@ -84,9 +85,7 @@ does not widen these capability contracts.
 - One successful `sprint-close.sh` invocation flips the sprint to
   `status: completed` and appends final Progress. Mirrorless GitHub requires no
   task directories; checked legacy GitHub mirrors are archived only when
-  present. Local tasks are closed separately through the configured adapter,
-  which updates canonical JSON and its completed projection before sprint
-  close finalizes the sprint.
+  present.
 
 ### Hard Constraints
 - Never mutate a sprint's `status: completed` back to `active`; completed sprints are immutable history.

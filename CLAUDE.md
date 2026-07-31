@@ -24,16 +24,17 @@ The `spec-charter`, `spec-system-map`, and `spec-grill` skills moved to [craftki
 
 - **GitHub Issues = source of truth** for task definitions (what to do)
 - **Sprint files = execution hub** (how to do it, context, notes, progress)
-- **Task files = thin GitHub mirror** (sync cache, AC checkboxes only)
-- **Backlog.md compatible** — task file format follows Backlog.md; sprints/ is a custom addition
+- **No required GitHub task mirror** — resolve task intent and AC from live Issues
+- **Legacy task export is explicit** — `sync-pull --legacy-export` is rollback/diagnostic material only
+- **Backlog.md compatible** — legacy task exports follow Backlog.md shape; sprints/ is a custom addition
 - **Cross-platform** — works on Claude Code and Codex (both have `gh` CLI)
-- **Explicit sync** — pull/push is manual; no silent background sync
+- **No hidden sync** — provider writes and legacy exports are deliberate operations
 
 ## Two-Layer Architecture
 
 ```
 GitHub (what)  ↔  gh CLI  ↔  backlog/sprints/ (how + context)
-                              backlog/tasks/   (thin mirror)
+                              backlog/tasks/   (optional legacy export)
 ```
 
 ## Project Spec Home

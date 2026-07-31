@@ -14,7 +14,7 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 
 ## Full inventory
 
-- `scripts/setup-dev-backlog.js [project-name] [--tracker github|local] [--non-interactive] [--json]` — persist one canonical tracker; GitHub creates only `sprints/`, while local compatibility also creates projection directories.
+- `scripts/setup-dev-backlog.js [project-name] [--tracker github] [--non-interactive] [--json]` — persist GitHub as the canonical task authority and create only `sprints/`.
 - `scripts/init.sh [project-name]` — bootstrap `backlog/` with `.tracker` and directories.
 - `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `process.md`.
 - `scripts/effective-task-spec.js TASK_REF [--repo OWNER/REPO] [--spec-ref PATH] [--backlog-dir PATH] [--root PATH]` — resolve the configured live task into effective spec, normalized AC/lifecycle, selected source, and stable SHA-256 revision/digest. A body marker `<!-- dev-backlog:spec_ref PATH -->` or explicit flag selects a repository-relative spec; otherwise the canonical task body wins. Any authority/spec load failure stops without a task-mirror fallback.
@@ -33,11 +33,10 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 ## Tracker routing
 
 `backlog/.tracker` is the runtime selection authority. When it is absent, a
-legacy `tracker:` key read from `config.yml` is the compatibility fallback;
-with neither, GitHub remains the deterministic default. Setup migrates a legacy
-selection to `.tracker` without editing `config.yml`. GitHub mode uses `gh` and
-treats task files as mirrors; local mode uses `local-tracker.json` as canonical
-and derives the same task-file mirrors with zero provider calls.
+legacy `tracker: github` key read from `config.yml` is the compatibility
+fallback; any other value fails. With neither, GitHub remains the deterministic
+default. Setup pins the legacy GitHub selection to `.tracker` without editing
+`config.yml`. Task files exist only as explicit one-way legacy exports.
 
-Detailed adapter mechanics and compatibility evidence are single-sourced in
-[`docs/tracker-adapter-design.md`](../../../docs/tracker-adapter-design.md).
+Retained seams and compatibility evidence are single-sourced in
+[`docs/compatibility-subtraction.md`](../../../docs/compatibility-subtraction.md).

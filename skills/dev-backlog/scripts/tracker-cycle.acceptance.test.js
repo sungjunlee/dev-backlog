@@ -6,11 +6,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { resolveBashExecutable, toBashArgs } = require("./bash-runtime.js");
 
-const trackerModule = require("./tracker.js");
-
 const SCRIPTS_DIR = __dirname;
 const TRACKER_PATH = path.join(SCRIPTS_DIR, "tracker.js");
-const SETUP_PATH = path.join(SCRIPTS_DIR, "setup-dev-backlog.js");
 const SYNC_PATH = path.join(SCRIPTS_DIR, "sync-pull.js");
 const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
 const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
@@ -184,19 +181,6 @@ childProcess.execFileSync = function (command, args, options) {
   };
 }
 
-function writeGhTrap(root) {
-  const binDir = path.join(root, "bin");
-  const marker = path.join(root, "gh-was-called");
-  fs.mkdirSync(binDir, { recursive: true });
-  const ghPath = path.join(binDir, "gh");
-  fs.writeFileSync(ghPath, `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(marker)}\nexit 97\n`);
-  fs.chmodSync(ghPath, 0o755);
-  return {
-    env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}` },
-    calls: () => fs.existsSync(marker) ? fs.readFileSync(marker, "utf8").trim().split("\n") : [],
-  };
-}
-
 function prepareGithub(t) {
   const root = makeRoot(t, "tracker-cycle-github-");
   const backlogDir = path.join(root, "backlog");
@@ -228,35 +212,6 @@ function prepareMirrorlessGithub(t) {
     tracker: "github", root, cwd: root, backlogDir, worker: writeWorker(root),
     env: gh.env, providerCalls: gh.calls, providerState: gh.state,
   };
-}
-
-function prepareLocal(t) {
-  const root = makeRoot(t, "tracker-cycle-local-");
-  const trap = writeGhTrap(root);
-  const setup = parseJsonResult(run(process.execPath, [
-    SETUP_PATH, "--tracker", "local", "--non-interactive", "--json", "--project-name", "offline-cycle",
-  ], { cwd: root, env: trap.env }), "local setup");
-  assert.equal(setup.selection, "local");
-  return {
-    tracker: "local", root, cwd: root, backlogDir: path.join(root, "backlog"),
-    worker: writeWorker(root), env: trap.env, providerCalls: trap.calls,
-  };
-}
-
-const CYCLE_ROWS = [
-  { tracker: "github", prepare: prepareGithub },
-  { tracker: "local", prepare: prepareLocal },
-];
-
-function writeLocalSprint(fixture, identity) {
-  const sprintPath = path.join(fixture.backlogDir, "sprints", "2026-07-local-cycle.md");
-  fs.writeFileSync(sprintPath, [
-    "---", "milestone: local cycle", "status: active", "started: 2026-07-12", "---", "",
-    "# Local cycle", "", "## Goal", "Prove the local core cycle.", "", "## Plan", "",
-    "### Batch 1 - local", `- [ ] ${identity.ref} Offline canonical task`, "",
-    "## Running Context", "Local files are canonical.", "", "## Progress", "",
-  ].join("\n"));
-  return sprintPath;
 }
 
 function orient(fixture) {
@@ -413,134 +368,43 @@ function runMirrorlessGithubCycle(fixture) {
   assertNoTaskDirectories();
 }
 
-function runLocalCycle(fixture) {
-  const body = "\n## Description\nHuman local body\n\n## Acceptance Criteria\n- [ ] Keep this AC\n";
-  const created = runWorker(fixture, "create", { id: "7.2", title: "Offline canonical task", body });
-  assert.deepEqual(created, { tracker: "local", id: "7.2", ref: "BACK-7.2" });
-  const taskPath = path.join(fixture.backlogDir, "tasks", "BACK-7.2 - offline-canonical-task.md");
-  assert.equal(fs.readFileSync(taskPath, "utf8").endsWith(body), true);
-
-  const sprintPath = writeLocalSprint(fixture, created);
-  const { status, next } = orient(fixture);
-  assert.deepEqual(status.plan_items.map(({ tracker, id, ref, issue_number }) => ({ tracker, id, ref, issue_number })), [
-    { tracker: "local", id: "7.2", ref: "BACK-7.2", issue_number: null },
-  ]);
-  assert.equal(next.next_batch.items[0].ref, "BACK-7.2");
-  assert.equal(runWorker(fixture, "read", { selector: "BACK-7.2" }).body, body);
-
-  const bodyBefore = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
-  runWorker(fixture, "update", { selector: "BACK-7.2", changes: { status: "In Progress" } });
-  const afterUpdate = fs.readFileSync(taskPath, "utf8");
-  assert.match(afterUpdate, /^status: In Progress$/m);
-  assert.equal(afterUpdate.slice(afterUpdate.indexOf("\n## Description")), bodyBefore);
-
-  runWorker(fixture, "close", { selector: "BACK-7.2" });
-  const archivedPath = path.join(fixture.backlogDir, "completed", "BACK-7.2 - offline-canonical-task.md");
-  assert.equal(fs.existsSync(taskPath), false);
-  assert.match(fs.readFileSync(archivedPath, "utf8"), /^status: Done$/m);
-  assert.equal(fs.readFileSync(archivedPath, "utf8").slice(fs.readFileSync(archivedPath, "utf8").indexOf("\n## Description")), bodyBefore);
-
-  finishSprint(fixture, sprintPath);
-  assert.deepEqual(runWorker(fixture, "list", { state: "open" }), []);
-  assert.equal(runWorker(fixture, "list", { state: "closed" })[0].ref, "BACK-7.2");
-  const finalRead = runWorker(fixture, "read", { selector: "BACK-7.2" });
-  assert.equal(finalRead.state, "closed");
-  assert.equal(finalRead.status, "Done");
-  assert.deepEqual(fixture.providerCalls(), [], "local cycle must make zero provider calls");
-}
-
-describe("tracker core cycle acceptance matrix", () => {
-  for (const row of CYCLE_ROWS) {
-    it(`${row.tracker}: setup/config → create → Plan → orient/read → update → complete → final read/list`, (t) => {
-      const fixture = row.prepare(t);
-      if (row.tracker === "github") runGithubCycle(fixture);
-      else runLocalCycle(fixture);
-    });
-  }
+describe("GitHub tracker core cycle acceptance", () => {
+  it("setup/config → create → Plan → orient/read → update → complete → final read/list", (t) => {
+    runGithubCycle(prepareGithub(t));
+  });
 });
 
 describe("mirrorless GitHub core acceptance", () => {
   it("runs create → Plan → orient/effective read → update → complete with no task directories", (t) => {
     runMirrorlessGithubCycle(prepareMirrorlessGithub(t));
   });
-});
 
-describe("typed unsupported-capability contract", () => {
-  for (const capability of trackerModule.CAPABILITY_NAMES) {
-    it(`local ${capability} fails before side effects with the shared serialized shape`, (t) => {
-      const fixture = prepareLocal(t);
-      const resolved = trackerModule.resolveConfiguredTracker({ tracker: "local" }, { backlogDir: fixture.backlogDir });
-      let sideEffects = 0;
-      let caught;
-      try {
-        trackerModule.invokeCapability(resolved, capability, () => { sideEffects += 1; });
-      } catch (error) {
-        caught = error;
-      }
-      assert.equal(sideEffects, 0);
-      assert.ok(caught instanceof trackerModule.UnsupportedTrackerCapabilityError);
-      assert.equal(typeof trackerModule.serializeTrackerError, "function");
-      assert.deepEqual(trackerModule.serializeTrackerError(caught), {
-        code: "TRACKER_CAPABILITY_UNSUPPORTED",
-        tracker: "local",
-        capability,
-        message: `Tracker "local" does not support capability "${capability}".`,
-        remediation: `Use tracker "local" without "${capability}", or explicitly change ${path.join(fixture.backlogDir, ".tracker")} to a tracker that supports it before retrying. No tracker switch was attempted.`,
-      });
-      assert.deepEqual(fixture.providerCalls(), []);
-    });
-  }
-});
-
-describe("unsupported capability public CLI boundaries", () => {
-  const boundaries = [
-    { name: "sprint-init", script: SPRINT_INIT_PATH, args: () => ["blocked", "--json"], capability: "milestones", configPath: () => "backlog/.tracker" },
-  ];
-
-  for (const boundary of boundaries) {
-    it(`${boundary.name} emits one structured JSON error and matching human remediation`, (t) => {
-      const fixture = prepareLocal(t);
-      const before = snapshotFiles(fixture.backlogDir);
-      const boundaryArgs = boundary.args(fixture);
-      const json = run(process.execPath, [boundary.script, ...boundaryArgs], fixture);
-      assert.notEqual(json.status, 0);
-      assert.equal(json.stderr, "");
-      const payload = JSON.parse(json.stdout);
-      assert.deepEqual(Object.keys(payload), ["error"]);
-      assert.deepEqual(payload.error, {
-        code: "TRACKER_CAPABILITY_UNSUPPORTED",
-        tracker: "local",
-        capability: boundary.capability,
-        message: `Tracker "local" does not support capability "${boundary.capability}".`,
-        remediation: `Use tracker "local" without "${boundary.capability}", or explicitly change ${boundary.configPath(fixture)} to a tracker that supports it before retrying. No tracker switch was attempted.`,
-      });
-
-      const humanArgs = boundaryArgs.filter((arg) => arg !== "--json");
-      const human = run(process.execPath, [boundary.script, ...humanArgs], fixture);
-      assert.notEqual(human.status, 0);
-      assert.match(human.stderr, new RegExp(escapeRegExp(payload.error.remediation)));
-      assert.deepEqual(snapshotFiles(fixture.backlogDir), before, "capability failure must precede side effects");
-      assert.deepEqual(fixture.providerCalls(), [], "capability failure must not call gh");
-      assert.equal(fs.readFileSync(path.join(fixture.backlogDir, ".tracker"), "utf8"), "local\n");
-    });
-  }
-});
-
-function snapshotFiles(root) {
-  const snapshot = {};
-  function walk(dir, relative = "") {
-    for (const name of fs.readdirSync(dir).sort()) {
-      const full = path.join(dir, name);
-      const key = path.join(relative, name);
-      const stat = fs.lstatSync(full);
-      if (stat.isDirectory()) walk(full, key);
-      else snapshot[key] = fs.readFileSync(full).toString("base64");
+  it("does not require Relay, Matt/craftkit, Projects, or Backlog.md tooling", (t) => {
+    const fixture = prepareMirrorlessGithub(t);
+    const optionalPaths = [
+      path.join(fixture.root, ".relay"),
+      path.join(fixture.root, ".agents", "skills"),
+      path.join(fixture.root, "spec"),
+      path.join(fixture.root, "node_modules"),
+      path.join(fixture.backlogDir, "tasks"),
+      path.join(fixture.backlogDir, "completed"),
+    ];
+    for (const optionalPath of optionalPaths) {
+      assert.equal(fs.existsSync(optionalPath), false, `${optionalPath} must start absent`);
     }
-  }
-  walk(root);
-  return snapshot;
-}
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+    runMirrorlessGithubCycle(fixture);
+
+    for (const optionalPath of optionalPaths) {
+      assert.equal(fs.existsSync(optionalPath), false, `${optionalPath} must remain absent`);
+    }
+    assert.equal(
+      fixture.providerCalls().some((args) =>
+        args[0] === "project" ||
+        args.some((arg) => /projects(?:V2)?/i.test(String(arg)))
+      ),
+      false,
+      "core execution must not require GitHub Projects"
+    );
+  });
+});

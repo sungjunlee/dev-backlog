@@ -86,7 +86,8 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   );
 
   assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
-  assert.match(readme, /`backlog\/local-tracker\.json` remains its sole task authority/);
+  assert.match(readme, /Backlog\.md compatibility is a one-way legacy boundary/);
+  assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
   assert.match(skill, /`objectives:`\/`component:` are present only when their backing spec files exist/);
   assert.match(skill, /legacy mirror may be inspected only as diagnostic\/rollback evidence/);
   assert.match(capabilities, /If that read fails, execution stops/);
