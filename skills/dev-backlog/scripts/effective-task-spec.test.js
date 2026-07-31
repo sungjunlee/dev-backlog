@@ -158,6 +158,10 @@ describe("effective task spec selection", () => {
         "",
         "    <!-- dev-backlog:spec_ref docs/indented.md -->",
         "",
+        "A multiline code span: `",
+        "<!-- dev-backlog:spec_ref docs/multiline-inline.md -->",
+        "` remains documentation.",
+        "",
         "The canonical Issue body remains authoritative.",
       ].join("\n"),
     };
@@ -257,9 +261,22 @@ describe("acceptance criteria parsing and repository spec safety", () => {
       "- [ ] Example only",
       "```",
       "2) [x] Second ordered criterion",
+      "   with a continuation",
+      "",
+      "   - PNG",
+      "   - JPEG",
     ].join("\n")), [
       { text: "First ordered `criterion`", checked: false },
-      { text: "Second ordered criterion", checked: true },
+      {
+        text: [
+          "Second ordered criterion",
+          "   with a continuation",
+          "",
+          "   - PNG",
+          "   - JPEG",
+        ].join("\n"),
+        checked: true,
+      },
     ]);
   });
 

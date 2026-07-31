@@ -19,8 +19,8 @@ const GITHUB_RESOLUTION_FIELDS =
   "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url";
 const SPEC_REF_MARKER_RE =
   /<!--\s*dev-backlog:spec_ref\s+([^\r\n]*?)\s*-->/gi;
-const TASK_LIST_RE =
-  /^\s*(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\]\s+(.+?)\s*$/gm;
+const TASK_LIST_LINE_RE =
+  /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\]\s+(.+?)\s*$/;
 
 const SOURCE_UNAVAILABLE_CODE = "TASK_SPEC_SOURCE_UNAVAILABLE";
 const SPEC_REF_UNAVAILABLE_CODE = "TASK_SPEC_REF_UNAVAILABLE";
@@ -52,6 +52,42 @@ function digestText(value) {
   return crypto.createHash("sha256").update(normalizeText(value), "utf8").digest("hex");
 }
 
+function stripCodeSpans(markdown) {
+  const text = normalizeText(markdown);
+  let visible = "";
+  for (let index = 0; index < text.length;) {
+    if (text[index] !== "`") {
+      visible += text[index++];
+      continue;
+    }
+
+    let runEnd = index;
+    while (text[runEnd] === "`") runEnd += 1;
+    const runLength = runEnd - index;
+    let close = runEnd;
+    while (close < text.length) {
+      if (text[close] !== "`") {
+        close += 1;
+        continue;
+      }
+      let closeEnd = close;
+      while (text[closeEnd] === "`") closeEnd += 1;
+      if (closeEnd - close === runLength) break;
+      close = closeEnd;
+    }
+
+    if (close >= text.length) {
+      visible += text.slice(index, runEnd);
+      index = runEnd;
+      continue;
+    }
+    const hidden = text.slice(index, close + runLength);
+    visible += hidden.replace(/[^\n]/g, " ");
+    index = close + runLength;
+  }
+  return visible;
+}
+
 function markdownOutsideCode(markdown, { stripInline = false } = {}) {
   const visible = [];
   let fence = null;
@@ -81,9 +117,10 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       visible.push("");
       continue;
     }
-    visible.push(stripInline ? line.replace(/(`+).*?\1/g, "") : line);
+    visible.push(line);
   }
-  return visible.join("\n");
+  const outsideBlocks = visible.join("\n");
+  return stripInline ? stripCodeSpans(outsideBlocks) : outsideBlocks;
 }
 
 function explicitSpecRef(task, requestedSpecRef) {
@@ -182,11 +219,38 @@ function acceptanceCriteriaSection(markdown) {
 
 function parseAcceptanceCriteria(markdown) {
   const criteria = [];
-  for (const match of acceptanceCriteriaSection(markdown).matchAll(TASK_LIST_RE)) {
+  const lines = acceptanceCriteriaSection(markdown).split("\n");
+  for (let index = 0; index < lines.length;) {
+    const match = lines[index].match(TASK_LIST_LINE_RE);
+    if (!match) {
+      index += 1;
+      continue;
+    }
+    const baseIndent = match[1].replace(/\t/g, "    ").length;
+    const content = [match[3].trim()];
+    let next = index + 1;
+    let pendingBlankLines = 0;
+    while (next < lines.length) {
+      const line = lines[next];
+      if (!line.trim()) {
+        pendingBlankLines += 1;
+        next += 1;
+        continue;
+      }
+      const indent = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
+      if (indent <= baseIndent) break;
+      while (pendingBlankLines > 0) {
+        content.push("");
+        pendingBlankLines -= 1;
+      }
+      content.push(line.trimEnd());
+      next += 1;
+    }
     criteria.push(Object.freeze({
-      text: match[2].trim(),
-      checked: match[1].toLowerCase() === "x",
+      text: content.join("\n").trim(),
+      checked: match[2].toLowerCase() === "x",
     }));
+    index = next;
   }
   return Object.freeze(criteria);
 }
@@ -394,6 +458,7 @@ module.exports = {
   explicitSpecRef,
   loadRepositorySpec,
   markdownOutsideCode,
+  stripCodeSpans,
   normalizeLifecycle,
   parseCli,
   parseAcceptanceCriteria,
