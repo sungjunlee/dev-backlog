@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-07-28
-revision: 11
+last_amended: 2026-07-31
+revision: 12
 ---
 
 # dev-backlog Charter
@@ -13,35 +13,38 @@ in-flight delegation status leak out of the selected task tracker; continuity
 across sessions is rebuilt from scratch each time.
 
 ## Approach           <!-- Tier 1 · Direction (human-gated) -->
-Select exactly one configured tracker adapter as the canonical task spec for a
-repository; add a thin, explicit, markdown-only execution hub (the active
-sprint file) that humans and agents both read and update. GitHub remains the
-compatibility baseline, while local task files are the first alternative
-canonical store. Companion skill `backlog-triage` grooms supported tracker
-state — it never creates a parallel task truth. The spec axis
+Use GitHub Issues as the sole task-definition and lifecycle authority. Simple
+Issue → PR work needs no sprint. When dependency, delegation, cross-session
+context, or parallel-track complexity requires execution continuity, add one
+thin, explicit, markdown-only sprint file that humans and agents both read and
+update. Companion skill `backlog-triage` grooms GitHub state — it never creates
+a parallel task truth. The spec axis
 (`spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md`) is authored by
 craftkit's `spec-charter`/`spec-system-map`/`spec-grill` skills and consumed
 here as read-only yardsticks.
 No server, no daemon, no hidden state, no silent sync.
 
 ## Non-Goals          <!-- Tier 1 · Direction (human-gated) -->
-- A universal or multi-master issue tracker — one configured adapter owns task truth; dev-backlog does not synchronize canonical stores.
+- A universal, pluggable, or multi-master issue tracker — GitHub Issues own task truth; dev-backlog does not synchronize canonical stores.
 - A database, server, or background daemon — Markdown + bash + node built-ins only; no mystery state.
 - A lifecycle-owning workflow engine (Fractal / gsd-2 style) — those conflict with the tracker-anchored model; their patterns are absorbed, never integrated.
 - Silent background sync — every pull and push is an explicit user action.
 - A knowledge base / wiki replacement — `spec/charter.md` is a yardstick, `_context.md` is rediscovery-prone HOW-knowledge, neither is a long-form doc store.
-- Broad SaaS connector proliferation (Jira, Linear, Notion) — out of scope; only explicitly supported forge/local adapters belong to the product boundary.
+- Broad SaaS connector proliferation (Jira, Linear, Notion) or new tracker adapters — out of scope.
 - Backlog.md convention-following — the task-file format stays Backlog.md-compatible, but new features are not constrained by Backlog.md conventions.
+- Dual-write state or automatic memory writes — mirrors, Projects, indexes, and summaries are projections and never become independent write targets.
+- Hard Relay, Matt Pocock skill, GitHub Projects, or Backlog.md dependencies — each may be used optionally without entering the core path.
 
 ## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status: active → implemented → validated, proof-gated) -->
-- O1 [validated] Claude Code, Codex, and humans read the same active sprint file as the single execution state · src: user (adoption 2026-07-27: 146 sprints across 17 repos other than this one)
+- O1 [validated] For complex work admitted to a sprint, Claude Code, Codex, and humans read the same active sprint file as the single execution-continuity state · src: user (adoption 2026-07-27: 146 sprints across 17 repos other than this one)
 - O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
 - O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close; adoption 2026-07-27: `backlog/triage/` reports in 7 repos other than this one)
 - O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5; adoption 2026-07-27: dated reassess reports in 3 repos other than this one — survival-alpha, beopsuny-skill, aibris)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
 - O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates; adoption 2026-07-27: 10 repos run sprints with no `spec/` axis at all, up to 15 sprints each)
-- O8 [implemented] The same core sprint cycle is proven on both `github` and `local`, while GitHub's existing task, milestone, and closing-link behavior remains backward compatible · src: user (proof: GitHub seam PR #286 + local lifecycle PR #298 + table-driven dual-mode acceptance and compatibility proof PR #303; adoption: **not expected** — `local` exists to prove the seam admits a non-GitHub adapter, that proof is delivered, and user adoption of `local` is not a goal of this objective. The generalization direction is carried by the seam and its ≤200-line translator budget, not by `local` gaining users)
-- O9 [implemented] Exactly one configured tracker adapter owns canonical task truth per repository; runtime never silently changes the selected tracker · src: user (proof: configured-only resolver PR #282 + canonical local store PR #298 + persisted immutable setup PR #301 + no-switch/error proof PR #303; adoption 2026-07-27: none — 0 of 17 other repos set a non-default tracker)
+- O8 [implemented] Historical proof: the same core sprint cycle was demonstrated on `github` and `local` without silent switching. Retained so completed sprint references remain resolvable; superseded as product direction by O10 on 2026-07-31 · src: user (proof: PRs #286/#298/#303; adoption premise absent: all 18 known consumers had a GitHub remote)
+- O9 [implemented] Historical proof: exactly one configured adapter owned task truth during the tracker-seam phase. Retained so completed sprint references remain resolvable; superseded as product direction by O10 on 2026-07-31 · src: user (proof: PRs #282/#298/#301/#303; adoption 2026-07-27: 0 of 17 other repos selected a non-default tracker)
+- O10 [active] GitHub Issues are the standalone task-definition and lifecycle authority; simple Issue → PR work is sprint-free, while complex work preserves continuity in one admitted sprint without task mirrors, dual writes, or required ecosystem integrations · src: user (adoption evidence 2026-07-27: 0 of 17 other consumer repos selected a non-default tracker; 2026-07-28: all 18 known consumer repos had a GitHub remote)
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->
 | date       | decision                                                                              | rationale                                                                                        | supersedes |
@@ -60,3 +63,5 @@ No server, no daemon, no hidden state, no silent sync.
 | 2026-07-11 | Exactly one configured tracker adapter owns task truth per repository; initial adapters are `github` and `local`, with GitHub as the compatibility baseline | Migration must stage task-ID and `gh` coupling behind a compatibility-preserving seam; capability-gated extensions prevent a lowest-common-denominator interface, while single ownership prevents multi-master sync | — |
 | 2026-07-27 | Objective status splits `implemented` (producer-side proof) from `validated` (cited use outside this repo); O8 and O9 move to `implemented` | measured 2026-07-27 across 17 other repos consuming dev-backlog: `local` has 0 adopters and 0 set a non-default tracker, yet both objectives read `validated` on merged-PR proof while v0.9.0 was deleting 2,556 lines from one of those axes for being built at the wrong size. Vocabulary defined by craftkit `spec-charter` (craftkit#165) | — |
 | 2026-07-28 | O8 stays `[implemented]` by design: `local` proved the seam admits a non-GitHub adapter, and user adoption of `local` is not a goal of O8 | measured 2026-07-28: all 18 repos consuming dev-backlog have a GitHub remote, so `local`'s premise has zero instances and O8 cannot reach `[validated]` by waiting. Restating the objective's purpose is honest; manufacturing an adopter or deleting a working adapter is not. O8's predicate also drops `mirror` and `progress` because #340 deleted that behavior — that is removing a reference to deleted code, **not** weakening a predicate so its proof looks sufficient | — |
+| 2026-07-31 | GitHub Issues become the sole task-definition/lifecycle authority; sprints are admitted by execution complexity, while tracker generalization and task mirrors leave the target product boundary | measured adoption found 0 of 17 consumers selecting a non-default tracker and all 18 known consumers on GitHub; preserving unused generality would prolong dual-state and compatibility cost without user evidence. O8/O9 cease to direct product work but remain implemented historical IDs so completed sprint references still resolve | 2026-07-11 configured-tracker direction; 2026-07-28 O8 retention |
+| 2026-07-31 | Relay, Matt Pocock skills, GitHub Projects, Backlog.md compatibility, and retrieval/memory experiments remain optional projections or techniques | the standalone Issue → PR and complex-sprint paths must survive without ecosystem dependencies; projections cannot acquire write authority, and memory requires a separate measured gate | — |

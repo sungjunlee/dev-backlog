@@ -3,16 +3,22 @@
 [![CI](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml/badge.svg)](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Choose one canonical task tracker per repository: GitHub Issues or an offline
-local Markdown store. Sprint files remain the execution hub that both you and
-your AI agent read during a coding session.
+GitHub Issues own task definition and lifecycle. Simple Issue → PR work stays
+sprint-free; a local sprint file is added only when complex execution needs
+shared batching, context, progress, or handoff across issues, actors, or
+sessions.
 
 dev-backlog adds a local sprint file that carries the plan, decisions, and progress across tasks and sessions. Claude Code, Codex, and humans all read the same file.
 
-No new server. No hidden state. Existing GitHub repositories keep their current
-behavior without migration.
+No new server. No hidden state. No automatic memory writes. Existing GitHub
+repositories keep their current behavior without migration.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+
+The implementation still exposes local-tracker and task-mirror compatibility
+while the 2026-08 migration is staged. Those paths are frozen, are not the
+target product boundary, and never become co-authoritative. See the
+[authority and routing contract](skills/dev-backlog/references/authority-contract.md).
 
 ```text
 backlog/.tracker: github | local
@@ -34,9 +40,9 @@ backlog/sprints/     execution hub: plan, context, progress
 
 | Capability | What changes |
 |------------|--------------|
-| One canonical tracker | Explicit `github` or fully offline `local`; runtime never switches it |
-| One active sprint file per track | The human and the agent read the same execution plan; disjoint tracks may run concurrently |
-| Derived task files | `backlog/tasks/` mirrors the canonical store in both modes and is never read back as truth |
+| One task authority | Live GitHub Issues own specification, native planning metadata, and lifecycle |
+| Complexity-triggered sprint | Simple work stays Issue → PR; admitted complex tracks share one execution plan and may run concurrently when disjoint |
+| Non-authoritative compatibility | Transition task files are derived/read-only fallback material and are never read back as truth |
 | Explicit sync | Pull and refresh when you choose, not behind your back |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
@@ -71,6 +77,13 @@ git clone https://github.com/sungjunlee/dev-backlog.git
 Run these commands from the project you want to manage, not from the `dev-backlog` repo itself.
 The examples below assume you have this repo available at `/path/to/dev-backlog`. If you installed the skill with `npx skills add`, use the installed skill path instead.
 
+For one self-contained Issue, work directly from the live Issue and its PR.
+Open a sprint only for ordered multi-Issue work, delegated/parallel handoff,
+cross-Issue or cross-session context, or concurrent-track coordination.
+Duration, estimate, milestone membership, and Relay presence alone do not
+require one. The commands below show that admitted complex-work path and its
+transition-compatible setup.
+
 ```bash
 # 1. Choose the canonical tracker and bootstrap backlog/
 node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
@@ -94,13 +107,15 @@ bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
 
-For a fully offline repository, choose `--tracker local` instead. Create and
-update tasks in the canonical store through the configured tracker lifecycle, use normalized
+Transition compatibility only: an existing fully offline repository may still
+choose `--tracker local`. Create and update tasks in the compatibility store
+through the configured tracker lifecycle, use normalized
 refs such as `BACK-1` in the Plan, and run the same `status`, `next`, and
 `sprint-close` commands. Local mode deliberately does not invent milestones,
 PR relationships, comments, or closing-keyword links.
 Those requests fail before side effects with actionable remediation; JSON-capable
-commands return the same structured error contract.
+commands return the same structured error contract. Do not adopt local mode for
+new repositories or add features to it during the GitHub-native migration.
 
 For task `list`, `read`, `create`, `update`, and `close`, the stable invocation
 boundary is the configured adapter exported by `scripts/tracker.js`. Operators
@@ -203,14 +218,15 @@ Users can log in and access protected API endpoints.
 
 ## Daily Workflow
 
-1. Read the configured tracker; in GitHub mode, explicitly pull issues into `backlog/tasks/`.
-2. Create or read tasks in the canonical store and generate the active sprint file.
-3. Read the sprint before you code.
+1. Read the live GitHub Issue.
+2. If execution complexity meets a sprint-admission trigger, create the active sprint file; otherwise continue directly to its PR.
+3. For admitted work, read the sprint before you code.
 4. Work batch by batch, not issue by issue across ten tabs.
 5. Update `Running Context` and `Progress` as you learn things.
 6. Close the sprint explicitly when the work is really done.
 
-The configured tracker handles task truth. The sprint file handles execution.
+GitHub handles task truth. An admitted sprint file handles only complex
+execution continuity.
 
 ## Multi-Track Sprints
 
@@ -246,6 +262,8 @@ The core loop above needs none of these. Add one only when you want its capabili
 | Spec axis (charter / system map / capabilities) | Objective/capability alignment for sprints and triage, plus the reassess signal | craftkit skills installed; degrades gracefully when absent |
 | dev-relay | delegated-work tracking: `[~]` in-flight state and PR handoff in the sprint file | the dev-relay skill |
 | backlog-triage | open-issue grooming into an advisory report (classification, stale flags, Alignment, Decision Review) | nothing — ships in this bundle |
+| GitHub Projects | optional planning visualization over Issues | a separately configured Project; project-only fields remain non-authoritative |
+| Matt Pocock skills | optional shaping or execution techniques | separately installed skills; no persisted dev-backlog state |
 
 ### Spec axis (charter, system map, capabilities)
 
@@ -367,16 +385,17 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 
 | Decision | Why |
 |----------|-----|
-| Exactly one tracker owns task truth | GitHub collaboration and offline local work share one core lifecycle without becoming co-authoritative |
-| Sprint files are the execution hub | One file carries plan, context, and progress across sessions |
-| Task files are always mirrors | GitHub Issues or `local-tracker.json` owns task truth; both modes emit the same active/completed Markdown shape |
+| GitHub Issues own task truth | Task specification, native planning fields, and lifecycle have one standalone authority |
+| Sprint files are complexity-triggered | One file carries plan, context, and progress only when continuity extends beyond one Issue/PR |
+| Task files are transition projections | Legacy mirrors are fallback material pending staged retirement, never authority or a new feature surface |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
-| Task-file format is Backlog.md-compatible | `tasks/` follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) task format; `sprints/` and `gh` sync are dev-backlog additions |
+| Backlog.md is optional compatibility | Existing task Markdown follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) shape, but its runtime and conventions are not dependencies |
 
 ## Docs
 
 - [Agent execution contract](skills/dev-backlog/SKILL.md)
+- [Authority and routing contract](skills/dev-backlog/references/authority-contract.md)
 - [Process guide](skills/dev-backlog/references/process.md)
 - [File format and config](skills/dev-backlog/references/file-format.md)
 - [GitHub sync patterns](skills/dev-backlog/references/github-sync.md)

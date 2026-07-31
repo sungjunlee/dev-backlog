@@ -15,7 +15,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 ## Plan
 
 ### Batch 1 — Authority gate
-- [~] #345 Define the GitHub-native authority contract and reduced product boundary (3d) — branch codex/github-native-core-simplification
+- [~] #345 Define the GitHub-native authority contract and reduced product boundary (3d) [branch:codex/github-native-core-simplification]
 
 ### Batch 2 — Resolver and independent evidence tracks
 - [ ] #346 Resolve effective task specs without GitHub task mirrors (8d)
