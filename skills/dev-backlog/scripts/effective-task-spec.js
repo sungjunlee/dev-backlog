@@ -18,9 +18,13 @@ const { resolveConfiguredTracker } = require("./tracker.js");
 const GITHUB_RESOLUTION_FIELDS =
   "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url";
 const SPEC_REF_MARKER_RE =
-  /<!--\s*dev-backlog:spec_ref\s+([^\r\n]*?)\s*-->/gi;
+  /^[ \t]{0,3}<!--\s*dev-backlog:spec_ref\s+([^\r\n]*?)\s*-->[ \t]*$/gim;
+const AC_MARKER_RE =
+  /^[ \t]{0,3}<!--\s*AC:BEGIN\s*-->[ \t]*$\n([\s\S]*?)^[ \t]{0,3}<!--\s*AC:END\s*-->[ \t]*$/imd;
 const TASK_LIST_LINE_RE =
   /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+\[([ xX])\]\s+(.+?)\s*$/;
+const LIST_ITEM_LINE_RE =
+  /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+/;
 
 const SOURCE_UNAVAILABLE_CODE = "TASK_SPEC_SOURCE_UNAVAILABLE";
 const SPEC_REF_UNAVAILABLE_CODE = "TASK_SPEC_REF_UNAVAILABLE";
@@ -91,6 +95,7 @@ function stripCodeSpans(markdown) {
 function markdownOutsideCode(markdown, { stripInline = false } = {}) {
   const visible = [];
   let fence = null;
+  let listBaseIndent = null;
   for (const line of normalizeText(markdown).split("\n")) {
     const fenceMatch = line.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
     if (fence) {
@@ -113,7 +118,26 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       visible.push("");
       continue;
     }
-    if (/^(?: {4}|\t)/.test(line)) {
+    if (!line.trim()) {
+      visible.push("");
+      continue;
+    }
+
+    const leading = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
+    const listItem = line.match(LIST_ITEM_LINE_RE);
+    const isListContinuation =
+      listBaseIndent !== null && leading > listBaseIndent;
+    if (listItem && (leading < 4 || isListContinuation)) {
+      if (leading < 4) listBaseIndent = leading;
+      visible.push(line);
+      continue;
+    }
+    if (isListContinuation) {
+      visible.push(line);
+      continue;
+    }
+    listBaseIndent = null;
+    if (leading >= 4) {
       visible.push("");
       continue;
     }
@@ -195,20 +219,23 @@ function explicitSpecRef(task, requestedSpecRef) {
 
 function acceptanceCriteriaSection(markdown) {
   const text = markdownOutsideCode(markdown);
-  const marked = text.match(
-    /<!--\s*AC:BEGIN\s*-->([\s\S]*?)<!--\s*AC:END\s*-->/i
-  );
-  if (marked) return marked[1];
+  const structuralText = stripCodeSpans(text);
+  const marked = AC_MARKER_RE.exec(structuralText);
+  if (marked) {
+    const [start, end] = marked.indices[1];
+    return text.slice(start, end);
+  }
 
+  const structuralLines = structuralText.split("\n");
   const lines = text.split("\n");
   const heading = /^(#{1,6})\s+(?:acceptance criteria|acceptance criterion|ac)\s*#*\s*$/i;
-  const start = lines.findIndex((line) => heading.test(line.trim()));
+  const start = structuralLines.findIndex((line) => heading.test(line.trim()));
   if (start < 0) return text;
 
-  const level = lines[start].trim().match(/^#+/)[0].length;
+  const level = structuralLines[start].trim().match(/^#+/)[0].length;
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    const next = lines[index].match(/^(#{1,6})\s+/);
+    const next = structuralLines[index].match(/^(#{1,6})\s+/);
     if (next && next[1].length <= level) {
       end = index;
       break;

@@ -263,8 +263,8 @@ describe("acceptance criteria parsing and repository spec safety", () => {
       "2) [x] Second ordered criterion",
       "   with a continuation",
       "",
-      "   - PNG",
-      "   - JPEG",
+      "    - PNG",
+      "    - JPEG",
     ].join("\n")), [
       { text: "First ordered `criterion`", checked: false },
       {
@@ -272,12 +272,33 @@ describe("acceptance criteria parsing and repository spec safety", () => {
           "Second ordered criterion",
           "   with a continuation",
           "",
-          "   - PNG",
-          "   - JPEG",
+          "    - PNG",
+          "    - JPEG",
         ].join("\n"),
         checked: true,
       },
     ]);
+  });
+
+  it("ignores AC marker and task-list examples in code while retaining real nested content", () => {
+    assert.deepEqual(parseAcceptanceCriteria([
+      "Document `<!-- AC:BEGIN -->` and `<!-- AC:END -->`.",
+      "",
+      "## Acceptance Criteria",
+      "",
+      "    - [ ] Indented code example",
+      "",
+      "- [ ] Preserve formats:",
+      "    - PNG",
+      "    - JPEG",
+    ].join("\n")), [{
+      text: [
+        "Preserve formats:",
+        "    - PNG",
+        "    - JPEG",
+      ].join("\n"),
+      checked: false,
+    }]);
   });
 
   it("loads only repository-contained explicit specs", (t) => {
