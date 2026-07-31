@@ -103,7 +103,11 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
 
-# 5. Close the sprint when the work is done
+# 5. Resolve task intent and AC from the live authority (no mirror required)
+node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
+  "#42" --repo OWNER/REPO
+
+# 6. Close the sprint when the work is done (no mirror move required)
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
 
@@ -220,12 +224,13 @@ Users can log in and access protected API endpoints.
 
 ## Daily Workflow
 
-1. Read the live GitHub Issue.
+1. Resolve the live task with `effective-task-spec.js`; keep its selected
+   source and revision with the work handoff.
 2. If execution complexity meets a sprint-admission trigger, create the active sprint file; otherwise continue directly to its PR.
 3. For admitted work, read the sprint before you code.
 4. For admitted work, execute its ordered batches; otherwise implement the Issue directly.
 5. Update `Running Context` and `Progress` only for admitted work.
-6. Close the sprint explicitly only when a sprint was admitted.
+6. Re-resolve and verify AC before completion. Close the sprint explicitly only when a sprint was admitted. A task mirror is not required.
 
 GitHub handles task truth. An admitted sprint file handles only complex
 execution continuity.
