@@ -197,6 +197,23 @@ describe("fail-closed authority boundary", () => {
       }
     );
   });
+
+  it("rejects empty explicit spec_ref selections instead of falling back to the Issue body", () => {
+    const fixture = resolvedTask({
+      body: "- [ ] Issue fallback must not win.",
+      state: "OPEN",
+    });
+
+    assert.throws(
+      () => resolveEffectiveTaskSpec(fixture.resolved, "#42", { specRef: "" }),
+      (error) => {
+        assert.ok(error instanceof EffectiveTaskSpecError);
+        assert.equal(error.code, "TASK_SPEC_REF_INVALID");
+        assert.match(error.message, /cannot be empty/);
+        return true;
+      }
+    );
+  });
 });
 
 describe("acceptance criteria parsing and repository spec safety", () => {

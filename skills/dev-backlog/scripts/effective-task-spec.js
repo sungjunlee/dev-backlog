@@ -54,16 +54,54 @@ function digestText(value) {
 function explicitSpecRef(task, requestedSpecRef) {
   const candidates = [];
   if (requestedSpecRef !== undefined && requestedSpecRef !== null) {
-    candidates.push(String(requestedSpecRef).trim());
-  } else if (typeof task.spec_ref === "string" && task.spec_ref.trim()) {
+    const requested = String(requestedSpecRef).trim();
+    if (!requested) {
+      throw new EffectiveTaskSpecError(
+        INVALID_SPEC_REF_CODE,
+        "An explicit spec_ref cannot be empty.",
+        {
+          tracker: task.tracker,
+          taskRef: task.ref,
+          remediation:
+            "Provide one non-empty repository-relative spec_ref or remove the explicit selection.",
+        }
+      );
+    }
+    candidates.push(requested);
+  } else if (Object.hasOwn(task, "spec_ref")) {
+    if (typeof task.spec_ref !== "string" || !task.spec_ref.trim()) {
+      throw new EffectiveTaskSpecError(
+        INVALID_SPEC_REF_CODE,
+        `Task ${task.ref || task.id || ""} has an invalid empty spec_ref.`,
+        {
+          tracker: task.tracker,
+          taskRef: task.ref,
+          remediation:
+            "Set spec_ref to one non-empty repository-relative path or remove the field.",
+        }
+      );
+    }
     candidates.push(task.spec_ref.trim());
   } else {
     for (const match of normalizeText(task.body).matchAll(SPEC_REF_MARKER_RE)) {
-      candidates.push(match[1].trim());
+      const markerRef = match[1].trim();
+      if (!markerRef) {
+        throw new EffectiveTaskSpecError(
+          INVALID_SPEC_REF_CODE,
+          `Task ${task.ref || task.id || ""} declares an empty spec_ref marker.`,
+          {
+            tracker: task.tracker,
+            taskRef: task.ref,
+            remediation:
+              "Give the marker one repository-relative path or remove the marker.",
+          }
+        );
+      }
+      candidates.push(markerRef);
     }
   }
 
-  const unique = [...new Set(candidates.filter(Boolean))];
+  const unique = [...new Set(candidates)];
   if (unique.length > 1) {
     throw new EffectiveTaskSpecError(
       INVALID_SPEC_REF_CODE,
