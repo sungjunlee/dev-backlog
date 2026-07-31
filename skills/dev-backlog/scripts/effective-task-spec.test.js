@@ -316,6 +316,32 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     }]);
   });
 
+  it("masks retired criteria in HTML comments and preserves lazy continuation text", () => {
+    assert.deepEqual(parseAcceptanceCriteria([
+      "## Acceptance Criteria",
+      "",
+      "<!-- retired",
+      "- [ ] Old requirement",
+      "-->",
+      "",
+      "- [ ] Reject invalid input",
+      "and report the field name",
+      "- [x] Keep the next criterion separate",
+    ].join("\n")), [
+      {
+        text: [
+          "Reject invalid input",
+          "and report the field name",
+        ].join("\n"),
+        checked: false,
+      },
+      {
+        text: "Keep the next criterion separate",
+        checked: true,
+      },
+    ]);
+  });
+
   it("loads only repository-contained explicit specs", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "effective-spec-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));

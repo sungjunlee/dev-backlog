@@ -92,6 +92,40 @@ function stripCodeSpans(markdown) {
   return visible;
 }
 
+function maskHtmlComments(markdown) {
+  const text = normalizeText(markdown);
+  let visible = "";
+  for (let index = 0; index < text.length;) {
+    const open = text.indexOf("<!--", index);
+    if (open < 0) {
+      visible += text.slice(index);
+      break;
+    }
+    visible += text.slice(index, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0) {
+      visible += text.slice(open).replace(/[^\n]/g, " ");
+      break;
+    }
+
+    const end = close + 3;
+    const comment = text.slice(open, end);
+    const lineStart = text.lastIndexOf("\n", open - 1) + 1;
+    const nextNewline = text.indexOf("\n", end);
+    const lineEnd = nextNewline < 0 ? text.length : nextNewline;
+    const prefix = text.slice(lineStart, open);
+    const suffix = text.slice(end, lineEnd);
+    const isDirective =
+      /^[ \t]{0,3}$/.test(prefix) &&
+      /^[ \t]*$/.test(suffix) &&
+      /^<!--\s*(?:dev-backlog:spec_ref(?:\s+[^\r\n]*)?|AC:(?:BEGIN|END))\s*-->$/i
+        .test(comment);
+    visible += isDirective ? comment : comment.replace(/[^\n]/g, " ");
+    index = end;
+  }
+  return visible;
+}
+
 function markdownOutsideCode(markdown, { stripInline = false } = {}) {
   const visible = [];
   let fence = null;
@@ -145,8 +179,10 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
     }
     visible.push(line);
   }
-  const outsideBlocks = visible.join("\n");
-  return stripInline ? stripCodeSpans(outsideBlocks) : outsideBlocks;
+  const outsideBlocksAndComments = maskHtmlComments(visible.join("\n"));
+  return stripInline
+    ? stripCodeSpans(outsideBlocksAndComments)
+    : outsideBlocksAndComments;
 }
 
 function explicitSpecRef(task, requestedSpecRef) {
@@ -267,7 +303,11 @@ function parseAcceptanceCriteria(markdown) {
         continue;
       }
       const indent = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
-      if (indent <= baseIndent) break;
+      const peerListItem =
+        indent <= baseIndent && LIST_ITEM_LINE_RE.test(line);
+      const heading = indent <= baseIndent && /^#{1,6}\s+/.test(line);
+      if (peerListItem || heading) break;
+      if (indent <= baseIndent && pendingBlankLines > 0) break;
       while (pendingBlankLines > 0) {
         content.push("");
         pendingBlankLines -= 1;
@@ -486,6 +526,7 @@ module.exports = {
   digestText,
   explicitSpecRef,
   loadRepositorySpec,
+  maskHtmlComments,
   markdownOutsideCode,
   stripCodeSpans,
   normalizeLifecycle,
