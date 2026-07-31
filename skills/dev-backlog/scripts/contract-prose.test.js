@@ -63,3 +63,19 @@ it("records the measured Projects decision without adding a core profile", () =>
   assert.match(sync, /Projects are therefore not an\s+adopted dev-backlog profile/);
   assert.match(sync, /Milestones \+ labels remain the planning default/);
 });
+
+it("keeps historical retrieval as a measured disposable shadow", () => {
+  const markdown = fs.readFileSync(
+    path.join(ROOT, "docs/historical-retrieval-shadow.md"),
+    "utf8",
+  );
+
+  assert.match(markdown, /The shadow is active/);
+  assert.match(markdown, /No compiled report, topic graph, search index/);
+  assert.match(markdown, /20\/20 \(100%\)/);
+  assert.match(markdown, /37\/41 Issue\/PR pointers/);
+  assert.match(markdown, /1 local query \+ 0\.05 amortized external compile/);
+  assert.match(markdown, /no decision before 2026-08-28/);
+  assert.match(markdown, /project-memory.*human-gated charter amendment/si);
+  assert.match(markdown, /outside the\s+repository/);
+});
