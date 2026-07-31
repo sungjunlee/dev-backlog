@@ -19,13 +19,13 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 
 ### Batch 2 — Resolver and independent evidence tracks
 - [x] #346 Resolve effective task specs without GitHub task mirrors (8d) → PR #352 (merged)
-- [ ] #349 Validate GitHub Projects as an optional planning projection (3d)
+- [~] #349 Validate GitHub Projects as an optional planning projection (3d) → PR #355 (open) [branch:codex/projects-projection-pilot]
 
 ### Batch 3 — Mirrorless execution pilot
 - [x] #347 Pilot mirrorless GitHub execution and retire task mirrors (two sprints across 2–3 consuming repositories) → PR #353 (merged)
 
 ### Batch 4 — Subtract unused compatibility machinery
-- [~] #348 Subtract zero-adopter tracker and compatibility machinery (5d) → PR #354 (open) [branch:codex/compatibility-subtraction]
+- [x] #348 Subtract zero-adopter tracker and compatibility machinery (5d) → PR #354 (merged)
 
 ### Batch 5 — Evidence-gated memory decision
 - [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31]
@@ -51,5 +51,10 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: #348 independent review restored retained GitHub seam safety coverage for setup atomicity, public no-effect gates, availability/adapter/identity/capability contracts, and typed CLI errors. The final review reported no findings; focused tracker tests passed 18/18 and shell smoke passed 191/191.
 - 2026-07-31: Opened #348 PR #354 from `codex/compatibility-subtraction`; awaiting GitHub CI and PR review.
 - 2026-07-31: Addressed PR #354 Codex review by removing the actor contract's remaining current-local examples, preserving configured-prefix refs only for historical file orientation, and replacing impossible tracker-switch remediation with GitHub capability-transport recovery. Focused 33/33 and the full Node suite passed; independent re-review reported no findings.
+- 2026-07-31: #348 completed via PR #354. All 6 AC are checked; Linux/Windows CI and CodeRabbit passed, the Codex P2 thread was resolved, and Issue #348 closed automatically. Started #349 on `codex/projects-projection-pilot`; Project creation remains gated on explicit informed approval for persistent organization Project read/write OAuth scope.
 - 2026-07-31: #350 shadow benchmark started with 20 pre-registered historical-retrieval questions across dev-backlog, dev-relay, and consumer repositories. The earliest four-week go/no-go date is 2026-08-28.
 - 2026-07-31: #349 Projects scope escalation was refused pending explicit informed approval for persistent organization Project read/write access. No Project resource or local state was created.
+- 2026-07-31: After explicit informed approval, added the persistent `project` OAuth scope and created private pilot Project #5. CLI covered Project/item/field discovery plus Priority/Date creation and field updates; GraphQL was required to create the Iteration field.
+- 2026-07-31: #349 Project #5 added real Issues #345–#350 and read back 18/18 Priority, Iteration, and Target Date values. A second planning cycle updated only four changed values. Invalid-token and invalid-iteration writes both failed non-zero with identical local sprint hash, Git status, canonical Issue snapshot, and Project snapshot.
+- 2026-07-31: #349 evidence shows no repeated value: Project cycle 2 required four writes plus one read-back (45.8 s), while milestones + labels read the same six Issues in one call (4.0 s) and sprint Plan already held execution order. Decision: retain milestones + labels; add no Project profile or abstraction.
+- 2026-07-31: Opened #349 PR #355 after core absence 3/3, contract prose 8/8, exact external read-back, and an independent no-findings review.
