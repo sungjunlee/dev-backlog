@@ -138,6 +138,7 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
         fenceMatch &&
         fenceMatch[1][0] === fence.character &&
         fenceMatch[1].length >= fence.length &&
+        Math.abs(leading - fence.indent) <= 3 &&
         !fenceMatch[2].trim()
       ) {
         fence = null;
@@ -151,6 +152,7 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
       fence = {
         character: fenceMatch[1][0],
         length: fenceMatch[1].length,
+        indent: leading,
       };
       visible.push("");
       continue;
@@ -303,6 +305,7 @@ function parseAcceptanceCriteria(markdown) {
         continue;
       }
       const indent = line.match(/^[ \t]*/)[0].replace(/\t/g, "    ").length;
+      if (TASK_LIST_LINE_RE.test(line)) break;
       const peerListItem =
         indent <= baseIndent && LIST_ITEM_LINE_RE.test(line);
       const heading = indent <= baseIndent && /^#{1,6}\s+/.test(line);

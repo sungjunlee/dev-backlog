@@ -154,6 +154,8 @@ describe("effective task spec selection", () => {
         "<!-- dev-backlog:spec_ref docs/fenced.md -->",
         "```still-code",
         "<!-- dev-backlog:spec_ref docs/still-fenced.md -->",
+        "    ```",
+        "<!-- dev-backlog:spec_ref docs/after-indented-fake-close.md -->",
         "```",
         "",
         "    <!-- dev-backlog:spec_ref docs/indented.md -->",
@@ -339,6 +341,19 @@ describe("acceptance criteria parsing and repository spec safety", () => {
         text: "Keep the next criterion separate",
         checked: true,
       },
+    ]);
+  });
+
+  it("returns nested task criteria separately so unchecked children cannot hide", () => {
+    assert.deepEqual(parseAcceptanceCriteria([
+      "## Acceptance Criteria",
+      "- [x] Export images",
+      "  - [x] PNG",
+      "  - [ ] JPEG",
+    ].join("\n")), [
+      { text: "Export images", checked: true },
+      { text: "PNG", checked: true },
+      { text: "JPEG", checked: false },
     ]);
   });
 
