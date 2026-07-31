@@ -24,7 +24,7 @@ README covers install and human quick start. This file is the agent execution co
 | "plan sprint", "make sprint", or complex work with no active sprint | `plan` | One active sprint file exists with Goal and ordered Plan; `objectives:`/`component:` are present only when their backing spec files exist. |
 | "work #N", "continue", "do next batch" | `work` | Live Issue AC is verified and lifecycle is updated; an admitted sprint is also updated when present. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
-| "sync", "pull issues", "refresh backlog" | `sync` | GitHub mirrors are explicitly refreshed; the local canonical store needs no provider sync. |
+| "sync", "export issue mirrors" | `sync` | A deliberate legacy/rollback export is produced; it is never a prerequisite for work. |
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
 
 If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
@@ -45,10 +45,10 @@ live resolver and compatibility subtraction are staged:
 
 ```
 backlog/.tracker (one line: github | local)
-  github -> GitHub Issues canonical; backlog/tasks/ are derived mirrors
+  github -> GitHub Issues canonical; no task-file directory required
   local  -> backlog/local-tracker.json canonical; zero provider calls
 
-backlog/tasks/ + completed/ <- derived task mirrors in both modes
+backlog/tasks/ + completed/ <- optional GitHub exports / derived local compatibility projections
 backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
 backlog/sprints/ <- shared execution hub in both modes
 ```
@@ -161,9 +161,12 @@ For a whole sprint:
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
-### Sync
+### Sync / Legacy Export
 
-- GitHub: pull canonical issues into mirrors at sprint start and when they change; provider writes remain explicit.
+- GitHub core: do not pull task files. Re-resolve live task intent and AC when
+  the Issue changes.
+- GitHub rollback/diagnostics: `sync-pull.js --legacy-export` may explicitly
+  export non-authoritative mirrors. Never use them as execution input.
 - Local: `backlog/local-tracker.json` is already canonical and its mirrors are refreshed on every mutation; do not call `gh` or manufacture a push/pull step.
 - Never perform background sync or switch trackers after a failure.
 
@@ -193,7 +196,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - `scripts/setup-dev-backlog.js` — persist the explicit canonical tracker without migrating task files.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC,
   lifecycle, source, and stable digest without consulting task mirrors.
-- `scripts/sync-pull.js` — materialize configured open tasks; in GitHub mode, preserve legacy mirrors.
+- `scripts/sync-pull.js --legacy-export` — opt-in rollback/diagnostic export;
+  never part of setup, orient, plan, work, or complete.
 - `scripts/sprint-init.js` — create a milestone-backed sprint when supported; local plans are authored from normalized refs.
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.

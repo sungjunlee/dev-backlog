@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const { spawnSync } = require("node:child_process");
 const {
   statusFromLabels,
   priorityFromLabels,
@@ -89,6 +90,7 @@ describe("parseArgs", () => {
       dryRun: true,
       json: true,
       limit: undefined,
+      legacyExport: false,
     });
   });
 
@@ -106,6 +108,7 @@ describe("parseArgs", () => {
       dryRun: false,
       json: false,
       limit: 250,
+      legacyExport: false,
     });
   });
 
@@ -121,6 +124,22 @@ describe("parseArgs", () => {
 
     const invalidValue = parseArgs(["--limit", "0"], "BACK");
     assert.equal(invalidValue.error, "Invalid --limit value: 0. Expected a positive integer.");
+  });
+
+  it("recognizes the deliberate legacy export opt-in", () => {
+    const parsed = parseArgs(["--legacy-export", "--json"], "BACK");
+    assert.equal(parsed.legacyExport, true);
+  });
+});
+
+describe("legacy export CLI boundary", () => {
+  it("refuses to materialize mirrors without explicit --legacy-export", () => {
+    const result = spawnSync(process.execPath, [path.join(__dirname, "sync-pull.js")], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /legacy\/export-only/);
+    assert.match(result.stderr, /--legacy-export/);
   });
 });
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Pull open GitHub issues to local backlog/tasks/.
+ * Legacy/export-only projection of open GitHub issues to backlog/tasks/.
  *
- * Usage: ./scripts/sync-pull.js [PREFIX]
- *        node scripts/sync-pull.js [PREFIX]
+ * This is not part of setup, orient, plan, work, or complete. New GitHub
+ * repositories should not run it. The CLI requires --legacy-export so an
+ * operator cannot accidentally reintroduce task mirrors on the core path.
+ *
+ * Usage: node scripts/sync-pull.js --legacy-export [PREFIX]
  *
  * Options:
  *   --update    Update existing files (frontmatter only; preserves local AC checkboxes)
@@ -76,6 +79,7 @@ function parseArgs(args, defaultPrefix) {
     dryRun: false,
     json: false,
     limit: undefined,
+    legacyExport: false,
   };
   let prefixSet = false;
 
@@ -94,6 +98,11 @@ function parseArgs(args, defaultPrefix) {
 
     if (arg === "--json") {
       options.json = true;
+      continue;
+    }
+
+    if (arg === "--legacy-export") {
+      options.legacyExport = true;
       continue;
     }
 
@@ -131,6 +140,7 @@ function parseArgs(args, defaultPrefix) {
 function makeResult({ tasksDir, prefix, update, dryRun, issueCount }) {
   return {
     action: "sync-pull",
+    mode: "legacy-export",
     dryRun,
     update,
     prefix,
@@ -307,6 +317,14 @@ function main() {
   const args = process.argv.slice(2);
   const config = readConfig();
   const options = parseArgs(args, config.task_prefix);
+  if (!options.legacyExport) {
+    console.error(
+      "sync-pull is legacy/export-only and is not part of the GitHub core path. " +
+      "Use live Issues through effective-task-spec.js. To deliberately export " +
+      "diagnostic mirrors, rerun with --legacy-export."
+    );
+    process.exit(2);
+  }
   if (options.error) {
     console.error(options.error);
     process.exit(1);

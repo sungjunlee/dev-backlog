@@ -8,8 +8,7 @@ Common patterns for GitHub Issues + sprint file workflow.
 2. **Create milestone** — `gh api repos/{owner}/{repo}/milestones -f title="Sprint W13" -f due_on="2026-03-28"`
 3. **Assign issues** — `gh issue edit <N> --milestone "Sprint W13"`
 4. **Prioritize** — add `priority:high/medium/low` labels
-5. **Pull to local** — sync milestone issues to `backlog/tasks/`
-6. **Create sprint file** — run `./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"` or write manually:
+5. **Create sprint file** — run `./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"` or write manually:
    - Set Goal (one sentence)
    - Order issues into Batches (parallel-safe waves sized for one session)
    - Estimate time per task
@@ -25,9 +24,10 @@ gh issue list --milestone "Sprint W13" --json number,title,labels --jq '.[] | "\
 1. Read `backlog/sprints/_context.md` if it exists — project-level knowledge
 2. Read the active sprint file (`status: active` in frontmatter) — plan, progress, context
 3. Find where you left off: last Progress entry + first unchecked batch
-4. If a batch is mid-way, check the task file for AC progress
+4. If a batch is mid-way, resolve its live Issue and compare the source revision
 
-Two files at most, full picture. No need to query GitHub unless you suspect changes.
+The sprint and project context remain the only local files required. Resolve
+the selected live Issue at orientation time and whenever its revision changes.
 
 ## Session End
 
@@ -45,8 +45,8 @@ Two files at most, full picture. No need to query GitHub unless you suspect chan
 Each batch is one execution wave. Group by parallel-safety first, then session size: items in the same batch have disjoint files and no ordering dependency, while dependent work belongs in a later batch. Batch-heading prose suffixes such as `(after #211 and #212)` remain permitted as human documentation, not machine-readable grammar.
 
 1. Read sprint file → find the batch
-2. Start first task → update GitHub label → read task file AC → do the work
-3. Check off AC in task file → check off in sprint Plan → add Running Context if needed
+2. Start first task → resolve live Issue AC → optionally update GitHub state → do the work
+3. Verify live AC → check off the sprint Plan → add Running Context if needed
 4. Move to next task in batch — context carries naturally within the session
 5. When batch done → Progress entry → push GitHub comments for the batch
 
@@ -55,7 +55,7 @@ Each batch is one execution wave. Group by parallel-safety first, then session s
 Not everything needs a sprint. For a quick bug fix or one-off task:
 
 1. Work directly from GitHub: `gh issue view <N>`
-2. Optionally pull to local task file for AC tracking
+2. Resolve its task spec and AC directly from the live Issue
 3. No sprint file needed — just fix it, commit with `Fixes #<N>`, done
 4. If you discover it's bigger than expected, create a sprint file then
 

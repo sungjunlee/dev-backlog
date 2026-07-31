@@ -275,7 +275,7 @@ function runGithubCycle(fixture) {
   });
 
   const pulled = parseJsonResult(
-    run(process.execPath, [SYNC_PATH, "--limit", "1", "--json"], fixture),
+    run(process.execPath, [SYNC_PATH, "--legacy-export", "--limit", "1", "--json"], fixture),
     "github sync-pull"
   );
   assert.equal(pulled.createdFiles[0], "BACK-42 - cycle-task.md");
@@ -303,7 +303,9 @@ function runGithubCycle(fixture) {
 
   const originalBody = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
   runWorker(fixture, "update", { selector: "#42", changes: { title: "Cycle task renamed" } });
-  parseJsonResult(run(process.execPath, [SYNC_PATH, "--limit", "1", "--update", "--json"], fixture), "github update mirror");
+  parseJsonResult(run(process.execPath, [
+    SYNC_PATH, "--legacy-export", "--limit", "1", "--update", "--json",
+  ], fixture), "github update mirror");
   const updatedMirror = fs.readFileSync(taskPath, "utf8");
   assert.match(updatedMirror, /^title: Cycle task renamed$/m);
   assert.equal(updatedMirror.slice(updatedMirror.indexOf("\n## Description")), originalBody);

@@ -109,7 +109,7 @@ does not widen these capability contracts.
 **Goal:** Legacy task projections remain safe and read-only while live GitHub task resolution replaces them; no projection gains independent write authority.
 
 **In-scope:**
-- `sync-pull.js` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
+- `sync-pull.js --legacy-export` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
 - AC checkbox preservation in task bodies for non-machine-managed issues
 - Idempotent re-runs in both directions against unchanged state
 
@@ -121,9 +121,10 @@ does not widen these capability contracts.
 - New mirror features or bidirectional compatibility work
 
 ### Expected Behaviors
-- `sync-pull` on a fresh checkout produces `backlog/tasks/*.md` with no token prompt beyond `gh auth` already being valid.
-- `sync-pull --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
-- Running `sync-pull` twice against unchanged GitHub state produces byte-identical task files on the second run.
+- `sync-pull` without `--legacy-export` refuses before provider access or task-file materialization.
+- `sync-pull --legacy-export` on a fresh checkout produces `backlog/tasks/*.md` with no token prompt beyond `gh auth` already being valid.
+- `sync-pull --legacy-export --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
+- Running `sync-pull --legacy-export` twice against unchanged GitHub state produces byte-identical task files on the second run.
 
 ### Hard Constraints
 - Never write to human-authored provider content: task bodies without a dev-backlog machine marker, comments, labels, and issue state are untouchable.
@@ -138,6 +139,7 @@ does not widen these capability contracts.
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |
+| 2026-07-31 | Require `--legacy-export` for GitHub task projection | live Issue resolution is the minimum path; an explicit gate prevents accidental reintroduction of mirrors while retaining rollback diagnostics | implicit core-path `sync-pull` |
 | 2026-07-04 | Capability widens from read-only pull to bidirectional mirroring; the read-only bright line narrows to "human-authored content is untouchable" | sprint-mirror (PR #233, SSOT decision charter rev.4) writes only marker-identified machine-managed bodies; push-direction mirroring belongs with mirroring, not with monthly journaling | — |
 | 2026-07-12 | `sprint-mirror` becomes per-track: `--track` selects among multiple active tracks instead of failing on any second active (epic #289; human-gated pass #294) | the per-slug marker already made mirrors track-idempotent; only selection needed to change, and refusing to guess is preserved | 2026-07-04 single-active mirror selection |
 | 2026-07-28 | `sprint-mirror` is removed; this capability no longer publishes sprint state to the provider | measured 2026-07-28: four mirror issues ever created (#230, #234, #237, #239, all 2026-07-03/04) and none since, in any of the 18 consuming repos; the sprint file is committed at explicit boundaries and already readable directly (#340) | 2026-07-04 bidirectional widening; 2026-07-12 per-track mirror selection |

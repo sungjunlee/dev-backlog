@@ -241,6 +241,20 @@ describe("runDoctor", () => {
     assert.equal(report.reassess_signal.fired, false);
   });
 
+  it("passes a mirrorless GitHub backlog with no tasks or completed directories (#347)", () => {
+    write(path.join(repoRoot, "backlog", ".tracker"), "github\n");
+    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+
+    const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
+
+    assert.equal(fs.existsSync(path.join(repoRoot, "backlog", "tasks")), false);
+    assert.equal(fs.existsSync(path.join(repoRoot, "backlog", "completed")), false);
+    assert.equal(check(report, "active_sprint").status, "pass");
+    assert.equal(check(report, "sprint_shape").status, "pass");
+    assert.equal(report.exit_hint, "pass");
+    assert.equal(exitCodeFor(report), 0);
+  });
+
   it("tags per-track verdicts so a warn names the track it belongs to (#293)", () => {
     write(
       path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),

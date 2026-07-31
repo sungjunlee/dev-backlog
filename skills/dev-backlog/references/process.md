@@ -67,7 +67,9 @@ resolver never reads `backlog/tasks/` or `backlog/completed/`.
 
 1. Call the configured adapter's required `create` operation.
 2. Use its returned normalized ref in the current sprint Plan when in scope: GitHub `#N`, local `{PREFIX}-N[.M]`.
-3. In GitHub mode, explicitly materialize/refresh the thin task mirror with `sync-pull.js`. In local mode, create already wrote canonical JSON and its derived task mirror; do not call `gh`.
+3. In GitHub mode, continue directly from the created Issue; do not create a
+   task mirror. In local compatibility mode, create already wrote canonical
+   JSON and its derived projection; do not call `gh`.
 
 ## Plan — Sprint
 
@@ -115,9 +117,13 @@ For the whole sprint:
    doctor/reassess summary. No `backlog/tasks/` file or move is required.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
-## Sync — Explicit and Mode-Specific
+## Sync / Legacy Export — Explicit and Mode-Specific
 
-- **GitHub:** `sync-pull.js` explicitly refreshes derived task mirrors. Provider mutations such as labels and comments are explicit operations.
+- **GitHub core:** there is no pull step. Re-run `effective-task-spec.js` when
+  Issue content changes and review a changed source revision.
+- **GitHub rollback/diagnostics:** `sync-pull.js --legacy-export` explicitly
+  writes non-authoritative projections. It is outside setup, orient, plan,
+  work, and complete.
 - **Local:** `backlog/local-tracker.json` is canonical and its task-file mirrors are refreshed on every mutation; there is no provider pull/push and no background sync.
 - **Both:** an operation failure never changes `.tracker` or makes the other store authoritative.
 

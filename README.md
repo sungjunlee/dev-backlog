@@ -15,7 +15,7 @@ repositories keep their current behavior without migration.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
-The implementation still exposes local-tracker and task-mirror compatibility
+The implementation still exposes local-tracker and task-export compatibility
 while the 2026-08 migration is staged. Those paths are frozen, are not the
 target product boundary, and never become co-authoritative. See the
 [authority and routing contract](skills/dev-backlog/references/authority-contract.md).
@@ -23,10 +23,10 @@ target product boundary, and never become co-authoritative. See the
 ```text
 backlog/.tracker: github | local
         |
-        +-- github -> GitHub Issues (canonical) -> tasks/ derived mirrors
+        +-- github -> GitHub Issues (canonical) -> no required task mirror
         |
         `-- local  -> backlog/local-tracker.json (canonical, no gh)
-                      -> tasks/ derived mirrors
+                      -> tasks/ derived compatibility projections
 
 backlog/sprints/     execution hub: plan, context, progress
         ^
@@ -42,8 +42,8 @@ backlog/sprints/     execution hub: plan, context, progress
 |------------|--------------|
 | One task authority | Live GitHub Issues own specification, native planning metadata, and lifecycle |
 | Complexity-triggered sprint | Simple work stays Issue → PR; admitted complex tracks share one execution plan and may run concurrently when disjoint |
-| Non-authoritative compatibility | Transition task files are derived diagnostic/export material and are never read back as runtime truth |
-| Explicit sync | Pull and refresh when you choose, not behind your back |
+| Non-authoritative compatibility | Legacy task files can be exported for diagnosis/rollback and are never read back as runtime truth |
+| Live task reads | Work resolves Issue intent and AC directly; no pull step or background sync |
 | `[ ]` / `[~]` / `[x]` plan states | Delegated work stays visible in the sprint file, not buried in PR tabs |
 | `context-hook.sh` | Claude Code can get a one-line sprint summary before edits |
 | `sprint-close.sh` | Close the loop: mark sprint complete, archive tasks, optionally close the milestone |
@@ -89,27 +89,24 @@ transition-compatible setup.
 node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
   --tracker github --non-interactive
 
-# 2. Pull open GitHub issues into backlog/tasks/
-node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --dry-run
-node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js
-node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --json
-node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --limit 50
-
-# 3. Create an active sprint from a milestone
+# 2. Create an active sprint from a milestone
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system" --milestone "Sprint W13" --dry-run --json
 
-# 4. See what to do next
+# 3. See what to do next
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/status.sh
 
-# 5. Resolve task intent and AC from the live authority (no mirror required)
+# 4. Resolve task intent and AC from the live authority
 node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
   "#42" --repo OWNER/REPO
 
-# 6. Close the sprint when the work is done (no mirror move required)
+# 5. Close the sprint when the work is done
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
 ```
+
+Fresh GitHub setup creates only `backlog/.tracker` and `backlog/sprints/`;
+`backlog/tasks/` and `backlog/completed/` are not required or created.
 
 Transition compatibility only: an existing fully offline repository may still
 choose `--tracker local`. In that explicitly selected legacy mode,
@@ -370,13 +367,21 @@ Tell me the next batch, implement #42, and keep the sprint file updated.
 Update Running Context and Progress before you stop.
 ```
 
-When GitHub issue metadata changed during the session, refresh the local mirror:
+When GitHub Issue content changes during a session, resolve it again and compare
+the returned source revision:
 
 ```bash
-node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js --update
+node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
+  "#42" --repo OWNER/REPO
 ```
 
-This keeps Codex focused on one execution file, not ten browser tabs and stale issue context.
+The old projection command is rollback/diagnostic export only and requires
+deliberate opt-in:
+
+```bash
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
+  --legacy-export --dry-run
+```
 
 </details>
 
@@ -394,7 +399,7 @@ This keeps Codex focused on one execution file, not ten browser tabs and stale i
 |----------|-----|
 | GitHub Issues own task truth | Task specification, native planning fields, and lifecycle have one standalone authority |
 | Sprint files are complexity-triggered | One file carries plan, context, and progress only when continuity extends beyond one Issue/PR |
-| Task files are transition projections | Legacy mirrors are diagnostic/export material pending staged retirement, never runtime fallback, authority, or a new feature surface |
+| Task files are optional exports | Legacy mirrors are diagnostic/rollback material, never runtime fallback, authority, or a core-path dependency |
 | `_context.md` holds cross-sprint knowledge | Sprint files stay local to the sprint, project memory stays shared |
 | Sync is always explicit | No background process mutates your local state behind your back |
 | Backlog.md is optional compatibility | Existing task Markdown follows the [Backlog.md](https://github.com/MrLesk/Backlog.md) shape, but its runtime and conventions are not dependencies |

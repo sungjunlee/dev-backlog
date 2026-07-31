@@ -14,7 +14,14 @@ const readline = require("node:readline/promises");
 const { readLegacyTracker: readLegacyTrackerFile } = require("./legacy-tracker.js");
 
 const ALLOWED_TRACKERS = Object.freeze(["github", "local"]);
-const MINIMUM_DIRECTORIES = Object.freeze(["sprints", "tasks", "completed"]);
+const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
+const LOCAL_COMPATIBILITY_DIRECTORIES = Object.freeze(["tasks", "completed"]);
+
+function requiredDirectories(selection) {
+  return selection === "local"
+    ? [...MINIMUM_DIRECTORIES, ...LOCAL_COMPATIBILITY_DIRECTORIES]
+    : [...MINIMUM_DIRECTORIES];
+}
 
 function shellQuote(value) {
   const text = String(value);
@@ -282,14 +289,14 @@ function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
   return Object.freeze({ changed: true, created: !targetExists });
 }
 
-function ensureMinimumDirectories(backlogDir, fsApi) {
+function ensureMinimumDirectories(backlogDir, fsApi, selection) {
   const structure = { backlogCreated: false, created: [] };
   try {
     if (!lstatIfPresent(backlogDir, fsApi)) {
       fsApi.mkdirSync(backlogDir);
       structure.backlogCreated = true;
     }
-    for (const name of MINIMUM_DIRECTORIES) {
+    for (const name of requiredDirectories(selection)) {
       const directory = path.join(backlogDir, name);
       if (!lstatIfPresent(directory, fsApi)) {
         fsApi.mkdirSync(directory);
@@ -327,7 +334,10 @@ function validateExistingStructure(backlogDir, configPath, trackerPath, fsApi) {
   }
   const configExists = validateRegularFile(configPath, "config", fsApi);
   const trackerExists = validateRegularFile(trackerPath, "tracker", fsApi);
-  for (const name of MINIMUM_DIRECTORIES) {
+  // Validate every recognized compatibility directory even when the selected
+  // tracker would not create it. Existing legacy paths must not bypass the
+  // same symlink/non-directory safety boundary during a GitHub setup.
+  for (const name of requiredDirectories("local")) {
     const directory = path.join(backlogDir, name);
     const stat = lstatIfPresent(directory, fsApi);
     if (!stat) continue;
@@ -444,7 +454,7 @@ async function runSetup(options = {}, dependencies = {}) {
     recommendationEvidence = fresh.evidence;
   }
 
-  const structure = ensureMinimumDirectories(backlogDir, fsApi);
+  const structure = ensureMinimumDirectories(backlogDir, fsApi, selection);
   let publication;
   try {
     publication = atomicPublish(trackerPath, `${selection}\n`, { fs: fsApi });
@@ -551,6 +561,7 @@ if (require.main === module) {
 
 module.exports = {
   ALLOWED_TRACKERS,
+  LOCAL_COMPATIBILITY_DIRECTORIES,
   MINIMUM_DIRECTORIES,
   SetupError,
   atomicPublish,
@@ -563,5 +574,6 @@ module.exports = {
   printHumanResult,
   readLegacyTracker,
   readTrackerFile,
+  requiredDirectories,
   runSetup,
 };
