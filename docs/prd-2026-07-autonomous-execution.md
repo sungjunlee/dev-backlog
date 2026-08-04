@@ -1,6 +1,12 @@
 # PRD: Execution-State Substrate for Long-Running Work
 
-Status: draft
+> **Historical (2026-07-03).** This PRD was fully implemented and shipped in v0.8.0:
+> Workstream A (JSON read surfaces, actor-agnostic consumption contract, `backlog-doctor`),
+> the SSOT decision (spike #215, charter row 2026-07-03), and O5 activation (signal-gated
+> reassess, report-only) all landed; charter O4/O5 now stand [validated]. Workstream
+> descriptions below are a record of the design, not of open work.
+
+Status: shipped (v0.8.0)
 Date: 2026-07-03
 Source: 2026-07-03 skill-set review (a conversation review; its findings are restated in §2, so this document is self-contained). Charter objectives referenced: O4 (open-issue drift detectable without manual triage), O5 (automated spec reassess at completion boundaries — activated here), O6 (/goal completion-condition emission — stays deferred as a consumer-side concern).
 

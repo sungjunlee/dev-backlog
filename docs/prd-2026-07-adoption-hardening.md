@@ -1,6 +1,11 @@
 # PRD: Adoption Hardening — Standalone First Run for Non-Author Adopters
 
-Status: draft
+> **Historical (2026-07-07).** This PRD's workstreams were fully implemented and shipped in
+> v0.8.0: the adoption-gate portfolio closed 2 tracks, 4/4 (sprint close `8176f02`, portfolio
+> close `2848504`), and charter O7 now stands [validated] with the cold-adopter gate as proof.
+> Workstream descriptions below are a record of the design, not of open work.
+
+Status: shipped (v0.8.0)
 Date: 2026-07-06
 Source: 2026-07-06 multi-model review (codex, opencode/minimax-m3, pi via /delegate, plus a writing-effective-skills rubric pass; convergent findings are restated in §2, so this document is self-contained). Charter objectives referenced: O1/O2 (unchanged, this PRD defends them for non-author adopters), O3 (yardstick readability benefits from the token diet). A candidate new objective on non-author adoption is proposed in §8 and routes through `spec-charter amend` (human-gated), not through this PRD.
 
@@ -122,7 +127,7 @@ Suggested milestone cut: one milestone ("2026-07 adoption hardening"), all four 
 - S4. In a spec-less fixture, `sprint-init.js` emits no `objectives:`/`component:` keys and all four validators pass; with spec files present, invalid IDs still hard-fail. (G3)
 - S5. `skills/dev-backlog/SKILL.md` drops ≥30 lines net while every pre-existing eval prompt still passes. (G4)
 - S6. A seeded unmoored `[~]` produces a doctor warn that names `references/checkbox-repair.md`, and the runbook resolves it in one pass. (G5)
-- S7. dev-relay smoke tests pass unchanged after B3 (frontmatter omission is additive). 
+- S7. dev-relay smoke tests pass unchanged after B3 (frontmatter omission is additive).
 
 ## 11. Risks and Open Questions
 
