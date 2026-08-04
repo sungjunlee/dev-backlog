@@ -1,7 +1,7 @@
 # Spec System Design (v0.1)
 
 **Status:** Approved (M tier) · **Date:** 2026-05-23 · **Author:** session capture
-**Supersedes:** - · **Related:** [`spec/charter.md`](../spec/charter.md), [`spec/system-map.md`](../spec/system-map.md), [`skills/spec-charter/`](../skills/spec-charter/), [`skills/spec-system-map/`](../skills/spec-system-map/), [`skills/spec-grill/`](../skills/spec-grill/)
+**Supersedes:** - · **Related:** [`spec/charter.md`](../spec/charter.md), [`spec/system-map.md`](../spec/system-map.md), [`spec/capabilities.md`](../spec/capabilities.md), craftkit `spec-*` skills ([craftkit](https://github.com/sungjunlee/craftkit))
 
 > **Note (2026-07-05):** The `spec-charter`, `spec-system-map`, and `spec-grill` skills moved to [craftkit](https://github.com/sungjunlee/craftkit) in 0.7.0. `skills/spec-*` paths in this document are historical in-repo paths from when this design shipped here; the live skill definitions are the craftkit-installed skills.
 
@@ -90,8 +90,8 @@ The rule: constrain the address, not the thought. `component:` is a routing hand
 `spec/*` artifacts may read task acceptance criteria, relay Done Criteria, sprint context, PR reviews, and issue discussions as evidence. They must not copy those task-scoped artifacts into durable specs.
 
 | Artifact | Owns |
-|---|---|
-| GitHub Issues and `backlog/tasks/` | task definition and AC checkboxes, mirrored locally for execution progress |
+| --- | --- |
+| GitHub Issues | task definition and AC checkboxes, resolved live via `effective-task-spec.js` |
 | dev-relay run artifacts | frozen Done Criteria, rubrics, executor evidence, review anchors, and review notes |
 | `backlog/sprints/` | execution plan, ordering, Running Context, and Progress |
 | `spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md` | durable project direction, system shape, capability contracts, and bounded Learnings |
@@ -107,7 +107,7 @@ This preserves the existing readability budgets: `spec/charter.md` remains a 5-m
 ### Mutation discipline per layer
 
 | Layer | Who writes | When | Gate |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `spec/charter.md` Problem/Approach/Non-Goals | human via `spec-charter amend` | rarely | Tier 1 gate |
 | `spec/charter.md` Objectives | human via amend; status advance proof-gated | when an objective is added/removed/proven | Tier 2 gate |
 | `spec/charter.md` Decisions | append-only | when a non-trivial cross-cutting decision is made | Tier 3 |
@@ -121,7 +121,7 @@ This preserves the existing readability budgets: `spec/charter.md` remains a 5-m
 These paths are historical; since 0.7.0 the files live in the craftkit-installed skills.
 
 | Artifact | Owns | Does not own |
-|---|---|---|
+| --- | --- | --- |
 | `skills/spec-charter/SKILL.md` | `spec/charter.md` create/amend and report-only reassess dispatch contract | capability authoring details |
 | `skills/spec-charter/references/reassess.md` | operational reassess procedure: evidence order, report shape, recommendation rules, Learning Actions, stale-spec failure modes | durable naming policy or historical build notes |
 | `skills/spec-system-map/SKILL.md` | `spec/system-map.md` create/amend flow and high-level-only boundary | charter mutation rules or capability contracts |
@@ -216,7 +216,7 @@ Before any capability Behavior or Hard Constraint is committed:
 ## NOT in scope (deferred with rationale)
 
 | Deferred | Rationale | Promotion trigger |
-|---|---|---|
+| --- | --- | --- |
 | Per-capability files (`spec/components/*.md`) | YAGNI; a compact single file is easier to read and route through while under budget | `spec/capabilities.md` > 500 lines, >15 capabilities, or ownership demands |
 | ADR directory (`spec/decisions/*.md`) | Charter Decisions + per-capability `## Decisions` suffice | Cross-cutting decision volume > 10 in a quarter |
 | Adversarial grill subagent (separate context) | Single-context grill is testable now; subagent dispatch is an innovation token | Observed self-rationalization in working agent |
@@ -325,6 +325,7 @@ The most authentic test of this spec system is applying it to projects we alread
 5. **Manual reassess pass** — run `spec-charter reassess` on dev-backlog and one larger repo shape before adding sprint-close or relay-merge hooks. The test is whether the report produces a useful next action without creating churn.
 
 Each dogfood produces:
+
 - A `spec/capabilities.md` in the target repo
 - Reusable signal feedback for spec-system v0.2 (more findings, like the charter dogfood pattern that produced #93-#98)
 
@@ -333,7 +334,7 @@ Each dogfood produces:
 Manual reassess evidence was checked before adding a new seed script:
 
 | Repo | Command | Result | Reassess implication |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | dev-backlog | `node skills/dev-backlog/scripts/capabilities-doctor.js --json` | 7 capabilities, 258 lines, 0 warnings, 0 hard failures | compactness and Learnings marker evidence is sufficient for a no-change structural finding |
 | dev-backlog | `node skills/dev-backlog/scripts/component-lint.js --json` | 7 declared capabilities, 10 sprint files, 1 active sprint, 0 issues | routing evidence is sufficient; legacy/unrouted sprint files do not imply capability drift |
 | tamgu_note | `node <dev-backlog-skill-dir>/scripts/capabilities-doctor.js --capabilities spec/capabilities.md --json` | 7 capabilities, 232 lines, 0 warnings, 0 hard failures | large-repo-shaped spec remains within budget |

@@ -1,7 +1,7 @@
 ---
 id: BACK-264
 title: 'Epic: E3 first-run minimum path'
-status: To Do
+status: Done
 labels:
   - epic
 priority: medium

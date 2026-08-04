@@ -1,7 +1,7 @@
 ---
 id: BACK-220
 title: 'Epic: E4 signal-gated O5 activation'
-status: To Do
+status: Done
 labels:
   - epic
 priority: medium

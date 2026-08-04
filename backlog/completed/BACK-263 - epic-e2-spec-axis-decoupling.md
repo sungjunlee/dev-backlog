@@ -1,7 +1,7 @@
 ---
 id: BACK-263
 title: 'Epic: E2 spec-axis decoupling'
-status: To Do
+status: Done
 labels:
   - documentation
   - epic

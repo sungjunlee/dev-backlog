@@ -38,7 +38,7 @@ backlog/sprints/     execution hub: plan, context, progress
 ## What You Get
 
 | Capability | What changes |
-|------------|--------------|
+| ------------ | -------------- |
 | One task authority | Live GitHub Issues own specification, native planning metadata, and lifecycle |
 | Complexity-triggered sprint | Simple work stays Issue → PR; admitted complex tracks share one execution plan and may run concurrently when disjoint |
 | Non-authoritative compatibility | Legacy task files can be exported for diagnosis/rollback and are never read back as runtime truth |
@@ -261,7 +261,7 @@ bash skills/dev-backlog/scripts/sprint-close.sh --track 2026-07-auth  # close ju
 The core loop above needs none of these. Add one only when you want its capability — each row prices what it adds and what it requires.
 
 | Extension | Adds | Requires |
-|-----------|------|----------|
+| ----------- | ------ | ---------- |
 | Spec axis (charter / system map / capabilities) | Objective/capability alignment for sprints and triage, plus the reassess signal | craftkit skills installed; degrades gracefully when absent |
 | dev-relay | delegated-work tracking: `[~]` in-flight state and PR handoff in the sprint file | the dev-relay skill |
 | backlog-triage | open-issue grooming into an advisory report (classification, stale flags, Alignment, Decision Review) | nothing — ships in this bundle |
@@ -395,7 +395,7 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
 ## Design Choices
 
 | Decision | Why |
-|----------|-----|
+| ---------- | ----- |
 | GitHub Issues own task truth | Task specification, native planning fields, and lifecycle have one standalone authority |
 | Sprint files are complexity-triggered | One file carries plan, context, and progress only when continuity extends beyond one Issue/PR |
 | Task files are optional exports | Legacy mirrors are diagnostic/rollback material, never runtime fallback, authority, or a core-path dependency |
@@ -405,6 +405,7 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
 
 ## Docs
 
+- [Project docs index](docs/README.md) — PRDs, pilots, and design records
 - [Agent execution contract](skills/dev-backlog/SKILL.md)
 - [Authority and routing contract](skills/dev-backlog/references/authority-contract.md)
 - [Process guide](skills/dev-backlog/references/process.md)

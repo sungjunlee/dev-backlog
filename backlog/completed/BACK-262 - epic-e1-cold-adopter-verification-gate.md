@@ -1,7 +1,7 @@
 ---
 id: BACK-262
 title: 'Epic: E1 cold-adopter verification gate'
-status: To Do
+status: Done
 labels:
   - enhancement
   - epic

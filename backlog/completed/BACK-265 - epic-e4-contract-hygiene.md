@@ -1,7 +1,7 @@
 ---
 id: BACK-265
 title: 'Epic: E4 contract hygiene'
-status: To Do
+status: Done
 labels:
   - epic
 priority: medium
