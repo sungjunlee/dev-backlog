@@ -22,7 +22,10 @@ current status.
 ## Arms and authority boundary
 
 - **A — legacy mirror grep:** search only historical files under
-  `backlog/tasks/` and `backlog/completed/`.
+  `backlog/tasks/` and `backlog/completed/`. *2026-08-05: `backlog/completed/` was
+  retired — its 63 files were all CLOSED GitHub Issues and are preserved in git
+  history; Arm A's mirror surface is now effectively `backlog/tasks/` (empty) and
+  git history.*
 - **B — live sources:** query GitHub Issues and PRs, Git history, and existing
   spec, ADR, sprint, or evidence documents.
 - **C — disposable report:** compile the same live sources on demand into a

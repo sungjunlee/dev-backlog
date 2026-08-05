@@ -10,20 +10,23 @@ BACKLOG_DIR="backlog"
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --json) JSON=1 ;;
-    --track) shift; TRACK="${1:-}" ;;
-    --track=*) TRACK="${1#--track=}" ;;
-    *) BACKLOG_DIR="$1" ;;
-  esac
-  shift
+	case "$1" in
+	--json) JSON=1 ;;
+	--track)
+		shift
+		TRACK="${1:-}"
+		;;
+	--track=*) TRACK="${1#--track=}" ;;
+	*) BACKLOG_DIR="$1" ;;
+	esac
+	shift
 done
 
 if [ "$JSON" -eq 1 ]; then
-  if [ -n "$TRACK" ]; then
-    exec node "$SCRIPT_DIR/sprint-state.js" --mode status --track "$TRACK" "$BACKLOG_DIR"
-  fi
-  exec node "$SCRIPT_DIR/sprint-state.js" --mode status "$BACKLOG_DIR"
+	if [ -n "$TRACK" ]; then
+		exec node "$SCRIPT_DIR/sprint-state.js" --mode status --track "$TRACK" "$BACKLOG_DIR"
+	fi
+	exec node "$SCRIPT_DIR/sprint-state.js" --mode status "$BACKLOG_DIR"
 fi
 
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
@@ -31,137 +34,132 @@ SPRINTS_DIR="$BACKLOG_DIR/sprints"
 # --- Active Sprint ---
 echo "=== Active Sprint ==="
 if [ -d "$SPRINTS_DIR" ]; then
-  if [ -n "$TRACK" ]; then
-    ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
-    if [ -z "$ACTIVE" ]; then ACTIVE_STATUS=1; else ACTIVE_STATUS=0; fi
-  else
-    ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
-    ACTIVE_STATUS=$?
-  fi
-  if [ "$ACTIVE_STATUS" -eq 2 ]; then
-    ACTIVE_COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
-    echo "$ACTIVE_COUNT active tracks (portfolio):"
-    find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
-      [ -z "$sprint" ] && continue
-      NAME=$(basename "$sprint" .md)
-      count_checkboxes "$sprint"
-      if [ "$CB_TOTAL" -gt 0 ]; then PCT=$((CB_DONE * 100 / CB_TOTAL)); else PCT=0; fi
-      if [ "$CB_IN_FLIGHT" -gt 0 ]; then
-        echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%) — $CB_IN_FLIGHT in-flight"
-      else
-        echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%)"
-      fi
-    done
-  elif [ "$ACTIVE_STATUS" -eq 0 ]; then
-    SPRINT_NAME=$(basename "$ACTIVE" .md)
-    count_checkboxes "$ACTIVE"
-    if [ "$CB_TOTAL" -gt 0 ]; then
-      PCT=$((CB_DONE * 100 / CB_TOTAL))
-    else
-      PCT=0
-    fi
-    if [ "$CB_IN_FLIGHT" -gt 0 ]; then
-      echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%) — $CB_IN_FLIGHT in-flight"
-    else
-      echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%)"
-    fi
+	if [ -n "$TRACK" ]; then
+		ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+		if [ -z "$ACTIVE" ]; then ACTIVE_STATUS=1; else ACTIVE_STATUS=0; fi
+	else
+		ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+		ACTIVE_STATUS=$?
+	fi
+	if [ "$ACTIVE_STATUS" -eq 2 ]; then
+		ACTIVE_COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
+		echo "$ACTIVE_COUNT active tracks (portfolio):"
+		find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
+			[ -z "$sprint" ] && continue
+			NAME=$(basename "$sprint" .md)
+			count_checkboxes "$sprint"
+			if [ "$CB_TOTAL" -gt 0 ]; then PCT=$((CB_DONE * 100 / CB_TOTAL)); else PCT=0; fi
+			if [ "$CB_IN_FLIGHT" -gt 0 ]; then
+				echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%) — $CB_IN_FLIGHT in-flight"
+			else
+				echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%)"
+			fi
+		done
+	elif [ "$ACTIVE_STATUS" -eq 0 ]; then
+		SPRINT_NAME=$(basename "$ACTIVE" .md)
+		count_checkboxes "$ACTIVE"
+		if [ "$CB_TOTAL" -gt 0 ]; then
+			PCT=$((CB_DONE * 100 / CB_TOTAL))
+		else
+			PCT=0
+		fi
+		if [ "$CB_IN_FLIGHT" -gt 0 ]; then
+			echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%) — $CB_IN_FLIGHT in-flight"
+		else
+			echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%)"
+		fi
 
-    # Show in-flight items (dispatched via dev-relay)
-    IN_FLIGHT_ITEMS=$(checkbox_lines "$ACTIVE" "~" | head -3)
-    if [ -n "$IN_FLIGHT_ITEMS" ]; then
-      echo ""
-      echo "In flight:"
-      echo "$IN_FLIGHT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
-    fi
+		# Show in-flight items (dispatched via dev-relay)
+		IN_FLIGHT_ITEMS=$(checkbox_lines "$ACTIVE" "~" | head -3)
+		if [ -n "$IN_FLIGHT_ITEMS" ]; then
+			echo ""
+			echo "In flight:"
+			echo "$IN_FLIGHT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
+		fi
 
-    # Show next unchecked items
-    NEXT_ITEMS=$(checkbox_lines "$ACTIVE" " " | head -3)
-    if [ -n "$NEXT_ITEMS" ]; then
-      echo ""
-      echo "Next up:"
-      echo "$NEXT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
-    fi
+		# Show next unchecked items
+		NEXT_ITEMS=$(checkbox_lines "$ACTIVE" " " | head -3)
+		if [ -n "$NEXT_ITEMS" ]; then
+			echo ""
+			echo "Next up:"
+			echo "$NEXT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
+		fi
 
-    if [ "$CB_TODO" -eq 0 ] && [ "$CB_IN_FLIGHT" -eq 0 ] && [ "$CB_TOTAL" -gt 0 ]; then
-      echo ""
-      echo ">> All items done — ready to close sprint"
-    fi
-  else
-    if [ -n "$TRACK" ]; then
-      echo "(no active track matches '$TRACK')"
-    else
-      echo "(no active sprint)"
-    fi
-  fi
+		if [ "$CB_TODO" -eq 0 ] && [ "$CB_IN_FLIGHT" -eq 0 ] && [ "$CB_TOTAL" -gt 0 ]; then
+			echo ""
+			echo ">> All items done — ready to close sprint"
+		fi
+	else
+		if [ -n "$TRACK" ]; then
+			echo "(no active track matches '$TRACK')"
+		else
+			echo "(no active sprint)"
+		fi
+	fi
 else
-  echo "(no backlog/sprints/ directory)"
+	echo "(no backlog/sprints/ directory)"
 fi
 
 # --- Configured Tracker Tasks ---
 echo ""
 echo "=== Tracker Tasks ==="
 if command -v column >/dev/null 2>&1; then
-  node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t' \
-    || echo "(gh not available)"
+	node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t' ||
+		echo "(gh not available)"
 else
-  echo "(gh not available)"
+	echo "(gh not available)"
 fi
 
 # --- Local Files ---
 echo ""
 echo "=== Local Files ==="
 if [ -d "$BACKLOG_DIR/tasks" ]; then
-  total=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-  todo=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*To Do" {} \; 2>/dev/null | wc -l | tr -d ' ')
-  inprog=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*In Progress" {} \; 2>/dev/null | wc -l | tr -d ' ')
-  echo "Tasks: $total total, $todo To Do, $inprog In Progress"
+	total=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+	todo=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*To Do" {} \; 2>/dev/null | wc -l | tr -d ' ')
+	inprog=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*In Progress" {} \; 2>/dev/null | wc -l | tr -d ' ')
+	echo "Tasks: $total total, $todo To Do, $inprog In Progress"
 else
-  echo "No backlog/tasks/ directory"
-fi
-
-if [ -d "$BACKLOG_DIR/completed" ]; then
-  done_count=$(find "$BACKLOG_DIR/completed" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-  echo "Completed: $done_count"
+	echo "No backlog/tasks/ directory"
 fi
 
 # --- Relay Runs (optional — only when dev-relay is installed) ---
 RELAY_HOME="${RELAY_HOME:-$HOME/.relay}"
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -n "$REPO_ROOT" ] && [ -d "$RELAY_HOME/runs" ]; then
-  RESOLVED=$(cd "$REPO_ROOT" && pwd -P)
-  SLUG_BASE=$(basename "$RESOLVED" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/^-\|-$//g')
-  # Portable sha256: prefer sha256sum (Linux), fall back to shasum (macOS)
-  if command -v sha256sum >/dev/null 2>&1; then
-    SLUG_HASH=$(printf '%s' "$RESOLVED" | sha256sum | cut -c1-8)
-  elif command -v shasum >/dev/null 2>&1; then
-    SLUG_HASH=$(printf '%s' "$RESOLVED" | shasum -a 256 | cut -c1-8)
-  else
-    SLUG_HASH=""
-  fi
-  if [ -n "$SLUG_HASH" ]; then
-    RELAY_RUNS_DIR="$RELAY_HOME/runs/${SLUG_BASE}-${SLUG_HASH}"
-    if [ -d "$RELAY_RUNS_DIR" ]; then
-      ACTIVE_MANIFESTS=$(find "$RELAY_RUNS_DIR" -maxdepth 1 -name "*.md" \
-        -exec grep -lE "^state: *(dispatched|review_pending|changes_requested|ready_to_merge)" {} + 2>/dev/null)
-      ACTIVE_RUNS=$(echo "$ACTIVE_MANIFESTS" | grep -c '.' 2>/dev/null) || ACTIVE_RUNS=0
-      if [ "$ACTIVE_RUNS" -gt 0 ]; then
-        echo ""
-        echo "=== Relay Runs ==="
-        echo "$ACTIVE_MANIFESTS" | while IFS= read -r mf; do
-          [ -z "$mf" ] && continue
-          RUN_ID=$(basename "$mf" .md)
-          STATE=$(awk -F': *' '/^state:/{gsub(/['"'"'"]/,"",$2); print $2; exit}' "$mf")
-          echo "  $RUN_ID ($STATE)"
-        done
-      fi
-    fi
-  fi
+	RESOLVED=$(cd "$REPO_ROOT" && pwd -P)
+	SLUG_BASE=$(basename "$RESOLVED" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/^-\|-$//g')
+	# Portable sha256: prefer sha256sum (Linux), fall back to shasum (macOS)
+	if command -v sha256sum >/dev/null 2>&1; then
+		SLUG_HASH=$(printf '%s' "$RESOLVED" | sha256sum | cut -c1-8)
+	elif command -v shasum >/dev/null 2>&1; then
+		SLUG_HASH=$(printf '%s' "$RESOLVED" | shasum -a 256 | cut -c1-8)
+	else
+		SLUG_HASH=""
+	fi
+	if [ -n "$SLUG_HASH" ]; then
+		RELAY_RUNS_DIR="$RELAY_HOME/runs/${SLUG_BASE}-${SLUG_HASH}"
+		if [ -d "$RELAY_RUNS_DIR" ]; then
+			ACTIVE_MANIFESTS=$(find "$RELAY_RUNS_DIR" -maxdepth 1 -name "*.md" \
+				-exec grep -lE "^state: *(dispatched|review_pending|changes_requested|ready_to_merge)" {} + 2>/dev/null)
+			ACTIVE_RUNS=$(echo "$ACTIVE_MANIFESTS" | grep -c '.' 2>/dev/null) || ACTIVE_RUNS=0
+			if [ "$ACTIVE_RUNS" -gt 0 ]; then
+				echo ""
+				echo "=== Relay Runs ==="
+				echo "$ACTIVE_MANIFESTS" | while IFS= read -r mf; do
+					[ -z "$mf" ] && continue
+					RUN_ID=$(basename "$mf" .md)
+					STATE=$(awk -F': *' '/^state:/{gsub(/['"'"'"]/,"",$2); print $2; exit}' "$mf")
+					echo "  $RUN_ID ($STATE)"
+				done
+			fi
+		fi
+	fi
 fi
 
 # --- Past Sprints ---
 if [ -d "$SPRINTS_DIR" ]; then
-  PAST=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: completed" {} \; 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$PAST" -gt 0 ]; then
-    echo "Past sprints: $PAST"
-  fi
+	PAST=$(find "$SPRINTS_DIR" -maxdepth 1 -name "*.md" ! -name "_context.md" -exec grep -l "^status: completed" {} \; 2>/dev/null | wc -l | tr -d ' ')
+	if [ "$PAST" -gt 0 ]; then
+		echo "Past sprints: $PAST"
+	fi
 fi

@@ -15,49 +15,49 @@ PASS=0
 FAIL=0
 
 assert_contains() {
-  local label="$1" output="$2" expected="$3"
-  if echo "$output" | grep -qF "$expected"; then
-    PASS=$((PASS + 1))
-  else
-    FAIL=$((FAIL + 1))
-    echo "FAIL: $label"
-    echo "  expected to contain: $expected"
-    echo "  got: $output"
-  fi
+	local label="$1" output="$2" expected="$3"
+	if echo "$output" | grep -qF "$expected"; then
+		PASS=$((PASS + 1))
+	else
+		FAIL=$((FAIL + 1))
+		echo "FAIL: $label"
+		echo "  expected to contain: $expected"
+		echo "  got: $output"
+	fi
 }
 
 assert_not_contains() {
-  local label="$1" output="$2" unexpected="$3"
-  if echo "$output" | grep -qF "$unexpected"; then
-    FAIL=$((FAIL + 1))
-    echo "FAIL: $label"
-    echo "  expected NOT to contain: $unexpected"
-    echo "  got: $output"
-  else
-    PASS=$((PASS + 1))
-  fi
+	local label="$1" output="$2" unexpected="$3"
+	if echo "$output" | grep -qF "$unexpected"; then
+		FAIL=$((FAIL + 1))
+		echo "FAIL: $label"
+		echo "  expected NOT to contain: $unexpected"
+		echo "  got: $output"
+	else
+		PASS=$((PASS + 1))
+	fi
 }
 
 assert_equals() {
-  local label="$1" actual="$2" expected="$3"
-  if [ "$actual" = "$expected" ]; then
-    PASS=$((PASS + 1))
-  else
-    FAIL=$((FAIL + 1))
-    echo "FAIL: $label"
-    echo "  expected: $expected"
-    echo "  got: $actual"
-  fi
+	local label="$1" actual="$2" expected="$3"
+	if [ "$actual" = "$expected" ]; then
+		PASS=$((PASS + 1))
+	else
+		FAIL=$((FAIL + 1))
+		echo "FAIL: $label"
+		echo "  expected: $expected"
+		echo "  got: $actual"
+	fi
 }
 
 assert_json_eval() {
-  local label="$1" output="$2" script="$3"
-  local status
-  set +e
-  printf "%s" "$output" | node -e "$script"
-  status=$?
-  set -e
-  assert_equals "$label" "$status" "0"
+	local label="$1" output="$2" script="$3"
+	local status
+	set +e
+	printf "%s" "$output" | node -e "$script"
+	status=$?
+	set -e
+	assert_equals "$label" "$status" "0"
 }
 
 # ============================================================
@@ -147,7 +147,7 @@ for (const item of inFlight) {
 # observable even when the live repo has no [~] items.
 RECOVERY_FIXTURE_DIR="$TEST_DIR/recovery-backlog"
 mkdir -p "$RECOVERY_FIXTURE_DIR/sprints"
-cat > "$RECOVERY_FIXTURE_DIR/sprints/2026-01-recovery-fixture.md" << 'EOF'
+cat >"$RECOVERY_FIXTURE_DIR/sprints/2026-01-recovery-fixture.md" <<'EOF'
 ---
 milestone: recovery fixture
 status: active
@@ -198,7 +198,7 @@ if (next.next_batch && Array.isArray(next.next_batch.items) && next.next_batch.i
 
 # --- extract_section tests ---
 
-cat > "$TEST_DIR/sections.md" << 'EOF'
+cat >"$TEST_DIR/sections.md" <<'EOF'
 ## Goal
 Test the parsing.
 
@@ -228,7 +228,7 @@ OUT=$(extract_section "$TEST_DIR/sections.md" "Progress")
 assert_contains "extract: last section" "$OUT" "2026-03-30: Done."
 
 # Empty section
-cat > "$TEST_DIR/empty-section.md" << 'EOF'
+cat >"$TEST_DIR/empty-section.md" <<'EOF'
 ## Goal
 
 ## Plan
@@ -243,7 +243,7 @@ OUT=$(extract_section "$TEST_DIR/sections.md" "Nonexistent")
 assert_equals "extract: missing section" "$OUT" ""
 
 # Section with trailing whitespace in heading
-cat > "$TEST_DIR/trailing.md" << 'TEOF'
+cat >"$TEST_DIR/trailing.md" <<'TEOF'
 ## Goal
 Content here.
 
@@ -255,7 +255,7 @@ assert_equals "extract: trailing whitespace heading" "$OUT" "Content here."
 
 # --- count_checkboxes tests ---
 
-cat > "$TEST_DIR/checkboxes.md" << 'EOF'
+cat >"$TEST_DIR/checkboxes.md" <<'EOF'
 - [x] #1 Done
 - [x] #2 Also done
 - [~] #3 In flight
@@ -271,11 +271,11 @@ assert_equals "count: todo" "$CB_TODO" "2"
 
 # Configured local refs use the same shell parser, including decimal subtasks.
 mkdir -p "$TEST_DIR/local-backlog/sprints"
-printf 'local\n' > "$TEST_DIR/local-backlog/.tracker"
-cat > "$TEST_DIR/local-backlog/config.yml" << 'EOF'
+printf 'local\n' >"$TEST_DIR/local-backlog/.tracker"
+cat >"$TEST_DIR/local-backlog/config.yml" <<'EOF'
 task_prefix: BACK
 EOF
-cat > "$TEST_DIR/local-backlog/sprints/active.md" << 'EOF'
+cat >"$TEST_DIR/local-backlog/sprints/active.md" <<'EOF'
 ---
 status: active
 ---
@@ -309,7 +309,7 @@ assert_contains "status local: counts all valid refs" "$OUT" "1/3 tasks (33%)"
 assert_contains "status local: displays decimal next ref" "$OUT" "BACK-11.2 Next subtask"
 
 # Empty file
-cat > "$TEST_DIR/empty.md" << 'EOF'
+cat >"$TEST_DIR/empty.md" <<'EOF'
 No checkboxes here.
 EOF
 
@@ -320,19 +320,19 @@ assert_equals "count: empty done" "$CB_DONE" "0"
 # --- find_active_sprint tests ---
 
 mkdir -p "$TEST_DIR/sprints"
-cat > "$TEST_DIR/sprints/completed.md" << 'EOF'
+cat >"$TEST_DIR/sprints/completed.md" <<'EOF'
 ---
 status: completed
 ---
 EOF
 
-cat > "$TEST_DIR/sprints/active.md" << 'EOF'
+cat >"$TEST_DIR/sprints/active.md" <<'EOF'
 ---
 status: active
 ---
 EOF
 
-cat > "$TEST_DIR/sprints/_context.md" << 'EOF'
+cat >"$TEST_DIR/sprints/_context.md" <<'EOF'
 status: active
 EOF
 
@@ -349,13 +349,13 @@ set -e
 assert_equals "find: no active exit code" "$STATUS" "1"
 assert_equals "find: no active output" "$OUT" ""
 
-cat > "$TEST_DIR/sprints/active-a.md" << 'EOF'
+cat >"$TEST_DIR/sprints/active-a.md" <<'EOF'
 ---
 status: active
 ---
 EOF
 
-cat > "$TEST_DIR/sprints/active-b.md" << 'EOF'
+cat >"$TEST_DIR/sprints/active-b.md" <<'EOF'
 ---
 status: active
 ---
@@ -377,7 +377,7 @@ assert_contains "find: multiple active lists second" "$(cat "$ERR")" "active-b.m
 # ============================================================
 
 mkdir -p "$TEST_DIR/backlog/sprints"
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -455,7 +455,7 @@ if (
 '
 
 # --- All done ---
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -486,7 +486,7 @@ assert_contains "status all-done: ready message" "$OUT" "ready to close sprint"
 assert_contains "status all-done: 100%" "$OUT" "100%"
 
 # --- All in-flight ---
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -514,7 +514,7 @@ assert_contains "all-inflight: 0 remaining" "$OUT" "0 remaining"
 assert_not_contains "all-inflight: not ready to close" "$OUT" "All items checked"
 
 # --- Flat plan (no batch headers) ---
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -545,7 +545,7 @@ assert_contains "flat: shows in-flight item" "$OUT" "[~] #2"
 assert_contains "flat: shows next item" "$OUT" "[ ] #3"
 
 # --- Malformed sprint file (missing frontmatter) ---
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 status: active
 
 # No Frontmatter Sprint
@@ -560,7 +560,7 @@ assert_contains "malformed: counts tasks" "$OUT" "0/1 done"
 
 # --- No active sprint ---
 rm "$TEST_DIR/backlog/sprints/2026-03-test.md"
-cat > "$TEST_DIR/backlog/sprints/2026-02-past.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-02-past.md" <<'EOF'
 ---
 status: completed
 ---
@@ -573,7 +573,7 @@ OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
 assert_contains "status no-active: message" "$OUT" "no active sprint"
 
 # --- Multiple active sprints ---
-cat > "$TEST_DIR/backlog/sprints/2026-03-active-a.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-active-a.md" <<'EOF'
 ---
 status: active
 ---
@@ -582,7 +582,7 @@ status: active
 - [ ] #1 Task A
 EOF
 
-cat > "$TEST_DIR/backlog/sprints/2026-03-active-b.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-active-b.md" <<'EOF'
 ---
 status: active
 ---
@@ -629,7 +629,7 @@ assert_not_contains "next --track: excludes other track" "$OUT" "Task B"
 rm "$TEST_DIR/backlog/sprints/2026-03-active-a.md" "$TEST_DIR/backlog/sprints/2026-03-active-b.md"
 
 # Overlapping scope (same component) is fail-loud in JSON mode (#291).
-cat > "$TEST_DIR/backlog/sprints/2026-03-ov-a.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-ov-a.md" <<'EOF'
 ---
 status: active
 component: "shared-thing"
@@ -638,7 +638,7 @@ component: "shared-thing"
 ## Plan
 - [ ] #1 Task A
 EOF
-cat > "$TEST_DIR/backlog/sprints/2026-03-ov-b.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-ov-b.md" <<'EOF'
 ---
 status: active
 component: "shared-thing"
@@ -657,27 +657,21 @@ rm "$TEST_DIR/backlog/sprints/2026-03-ov-a.md" "$TEST_DIR/backlog/sprints/2026-0
 
 # --- status.sh: local files section ---
 mkdir -p "$TEST_DIR/backlog/tasks"
-cat > "$TEST_DIR/backlog/tasks/BACK-1.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-1.md" <<'EOF'
 ---
 status: To Do
 ---
 EOF
-cat > "$TEST_DIR/backlog/tasks/BACK-2.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-2.md" <<'EOF'
 ---
 status: In Progress
 ---
-EOF
-
-mkdir -p "$TEST_DIR/backlog/completed"
-cat > "$TEST_DIR/backlog/completed/BACK-0.md" << 'EOF'
-done
 EOF
 
 OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
 assert_contains "status: task count" "$OUT" "Tasks: 2 total"
 assert_contains "status: todo count" "$OUT" "1 To Do"
 assert_contains "status: inprog count" "$OUT" "1 In Progress"
-assert_contains "status: completed count" "$OUT" "Completed: 1"
 
 # A missing formatter must be detected before starting the Node producer. This
 # keeps the compatibility fallback and prevents a closed pipe from surfacing as
@@ -688,7 +682,7 @@ NODE_CALLED="$TEST_DIR/no-column-node-called"
 mkdir -p "$NO_COLUMN_BIN" "$NO_COLUMN_BACKLOG"
 ln -s "$(command -v dirname)" "$NO_COLUMN_BIN/dirname"
 ln -s "$(command -v git)" "$NO_COLUMN_BIN/git"
-cat > "$NO_COLUMN_BIN/node" << 'EOF'
+cat >"$NO_COLUMN_BIN/node" <<'EOF'
 #!/bin/bash
 : > "$NODE_CALLED"
 exit 99
@@ -697,7 +691,7 @@ chmod +x "$NO_COLUMN_BIN/node"
 
 set +e
 OUT=$(NODE_CALLED="$NODE_CALLED" PATH="$NO_COLUMN_BIN" RELAY_HOME="$TEST_DIR/no-relay" \
-  /bin/bash "$SCRIPT_DIR/status.sh" "$NO_COLUMN_BACKLOG" 2>&1)
+	/bin/bash "$SCRIPT_DIR/status.sh" "$NO_COLUMN_BACKLOG" 2>&1)
 STATUS=$?
 set -e
 assert_equals "status no-column: exit code" "$STATUS" "0"
@@ -712,7 +706,7 @@ assert_not_contains "status no-column: no EPIPE" "$OUT" "EPIPE"
 # ============================================================
 
 # Restore active sprint for hook tests
-cat > "$TEST_DIR/backlog/sprints/2026-03-test.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -761,7 +755,7 @@ assert_equals "hook: no dir = empty" "$OUT" ""
 
 # All done — no next item
 mkdir -p "$TEST_DIR/backlog/sprints"
-cat > "$TEST_DIR/backlog/sprints/2026-03-done.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-done.md" <<'EOF'
 ---
 status: active
 ---
@@ -786,38 +780,38 @@ assert_equals "contract: [x] matches" "$(echo '- [x] #3 Task' | grep -c "$RE_CB_
 
 # Issue number extraction
 assert_equals "contract: issue number" \
-  "$(echo '- [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)' | sed "s/${RE_CB_ANY}\([0-9]*\).*/\1/")" "42"
+	"$(echo '- [x] #42 OAuth2 flow (~2hr) → PR #87 (merged)' | sed "s/${RE_CB_ANY}\([0-9]*\).*/\1/")" "42"
 
 # Section heading regex
 assert_equals "contract: Plan heading" \
-  "$(echo '## Plan' | grep -c '^## Plan[ 	]*$')" "1"
+	"$(echo '## Plan' | grep -c '^## Plan[ 	]*$')" "1"
 assert_equals "contract: Running Context heading" \
-  "$(echo '## Running Context' | grep -c '^## Running Context[ 	]*$')" "1"
+	"$(echo '## Running Context' | grep -c '^## Running Context[ 	]*$')" "1"
 
 # Relay-merge progress log format
 assert_equals "contract: progress log" \
-  "$(echo '- 2026-03-25 10:50: #38 dispatched → PR #87 → reviewed (LGTM, round 1) → merged' | grep -c '#[0-9]* dispatched → PR #[0-9]*')" "1"
+	"$(echo '- 2026-03-25 10:50: #38 dispatched → PR #87 → reviewed (LGTM, round 1) → merged' | grep -c '#[0-9]* dispatched → PR #[0-9]*')" "1"
 
 # Run-ID annotation extraction
 assert_equals "contract: run-id extraction" \
-  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" "issue-42-20260403120000000"
+	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" "issue-42-20260403120000000"
 
 # Run-ID is optional (no annotation = line unchanged by sed, grep finds 0)
 assert_equals "contract: no run-id is valid" \
-  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | grep -c '\[run:')" "0"
+	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | grep -c '\[run:')" "0"
 
 # Extraction sed on line without run-id returns original line (no false positive)
 assert_equals "contract: run-id extraction on absent annotation" \
-  "$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" \
-  "- [x] #42 OAuth2 flow → PR #87 (merged)"
+	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" \
+	"- [x] #42 OAuth2 flow → PR #87 (merged)"
 
 # _context.md section headings
 assert_equals "contract: Architecture Decisions heading" \
-  "$(echo '## Architecture Decisions' | grep -c '^## Architecture Decisions[ 	]*$')" "1"
+	"$(echo '## Architecture Decisions' | grep -c '^## Architecture Decisions[ 	]*$')" "1"
 assert_equals "contract: Conventions heading" \
-  "$(echo '## Conventions' | grep -c '^## Conventions[ 	]*$')" "1"
+	"$(echo '## Conventions' | grep -c '^## Conventions[ 	]*$')" "1"
 assert_equals "contract: Known Gotchas heading" \
-  "$(echo '## Known Gotchas' | grep -c '^## Known Gotchas[ 	]*$')" "1"
+	"$(echo '## Known Gotchas' | grep -c '^## Known Gotchas[ 	]*$')" "1"
 
 # ============================================================
 # sprint-close.sh tests
@@ -827,7 +821,7 @@ assert_equals "contract: Known Gotchas heading" \
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
 
-cat > "$TEST_DIR/backlog/sprints/2026-03-auth.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-auth.md" <<'EOF'
 ---
 milestone: Auth Sprint
 status: active
@@ -853,14 +847,14 @@ Ship auth.
 EOF
 
 # Create matching task files
-cat > "$TEST_DIR/backlog/tasks/BACK-1 - db-schema.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-1 - db-schema.md" <<'EOF'
 ---
 id: BACK-1
 title: DB schema
 status: In Progress
 ---
 EOF
-cat > "$TEST_DIR/backlog/tasks/BACK-2 - oauth-flow.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-2 - oauth-flow.md" <<'EOF'
 ---
 id: BACK-2
 title: OAuth flow
@@ -868,7 +862,7 @@ status: In Progress
 ---
 EOF
 # Task not in sprint — should NOT be moved
-cat > "$TEST_DIR/backlog/tasks/BACK-99 - unrelated.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-99 - unrelated.md" <<'EOF'
 ---
 id: BACK-99
 title: Unrelated
@@ -876,7 +870,7 @@ status: To Do
 ---
 EOF
 
-cat > "$TEST_DIR/backlog/sprints/2026-03-other-active.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-other-active.md" <<'EOF'
 ---
 status: active
 ---
@@ -962,8 +956,8 @@ assert_equals "close: completed has 2" "$(ls "$TEST_DIR/backlog/completed/" | wc
 # --- mirrorless GitHub close (#346): no task file or archive directory required ---
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints"
-printf 'github\n' > "$TEST_DIR/backlog/.tracker"
-cat > "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md" << 'EOF'
+printf 'github\n' >"$TEST_DIR/backlog/.tracker"
+cat >"$TEST_DIR/backlog/sprints/2026-03-mirrorless.md" <<'EOF'
 ---
 status: active
 ---
@@ -985,15 +979,15 @@ OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
 assert_contains "close mirrorless: set completed" "$OUT" "status: completed"
 assert_contains "close mirrorless: reports no mirror requirement" "$OUT" "No legacy task mirrors required"
 assert_equals "close mirrorless: does not create tasks directory" \
-  "$(test -d "$TEST_DIR/backlog/tasks" && echo yes || echo no)" "no"
+	"$(test -d "$TEST_DIR/backlog/tasks" && echo yes || echo no)" "no"
 assert_equals "close mirrorless: sprint completed" \
-  "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md")" "status: completed"
+	"$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md")" "status: completed"
 
 # --- ambiguous issue number test (#1 must not match #11) ---
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
 
-cat > "$TEST_DIR/backlog/sprints/2026-03-ambig.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-ambig.md" <<'EOF'
 ---
 status: active
 ---
@@ -1006,12 +1000,12 @@ status: active
 ## Progress
 EOF
 
-cat > "$TEST_DIR/backlog/tasks/BACK-1 - short-task.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-1 - short-task.md" <<'EOF'
 ---
 id: BACK-1
 ---
 EOF
-cat > "$TEST_DIR/backlog/tasks/BACK-11 - longer-task.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-11 - longer-task.md" <<'EOF'
 ---
 id: BACK-11
 ---
@@ -1024,11 +1018,11 @@ assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev
 # --- local decimal closeout (BACK-1.2 must not match BACK-1.20) ---
 rm -rf "$TEST_DIR/backlog"
 mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
-printf 'local\n' > "$TEST_DIR/backlog/.tracker"
-cat > "$TEST_DIR/backlog/config.yml" << 'EOF'
+printf 'local\n' >"$TEST_DIR/backlog/.tracker"
+cat >"$TEST_DIR/backlog/config.yml" <<'EOF'
 task_prefix: BACK
 EOF
-cat > "$TEST_DIR/backlog/sprints/2026-03-local.md" << 'EOF'
+cat >"$TEST_DIR/backlog/sprints/2026-03-local.md" <<'EOF'
 ---
 status: active
 ---
@@ -1043,12 +1037,12 @@ Close one local subtask.
 
 ## Progress
 EOF
-cat > "$TEST_DIR/backlog/tasks/BACK-1.2 - short-subtask.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-1.2 - short-subtask.md" <<'EOF'
 ---
 id: BACK-1.2
 ---
 EOF
-cat > "$TEST_DIR/backlog/tasks/BACK-1.20 - longer-subtask.md" << 'EOF'
+cat >"$TEST_DIR/backlog/tasks/BACK-1.20 - longer-subtask.md" <<'EOF'
 ---
 id: BACK-1.20
 ---
@@ -1074,37 +1068,37 @@ assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
 XFAIL=0
 XPASS=0
-GATE_B3="${GATE_B3:-1}"      # #258 landed: enforced — sprint-init omits spec fields when no spec files
-GATE_A2A3="${GATE_A2A3:-1}"  # #254/#255 landed: enforced regression guard against re-adding ../spec-charter reads
+GATE_B3="${GATE_B3:-1}"     # #258 landed: enforced — sprint-init omits spec fields when no spec files
+GATE_A2A3="${GATE_A2A3:-1}" # #254/#255 landed: enforced regression guard against re-adding ../spec-charter reads
 
 # gated_assert LABEL GATE RESULT("pass"|"fail")
 #   GATE=1 → enforced like a normal assertion (feeds PASS/FAIL).
 #   GATE=0 → expected-fail: RESULT=fail is the known-RED baseline (XFAIL, ok);
 #            RESULT=pass means the fix landed early (XPASS) — flip the gate.
 gated_assert() {
-  local label="$1" gate="$2" result="$3"
-  if [ "$gate" = "1" ]; then
-    if [ "$result" = "pass" ]; then
-      PASS=$((PASS + 1))
-    else
-      FAIL=$((FAIL + 1))
-      echo "FAIL: $label"
-    fi
-  else
-    if [ "$result" = "pass" ]; then
-      XPASS=$((XPASS + 1))
-      echo "XPASS: $label — fix appears to have landed; set its gate to 1 to enforce."
-    else
-      XFAIL=$((XFAIL + 1))
-    fi
-  fi
+	local label="$1" gate="$2" result="$3"
+	if [ "$gate" = "1" ]; then
+		if [ "$result" = "pass" ]; then
+			PASS=$((PASS + 1))
+		else
+			FAIL=$((FAIL + 1))
+			echo "FAIL: $label"
+		fi
+	else
+		if [ "$result" = "pass" ]; then
+			XPASS=$((XPASS + 1))
+			echo "XPASS: $label — fix appears to have landed; set its gate to 1 to enforce."
+		else
+			XFAIL=$((XFAIL + 1))
+		fi
+	fi
 }
 
 # Build a genuinely spec-less project: run scripts with cwd inside it so spec
 # resolution finds nothing (scripts resolve their own path via SCRIPT_DIR).
 COLD_DIR="$TEST_DIR/cold-adopter"
 mkdir -p "$COLD_DIR/backlog/sprints" "$COLD_DIR/backlog/tasks" "$COLD_DIR/backlog/completed"
-cat > "$COLD_DIR/backlog/sprints/2026-01-cold.md" << 'EOF'
+cat >"$COLD_DIR/backlog/sprints/2026-01-cold.md" <<'EOF'
 ---
 milestone: cold fixture
 status: active
@@ -1177,9 +1171,9 @@ gated_assert "cold: sprint-init omits spec fields when no spec files (#258 B3)" 
 # matches its own source) and matches only the concrete reference-file paths,
 # not name-only mentions or negative "never chase ../spec-charter/..." warnings.
 if grep -rlF "../spec-charter/references/" --include="*.md" "$REPO_ROOT/skills/" >/dev/null 2>&1; then
-  A2A3_RES="fail"   # still coupled → RED
+	A2A3_RES="fail" # still coupled → RED
 else
-  A2A3_RES="pass"
+	A2A3_RES="pass"
 fi
 gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$GATE_A2A3" "$A2A3_RES"
 
@@ -1193,13 +1187,13 @@ gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2
 # failed on ANY two actives with a DIFFERENT message ("Multiple active sprint
 # files found"), so the overlap fixture keys on the active_sprint verdict's
 # "Active tracks overlap on scope" message, not the exit code (#290 B2).
-GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-1}"  # #291+#293 landed: enforced — doctor passes on disjoint-scope tracks
-GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-1}"    # #293 landed: enforced — doctor active_sprint verdict emits the scope-overlap message
+GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-1}" # #291+#293 landed: enforced — doctor passes on disjoint-scope tracks
+GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-1}"   # #293 landed: enforced — doctor active_sprint verdict emits the scope-overlap message
 
 # helper: write a minimal, shape-valid active sprint with a given scope
 mt_write_sprint() { # dir file title issue scope_yaml
-  local file="$1" title="$2" issue="$3" scope="$4"
-  cat > "$file" << EOF
+	local file="$1" title="$2" issue="$3" scope="$4"
+	cat >"$file" <<EOF
 ---
 milestone: mt
 status: active
@@ -1281,7 +1275,7 @@ if (tags[0] !== "2026-07-auth" || tags[1] !== "2026-07-billing") process.exit(1)
 MT_SCOPELESS_DIR="$TEST_DIR/mt-scopeless"
 mkdir -p "$MT_SCOPELESS_DIR/backlog/sprints"
 for slug in one two; do
-  cat > "$MT_SCOPELESS_DIR/backlog/sprints/2026-07-$slug.md" << EOF
+	cat >"$MT_SCOPELESS_DIR/backlog/sprints/2026-07-$slug.md" <<EOF
 ---
 milestone: mt
 status: active
@@ -1422,8 +1416,8 @@ echo ""
 TOTAL=$((PASS + FAIL))
 echo "$TOTAL tests: $PASS passed, $FAIL failed"
 if [ "$((XFAIL + XPASS))" -gt 0 ]; then
-  echo "known-RED gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
+	echo "known-RED gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
 fi
 if [ "$FAIL" -gt 0 ]; then
-  exit 1
+	exit 1
 fi
