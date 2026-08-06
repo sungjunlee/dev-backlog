@@ -11,7 +11,7 @@ metadata:
 
 Real job: inspect open GitHub Issues, produce an advisory triage report, and apply only human-accepted issue mutations through stable anchor comments.
 
-Sibling skill to `dev-backlog`, not a replacement. `dev-backlog` owns sprint execution, progress, milestones, and AC mirrors. `backlog-triage` owns open-issue classification, relationships, stale signals, priority/milestone proposals, and optional accepted GitHub mutations.
+Sibling skill to `dev-backlog`, not a replacement. `dev-backlog` owns sprint execution, progress, milestones, and AC resolution from live GitHub Issues. `backlog-triage` owns open-issue classification, relationships, stale signals, priority/milestone proposals, and optional accepted GitHub mutations.
 
 ## Phase Model
 
