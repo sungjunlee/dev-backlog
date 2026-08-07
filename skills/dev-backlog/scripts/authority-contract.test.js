@@ -18,7 +18,7 @@ const EXPECTED_STATE_CLASSES = [
   "Derived retrieval output",
 ];
 const EXPECTED_SOLE_AUTHORITIES = [
-  "GitHub Issue body and acceptance criteria",
+  "GitHub Issue body and acceptance criteria; a posted `## Agent Brief` comment is the contract when present",
   "GitHub Issue state and native metadata",
   "GitHub Issue native metadata",
   "One active sprint file for the admitted track",

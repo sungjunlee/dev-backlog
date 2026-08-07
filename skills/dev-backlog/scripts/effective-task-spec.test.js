@@ -11,6 +11,7 @@ const {
   EffectiveTaskSpecError,
   digestText,
   explicitSpecRef,
+  findAgentBriefComment,
   parseCli,
   parseAcceptanceCriteria,
   resolveEffectiveTaskSpec,
@@ -448,6 +449,121 @@ describe("acceptance criteria parsing and repository spec safety", () => {
         return true;
       }
     );
+  });
+});
+
+describe("AGENT-BRIEF comment support", () => {
+  const briefBody = [
+    "## Agent Brief",
+    "",
+    "**Category:** bug",
+    "**Summary:** Fix truncation.",
+    "",
+    "**Current behavior:**",
+    "Descriptions cut mid-word.",
+    "",
+    "**Desired behavior:**",
+    "Break at the last word boundary before 1024.",
+    "",
+    "**Key interfaces:**",
+    "- `SkillMetadata.description` — no type change",
+    "",
+    "**Acceptance criteria:**",
+    "- [ ] Break at the last word boundary",
+    "- [x] Append \"...\" when truncated",
+    "",
+    "**Out of scope:**",
+    "- Font rendering",
+  ].join("\n");
+
+  it("uses the latest AGENT-BRIEF comment as the effective spec", () => {
+    const fixture = resolvedTask({
+      body: "## Outcome\nStale body text.",
+      state: "OPEN",
+      url: "https://github.com/acme/widgets/issues/42",
+      comments: [
+        { id: "1", url: "https://github.com/acme/widgets/issues/42#issuecomment-1", body: "just a note" },
+        { id: "2", url: "https://github.com/acme/widgets/issues/42#issuecomment-2", body: briefBody },
+      ],
+    });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "#42", {
+      repo: "acme/widgets",
+    });
+
+    assert.equal(result.effective_spec, briefBody);
+    assert.equal(result.source_ref, "https://github.com/acme/widgets/issues/42#issuecomment-2");
+    assert.deepEqual(result.acceptance_criteria, [
+      { text: "Break at the last word boundary", checked: false },
+      { text: "Append \"...\" when truncated", checked: true },
+    ]);
+    assert.equal(result.lifecycle.state, "open");
+  });
+
+  it("picks the newest comment when several carry an Agent Brief heading", () => {
+    const older = "## Agent Brief\n\n**Acceptance criteria:**\n- [ ] Old criterion";
+    const newer = "## Agent Brief\n\n**Acceptance criteria:**\n- [ ] New criterion";
+    const fixture = resolvedTask({
+      body: "ignored",
+      state: "OPEN",
+      comments: [
+        { id: "1", url: "https://github.com/acme/widgets/issues/42#issuecomment-1", body: older },
+        { id: "2", url: "https://github.com/acme/widgets/issues/42#issuecomment-2", body: newer },
+      ],
+    });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "#42", {});
+    assert.equal(result.source_ref, "https://github.com/acme/widgets/issues/42#issuecomment-2");
+    assert.deepEqual(result.acceptance_criteria, [
+      { text: "New criterion", checked: false },
+    ]);
+  });
+
+  it("falls back to the issue body when no Agent Brief comment exists", () => {
+    const fixture = resolvedTask({
+      body: "## Outcome\nNo brief here.",
+      state: "OPEN",
+      comments: [
+        { id: "1", url: "https://github.com/acme/widgets/issues/42#issuecomment-1", body: "**Summary:** an ordinary note" },
+      ],
+    });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "#42", {});
+    assert.equal(result.effective_spec, "## Outcome\nNo brief here.");
+  });
+
+  it("lets an explicit spec_ref win over an Agent Brief comment", () => {
+    const fixture = resolvedTask({
+      body: "<!-- dev-backlog:spec_ref docs/task-42.md -->\n## Outcome\nbody",
+      state: "OPEN",
+      comments: [
+        { id: "2", url: "https://github.com/acme/widgets/issues/42#issuecomment-2", body: briefBody },
+      ],
+    });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "#42", {
+      rootDir: "/tmp",
+      loadSpec: () => "# Loaded spec\n\n**Acceptance criteria:**\n- [ ] From spec_ref",
+    });
+
+    assert.equal(result.effective_spec, "# Loaded spec\n\n**Acceptance criteria:**\n- [ ] From spec_ref");
+  });
+
+  it("extracts bold-label acceptance criteria from a standalone brief", () => {
+    assert.deepEqual(parseAcceptanceCriteria(briefBody), [
+      { text: "Break at the last word boundary", checked: false },
+      { text: "Append \"...\" when truncated", checked: true },
+    ]);
+  });
+
+  it("findAgentBriefComment ignores briefs inside fenced code blocks", () => {
+    const fixture = resolvedTask({
+      body: "body",
+      comments: [
+        { id: "1", url: "https://github.com/acme/widgets/issues/42#issuecomment-1", body: "```markdown\n## Agent Brief\n```" },
+      ],
+    });
+    assert.equal(findAgentBriefComment(fixture.resolved), null);
   });
 });
 

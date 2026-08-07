@@ -266,7 +266,7 @@ The core loop above needs none of these. Add one only when you want its capabili
 | dev-relay | delegated-work tracking: `[~]` in-flight state and PR handoff in the sprint file | the dev-relay skill |
 | backlog-triage | open-issue grooming into an advisory report (classification, stale flags, Alignment, Decision Review) | nothing — ships in this bundle |
 | GitHub Projects | optional planning visualization over Issues | a separately configured Project; project-only fields remain non-authoritative |
-| Matt Pocock skills | optional shaping or execution techniques (to-tickets template, AC checkbox parsing work with dev-backlog's resolver natively) | separately installed skills; `.scratch/<feature>/issues/` local tickets and AGENT-BRIEF comments are outside dev-backlog's contract — mutually referenceable, never required |
+| Matt Pocock skills | optional shaping or execution techniques (to-tickets templates and `## Agent Brief` comments resolve natively; brief AC use bold labels) | separately installed skills; `.scratch/<feature>/issues/` local tickets stay outside dev-backlog's contract — mutually referenceable, never required |
 
 ### Spec axis (charter, system map, capabilities)
 

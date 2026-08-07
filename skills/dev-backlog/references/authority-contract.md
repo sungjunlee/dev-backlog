@@ -18,7 +18,7 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | GitHub Issue body and acceptance criteria | Create or amend the Issue, then read the live Issue | Legacy `backlog/tasks/` files, sprint Plan text, GitHub Projects |
+| Task specification | GitHub Issue body and acceptance criteria; a posted `## Agent Brief` comment is the contract when present | Create or amend the Issue (or post the brief as a comment), then read the live Issue and its comments | Legacy `backlog/tasks/` files, sprint Plan text, GitHub Projects |
 | Task lifecycle | GitHub Issue state and native metadata | Update the Issue state, labels, milestone, assignees, and native relationships | Sprint checkboxes, legacy task files, project-board fields |
 | Planning fields | GitHub Issue native metadata | Use labels, milestone, assignees, and Issue relationships; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |

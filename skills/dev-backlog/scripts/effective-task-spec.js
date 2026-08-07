@@ -16,9 +16,11 @@ const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
 
 const GITHUB_RESOLUTION_FIELDS =
-  "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url";
+  "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url,comments";
 const SPEC_REF_MARKER_RE =
   /^[ \t]{0,3}<!--\s*dev-backlog:spec_ref\s+([^\r\n]*?)\s*-->[ \t]*$/gim;
+const AGENT_BRIEF_HEADING_RE =
+  /^[ \t]{0,3}##\s+Agent Brief\s*$/im;
 const AC_MARKER_RE =
   /^[ \t]{0,3}<!--\s*AC:BEGIN\s*-->[ \t]*$\n([\s\S]*?)^[ \t]{0,3}<!--\s*AC:END\s*-->[ \t]*$/imd;
 const TASK_LIST_LINE_RE =
@@ -207,6 +209,18 @@ function markdownOutsideCode(markdown, { stripInline = false } = {}) {
     : outsideBlocksAndComments;
 }
 
+function findAgentBriefComment(task) {
+  const comments = Array.isArray(task.comments) ? task.comments : [];
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    const comment = comments[index];
+    if (!comment || typeof comment.body !== "string") continue;
+    if (AGENT_BRIEF_HEADING_RE.test(markdownOutsideCode(comment.body, { stripInline: true }))) {
+      return comment;
+    }
+  }
+  return null;
+}
+
 function explicitSpecRef(task, requestedSpecRef) {
   const candidates = [];
   if (requestedSpecRef !== undefined && requestedSpecRef !== null) {
@@ -289,14 +303,27 @@ function acceptanceCriteriaSection(markdown) {
   const structuralLines = structuralText.split("\n");
   const lines = text.split("\n");
   const heading = /^(#{1,6})\s+(?:acceptance criteria|acceptance criterion|ac)\s*#*\s*$/i;
-  const start = structuralLines.findIndex((line) => heading.test(line.trim()));
+  const boldLabel = /^\*\*\s*(?:acceptance criteria|acceptance criterion|ac)\s*\*+\s*:?\s*$/i;
+  const anyBoldLabel = /^\*\*[^*\n]+\*+\s*:?\s*$/;
+  const isAcSectionStart = (line) => {
+    const trimmed = line.trim();
+    return heading.test(trimmed) || boldLabel.test(trimmed);
+  };
+  const start = structuralLines.findIndex(isAcSectionStart);
   if (start < 0) return text;
 
-  const level = structuralLines[start].trim().match(/^#+/)[0].length;
+  const startLine = structuralLines[start].trim();
+  const headingMatch = startLine.match(/^(#{1,6})/);
+  const level = headingMatch ? headingMatch[1].length : 1;
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    const next = structuralLines[index].match(/^(#{1,6})\s+/);
-    if (next && next[1].length <= level) {
+    const line = structuralLines[index].trim();
+    const nextHeading = line.match(/^(#{1,6})/);
+    if (nextHeading && nextHeading[1].length <= level) {
+      end = index;
+      break;
+    }
+    if (anyBoldLabel.test(line)) {
       end = index;
       break;
     }
@@ -473,8 +500,14 @@ function resolveEffectiveTaskSpec(resolved, taskRef, {
       );
     }
   } else {
-    effectiveSpec = normalizeText(task.body);
-    sourceRef = taskBodySourceRef(task);
+    const brief = findAgentBriefComment(task);
+    if (brief) {
+      effectiveSpec = normalizeText(brief.body);
+      sourceRef = brief.url || taskBodySourceRef(task);
+    } else {
+      effectiveSpec = normalizeText(task.body);
+      sourceRef = taskBodySourceRef(task);
+    }
   }
 
   const digest = digestText(effectiveSpec);
@@ -548,6 +581,7 @@ module.exports = {
   acceptanceCriteriaSection,
   digestText,
   explicitSpecRef,
+  findAgentBriefComment,
   loadRepositorySpec,
   maskHtmlComments,
   markdownOutsideCode,
