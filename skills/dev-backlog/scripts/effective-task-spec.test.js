@@ -395,6 +395,35 @@ describe("acceptance criteria parsing and repository spec safety", () => {
     ]);
   });
 
+  it("parses a mattpocock to-tickets issue template natively", () => {
+    // Real shape from mattpocock/skills to-tickets' <issue-template>: headings
+    // like ## Parent / ## What to build / ## Blocked by carry no AC markers, so
+    // only the ## Acceptance criteria list must be extracted.
+    const body = [
+      "## Parent",
+      "",
+      "#123 — parent epic issue",
+      "",
+      "## What to build",
+      "",
+      "The end-to-end behaviour this ticket makes work, from the user's perspective — not layer-by-layer implementation.",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- [ ] Criterion 1",
+      "- [ ] Criterion 2",
+      "",
+      "## Blocked by",
+      "",
+      "- #122 — blocking ticket",
+      "",
+    ].join("\n");
+    assert.deepEqual(parseAcceptanceCriteria(body), [
+      { text: "Criterion 1", checked: false },
+      { text: "Criterion 2", checked: false },
+    ]);
+  });
+
   it("loads only repository-contained explicit specs", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "effective-spec-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
