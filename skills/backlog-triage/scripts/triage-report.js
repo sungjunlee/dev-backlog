@@ -694,8 +694,8 @@ function validateModelAction(action, index) {
     }
   }
 
-  if (section === "milestone" && !String(action.sprintName || "").trim()) {
-    throw new Error(`${label} (assign-milestone) requires a non-empty top-level sprintName for grouping.`);
+  if (section === "milestone" && (typeof action.sprintName !== "string" || !action.sprintName.trim())) {
+    throw new Error(`${label} (assign-milestone) requires a non-empty string top-level sprintName for grouping.`);
   }
 
   if (!String(action.summary || "").trim()) {

@@ -715,6 +715,13 @@ describe("loadModelActions", () => {
     assert.throws(() => loadModelActions(actionsPath), /top-level sprintName/);
   });
 
+  it("rejects a non-string sprintName (numeric) for milestone actions", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "Sprint W34" }, sprintName: 202608, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /non-empty string top-level sprintName/);
+  });
+
   it("rejects an empty summary", () => {
     const actionsPath = writeActions([
       { section: "priority", verb: "set-priority", issueNumber: 42, args: { value: "high" }, summary: "  " },
@@ -845,6 +852,35 @@ describe("model-action merge into report model", () => {
 
     const apply = model.sections.find((section) => section.key === "apply").markdown;
     assert.equal((apply.match(/triage:set-priority #42/g) || []).length, 1);
+  });
+
+  it("dedupes two same-key actions inside the priority section itself", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage (duplicate)",
+        },
+      ],
+    });
+
+    const priority = model.sections.find((section) => section.key === "priority").markdown;
+    assert.equal((priority.match(/triage:set-priority #42/g) || []).length, 1);
   });
 
   it("dedupes args that differ only by key order or whitespace, matching apply normalization", () => {
