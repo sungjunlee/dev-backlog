@@ -9,10 +9,10 @@ const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
 const OPTIONAL_RELATIONSHIPS_MARKER =
   "_(comment and closing-PR relationship signals run only when snapshot v2 fields are present)_";
 const DEFERRED_OBSOLETE_MARKER =
-  "_(merged closing-PR and duplicate-of-closed signals run only when snapshot v2 fields are present)_";
+  "_(merged closing-PR signals run only when snapshot v2 fields are present)_";
 
 function usage() {
-  return "Usage: triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--out PATH] [--json]";
+  return "Usage: triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--model-actions PATH] [--out PATH] [--json]";
 }
 
 function parseArgs(args) {
@@ -21,6 +21,7 @@ function parseArgs(args) {
     relatePath: undefined,
     stalePath: undefined,
     activeSprintPath: undefined,
+    modelActionsPath: undefined,
     outPath: undefined,
     json: false,
   };
@@ -33,7 +34,7 @@ function parseArgs(args) {
       continue;
     }
 
-    if (arg === "--snapshot" || arg === "--relate" || arg === "--stale" || arg === "--out") {
+    if (arg === "--snapshot" || arg === "--relate" || arg === "--stale" || arg === "--model-actions" || arg === "--out") {
       const nextValue = args[index + 1];
       if (!nextValue) {
         return { ...options, error: `Missing value for ${arg}. ${usage()}` };
@@ -42,6 +43,7 @@ function parseArgs(args) {
       if (arg === "--snapshot") options.snapshotPath = nextValue;
       if (arg === "--relate") options.relatePath = nextValue;
       if (arg === "--stale") options.stalePath = nextValue;
+      if (arg === "--model-actions") options.modelActionsPath = nextValue;
       if (arg === "--out") options.outPath = nextValue;
       index += 1;
       continue;
@@ -57,6 +59,10 @@ function parseArgs(args) {
     }
     if (arg.startsWith("--stale=")) {
       options.stalePath = arg.slice("--stale=".length);
+      continue;
+    }
+    if (arg.startsWith("--model-actions=")) {
+      options.modelActionsPath = arg.slice("--model-actions=".length);
       continue;
     }
     if (arg.startsWith("--out=")) {
@@ -338,11 +344,18 @@ function actionPriority(action) {
   return 0;
 }
 
+function normalizeActionKey(action) {
+  // Deferred require: triage-apply.js requires this module for ANCHOR_PATTERN,
+  // so a top-level require would create a circular dependency at load time.
+  const { normalizeArgs, stableSerialize } = require("./triage-apply.js");
+  return `${action.verb}|${action.issueNumber}|${stableSerialize(normalizeArgs(action.args))}`;
+}
+
 function dedupeActions(actions) {
   const selected = new Map();
 
   for (const action of actions) {
-    const key = `${action.section}:${action.verb}:${action.issueNumber}`;
+    const key = normalizeActionKey(action);
     const current = selected.get(key);
     if (!current || actionPriority(action) > actionPriority(current)) {
       selected.set(key, action);
@@ -456,7 +469,7 @@ function renderActionBlocks(actions, { withEvidence = false } = {}) {
 function renderObsoleteCandidates(stale, actions) {
   const lines = ["## Obsolete Candidates"];
 
-  if (!stale) {
+  if (!stale && actions.length === 0) {
     lines.push("_(no input provided)_", "", DEFERRED_OBSOLETE_MARKER);
     return lines.join("\n");
   }
@@ -472,143 +485,10 @@ function renderObsoleteCandidates(stale, actions) {
   return lines.join("\n");
 }
 
-function buildThemeStats(snapshot) {
-  const stats = new Map();
-  for (const issue of snapshot.issues) {
-    const theme = issue.buckets.theme || "uncategorized";
-    if (!stats.has(theme)) stats.set(theme, { total: 0, active: 0 });
-    const entry = stats.get(theme);
-    entry.total += 1;
-    if (issue.buckets.activity === "recent" || issue.buckets.activity === "warm") {
-      entry.active += 1;
-    }
-  }
-  return stats;
-}
-
-function buildRelationshipCounts(relate) {
-  const counts = new Map();
-  if (!relate) return counts;
-
-  for (const edge of relate.edges) {
-    if (edge.kind === "merged-pr-link") continue;
-    counts.set(edge.from, (counts.get(edge.from) || 0) + 1);
-    if (edge.to !== edge.from) {
-      counts.set(edge.to, (counts.get(edge.to) || 0) + 1);
-    }
-  }
-  return counts;
-}
-
-function buildClosedIssueSet(obsoleteActions) {
-  return new Set(
-    obsoleteActions
-      .filter((action) => action.verb === "close" || action.verb === "close-duplicate")
-      .map((action) => action.issueNumber)
-  );
-}
-
-function buildPriorityActions(snapshot, relate, obsoleteActions) {
-  const themeStats = buildThemeStats(snapshot);
-  const relationshipCounts = buildRelationshipCounts(relate);
-  const closedIssues = buildClosedIssueSet(obsoleteActions);
-  const actions = [];
-
-  for (const issue of snapshot.issues) {
-    if (closedIssues.has(issue.number)) continue;
-
-    const currentPriority = issue.buckets.label?.priority || "medium";
-    if (currentPriority === "high" || currentPriority === "critical") continue;
-
-    const theme = issue.buckets.theme || "uncategorized";
-    const themeStat = themeStats.get(theme) || { total: 0, active: 0 };
-    const relationshipCount = relationshipCounts.get(issue.number) || 0;
-    const themeHot = theme !== "uncategorized" && themeStat.active >= 2;
-    const relationshipHot = relationshipCount > 0;
-    const activityEligible = issue.buckets.activity !== "cold";
-
-    if (!activityEligible) continue;
-    if (!themeHot && !relationshipHot) continue;
-
-    const reasons = [];
-    if (themeHot) reasons.push(`theme ${theme} has ${themeStat.active} recent/warm issues`);
-    if (relationshipHot) reasons.push(`connected by ${relationshipCount} relationship edge${relationshipCount === 1 ? "" : "s"}`);
-
-    actions.push({
-      section: "priority",
-      verb: "set-priority",
-      issueNumber: issue.number,
-      args: {
-        value: "high",
-        reason: reasons.join("; "),
-      },
-      summary: `Set priority:high on #${issue.number} — ${reasons.join("; ")}`,
-      evidence: reasons.join("; "),
-    });
-  }
-
-  return dedupeActions(actions);
-}
-
-function getIsoWeek(date) {
-  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = target.getUTCDay() || 7;
-  target.setUTCDate(target.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
-  return Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
-}
-
-function nextSprintName(generated) {
-  const generatedDate = new Date(generated);
-  return `Sprint W${getIsoWeek(generatedDate) + 1}`;
-}
-
-function buildMilestoneActions(snapshot, relate, obsoleteActions, priorityActions) {
-  const relationshipCounts = buildRelationshipCounts(relate);
-  const closedIssues = buildClosedIssueSet(obsoleteActions);
-  const priorityIssues = new Set(priorityActions.map((action) => action.issueNumber));
-  const sprintName = nextSprintName(snapshot.generated);
-  const actions = [];
-
-  for (const issue of snapshot.issues) {
-    if (closedIssues.has(issue.number)) continue;
-    if (issue.milestone !== null && issue.milestone !== undefined) continue;
-
-    const theme = issue.buckets.theme || "uncategorized";
-    const relationshipCount = relationshipCounts.get(issue.number) || 0;
-    const relationshipHot = relationshipCount > 0;
-    const activeTheme = theme !== "uncategorized" && issue.buckets.activity !== "cold";
-    const priorityHot = priorityIssues.has(issue.number);
-
-    if (!relationshipHot && !activeTheme && !priorityHot) continue;
-
-    const rationale = [];
-    if (activeTheme) rationale.push(`theme ${theme}`);
-    if (relationshipHot) rationale.push(`${relationshipCount} relationship edge${relationshipCount === 1 ? "" : "s"}`);
-    if (priorityHot) rationale.push("priority proposal above");
-
-    actions.push({
-      section: "milestone",
-      verb: "assign-milestone",
-      issueNumber: issue.number,
-      args: {
-        name: sprintName,
-        cluster: theme,
-      },
-      cluster: theme,
-      sprintName,
-      summary: `Assign ${sprintName} to #${issue.number} — ${rationale.join("; ")}`,
-      evidence: rationale.join("; "),
-    });
-  }
-
-  return dedupeActions(actions);
-}
-
 function renderPriorityProposals(actions) {
   const lines = [
     "## Priority Proposals",
-    "Heuristic: suggest `priority:high` for non-high issues that are still active and either sit in a theme with multiple recent/warm issues or participate in relationship edges.",
+    "Model judgment: non-high issues worth escalating, with rationale from theme activity, relationship edges, and sprint focus.",
   ];
 
   if (actions.length === 0) {
@@ -616,7 +496,7 @@ function renderPriorityProposals(actions) {
     return lines.join("\n");
   }
 
-  lines.push("", ...renderActionBlocks(actions));
+  lines.push("", ...renderActionBlocks(actions, { withEvidence: true }));
   if (lines[lines.length - 1] === "") lines.pop();
   return lines.join("\n");
 }
@@ -636,7 +516,7 @@ function renderMilestoneSuggestions(actions) {
     for (const [cluster, clusterActions] of sortGroupEntries(byCluster)) {
       lines.push(`Theme cluster: ${cluster}`);
       lines.push("");
-      lines.push(...renderActionBlocks(clusterActions));
+      lines.push(...renderActionBlocks(clusterActions, { withEvidence: true }));
       if (lines[lines.length - 1] === "") lines.pop();
       lines.push("");
     }
@@ -684,17 +564,26 @@ function buildFrontmatter(snapshot, snapshotPath) {
   ].join("\n");
 }
 
-function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintContent = "" }) {
+function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintContent = "", modelActions = [] }) {
   const issueIndex = buildIssueIndex(snapshot);
   const protectedIssueNumbers = collectActiveSprintIssueNumbers(activeSprintContent);
-  const obsoleteActions = buildObsoleteActions(stale, { protectedIssueNumbers });
-  const priorityActions = buildPriorityActions(snapshot, relate, obsoleteActions);
-  const milestoneActions = buildMilestoneActions(snapshot, relate, obsoleteActions, priorityActions);
-  const allActions = [...obsoleteActions, ...priorityActions, ...milestoneActions];
+
+  const modelObsoleteActions = modelActions.filter((action) => action.section === "obsolete");
+  const obsoleteActions = dedupeActions([
+    ...buildObsoleteActions(stale, { protectedIssueNumbers }),
+    ...modelObsoleteActions.filter((action) => !protectedIssueNumbers.has(action.issueNumber)),
+  ]);
+
+  const modelRelationships = modelActions.filter((action) => action.section === "relationship");
+  const mergedRelate = mergeModelRelationships(relate, modelRelationships);
+
+  const priorityActions = dedupeActions(modelActions.filter((action) => action.section === "priority"));
+  const milestoneActions = dedupeActions(modelActions.filter((action) => action.section === "milestone"));
+  const allActions = dedupeActions([...obsoleteActions, ...priorityActions, ...milestoneActions]);
 
   const sections = [
     { key: "classification", title: "Classification", markdown: renderClassification(snapshot) },
-    { key: "relationships", title: "Relationships", markdown: renderRelationships(relate, issueIndex) },
+    { key: "relationships", title: "Relationships", markdown: renderRelationships(mergedRelate, issueIndex) },
     { key: "obsolete", title: "Obsolete Candidates", markdown: renderObsoleteCandidates(stale, obsoleteActions) },
     { key: "priority", title: "Priority Proposals", markdown: renderPriorityProposals(priorityActions) },
     { key: "milestone", title: "Milestone Suggestions", markdown: renderMilestoneSuggestions(milestoneActions) },
@@ -714,6 +603,129 @@ function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintC
     sections,
     anchors,
   };
+}
+
+function mergeModelRelationships(relate, modelRelationships) {
+  if (modelRelationships.length === 0) return relate;
+
+  const base = relate && Array.isArray(relate.edges)
+    ? { ...relate, edges: [...relate.edges] }
+    : { edges: [] };
+
+  for (const action of modelRelationships) {
+    const edge = action.args;
+    base.edges.push({
+      from: edge.from,
+      to: edge.to,
+      kind: edge.kind,
+      confidence: Number.isFinite(edge.confidence) ? edge.confidence : 1,
+      evidence: typeof edge.evidence === "object" && edge.evidence !== null ? edge.evidence : {},
+    });
+  }
+
+  return base;
+}
+
+const MODEL_SECTION_VERBS = Object.freeze({
+  priority: new Set(["set-priority"]),
+  milestone: new Set(["assign-milestone"]),
+  obsolete: new Set(["close", "revisit", "close-duplicate"]),
+  relationship: new Set(["edge"]),
+});
+
+const MODEL_EDGE_KINDS = new Set([
+  "mentions",
+  "comment-mentions",
+  "blocks",
+  "depends-on",
+  "duplicate-candidate",
+  "merged-pr-link",
+]);
+
+function validateModelAction(action, index) {
+  const label = `model action[${index}]`;
+
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    throw new Error(`${label} must be an object.`);
+  }
+
+  const section = String(action.section || "");
+  if (!MODEL_SECTION_VERBS[section]) {
+    throw new Error(`${label} has unsupported section "${section}"; expected one of ${Object.keys(MODEL_SECTION_VERBS).join(", ")}.`);
+  }
+
+  const verb = String(action.verb || "");
+  if (!MODEL_SECTION_VERBS[section].has(verb)) {
+    throw new Error(`${label} uses verb "${verb}" which is not allowed in section "${section}".`);
+  }
+
+  const args = action.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error(`${label} must carry a plain-object args.`);
+  }
+
+  if (section === "relationship") {
+    if (!Number.isSafeInteger(args.from) || args.from <= 0 || !Number.isSafeInteger(args.to) || args.to <= 0) {
+      throw new Error(`${label} (edge) requires positive safe-integer args.from and args.to.`);
+    }
+    if (!MODEL_EDGE_KINDS.has(args.kind)) {
+      throw new Error(`${label} (edge) has unsupported kind "${args.kind}"; expected one of ${[...MODEL_EDGE_KINDS].join(", ")}.`);
+    }
+  } else {
+    if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber <= 0) {
+      throw new Error(`${label} must carry a positive safe-integer issueNumber.`);
+    }
+  }
+
+  const requiredArgs = section === "priority"
+    ? ["value"]
+    : section === "milestone"
+      ? ["name"]
+      : section === "obsolete"
+        ? verb === "close-duplicate"
+          ? ["target", "reason"]
+          : ["reason"]
+        : [];
+
+  for (const key of requiredArgs) {
+    const value = args[key];
+    if (typeof value !== "string" || value.trim() === "") {
+      throw new Error(`${label} (${verb}) requires a non-empty string arg "${key}".`);
+    }
+  }
+
+  if (section === "milestone" && (typeof action.sprintName !== "string" || !action.sprintName.trim())) {
+    throw new Error(`${label} (assign-milestone) requires a non-empty string top-level sprintName for grouping.`);
+  }
+  if (section === "milestone" && action.cluster !== undefined && typeof action.cluster !== "string") {
+    throw new Error(`${label} (assign-milestone) top-level cluster, when present, must be a string.`);
+  }
+
+  if (!String(action.summary || "").trim()) {
+    throw new Error(`${label} must carry a non-empty summary.`);
+  }
+}
+
+function loadModelActions(modelActionsPath) {
+  if (!modelActionsPath) return [];
+  const actions = readJsonFile(modelActionsPath, { label: "model actions JSON" });
+  if (!Array.isArray(actions)) {
+    throw new Error(`Invalid model actions JSON at ${modelActionsPath}: expected an array of action objects.`);
+  }
+
+  return actions.map((action, index) => {
+    validateModelAction(action, index);
+    return {
+      section: String(action.section),
+      verb: String(action.verb),
+      issueNumber: action.section === "relationship" ? undefined : action.issueNumber,
+      args: action.args,
+      cluster: typeof action.cluster === "string" ? action.cluster : undefined,
+      sprintName: typeof action.sprintName === "string" ? action.sprintName : undefined,
+      summary: String(action.summary),
+      evidence: typeof action.evidence === "string" ? action.evidence : undefined,
+    };
+  });
 }
 
 function renderReport(reportModel) {
@@ -757,12 +769,14 @@ function loadInputs(options) {
   const activeSprintContent = options.activeSprintPath
     ? fs.readFileSync(path.resolve(options.activeSprintPath), "utf-8")
     : "";
+  const modelActions = loadModelActions(options.modelActionsPath);
 
   return {
     snapshot,
     relate,
     stale,
     activeSprintContent,
+    modelActions,
   };
 }
 
@@ -785,6 +799,7 @@ function main() {
       relate: inputs.relate,
       stale: inputs.stale,
       activeSprintContent: inputs.activeSprintContent,
+      modelActions: inputs.modelActions,
     });
     markdown = renderReport(reportModel);
   } catch (error) {
@@ -799,8 +814,6 @@ function main() {
     console.log(JSON.stringify({ sections: reportModel.sections, anchors: reportModel.anchors }, null, 2));
   }
 }
-
-if (require.main === module) main();
 
 module.exports = {
   ANCHOR_PATTERN,
@@ -817,9 +830,9 @@ module.exports = {
   extractMarkdownSection,
   collectActiveSprintIssueNumbers,
   buildObsoleteActions,
-  buildRelationshipCounts,
-  buildPriorityActions,
-  buildMilestoneActions,
+  loadModelActions,
+  validateModelAction,
+  mergeModelRelationships,
   formatStaleEvidence,
   staleCandidateToAction,
   buildReportModel,
@@ -828,3 +841,5 @@ module.exports = {
   writeReportFile,
   loadInputs,
 };
+
+if (require.main === module) main();

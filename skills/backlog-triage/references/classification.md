@@ -15,7 +15,6 @@ comment_fetch_concurrency: 5
 closed_issue_days: 180
 closed_issue_limit: 200
 stale_days: 60
-duplicate_threshold: 0.75
 ```
 
 - `theme_keywords` maps a theme name to title-keyword substrings. The first matching theme wins.
@@ -24,7 +23,7 @@ duplicate_threshold: 0.75
 - `comment_fetch_concurrency` bounds `--with-comments` fan-out when comment hydration is enabled.
 - `closed_issue_days` bounds the lookback window for `--with-closed-issues`.
 - `closed_issue_limit` caps how many recent closed issues are collected for snapshot v2 enrichment.
-- `stale_days` and `duplicate_threshold` are collected as config-as-data for downstream scripts (`triage-stale`, `triage-relate`); `triage-collect` does not apply them yet.
+- `stale_days` is collected as config-as-data for `triage-stale`; `triage-collect` does not apply it yet.
 
 ## Snapshot shape
 

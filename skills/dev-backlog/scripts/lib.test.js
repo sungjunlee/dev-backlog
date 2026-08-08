@@ -291,7 +291,7 @@ describe("readTriageConfig", () => {
         "  warm: 10",
         "  cold: 45",
         "stale_days: 75",
-        "duplicate_threshold: 0.9",
+        "closed_issue_days: 30",
         "",
       ].join("\n")
     );
@@ -304,7 +304,7 @@ describe("readTriageConfig", () => {
     });
     assert.deepEqual(config.activity_days, { warm: 10, cold: 45 });
     assert.equal(config.stale_days, 75);
-    assert.equal(config.duplicate_threshold, 0.9);
+    assert.equal(config.closed_issue_days, 30);
   });
 });
 

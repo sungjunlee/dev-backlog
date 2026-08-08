@@ -1,17 +1,16 @@
 # Relationships
 
-**Purpose.** `triage-relate.js` reads a previously collected issue snapshot and emits read-only relationship edges for snapshot-resident signals:
+**Purpose.** The `## Relationships` section of the triage report maps how open issues connect to each other and to merged closing PRs. Deterministic signals come from `triage-relate.js`; semantic judgment (blocking, dependency, duplication) is the model's job and is rendered from the model's own edge JSON.
+
+## Script-generated Edges (deterministic)
+
+`triage-relate.js` reads a previously collected issue snapshot and emits read-only edges for snapshot-resident signals that need no interpretation:
 
 - `mentions` from plain `#123` references in issue bodies
 - `comment-mentions` from plain `#123` references in optional issue comments
-- `blocks` from explicit blocking / closing phrases in issue bodies
-- `depends-on` from explicit dependency phrases in issue bodies
 - `merged-pr-link` from per-issue merged closing PR metadata
-- `duplicate-candidate` from title-token Jaccard overlap
 
 Every emitted edge carries evidence taken directly from the snapshot so downstream report rendering can show why the relationship was inferred without re-fetching from GitHub.
-
-## Implemented Heuristics
 
 ### `mentions`
 
@@ -42,29 +41,6 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
   - `match`: matched issue reference
   - `snippet`: normalized sentence/line fragment containing the match
 
-### `blocks`
-
-- Source: `issue.body`
-- Keywords used by `scanBlocks`:
-  - `blocks #123`
-  - `closes #123`
-- Confidence: `1`
-- Evidence:
-  - `phrase`: normalized matched phrase, for example `Blocks #123`
-  - `snippet`: normalized sentence/line fragment containing the phrase
-
-### `depends-on`
-
-- Source: `issue.body`
-- Keywords used by `scanDependsOn`:
-  - `blocked by #123`
-  - `depends on #123`
-  - `depends-on #123`
-- Confidence: `1`
-- Evidence:
-  - `phrase`: normalized matched phrase, for example `depends on #123`
-  - `snippet`: normalized sentence/line fragment containing the phrase
-
 ### `merged-pr-link`
 
 - Source: `issue.closing_prs`
@@ -79,31 +55,55 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
   - `pr.mergedAt`: merge timestamp
   - `pr.url`: closing PR URL when present
 
+## Model-judged Edges (semantic)
+
+Blocking, dependency, and duplication require reading issue intent, so they are judged by the model reading the snapshot, not by phrase matching or title token overlap. The model emits them as `section: "relationship"` entries in a `--model-actions` JSON file; `triage-report.js` validates each entry and merges it into the Relationships path. Wire shape:
+
+```json
+{
+  "section": "relationship",
+  "verb": "edge",
+  "args": {
+    "from": 100,
+    "to": 101,
+    "kind": "blocks",
+    "confidence": 1,
+    "evidence": { "phrase": "Blocks #101" }
+  },
+  "summary": "Blocks edge 100 -> 101"
+}
+```
+
+`args.kind` must be one of the script's deterministic kinds plus the semantic kinds below; `triage-report.js` rejects unknown kinds.
+
+### `blocks`
+
+- Read `issue.body` and comment bodies for explicit statements that issue X blocks issue Y, or closes it once completed.
+- Only emit for issues that exist in the snapshot; never for `#999`-style dangling references.
+- Confidence: `1` when the phrasing is explicit, lower when inferred.
+- Evidence:
+  - `phrase`: normalized matched phrase, for example `Blocks #123`
+  - `snippet`: normalized sentence/line fragment containing the phrase
+
+### `depends-on`
+
+- Read `issue.body` and comment bodies for explicit dependency statements: `blocked by #123`, `depends on #123`, `depends-on #123`, or equivalent intent.
+- Only emit for issues that exist in the snapshot.
+- Confidence: `1` when explicit, lower when inferred.
+- Evidence:
+  - `phrase`: normalized matched phrase, for example `depends on #123`
+  - `snippet`: normalized sentence/line fragment containing the phrase
+
 ### `duplicate-candidate`
 
-- Source: `issue.title`
-- Threshold: `backlog/triage-config.yml -> duplicate_threshold`
-- Confidence: Jaccard similarity score
-- Canonicalization:
-  - compare each issue pair once
-  - emit a single edge with the smaller issue number as `from`
-- Evidence:
-  - `score`: rounded Jaccard score (`4` decimal places)
-  - `overlap`: sorted shared title tokens
+- Compare open issues against each other and against closed issues, judging semantic duplication from titles, bodies, labels, and comments — not title-token overlap alone.
+- Emit one canonical edge with the smaller issue number as `from`.
+- `args.evidence`:
+  - `reason`: short human-readable why this is a duplicate candidate
   - `titles.from`: lower-numbered issue title
   - `titles.to`: higher-numbered issue title
 
-## Jaccard Tokenization Rules
-
-Title similarity uses the following normalization before scoring:
-
-- lowercase the title
-- extract tokens with regex `[a-z0-9]+`
-- drop one-character tokens
-- deduplicate tokens per title by converting to a set
-- compute `overlap / union`
-
-If the union is empty, the score is `0` and no edge is emitted.
+A duplicate of a closed issue should be proposed as an Obsolete Candidate (`section: "obsolete"`, `verb: "close-duplicate"`), not only as a relationship edge — see `references/stale.md`.
 
 ## Evidence Schema
 
@@ -169,8 +169,7 @@ Evidence payloads vary by kind:
 
 ```json
 {
-  "score": 0.8,
-  "overlap": ["flow", "oauth", "refresh", "token"],
+  "reason": "same OAuth refresh flow as #200 with no substantive delta",
   "titles": {
     "from": "OAuth token refresh flow",
     "to": "OAuth token refresh flow redesign"
@@ -178,4 +177,4 @@ Evidence payloads vary by kind:
 }
 ```
 
-`triage-relate.js` is intentionally still read-only. Close or duplicate proposals belong to `triage-stale.js` and still require report review plus an accepted apply checkbox before any GitHub mutation.
+`triage-relate.js` is intentionally read-only. Close or duplicate proposals still require report review plus an accepted apply checkbox before any GitHub mutation.
