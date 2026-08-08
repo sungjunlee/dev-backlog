@@ -25,8 +25,8 @@ Phase 1 — Report (default, read-only)     Phase 2 — Apply (explicit mutation
 | Phase | Step | Completion boundary |
 | --- | --- | --- |
 | Report | Collect | One `gh` fetch writes a snapshot JSON; downstream steps use `--snapshot PATH` and do not re-fetch. |
-| Report | Analyze | Classification, relationships, stale/obsolete signals, Alignment, and Decision Review are computed from the same snapshot/spec evidence. |
-| Report | Render | One markdown report is written with anchored proposals and a consolidated Apply Checklist. |
+| Report | Analyze | Classification and deterministic signals come from scripts; the model judges blocks/depends-on/duplicates, priority, and milestone actions from the snapshot and writes them to a `--model-actions` JSON file. Alignment and Decision Review are prompt-driven from the same evidence. |
+| Report | Render | `triage-report.js` validates the model actions, merges them with deterministic signals, and writes one markdown report with anchored proposals and a consolidated Apply Checklist. |
 | Apply | Review | A human accepts proposals by flipping paired checkboxes from `[ ]` to `[x]`; unchecked anchors remain inert. |
 | Apply | Dry-run | `triage-apply.js <report.md>` prints intended `gh` mutations without writing. |
 | Apply | Mutate | `triage-apply.js <report.md> --apply` executes only accepted actions; `--yes` is required for non-interactive apply. |
@@ -107,7 +107,7 @@ node "$skill_dir/scripts/triage-collect.js" --dry-run --json
 node "$skill_dir/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md
 ```
 
-Model-judged actions (`--model-actions`) are a JSON array of action objects; each needs `section`, `verb`, `issueNumber`, and `summary`, with `args` carrying the mutation payload (see `references/apply.md` for the anchor grammar each verb maps to):
+Model-judged actions (`--model-actions`) are a JSON array of action objects. Sections `priority` / `milestone` / `obsolete` carry a positive `issueNumber`, `verb`, `summary`, and `args` with the mutation payload; section `relationship` carries `args.from` / `args.to` / `args.kind` for a model-judged edge. `triage-report.js` validates every entry before rendering (see `references/apply.md` for the anchor grammar each verb maps to):
 
 ```json
 [
@@ -122,10 +122,23 @@ Model-judged actions (`--model-actions`) are a JSON array of action objects; eac
     "section": "milestone",
     "verb": "assign-milestone",
     "issueNumber": 43,
-    "args": { "name": "Sprint W34", "cluster": "auth" },
+    "args": { "name": "Sprint W34" },
     "cluster": "auth",
     "sprintName": "Sprint W34",
     "summary": "Assign Sprint W34 to #43 — auth cluster"
+  },
+  {
+    "section": "obsolete",
+    "verb": "close-duplicate",
+    "issueNumber": 44,
+    "args": { "target": "#12", "reason": "open issue duplicates closed #12" },
+    "summary": "Close duplicate #44 into #12 — open issue duplicates closed #12"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 45, "to": 46, "kind": "blocks", "evidence": { "phrase": "Blocks #46" } },
+    "summary": "Blocks edge 45 -> 46"
   }
 ]
 ```

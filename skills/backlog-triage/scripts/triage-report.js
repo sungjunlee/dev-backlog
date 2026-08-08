@@ -344,11 +344,19 @@ function actionPriority(action) {
   return 0;
 }
 
+function normalizeActionKey(action) {
+  return JSON.stringify({
+    verb: action.verb,
+    issueNumber: action.issueNumber,
+    args: action.args && typeof action.args === "object" ? action.args : {},
+  });
+}
+
 function dedupeActions(actions) {
   const selected = new Map();
 
   for (const action of actions) {
-    const key = `${action.section}:${action.verb}:${action.issueNumber}`;
+    const key = normalizeActionKey(action);
     const current = selected.get(key);
     if (!current || actionPriority(action) > actionPriority(current)) {
       selected.set(key, action);
@@ -462,7 +470,7 @@ function renderActionBlocks(actions, { withEvidence = false } = {}) {
 function renderObsoleteCandidates(stale, actions) {
   const lines = ["## Obsolete Candidates"];
 
-  if (!stale) {
+  if (!stale && actions.length === 0) {
     lines.push("_(no input provided)_", "", DEFERRED_OBSOLETE_MARKER);
     return lines.join("\n");
   }
@@ -489,7 +497,7 @@ function renderPriorityProposals(actions) {
     return lines.join("\n");
   }
 
-  lines.push("", ...renderActionBlocks(actions));
+  lines.push("", ...renderActionBlocks(actions, { withEvidence: true }));
   if (lines[lines.length - 1] === "") lines.pop();
   return lines.join("\n");
 }
@@ -509,7 +517,7 @@ function renderMilestoneSuggestions(actions) {
     for (const [cluster, clusterActions] of sortGroupEntries(byCluster)) {
       lines.push(`Theme cluster: ${cluster}`);
       lines.push("");
-      lines.push(...renderActionBlocks(clusterActions));
+      lines.push(...renderActionBlocks(clusterActions, { withEvidence: true }));
       if (lines[lines.length - 1] === "") lines.pop();
       lines.push("");
     }
@@ -560,14 +568,23 @@ function buildFrontmatter(snapshot, snapshotPath) {
 function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintContent = "", modelActions = [] }) {
   const issueIndex = buildIssueIndex(snapshot);
   const protectedIssueNumbers = collectActiveSprintIssueNumbers(activeSprintContent);
-  const obsoleteActions = buildObsoleteActions(stale, { protectedIssueNumbers });
+
+  const modelObsoleteActions = modelActions.filter((action) => action.section === "obsolete");
+  const obsoleteActions = dedupeActions([
+    ...buildObsoleteActions(stale, { protectedIssueNumbers }),
+    ...modelObsoleteActions.filter((action) => !protectedIssueNumbers.has(action.issueNumber)),
+  ]);
+
+  const modelRelationships = modelActions.filter((action) => action.section === "relationship");
+  const mergedRelate = mergeModelRelationships(relate, modelRelationships);
+
   const priorityActions = modelActions.filter((action) => action.section === "priority");
   const milestoneActions = modelActions.filter((action) => action.section === "milestone");
   const allActions = dedupeActions([...obsoleteActions, ...priorityActions, ...milestoneActions]);
 
   const sections = [
     { key: "classification", title: "Classification", markdown: renderClassification(snapshot) },
-    { key: "relationships", title: "Relationships", markdown: renderRelationships(relate, issueIndex) },
+    { key: "relationships", title: "Relationships", markdown: renderRelationships(mergedRelate, issueIndex) },
     { key: "obsolete", title: "Obsolete Candidates", markdown: renderObsoleteCandidates(stale, obsoleteActions) },
     { key: "priority", title: "Priority Proposals", markdown: renderPriorityProposals(priorityActions) },
     { key: "milestone", title: "Milestone Suggestions", markdown: renderMilestoneSuggestions(milestoneActions) },
@@ -589,22 +606,110 @@ function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintC
   };
 }
 
+function mergeModelRelationships(relate, modelRelationships) {
+  if (modelRelationships.length === 0) return relate;
+
+  const base = relate && Array.isArray(relate.edges)
+    ? { ...relate, edges: [...relate.edges] }
+    : { edges: [] };
+
+  for (const action of modelRelationships) {
+    const edge = action.args;
+    base.edges.push({
+      from: edge.from,
+      to: edge.to,
+      kind: edge.kind,
+      confidence: Number.isFinite(edge.confidence) ? edge.confidence : 1,
+      evidence: typeof edge.evidence === "object" && edge.evidence !== null ? edge.evidence : {},
+    });
+  }
+
+  return base;
+}
+
+const MODEL_SECTION_VERBS = Object.freeze({
+  priority: new Set(["set-priority"]),
+  milestone: new Set(["assign-milestone"]),
+  obsolete: new Set(["close", "revisit", "close-duplicate"]),
+  relationship: new Set(["edge"]),
+});
+
+const MODEL_EDGE_KINDS = new Set([
+  "mentions",
+  "comment-mentions",
+  "blocks",
+  "depends-on",
+  "duplicate-candidate",
+  "merged-pr-link",
+]);
+
+function validateModelAction(action, index) {
+  const label = `model action[${index}]`;
+
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    throw new Error(`${label} must be an object.`);
+  }
+
+  const section = String(action.section || "");
+  if (!MODEL_SECTION_VERBS[section]) {
+    throw new Error(`${label} has unsupported section "${section}"; expected one of ${Object.keys(MODEL_SECTION_VERBS).join(", ")}.`);
+  }
+
+  const verb = String(action.verb || "");
+  if (!MODEL_SECTION_VERBS[section].has(verb)) {
+    throw new Error(`${label} uses verb "${verb}" which is not allowed in section "${section}".`);
+  }
+
+  const args = action.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error(`${label} must carry a plain-object args.`);
+  }
+
+  if (section === "relationship") {
+    if (!Number.isSafeInteger(args.from) || args.from <= 0 || !Number.isSafeInteger(args.to) || args.to <= 0) {
+      throw new Error(`${label} (edge) requires positive safe-integer args.from and args.to.`);
+    }
+    if (!MODEL_EDGE_KINDS.has(args.kind)) {
+      throw new Error(`${label} (edge) has unsupported kind "${args.kind}"; expected one of ${[...MODEL_EDGE_KINDS].join(", ")}.`);
+    }
+  } else {
+    if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber <= 0) {
+      throw new Error(`${label} must carry a positive safe-integer issueNumber.`);
+    }
+  }
+
+  const requiredArgs = section === "priority" ? ["value"] : section === "milestone" ? ["name"] : [];
+  for (const key of requiredArgs) {
+    if (!(key in args)) {
+      throw new Error(`${label} (${verb}) is missing required arg "${key}".`);
+    }
+  }
+
+  if (!String(action.summary || "").trim()) {
+    throw new Error(`${label} must carry a non-empty summary.`);
+  }
+}
+
 function loadModelActions(modelActionsPath) {
   if (!modelActionsPath) return [];
   const actions = readJsonFile(modelActionsPath, { label: "model actions JSON" });
   if (!Array.isArray(actions)) {
     throw new Error(`Invalid model actions JSON at ${modelActionsPath}: expected an array of action objects.`);
   }
-  return actions.map((action) => ({
-    section: String(action.section || ""),
-    verb: String(action.verb || ""),
-    issueNumber: action.issueNumber,
-    args: action.args || {},
-    cluster: typeof action.cluster === "string" ? action.cluster : undefined,
-    sprintName: typeof action.sprintName === "string" ? action.sprintName : undefined,
-    summary: String(action.summary || ""),
-    evidence: typeof action.evidence === "string" ? action.evidence : undefined,
-  }));
+
+  return actions.map((action, index) => {
+    validateModelAction(action, index);
+    return {
+      section: String(action.section),
+      verb: String(action.verb),
+      issueNumber: action.section === "relationship" ? undefined : action.issueNumber,
+      args: action.args,
+      cluster: typeof action.cluster === "string" ? action.cluster : undefined,
+      sprintName: typeof action.sprintName === "string" ? action.sprintName : undefined,
+      summary: String(action.summary),
+      evidence: typeof action.evidence === "string" ? action.evidence : undefined,
+    };
+  });
 }
 
 function renderReport(reportModel) {
@@ -711,6 +816,9 @@ module.exports = {
   extractMarkdownSection,
   collectActiveSprintIssueNumbers,
   buildObsoleteActions,
+  loadModelActions,
+  validateModelAction,
+  mergeModelRelationships,
   formatStaleEvidence,
   staleCandidateToAction,
   buildReportModel,

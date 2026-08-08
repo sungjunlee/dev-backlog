@@ -15,6 +15,9 @@ const {
   formatStaleEvidence,
   staleCandidateToAction,
   collectActiveSprintIssueNumbers,
+  loadModelActions,
+  validateModelAction,
+  mergeModelRelationships,
 } = require("./triage-report.js");
 
 function makeSnapshot() {
@@ -600,5 +603,213 @@ describe("triage-report integration chain", () => {
         }),
       /snapshot|parse|json|malformed/i
     );
+  });
+});
+
+describe("loadModelActions", () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-model-actions-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function writeActions(actions) {
+    const actionsPath = path.join(tempDir, "model-actions.json");
+    fs.writeFileSync(actionsPath, `${JSON.stringify(actions, null, 2)}\n`);
+    return actionsPath;
+  }
+
+  it("loads a valid model-actions file from disk and normalizes fields", () => {
+    const actionsPath = writeActions([
+      {
+        section: "priority",
+        verb: "set-priority",
+        issueNumber: 42,
+        args: { value: "high", reason: "customer-reported outage" },
+        summary: "Set priority:high on #42 — customer-reported outage",
+        evidence: "customer-reported outage",
+      },
+      {
+        section: "milestone",
+        verb: "assign-milestone",
+        issueNumber: 43,
+        args: { name: "Sprint W34", cluster: "auth" },
+        cluster: "auth",
+        sprintName: "Sprint W34",
+        summary: "Assign Sprint W34 to #43 — auth cluster",
+      },
+    ]);
+
+    const actions = loadModelActions(actionsPath);
+    assert.equal(actions.length, 2);
+    assert.equal(actions[0].section, "priority");
+    assert.equal(actions[1].sprintName, "Sprint W34");
+  });
+
+  it("returns an empty array when no path is given", () => {
+    assert.deepEqual(loadModelActions(undefined), []);
+  });
+
+  it("rejects a non-array model-actions file", () => {
+    const actionsPath = path.join(tempDir, "model-actions.json");
+    fs.writeFileSync(actionsPath, '{"section":"priority"}\n');
+    assert.throws(() => loadModelActions(actionsPath), /expected an array/);
+  });
+
+  it("rejects unsupported section/verb combinations", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "close", issueNumber: 42, args: {}, summary: "Close #42" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /not allowed in section/);
+  });
+
+  it("rejects a malformed issueNumber", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 0, args: { value: "high" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /positive safe-integer issueNumber/);
+  });
+
+  it("rejects a missing required arg", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: {}, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /missing required arg "name"/);
+  });
+
+  it("rejects an empty summary", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 42, args: { value: "high" }, summary: "  " },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /non-empty summary/);
+  });
+
+  it("validates relationship edges with from/to/kind", () => {
+    assert.doesNotThrow(() =>
+      validateModelAction(
+        { section: "relationship", verb: "edge", args: { from: 100, to: 101, kind: "blocks", evidence: { phrase: "Blocks #101" } }, summary: "Blocks edge" },
+        0
+      )
+    );
+    assert.throws(
+      () =>
+        validateModelAction(
+          { section: "relationship", verb: "edge", args: { from: 100, to: 101, kind: "not-a-real-kind" }, summary: "x" },
+          0
+        ),
+      /unsupported kind/
+    );
+    assert.throws(
+      () => validateModelAction({ section: "relationship", verb: "edge", args: { from: 100, kind: "blocks" }, summary: "x" }, 0),
+      /args.from and args.to/
+    );
+  });
+});
+
+describe("model-action merge into report model", () => {
+  function snapshotWith(issues) {
+    return {
+      generated: "2026-04-18T01:30:00.000Z",
+      repo: "sungjunlee/dev-backlog",
+      config_path: "backlog/triage-config.yml",
+      issues,
+    };
+  }
+
+  function issue(number, overrides = {}) {
+    return {
+      number,
+      title: `Issue #${number}`,
+      body: "",
+      labels: [],
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-17T00:00:00.000Z",
+      milestone: null,
+      buckets: {
+        label: { type: "feature", priority: "medium", status: "todo" },
+        theme: "uncategorized",
+        age: "7-30d",
+        activity: "recent",
+        milestone: "unassigned",
+      },
+      ...overrides,
+    };
+  }
+
+  it("merges model relationship edges into the Relationships section", () => {
+    const snapshot = snapshotWith([issue(100), issue(101)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "relationship",
+          verb: "edge",
+          args: { from: 100, to: 101, kind: "blocks", confidence: 1, evidence: { phrase: "Blocks #101" } },
+          summary: "Blocks edge 100 -> 101",
+        },
+      ],
+    });
+
+    const relationships = model.sections.find((section) => section.key === "relationships").markdown;
+    assert.match(relationships, /#100 blocks #101/);
+  });
+
+  it("merges model obsolete actions into Obsolete Candidates even without a stale input", () => {
+    const snapshot = snapshotWith([issue(104)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "obsolete",
+          verb: "close-duplicate",
+          issueNumber: 104,
+          args: { target: "#44", reason: "open issue duplicates closed #44" },
+          summary: "Close duplicate #104 into #44 — open issue duplicates closed #44",
+        },
+      ],
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.match(obsolete, /triage:close-duplicate #104/);
+    assert.match(obsolete, /Close duplicate #104 into #44/);
+  });
+
+  it("dedupes with the apply contract key (verb, issueNumber, args) across sections", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "obsolete",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage (dup)",
+        },
+      ],
+    });
+
+    const apply = model.sections.find((section) => section.key === "apply").markdown;
+    assert.equal((apply.match(/triage:set-priority #42/g) || []).length, 1);
   });
 });

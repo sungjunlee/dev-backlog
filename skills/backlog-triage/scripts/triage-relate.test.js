@@ -278,7 +278,7 @@ describe("analyzeSnapshot", () => {
         [101, 100, "mentions"],
       ]
     );
-    // 블록/중복/의존성 문구 판단은 모델 몫이므로 스크립트는 mentions 만 생성한다.
+    // Blocking/dependency/duplicate judgment is the model's; the script emits mentions only.
     assert.equal(edges.some((edge) => edge.kind === "blocks" || edge.kind === "depends-on" || edge.kind === "duplicate-candidate"), false);
   });
 

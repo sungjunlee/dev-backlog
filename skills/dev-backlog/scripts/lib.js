@@ -55,7 +55,6 @@ const TRIAGE_CONFIG_DEFAULTS = {
     cold: 60,
   },
   stale_days: 60,
-  duplicate_threshold: 0.75,
 };
 
 function stripQuotes(text) {

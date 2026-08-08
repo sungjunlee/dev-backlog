@@ -25,7 +25,6 @@ const CONFIG = {
     cold: 60,
   },
   stale_days: 60,
-  duplicate_threshold: 0.75,
 };
 
 function loadFixtureIssues() {

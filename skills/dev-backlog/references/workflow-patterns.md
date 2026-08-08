@@ -100,7 +100,8 @@ SNAP=backlog/triage/.cache/<ts>.json
 node $SKILL/triage-collect.js
 node $SKILL/triage-relate.js --snapshot $SNAP --json > /tmp/relate.json
 node $SKILL/triage-stale.js  --snapshot $SNAP --json > /tmp/stale.json
-node $SKILL/triage-report.js --snapshot $SNAP --relate /tmp/relate.json --stale /tmp/stale.json
+# model-authored: blocks/depends-on/duplicate edges + priority/milestone actions
+node $SKILL/triage-report.js --snapshot $SNAP --relate /tmp/relate.json --stale /tmp/stale.json --model-actions /tmp/model-actions.json
 
 # Apply phase (opt-in): check proposals in the report, then
 node $SKILL/triage-apply.js backlog/triage/<date>-report.md --apply
