@@ -2,9 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readTriageConfig } = require("../../dev-backlog/scripts/lib");
 
-const DEFAULT_CONFIG_PATH = path.join("backlog", "triage-config.yml");
 
 function parseArgs(args) {
   const options = {
@@ -239,57 +237,8 @@ function scanCommentMentions(snapshot) {
   return dedupeEdges(edges);
 }
 
-function scanPhraseEdges(snapshot, patterns, kind, confidence) {
-  const edges = [];
-  const openNumbers = snapshotIssueNumbers(snapshot);
 
-  for (const issue of snapshot.issues) {
-    const source = typeof issue.body === "string" ? issue.body : "";
-    const masked = maskFencedCodeBlocks(source);
 
-    for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(masked)) !== null) {
-        const phraseIndex = match.index;
-        const hashIndex = masked.indexOf("#", phraseIndex);
-        if (hashIndex === -1 || isIssueRefInUrlToken(masked, hashIndex)) continue;
-
-        const target = Number(match[1]);
-        if (issue.number === target) continue;
-        if (!openNumbers.has(target)) continue;
-
-        edges.push(
-          makeEdge({
-            from: issue.number,
-            to: target,
-            kind,
-            confidence,
-            evidence: {
-              phrase: normalizeSnippet(match[0]),
-              snippet: extractSnippet(source, phraseIndex, phraseIndex + match[0].length),
-            },
-          })
-        );
-      }
-      pattern.lastIndex = 0;
-    }
-  }
-
-  return dedupeEdges(edges);
-}
-
-function scanBlocks(snapshot) {
-  return scanPhraseEdges(snapshot, [/\bblocks\s+#(\d+)\b/gi, /\bcloses\s+#(\d+)\b/gi], "blocks", 1);
-}
-
-function scanDependsOn(snapshot) {
-  return scanPhraseEdges(
-    snapshot,
-    [/\bblocked by\s+#(\d+)\b/gi, /\bdepends(?:\s+on|-on)\s+#(\d+)\b/gi],
-    "depends-on",
-    1
-  );
-}
 
 function scanMergedPrLinks(snapshot) {
   const edges = [];
@@ -324,65 +273,8 @@ function scanMergedPrLinks(snapshot) {
   return dedupeEdges(edges);
 }
 
-function tokenizeTitle(title) {
-  return new Set(
-    String(title || "")
-      .toLowerCase()
-      .match(/[a-z0-9]+/g)?.filter((token) => token.length > 1) || []
-  );
-}
 
-function jaccardSimilarity(left, right) {
-  const leftTokens = [...left];
-  const rightTokens = [...right];
-  const union = new Set([...leftTokens, ...rightTokens]);
-  if (union.size === 0) return { score: 0, overlap: [] };
 
-  const overlap = leftTokens.filter((token) => right.has(token));
-  return {
-    score: overlap.length / union.size,
-    overlap,
-  };
-}
-
-function findDuplicateCandidates(snapshot, config = readTriageConfig("backlog")) {
-  const threshold = Number(config.duplicate_threshold) || 0;
-  const edges = [];
-
-  for (let index = 0; index < snapshot.issues.length; index += 1) {
-    for (let otherIndex = index + 1; otherIndex < snapshot.issues.length; otherIndex += 1) {
-      const left = snapshot.issues[index];
-      const right = snapshot.issues[otherIndex];
-      const similarity = jaccardSimilarity(tokenizeTitle(left.title), tokenizeTitle(right.title));
-
-      if (similarity.score < threshold || similarity.overlap.length === 0) continue;
-
-      const from = Math.min(left.number, right.number);
-      const to = Math.max(left.number, right.number);
-      const fromIssue = from === left.number ? left : right;
-      const toIssue = to === right.number ? right : left;
-
-      edges.push(
-        makeEdge({
-          from,
-          to,
-          kind: "duplicate-candidate",
-          confidence: similarity.score,
-          evidence: {
-            score: Number(similarity.score.toFixed(4)),
-            overlap: similarity.overlap.sort(),
-            titles: {
-              from: fromIssue.title,
-              to: toIssue.title,
-            },
-          },
-        })
-      );
-    }
-  }
-
-  return dedupeEdges(edges);
-}
 
 function compareEdges(left, right) {
   return left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind);
@@ -432,23 +324,11 @@ function readSnapshotFile(snapshotPath) {
   }
 }
 
-function resolveBacklogDir(snapshot) {
-  const configPath =
-    typeof snapshot.config_path === "string" && snapshot.config_path.trim()
-      ? snapshot.config_path
-      : DEFAULT_CONFIG_PATH;
-  const backlogDir = path.dirname(configPath);
-  return backlogDir === "." ? "backlog" : backlogDir;
-}
-
-function analyzeSnapshot(snapshot, { config = readTriageConfig(resolveBacklogDir(snapshot)) } = {}) {
+function analyzeSnapshot(snapshot) {
   return sortEdges([
     ...scanMentions(snapshot),
     ...scanCommentMentions(snapshot),
-    ...scanBlocks(snapshot),
-    ...scanDependsOn(snapshot),
     ...scanMergedPrLinks(snapshot),
-    ...findDuplicateCandidates(snapshot, config),
   ]);
 }
 
@@ -458,10 +338,6 @@ function formatEdge(edge) {
     const prLabel = pr.number ? `PR #${pr.number}` : "merged PR";
     const mergedAt = pr.mergedAt ? ` merged at ${pr.mergedAt}` : "";
     return `#${edge.from} ${edge.kind} ${prLabel}${mergedAt}`;
-  }
-
-  if (edge.kind === "duplicate-candidate") {
-    return `#${edge.from} ${edge.kind} #${edge.to} (${edge.confidence.toFixed(2)}) ${edge.evidence.titles.from} <> ${edge.evidence.titles.to}`;
   }
 
   const snippet = typeof edge.evidence === "object" ? edge.evidence.snippet || edge.evidence.phrase : edge.evidence;
@@ -507,12 +383,8 @@ module.exports = {
   extractIssueRefs,
   scanMentions,
   scanCommentMentions,
-  scanBlocks,
-  scanDependsOn,
   scanMergedPrLinks,
-  findDuplicateCandidates,
   readSnapshotFile,
   analyzeSnapshot,
   sortEdges,
-  resolveBacklogDir,
 };

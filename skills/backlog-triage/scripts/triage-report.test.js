@@ -14,7 +14,6 @@ const {
   writeReportFile,
   formatStaleEvidence,
   staleCandidateToAction,
-  buildRelationshipCounts,
   collectActiveSprintIssueNumbers,
 } = require("./triage-report.js");
 
@@ -148,6 +147,7 @@ describe("parseArgs", () => {
         relatePath: "relate.json",
         stalePath: "stale.json",
         activeSprintPath: undefined,
+        modelActionsPath: undefined,
         outPath: "report.md",
         json: true,
       }
@@ -272,19 +272,6 @@ describe("renderer helpers", () => {
     assert.deepEqual([...collectActiveSprintIssueNumbers(content)].sort((left, right) => left - right), [101, 102]);
   });
 
-  it("does not count merged-pr-link as a planning relationship", () => {
-    const counts = buildRelationshipCounts({
-      edges: [
-        { from: 101, to: 101, kind: "merged-pr-link" },
-        { from: 102, to: 103, kind: "mentions" },
-      ],
-    });
-
-    assert.equal(counts.has(101), false);
-    assert.equal(counts.get(102), 1);
-    assert.equal(counts.get(103), 1);
-  });
-
   it("renders no-input placeholders for omitted relate/stale inputs", () => {
     const model = buildReportModel({
       snapshot: makeSnapshot(),
@@ -363,7 +350,7 @@ describe("renderer helpers", () => {
     assert.doesNotMatch(obsolete, /triage:close #105/);
   });
 
-  it("merged-pr-link alone does not create priority or milestone proposals", () => {
+  it("model actions drive priority and milestone proposals; none are invented without them", () => {
     const snapshot = {
       generated: "2026-04-18T01:30:00.000Z",
       repo: "sungjunlee/dev-backlog",
@@ -386,27 +373,50 @@ describe("renderer helpers", () => {
         },
       ],
     };
-    const relate = {
-      edges: [
-        {
-          from: 201,
-          to: 201,
-          kind: "merged-pr-link",
-          confidence: 1,
-          evidence: { pr: { number: 88, mergedAt: "2026-04-18T01:15:00.000Z" } },
-        },
-      ],
-    };
+
+    const baseModel = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+    });
+    assert.equal(baseModel.anchors.some((anchor) => anchor.section === "priority"), false);
+    assert.equal(baseModel.anchors.some((anchor) => anchor.section === "milestone"), false);
 
     const model = buildReportModel({
       snapshot,
       snapshotPath: "fixtures/snapshot.json",
-      relate,
+      relate: null,
       stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 201,
+          args: { value: "high", reason: "customer-reported outage" },
+          summary: "Set priority:high on #201 — customer-reported outage",
+          evidence: "customer-reported outage",
+        },
+        {
+          section: "milestone",
+          verb: "assign-milestone",
+          issueNumber: 201,
+          args: { name: "Sprint W17", cluster: "auth" },
+          cluster: "auth",
+          sprintName: "Sprint W17",
+          summary: "Assign Sprint W17 to #201 — auth cluster",
+          evidence: "auth cluster",
+        },
+      ],
     });
 
-    assert.equal(model.anchors.some((anchor) => anchor.section === "priority"), false);
-    assert.equal(model.anchors.some((anchor) => anchor.section === "milestone"), false);
+    assert.ok(model.anchors.some((anchor) => anchor.section === "priority" && anchor.line.includes("set-priority") && anchor.line.includes("#201")));
+    assert.ok(model.anchors.some((anchor) => anchor.section === "milestone" && anchor.line.includes("assign-milestone") && anchor.line.includes("#201")));
+
+    const priorityMarkdown = model.sections.find((section) => section.key === "priority").markdown;
+    const milestoneMarkdown = model.sections.find((section) => section.key === "milestone").markdown;
+    assert.match(priorityMarkdown, /Set priority:high on #201/);
+    assert.match(milestoneMarkdown, /Sprint W17/);
   });
 });
 
@@ -504,7 +514,7 @@ describe("triage-report integration chain", () => {
     assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
     assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
     assert.match(markdown, /comment and closing-PR relationship signals run only when snapshot v2 fields are present/);
-    assert.match(markdown, /merged closing-PR and duplicate-of-closed signals run only when snapshot v2 fields are present/);
+    assert.match(markdown, /merged closing-PR signals run only when snapshot v2 fields are present/);
 
     // Classification groups must match Done Criteria: theme / label / age.
     const classificationBlock = markdown.split(/^##\s+Classification/m)[1].split(/^##\s/m)[0];

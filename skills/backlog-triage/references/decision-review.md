@@ -95,3 +95,28 @@ Evidence absent: `spec/system-map.md`.
 ```
 
 Do not include anchors for non-mutating recommendations. Only include close/relabel/milestone anchors when the normal apply contract supports the action and a human can accept it with a checkbox.
+
+## Priority and Milestone Proposals
+
+Priority Proposals and Milestone Suggestions are also prompt-driven and delivered to `triage-report.js --model-actions`. The old script heuristics become judgment guidance:
+
+### Priority Proposals (`section: "priority"`, `verb: "set-priority"`)
+
+Suggest `priority:high` only for issues that are all of:
+
+- not already `priority:high` or `priority:critical`
+- not cold (recent activity or warm bucket)
+- not already proposed for close
+- high-leverage by at least one of: sits in a theme with several recent/warm issues, participates in relationship edges, or is called out by an active sprint or Decision Review
+
+Rationale must name the trigger (theme heat, relationship edges, sprint focus), not just restate the issue title.
+
+### Milestone Suggestions (`section: "milestone"`, `verb: "assign-milestone"`)
+
+Suggest a milestone only for issues that:
+
+- have no milestone yet
+- are not already proposed for close
+- are active or related (relationship edges, active theme, or a priority proposal above)
+
+Set `args.name` to a concrete candidate sprint (`Sprint W<next>`), `args.cluster` to the dominant theme, and put the same values in top-level `sprintName` / `cluster` for grouping. Only suggest a milestone when the issue is genuinely ready for sprint planning; otherwise leave it unassigned.

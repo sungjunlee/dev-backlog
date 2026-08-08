@@ -13,7 +13,6 @@ const SIGNALS = Object.freeze({
   WONTFIX: "wontfix",
   INVALID: "invalid",
   MERGED_CLOSING_PR: "merged-closing-pr",
-  DUPLICATE_OF_CLOSED: "duplicate-of-closed",
 });
 
 function usage() {
@@ -178,8 +177,6 @@ function pickAction(signal, context = {}) {
     case SIGNALS.INVALID:
     case SIGNALS.MERGED_CLOSING_PR:
       return "close";
-    case SIGNALS.DUPLICATE_OF_CLOSED:
-      return context.targetIssueNumber ? `merge-into:#${context.targetIssueNumber}` : "revisit";
     default:
       return context.targetIssueNumber ? `merge-into:#${context.targetIssueNumber}` : "revisit";
   }
@@ -280,82 +277,6 @@ function scanMergedClosingPr(issue) {
   return candidates;
 }
 
-function tokenizeTitle(title) {
-  return new Set(
-    String(title || "")
-      .toLowerCase()
-      .match(/[a-z0-9]+/g)?.filter((token) => token.length > 1) || []
-  );
-}
-
-function jaccardSimilarity(left, right) {
-  const leftTokens = [...left];
-  const rightTokens = [...right];
-  const union = new Set([...leftTokens, ...rightTokens]);
-  if (union.size === 0) return { score: 0, overlap: [] };
-
-  const overlap = leftTokens.filter((token) => right.has(token));
-  return {
-    score: overlap.length / union.size,
-    overlap,
-  };
-}
-
-function closedIssueMatches(openIssue, closedIssue, threshold = 0.8) {
-  if (!Number.isInteger(closedIssue?.number) || typeof closedIssue?.title !== "string") {
-    return null;
-  }
-
-  const openTitle = String(openIssue.title || "").trim().toLowerCase();
-  const closedTitle = String(closedIssue.title || "").trim().toLowerCase();
-  const similarity = jaccardSimilarity(tokenizeTitle(openIssue.title), tokenizeTitle(closedIssue.title));
-  const exactTitle = openTitle.length > 0 && openTitle === closedTitle;
-  if (!exactTitle && similarity.score < threshold) return null;
-
-  return {
-    score: Number(similarity.score.toFixed(4)),
-    overlap: similarity.overlap.sort(),
-    exactTitle,
-  };
-}
-
-function scanDuplicateOfClosed(issue, closedIssues, { threshold = 0.8 } = {}) {
-  if (!Array.isArray(closedIssues) || closedIssues.length === 0) return [];
-
-  const candidates = [];
-  for (const closedIssue of closedIssues) {
-    const match = closedIssueMatches(issue, closedIssue, threshold);
-    if (!match) continue;
-
-    candidates.push(
-      buildCandidate(
-        issue,
-        SIGNALS.DUPLICATE_OF_CLOSED,
-        `duplicate of closed issue #${closedIssue.number}: title similarity ${match.score.toFixed(2)}`,
-        {
-          target: {
-            number: closedIssue.number,
-            title: closedIssue.title,
-            state: closedIssue.state || "closed",
-            closedAt: typeof closedIssue.closedAt === "string" ? closedIssue.closedAt : null,
-            url: typeof closedIssue.url === "string" ? closedIssue.url : null,
-          },
-          score: match.score,
-          overlap: match.overlap,
-          exactTitle: match.exactTitle,
-          titles: {
-            open: issue.title,
-            closed: closedIssue.title,
-          },
-        },
-        { targetIssueNumber: closedIssue.number }
-      )
-    );
-  }
-
-  return candidates;
-}
-
 function resolveThresholdDays({ since, backlogDir = DEFAULT_BACKLOG_DIR, config } = {}) {
   if (since !== undefined) return since;
   const resolvedConfig = config || readTriageConfig(backlogDir);
@@ -375,7 +296,6 @@ function analyzeSnapshot(snapshot, { since, backlogDir = DEFAULT_BACKLOG_DIR, co
     const inactiveCandidate = scanInactive(issue, thresholdDays, snapshot.generated);
     if (inactiveCandidate) candidates.push(inactiveCandidate);
 
-    candidates.push(...scanDuplicateOfClosed(issue, snapshot.closed_issues));
   }
 
   return {
@@ -449,7 +369,6 @@ module.exports = {
   scanInactive,
   scanWontfixInvalid,
   scanMergedClosingPr,
-  scanDuplicateOfClosed,
   resolveThresholdDays,
   analyzeSnapshot,
   formatCandidate,

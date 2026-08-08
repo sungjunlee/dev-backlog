@@ -10,11 +10,30 @@
 | `wontfix` | Issue has a `wontfix` label (case-insensitive) | `labeled <matchedLabel>; explicit wontfix signal` | `close` |
 | `invalid` | Issue has an `invalid` label (case-insensitive) | `labeled <matchedLabel>; explicit invalid signal` | `close` |
 | `merged-closing-pr` | Optional `closing_prs[]` includes `state: "MERGED"` and non-empty `mergedAt` | `merged closing PR detected: PR #<n> merged at <mergedAt>` | `close` |
-| `duplicate-of-closed` | Optional `closed_issues[]` includes an exact or high-overlap title match | `duplicate of closed issue #<n>: title similarity <score>` | `merge-into:#<closed-issue>` |
 
 `stale_days` comes from `backlog/triage-config.yml` unless `--since N` is passed, in which case the CLI override wins.
 
 Issues with any milestone are exempt from the `inactive` signal even if they are older than the threshold.
+
+## Model-judged duplicate-of-closed
+
+An open issue that duplicates a closed issue is judged by the model reading titles, bodies, labels, and comments — the script no longer does title-token matching. The model proposes it as an Obsolete Candidate with `suggested_action: merge-into:#<closed-issue>` (or `revisit` when the open issue should stay), and the evidence should name the target closed issue:
+
+```json
+{
+  "target": {
+    "number": 44,
+    "title": "OAuth token refresh worker"
+  },
+  "reason": "open issue duplicates closed #44 with no substantive delta",
+  "titles": {
+    "open": "OAuth token refresh worker",
+    "closed": "OAuth token refresh worker"
+  }
+}
+```
+
+Guidance: only merge-into when the open issue has no new requirements beyond the closed one; otherwise mark `revisit` and note what is still missing.
 
 ## Evidence schema
 
@@ -59,27 +78,6 @@ For `invalid`, only `matchedLabel` and `labels` change accordingly.
   },
   "updatedAt": "2026-04-18T01:00:00.000Z",
   "milestone": null
-}
-```
-
-### `duplicate-of-closed`
-
-```json
-{
-  "target": {
-    "number": 44,
-    "title": "OAuth token refresh worker",
-    "state": "closed",
-    "closedAt": "2026-06-01T00:00:00.000Z",
-    "url": "https://github.com/owner/name/issues/44"
-  },
-  "score": 1,
-  "overlap": ["oauth", "refresh", "token", "worker"],
-  "exactTitle": true,
-  "titles": {
-    "open": "OAuth token refresh worker",
-    "closed": "OAuth token refresh worker"
-  }
 }
 ```
 

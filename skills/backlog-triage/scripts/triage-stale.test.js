@@ -12,7 +12,6 @@ const {
   scanInactive,
   scanWontfixInvalid,
   scanMergedClosingPr,
-  scanDuplicateOfClosed,
   resolveThresholdDays,
   analyzeSnapshot,
 } = require("./triage-stale.js");
@@ -72,7 +71,6 @@ describe("pickAction", () => {
   });
 
   it("keeps revisit and merge-into actions available for future signals", () => {
-    assert.equal(pickAction(SIGNALS.DUPLICATE_OF_CLOSED, { targetIssueNumber: 42 }), "merge-into:#42");
     assert.equal(pickAction("future-signal", { targetIssueNumber: 42 }), "merge-into:#42");
     assert.equal(pickAction("future-signal"), "revisit");
   });
@@ -178,36 +176,6 @@ describe("scanMergedClosingPr", () => {
   });
 });
 
-describe("scanDuplicateOfClosed", () => {
-  it("flags high-confidence duplicates of closed issues", () => {
-    const [candidate] = scanDuplicateOfClosed(
-      { number: 710, title: "OAuth token refresh worker" },
-      [
-        {
-          number: 44,
-          title: "OAuth token refresh worker",
-          state: "closed",
-          closedAt: "2026-06-01T00:00:00.000Z",
-        },
-      ]
-    );
-
-    assert.equal(candidate.suggested_action, "merge-into:#44");
-    assert.match(candidate.reason, /duplicate of closed issue #44/i);
-    assert.equal(candidate.evidence.target.number, 44);
-    assert.equal(candidate.evidence.exactTitle, true);
-  });
-
-  it("does not flag low-overlap closed issues", () => {
-    const candidates = scanDuplicateOfClosed(
-      { number: 711, title: "OAuth token refresh worker" },
-      [{ number: 45, title: "Documentation table formatting", state: "closed" }]
-    );
-
-    assert.deepEqual(candidates, []);
-  });
-});
-
 describe("resolveThresholdDays and analyzeSnapshot", () => {
   let tempBacklogDir;
 
@@ -255,7 +223,7 @@ describe("resolveThresholdDays and analyzeSnapshot", () => {
     assert.ok(!numbers.includes(502));
   });
 
-  it("includes optional merged-PR and duplicate-of-closed stale signals when snapshot fields are present", () => {
+  it("includes optional merged-PR stale signals when snapshot fields are present", () => {
     const snapshot = loadFixtureSnapshot();
     snapshot.issues.push({
       number: 700,
@@ -272,11 +240,10 @@ describe("resolveThresholdDays and analyzeSnapshot", () => {
       updatedAt: "2026-07-15T00:00:00.000Z",
       milestone: null,
     });
-    snapshot.closed_issues = [{ number: 44, title: "OAuth token refresh worker", state: "closed" }];
 
     const result = analyzeSnapshot(snapshot, { config: { stale_days: 60 } });
 
     assert.ok(result.candidates.some((candidate) => candidate.number === 700 && candidate.suggested_action === "close"));
-    assert.ok(result.candidates.some((candidate) => candidate.number === 701 && candidate.suggested_action === "merge-into:#44"));
+    assert.ok(!result.candidates.some((candidate) => candidate.number === 701));
   });
 });
