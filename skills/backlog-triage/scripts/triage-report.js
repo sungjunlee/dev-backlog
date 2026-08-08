@@ -697,6 +697,9 @@ function validateModelAction(action, index) {
   if (section === "milestone" && (typeof action.sprintName !== "string" || !action.sprintName.trim())) {
     throw new Error(`${label} (assign-milestone) requires a non-empty string top-level sprintName for grouping.`);
   }
+  if (section === "milestone" && action.cluster !== undefined && typeof action.cluster !== "string") {
+    throw new Error(`${label} (assign-milestone) top-level cluster, when present, must be a string.`);
+  }
 
   if (!String(action.summary || "").trim()) {
     throw new Error(`${label} must carry a non-empty summary.`);
