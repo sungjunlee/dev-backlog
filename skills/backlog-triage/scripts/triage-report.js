@@ -345,11 +345,10 @@ function actionPriority(action) {
 }
 
 function normalizeActionKey(action) {
-  return JSON.stringify({
-    verb: action.verb,
-    issueNumber: action.issueNumber,
-    args: action.args && typeof action.args === "object" ? action.args : {},
-  });
+  // Deferred require: triage-apply.js requires this module for ANCHOR_PATTERN,
+  // so a top-level require would create a circular dependency at load time.
+  const { normalizeArgs, stableSerialize } = require("./triage-apply.js");
+  return `${action.verb}|${action.issueNumber}|${stableSerialize(normalizeArgs(action.args))}`;
 }
 
 function dedupeActions(actions) {
@@ -678,11 +677,25 @@ function validateModelAction(action, index) {
     }
   }
 
-  const requiredArgs = section === "priority" ? ["value"] : section === "milestone" ? ["name"] : [];
+  const requiredArgs = section === "priority"
+    ? ["value"]
+    : section === "milestone"
+      ? ["name"]
+      : section === "obsolete"
+        ? verb === "close-duplicate"
+          ? ["target", "reason"]
+          : ["reason"]
+        : [];
+
   for (const key of requiredArgs) {
-    if (!(key in args)) {
-      throw new Error(`${label} (${verb}) is missing required arg "${key}".`);
+    const value = args[key];
+    if (typeof value !== "string" || value.trim() === "") {
+      throw new Error(`${label} (${verb}) requires a non-empty string arg "${key}".`);
     }
+  }
+
+  if (section === "milestone" && typeof action.sprintName !== "string" || section === "milestone" && !String(action.sprintName || "").trim()) {
+    throw new Error(`${label} (assign-milestone) requires a non-empty top-level sprintName for grouping.`);
   }
 
   if (!String(action.summary || "").trim()) {

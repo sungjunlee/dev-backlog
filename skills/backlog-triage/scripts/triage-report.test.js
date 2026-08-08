@@ -446,7 +446,6 @@ describe("triage-report integration chain", () => {
         "  warm: 14",
         "  cold: 60",
         "stale_days: 60",
-        "duplicate_threshold: 0.5",
         "",
       ].join("\n")
     );
@@ -459,7 +458,7 @@ describe("triage-report integration chain", () => {
     const snapshot = makeSnapshot();
     fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 
-    const relate = { edges: analyzeRelationships(snapshot, { config: { duplicate_threshold: 0.5 } }) };
+    const relate = { edges: analyzeRelationships(snapshot) };
     fs.writeFileSync(relatePath, `${JSON.stringify(relate, null, 2)}\n`);
 
     const stale = analyzeStale(snapshot, { config: { stale_days: 60 } });
@@ -676,9 +675,45 @@ describe("loadModelActions", () => {
 
   it("rejects a missing required arg", () => {
     const actionsPath = writeActions([
-      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: {}, summary: "x" },
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: {}, sprintName: "Sprint W34", summary: "x" },
     ]);
-    assert.throws(() => loadModelActions(actionsPath), /missing required arg "name"/);
+    assert.throws(() => loadModelActions(actionsPath), /requires a non-empty string arg "name"/);
+  });
+
+  it("rejects null and empty-string required arg values", () => {
+    const nullValuePath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 42, args: { value: null }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(nullValuePath), /non-empty string arg "value"/);
+
+    const emptyNamePath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "" }, sprintName: "Sprint W34", summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(emptyNamePath), /non-empty string arg "name"/);
+  });
+
+  it("requires reason for obsolete close and target+reason for close-duplicate", () => {
+    const closePath = writeActions([
+      { section: "obsolete", verb: "close", issueNumber: 42, args: {}, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(closePath), /non-empty string arg "reason"/);
+
+    const dupPath = writeActions([
+      { section: "obsolete", verb: "close-duplicate", issueNumber: 42, args: { target: "#44" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(dupPath), /non-empty string arg "reason"/);
+
+    const dupTargetPath = writeActions([
+      { section: "obsolete", verb: "close-duplicate", issueNumber: 42, args: { reason: "dup" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(dupTargetPath), /non-empty string arg "target"/);
+  });
+
+  it("requires a top-level sprintName for milestone actions", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "Sprint W34" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /top-level sprintName/);
   });
 
   it("rejects an empty summary", () => {

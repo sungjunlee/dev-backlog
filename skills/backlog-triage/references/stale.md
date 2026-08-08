@@ -17,23 +17,24 @@ Issues with any milestone are exempt from the `inactive` signal even if they are
 
 ## Model-judged duplicate-of-closed
 
-An open issue that duplicates a closed issue is judged by the model reading titles, bodies, labels, and comments — the script no longer does title-token matching. The model proposes it as an Obsolete Candidate with `suggested_action: merge-into:#<closed-issue>` (or `revisit` when the open issue should stay), and the evidence should name the target closed issue:
+An open issue that duplicates a closed issue is judged by the model reading titles, bodies, labels, and comments — the script no longer does title-token matching. The model proposes it as an Obsolete Candidate in a `--model-actions` JSON file, not through the stale script's old `suggested_action` grammar. Wire shape:
 
 ```json
 {
-  "target": {
-    "number": 44,
-    "title": "OAuth token refresh worker"
+  "section": "obsolete",
+  "verb": "close-duplicate",
+  "issueNumber": 44,
+  "args": {
+    "target": "#12",
+    "reason": "open issue duplicates closed #12 with no substantive delta"
   },
-  "reason": "open issue duplicates closed #44 with no substantive delta",
-  "titles": {
-    "open": "OAuth token refresh worker",
-    "closed": "OAuth token refresh worker"
-  }
+  "summary": "Close duplicate #44 into #12 — open issue duplicates closed #12"
 }
 ```
 
-Guidance: only merge-into when the open issue has no new requirements beyond the closed one; otherwise mark `revisit` and note what is still missing.
+`verb` must be `close-duplicate` (with `args.target` and `args.reason`), `close` (with `args.reason`), or `revisit` (with `args.reason`); `triage-report.js` rejects anything else.
+
+Guidance: only close-duplicate when the open issue has no new requirements beyond the closed one; otherwise use `revisit` and note what is still missing.
 
 ## Evidence schema
 

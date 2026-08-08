@@ -57,7 +57,24 @@ Every emitted edge carries evidence taken directly from the snapshot so downstre
 
 ## Model-judged Edges (semantic)
 
-Blocking, dependency, and duplication require reading issue intent, so they are judged by the model reading the snapshot, not by phrase matching or title token overlap. The model emits edges in the same shape as the script (kind, confidence, evidence) and passes them to `triage-report.js --model-actions`.
+Blocking, dependency, and duplication require reading issue intent, so they are judged by the model reading the snapshot, not by phrase matching or title token overlap. The model emits them as `section: "relationship"` entries in a `--model-actions` JSON file; `triage-report.js` validates each entry and merges it into the Relationships path. Wire shape:
+
+```json
+{
+  "section": "relationship",
+  "verb": "edge",
+  "args": {
+    "from": 100,
+    "to": 101,
+    "kind": "blocks",
+    "confidence": 1,
+    "evidence": { "phrase": "Blocks #101" }
+  },
+  "summary": "Blocks edge 100 -> 101"
+}
+```
+
+`args.kind` must be one of the script's deterministic kinds plus the semantic kinds below; `triage-report.js` rejects unknown kinds.
 
 ### `blocks`
 
@@ -81,12 +98,12 @@ Blocking, dependency, and duplication require reading issue intent, so they are 
 
 - Compare open issues against each other and against closed issues, judging semantic duplication from titles, bodies, labels, and comments — not title-token overlap alone.
 - Emit one canonical edge with the smaller issue number as `from`.
-- Evidence:
+- `args.evidence`:
   - `reason`: short human-readable why this is a duplicate candidate
   - `titles.from`: lower-numbered issue title
   - `titles.to`: higher-numbered issue title
 
-A duplicate of a closed issue should be proposed as an Obsolete Candidate (close / merge-into), not only as a relationship edge — see `references/stale.md`.
+A duplicate of a closed issue should be proposed as an Obsolete Candidate (`section: "obsolete"`, `verb: "close-duplicate"`), not only as a relationship edge — see `references/stale.md`.
 
 ## Evidence Schema
 
