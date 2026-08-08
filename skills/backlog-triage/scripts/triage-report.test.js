@@ -17,7 +17,6 @@ const {
   collectActiveSprintIssueNumbers,
   loadModelActions,
   validateModelAction,
-  mergeModelRelationships,
 } = require("./triage-report.js");
 
 function makeSnapshot() {
@@ -840,6 +839,35 @@ describe("model-action merge into report model", () => {
           issueNumber: 42,
           args: { value: "high", reason: "outage" },
           summary: "Set priority:high on #42 — outage (dup)",
+        },
+      ],
+    });
+
+    const apply = model.sections.find((section) => section.key === "apply").markdown;
+    assert.equal((apply.match(/triage:set-priority #42/g) || []).length, 1);
+  });
+
+  it("dedupes args that differ only by key order or whitespace, matching apply normalization", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "obsolete",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { reason: " outage ", value: "high" },
+          summary: "Set priority:high on #42 — outage (reordered/trimmed dup)",
         },
       ],
     });

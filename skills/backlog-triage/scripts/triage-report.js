@@ -577,8 +577,8 @@ function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintC
   const modelRelationships = modelActions.filter((action) => action.section === "relationship");
   const mergedRelate = mergeModelRelationships(relate, modelRelationships);
 
-  const priorityActions = modelActions.filter((action) => action.section === "priority");
-  const milestoneActions = modelActions.filter((action) => action.section === "milestone");
+  const priorityActions = dedupeActions(modelActions.filter((action) => action.section === "priority"));
+  const milestoneActions = dedupeActions(modelActions.filter((action) => action.section === "milestone"));
   const allActions = dedupeActions([...obsoleteActions, ...priorityActions, ...milestoneActions]);
 
   const sections = [
@@ -694,7 +694,7 @@ function validateModelAction(action, index) {
     }
   }
 
-  if (section === "milestone" && typeof action.sprintName !== "string" || section === "milestone" && !String(action.sprintName || "").trim()) {
+  if (section === "milestone" && !String(action.sprintName || "").trim()) {
     throw new Error(`${label} (assign-milestone) requires a non-empty top-level sprintName for grouping.`);
   }
 
@@ -812,8 +812,6 @@ function main() {
   }
 }
 
-if (require.main === module) main();
-
 module.exports = {
   ANCHOR_PATTERN,
   OPTIONAL_RELATIONSHIPS_MARKER,
@@ -840,3 +838,5 @@ module.exports = {
   writeReportFile,
   loadInputs,
 };
+
+if (require.main === module) main();
