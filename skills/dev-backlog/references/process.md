@@ -2,8 +2,9 @@
 
 Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
 the same core cycle through GitHub Issues. The retained seam and subtraction
-proof are documented in
-[Compatibility Subtraction](../../../docs/compatibility-subtraction.md).
+proof are recorded in the dev-backlog source repository at
+`docs/compatibility-subtraction.md` (source checkout only — not bundled with
+the installed skill).
 
 ## Setup — Choose Canonical Task Truth
 

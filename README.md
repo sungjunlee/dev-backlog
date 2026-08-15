@@ -17,9 +17,9 @@ under Upgrade behavior.
 
 README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
 
-The zero-adopter local tracker has been removed. GitHub is the only runtime
-task authority. Backlog.md-compatible files remain an explicit one-way legacy
-import/export boundary and never become co-authoritative. See the
+GitHub is the only runtime task authority. Backlog.md-compatible files remain
+an explicit one-way legacy import/export boundary and never become
+co-authoritative. See the
 [authority and routing contract](skills/dev-backlog/references/authority-contract.md).
 
 ```text
@@ -121,22 +121,18 @@ the GitHub mode; the exact procedure and signatures are documented in
 
 ### Upgrade behavior
 
-There is zero automatic tracker-selection migration. A repository with neither
-`backlog/.tracker` nor a legacy `tracker:` key in `backlog/config.yml` continues
-in GitHub mode with its existing `#N`, numeric `issue_number`, milestone,
-comment, and closing behavior. When `.tracker` is
-absent, runtime reads a legacy YAML selection as a compatibility fallback.
-Only the legacy value `github` is accepted. Running `setup-dev-backlog.js`
-pins that resolved choice to `.tracker`
-without editing `config.yml`; setup never migrates task files and runtime never
-chooses a tracker from availability or failure.
-Existing automation that invokes `sync-pull.js` without a flag must add
-`--legacy-export`; otherwise the command refuses before provider access or task
-materialization. This opt-in preserves rollback/diagnostic exports without
-putting them back on the normal workflow. It is an intentional CLI migration,
-not an automatic tracker or task-data migration.
-The retained compatibility seams, consumer evidence, and subtraction proof
-live in [docs/compatibility-subtraction.md](docs/compatibility-subtraction.md).
+There is zero automatic tracker-selection or task-data migration: existing
+repositories keep their `#N` identities, milestone, comment, and closing
+behavior unchanged, and runtime never chooses a tracker from availability or
+failure. The one intentional CLI change: automation that invokes
+`sync-pull.js` without a flag must add `--legacy-export`; otherwise the command
+refuses before provider access or task materialization (optional legacy export
+stays a deliberate, opt-in operation).
+Selection-resolution details live in
+[spec/system-map.md](spec/system-map.md); the retained compatibility seams,
+consumer evidence, and subtraction proof live in
+[docs/compatibility-subtraction.md](docs/compatibility-subtraction.md), and
+release-by-release removals in [CHANGELOG.md](CHANGELOG.md).
 
 Then use the skill during your coding session:
 
@@ -326,8 +322,9 @@ The integration test is excluded from the default `node --test` path unless you 
 
 ## Script Entry Points
 
-All deterministic helpers live under `skills/dev-backlog/scripts/`.
-Use the commands in Quick Start for the common path, and use [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md) as the canonical script/flag reference when you need the full execution contract.
+Deterministic helpers live under `skills/dev-backlog/scripts/` (sprint
+execution) and `skills/backlog-triage/scripts/` (triage pipeline).
+Use the commands in Quick Start for the common path; [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md) is the execution contract, and [skills/dev-backlog/references/scripts.md](skills/dev-backlog/references/scripts.md) carries the full script/flag inventory.
 
 <details>
 <summary>Claude Code hook example</summary>

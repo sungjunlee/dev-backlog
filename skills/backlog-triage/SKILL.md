@@ -97,7 +97,7 @@ Recommended cadence: run `backlog-triage` weekly or bi-weekly, then feed accepte
 
 ## Script Resolution
 
-Resolve scripts from the installed `backlog-triage` skill directory, not from the target project. In a source checkout, that is the local `scripts/` directory beside this `SKILL.md`; in an installed skill, locate the active skill directory and run the same script from there. Run scripts from the target project root. Operational scripts support `--json` for composition.
+Resolve scripts from the installed `backlog-triage` skill directory, not from the target project. In a source checkout, that is the local `scripts/` directory beside this `SKILL.md`; in an installed skill, locate the active skill directory and run the same script from there. Run scripts from the target project root. Operational scripts support `--json` for composition. These scripts `require` shared modules from the sibling `dev-backlog` skill (`../dev-backlog/scripts/`), so both skills must be installed from the same bundle — a standalone `backlog-triage` install has no supported script path.
 
 Concrete pattern:
 
