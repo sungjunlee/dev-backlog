@@ -143,7 +143,7 @@ Then use the skill during your coding session:
 /dev-backlog sync
 ```
 
-For the detailed sprint contract, section semantics, and full script inventory, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+For the detailed sprint contract and section semantics, see [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md); the full script/flag inventory is [skills/dev-backlog/references/scripts.md](skills/dev-backlog/references/scripts.md).
 
 ## Maintainer Verification
 
