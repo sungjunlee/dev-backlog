@@ -404,43 +404,18 @@ function formatStaleEvidence(candidate) {
 }
 
 function staleCandidateToAction(candidate) {
-  const evidence = formatStaleEvidence(candidate);
+  // triage-stale.js only ever emits suggested_action "close"; revisit and
+  // close-duplicate reach the obsolete section through --model-actions.
+  if (candidate.suggested_action !== "close") return null;
 
-  if (candidate.suggested_action === "close") {
-    return {
-      section: "obsolete",
-      verb: "close",
-      issueNumber: candidate.number,
-      args: { reason: candidate.reason },
-      summary: `Close #${candidate.number} — ${candidate.reason}`,
-      evidence,
-    };
-  }
-
-  if (candidate.suggested_action === "revisit") {
-    return {
-      section: "obsolete",
-      verb: "revisit",
-      issueNumber: candidate.number,
-      args: { reason: candidate.reason },
-      summary: `Revisit #${candidate.number} — ${candidate.reason}`,
-      evidence,
-    };
-  }
-
-  const mergeMatch = String(candidate.suggested_action || "").match(/^merge-into:(#\d+)$/);
-  if (mergeMatch) {
-    return {
-      section: "obsolete",
-      verb: "close-duplicate",
-      issueNumber: candidate.number,
-      args: { target: mergeMatch[1], reason: candidate.reason },
-      summary: `Close duplicate #${candidate.number} into ${mergeMatch[1]} — ${candidate.reason}`,
-      evidence,
-    };
-  }
-
-  return null;
+  return {
+    section: "obsolete",
+    verb: "close",
+    issueNumber: candidate.number,
+    args: { reason: candidate.reason },
+    summary: `Close #${candidate.number} — ${candidate.reason}`,
+    evidence: formatStaleEvidence(candidate),
+  };
 }
 
 function buildObsoleteActions(stale, { protectedIssueNumbers = new Set() } = {}) {

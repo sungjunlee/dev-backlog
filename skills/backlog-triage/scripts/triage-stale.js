@@ -176,8 +176,9 @@ function buildCandidate(issue, reason, evidence) {
     title: issue.title,
     reason,
     evidence,
-    // Deterministic stale signals only ever propose close; merge-into/revisit
-    // judgments belong to the model layer (#358).
+    // Deterministic stale signals only ever propose close; duplicate/revisit
+    // judgments enter the report through the model-actions path
+    // (close-duplicate / revisit verbs, #358).
     suggested_action: "close",
   };
 }

@@ -36,8 +36,9 @@ No server, no daemon, no hidden state, no silent sync.
 - Hard Relay, Matt Pocock skill, GitHub Projects, or Backlog.md dependencies — each may be used optionally without entering the core path.
 
 ## Objectives         <!-- Tier 2 · Predicates (add/remove human-gated; status: active → implemented → validated, proof-gated) -->
-Evidence scope: all adoption figures below are measured across a
-single-maintainer ecosystem (18 known consumer repos as of 2026-07-28), not
+Evidence scope: adoption figures below are measured within a single-maintainer
+ecosystem — 17 consumer repos other than this one, 18 known consumers counting
+it (as of 2026-07-28); each objective cites its own denominator. None of it is
 independent external-team adoption.
 - O1 [validated] For complex work admitted to a sprint, Claude Code, Codex, and humans read the same active sprint file as the single execution-continuity state · src: user (adoption 2026-07-27: 146 sprints across 17 repos other than this one)
 - O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
@@ -45,8 +46,8 @@ independent external-team adoption.
 - O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5; adoption 2026-07-27: dated reassess reports in 3 repos other than this one — survival-alpha, beopsuny-skill, aibris)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
 - O7 [validated] A repo with no craftkit and no `spec/` files can complete a full sprint cycle from this bundle alone, with no dangling cross-repo spec pointers · src: user (proof: adoption-hardening milestone #12 closed 14/14 on 2026-07-07; PRD §8 candidate measured by V1 cold-adopter gates; adoption 2026-07-27: 10 repos run sprints with no `spec/` axis at all, up to 15 sprints each)
-- O8 [implemented] Historical (superseded by O10, 2026-07-31; retained so sprint references resolve): core sprint cycle demonstrated on `github` and `local` without silent switching · proof: PRs #286/#298/#303; see Decisions 2026-07-27/28/31
-- O9 [implemented] Historical (superseded by O10, 2026-07-31; retained so sprint references resolve): exactly one configured adapter owned task truth during the tracker-seam phase · proof: PRs #282/#298/#301/#303; see Decisions 2026-07-31
+- O8 [implemented] Historical (superseded by O10, 2026-07-31; retained so sprint references resolve): core sprint cycle demonstrated on `github` and `local` without silent switching · src: user (proof: PRs #286/#298/#303; see Decisions 2026-07-27/28/31)
+- O9 [implemented] Historical (superseded by O10, 2026-07-31; retained so sprint references resolve): exactly one configured adapter owned task truth during the tracker-seam phase · src: user (proof: PRs #282/#298/#301/#303; see Decisions 2026-07-31)
 - O10 [active] GitHub Issues are the standalone task-definition and lifecycle authority; simple Issue → PR work is sprint-free, while complex work preserves continuity in one admitted sprint per track without task mirrors, dual writes, or required ecosystem integrations · src: user (adoption evidence 2026-07-27: 0 of 17 other consumer repos selected a non-default tracker; 2026-07-28: all 18 known consumer repos had a GitHub remote)
 
 ## Decisions          <!-- Tier 3 · History (immutable, append-only) -->

@@ -75,7 +75,8 @@ fake GitHub transport.
 ## Relocated learnings
 
 Moved here from `spec/capabilities.md` (tracker-task-truth) on 2026-08-15
-because #348 removed the surfaces they describe; retained for traceability:
+because the #348 subtraction (PR #354) removed the surfaces they describe;
+retained for traceability:
 
 - 2026-07-11 (PR #298): A canonical local Markdown store needs exact-ID
   allocation across active and completed tasks, fail-closed filesystem
