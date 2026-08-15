@@ -170,25 +170,15 @@ function daysSince(olderIso, newerIso) {
   return Math.floor((newer.getTime() - older.getTime()) / DAY_IN_MS);
 }
 
-function pickAction(signal, context = {}) {
-  switch (signal) {
-    case SIGNALS.INACTIVE:
-    case SIGNALS.WONTFIX:
-    case SIGNALS.INVALID:
-    case SIGNALS.MERGED_CLOSING_PR:
-      return "close";
-    default:
-      return context.targetIssueNumber ? `merge-into:#${context.targetIssueNumber}` : "revisit";
-  }
-}
-
-function buildCandidate(issue, signal, reason, evidence, actionContext = {}) {
+function buildCandidate(issue, reason, evidence) {
   return {
     number: issue.number,
     title: issue.title,
     reason,
     evidence,
-    suggested_action: pickAction(signal, actionContext),
+    // Deterministic stale signals only ever propose close; merge-into/revisit
+    // judgments belong to the model layer (#358).
+    suggested_action: "close",
   };
 }
 
@@ -203,7 +193,6 @@ function scanInactive(issue, thresholdDays, generated) {
 
   return buildCandidate(
     issue,
-    SIGNALS.INACTIVE,
     `inactive/stale: no activity for ${daysSinceUpdate} days; exceeds stale_days threshold (${thresholdDays}); no milestone assigned`,
     {
       updatedAt: issue.updatedAt,
@@ -229,7 +218,6 @@ function scanWontfixInvalid(issue) {
     candidates.push(
       buildCandidate(
         issue,
-        target,
         `labeled ${matchedLabel}; explicit ${target} signal`,
         {
           matchedLabel,
@@ -257,7 +245,6 @@ function scanMergedClosingPr(issue) {
     candidates.push(
       buildCandidate(
         issue,
-        SIGNALS.MERGED_CLOSING_PR,
         `merged closing PR detected: ${prLabel} merged at ${pr.mergedAt}`,
         {
           source: "closing_prs",
@@ -365,7 +352,6 @@ module.exports = {
   readSnapshot,
   normalizeLabels,
   daysSince,
-  pickAction,
   scanInactive,
   scanWontfixInvalid,
   scanMergedClosingPr,

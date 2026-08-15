@@ -7,13 +7,14 @@ const fs = require("fs");
 const path = require("path");
 const {
   GH_EXEC_DEFAULTS,
-  OPEN_ISSUE_COUNT_QUERY,
   OPEN_ISSUE_JSON_FIELDS,
   createGithubAdapter,
   getOpenIssueCount: getGithubOpenIssueCount,
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
 
+// Progress-issue publication was removed (#340); this marker survives only to
+// recognize legacy machine-managed issue bodies in sync-pull/triage-collect.
 const PROGRESS_MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
 const MARKER_SUFFIX = " -->";
 
@@ -331,7 +332,6 @@ module.exports = {
   CONFIG_DEFAULTS,
   TRIAGE_CONFIG_DEFAULTS,
   GH_EXEC_DEFAULTS,
-  OPEN_ISSUE_COUNT_QUERY,
   OPEN_ISSUE_JSON_FIELDS,
   getOpenIssueCount,
   fetchOpenIssues,

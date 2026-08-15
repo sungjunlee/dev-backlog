@@ -1,3 +1,6 @@
+// Test-support module: resolves a usable bash across POSIX and
+// Git-for-Windows for the integration/acceptance suites. Not a runtime
+// dependency of any operator script.
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");

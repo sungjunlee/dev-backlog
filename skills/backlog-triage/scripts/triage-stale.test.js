@@ -8,7 +8,6 @@ const {
   DEFAULT_STALE_DAYS,
   parseArgs,
   readSnapshot,
-  pickAction,
   scanInactive,
   scanWontfixInvalid,
   scanMergedClosingPr,
@@ -59,20 +58,6 @@ describe("readSnapshot", () => {
     const badPath = path.join(tmpDir, "bad.json");
     fs.writeFileSync(badPath, "not json\n");
     assert.throws(() => readSnapshot(badPath), /snapshot|json|malformed/i);
-  });
-});
-
-describe("pickAction", () => {
-  it("routes inactive and label-based stale signals to close", () => {
-    assert.equal(pickAction(SIGNALS.INACTIVE), "close");
-    assert.equal(pickAction(SIGNALS.WONTFIX), "close");
-    assert.equal(pickAction(SIGNALS.INVALID), "close");
-    assert.equal(pickAction(SIGNALS.MERGED_CLOSING_PR), "close");
-  });
-
-  it("keeps revisit and merge-into actions available for future signals", () => {
-    assert.equal(pickAction("future-signal", { targetIssueNumber: 42 }), "merge-into:#42");
-    assert.equal(pickAction("future-signal"), "revisit");
   });
 });
 
