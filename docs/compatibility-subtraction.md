@@ -71,3 +71,13 @@ surfaces are absent:
 The same test verifies that live task reads, AC resolution, status/next,
 updates, final close, and closed-task reads succeed with only this bundle and a
 fake GitHub transport.
+
+## Relocated learnings
+
+Moved here from `spec/capabilities.md` (tracker-task-truth) on 2026-08-15
+because #348 removed the surfaces they describe; retained for traceability:
+
+- 2026-07-11 (PR #298): A canonical local Markdown store needs exact-ID
+  allocation across active and completed tasks, fail-closed filesystem
+  boundaries, metadata-only body preservation, and crash-recoverable archive
+  semantics; merely replacing `gh` commands is not sufficient.
