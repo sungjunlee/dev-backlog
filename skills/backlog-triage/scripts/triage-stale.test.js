@@ -4,7 +4,6 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const {
-  SIGNALS,
   DEFAULT_STALE_DAYS,
   parseArgs,
   readSnapshot,

@@ -15,7 +15,7 @@ repositories retain their tracker selection and Issue identities without data
 migration; the legacy export CLI has the intentional opt-in change documented
 under Upgrade behavior.
 
-README.md is the product overview and human quick start. The agent execution contract, sprint-file rules, and full script reference live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md).
+README.md is the product overview and human quick start. The agent execution contract and sprint-file rules live in [skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md); the full script/flag inventory lives in [skills/dev-backlog/references/scripts.md](skills/dev-backlog/references/scripts.md).
 
 GitHub is the only runtime task authority. Backlog.md-compatible files remain
 an explicit one-way legacy import/export boundary and never become
