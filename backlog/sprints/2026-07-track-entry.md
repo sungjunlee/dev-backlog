@@ -70,7 +70,7 @@ the create-time disjointness guard cannot see.
   adoption evidence. That split is the point — the rule discriminates rather than
   downgrading everything. Measured across the 17 repos consuming dev-backlog besides this
   one: O1 146 sprints; O4 `backlog/triage/` reports in 7 repos; O5 dated reassess reports in
-  3 (survival-alpha, beopsuny-skill, aibris); O7 10 repos running sprints with no `spec/`
+  3 (consumer-A, beopsuny-skill, aibris); O7 10 repos running sprints with no `spec/`
   axis at all, up to 15 sprints each; O8 **0** repos using `local`; O9 **0** repos setting a
   non-default tracker.
   #335 proved to be a real hard blocker, not a hypothetical: running the pre-#335 parser

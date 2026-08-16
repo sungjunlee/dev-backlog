@@ -62,6 +62,9 @@ amendments are human-gated — propose, apply only on explicit approval.
 ## Working on This Project
 
 - All content in English (Korean in trigger keywords only)
+- **This is a public repo** — never name private consumer repositories in
+  committed content or public issue/PR text; use the stable `consumer-A`-style
+  aliases (mapping lives outside this repo) and never link to private repos
 - Keep README focused on the human quick start; keep `SKILL.md` under 250
   lines as the agent execution contract
 - Verify with `node --test skills/*/scripts/*.test.js` and

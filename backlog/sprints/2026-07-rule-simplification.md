@@ -89,7 +89,7 @@ true form, and O8 stops implying that someone should go find `local` a user.
   region of `capabilities.md` with zero conflict once #340 was in main.
 - 2026-07-28: Milestone opened after a workspace-wide reassessment under an explicit
   essence-first mandate. Two findings reframed the plan. The "5 stale sprints" cleanup I
-  had recommended shrank to **1** on measurement — dear-scene is actively developed (last
+  had recommended shrank to **1** on measurement — consumer-B is actively developed (last
   commit 8h before triage), beopjalal is on a live `codex/issue-1104` work branch, and
   print-play-learn (37 files) and yookahyu-calc (5) carry uncommitted user work; only
   investanza was genuinely dormant, and its sprint is now closed. And the largest

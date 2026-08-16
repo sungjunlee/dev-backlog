@@ -2,6 +2,11 @@
 
 Issue: [#350](https://github.com/sungjunlee/dev-backlog/issues/350)
 
+Privacy note: private consumer repositories appear under stable aliases
+(`consumer-A` … `consumer-E`, mapping kept outside this public repo, applied
+2026-08-16); public consumers keep their real names. Aliased mentions are not
+linked.
+
 Started: 2026-07-31
 
 Earliest decision: 2026-08-28 (four weeks)
@@ -72,11 +77,11 @@ boundary is an error.
 | ID | Historical question | Gold answer criteria | Gold sources |
 | --- | --- | --- | --- |
 | C1 | Why did aibris #139 define agent session/transcript storage as retention rather than safety, and what protected it? | About 11 GB of Codex sessions made this discovery, age aggregation, and user choice; default and `--risky` cannot delete transcripts without an explicit retention selector, and orphans are bucket aggregates. | [aibris #139](https://github.com/sungjunlee/aibris/issues/139) |
-| C2 | Which authority error and privacy boundary did dear-scene #267's owner-evidence campaign address? | Prevent one airport-scene judgment from generalizing to a whole trip by binding each question to the shown photo/moment and exact owner answer; preserve unanswered state and exclude private raw evidence from GitHub. | [dear-scene #267](https://github.com/sungjunlee/dear-scene/issues/267) |
+| C2 | Which authority error and privacy boundary did consumer-B #267's owner-evidence campaign address? | Prevent one scene-level judgment from generalizing to a whole event by binding each question to the shown evidence item/moment and exact owner answer; preserve unanswered state and exclude private raw evidence from GitHub. | consumer-B#267 |
 | C3 | How did the aibris cases distinguish sprint use for complex product work from a controlled mirrorless transition? | #139 needed a complex product sprint; #171/PR #172 was a docs-only episode whose sprint held live-Issue intent and handoff, not task authority, mirrors, or product changes. | [aibris #139](https://github.com/sungjunlee/aibris/issues/139), [aibris #171](https://github.com/sungjunlee/aibris/issues/171), [aibris PR #172](https://github.com/sungjunlee/aibris/pull/172), [pilot evidence](https://github.com/sungjunlee/dev-backlog/blob/dc23b96f07a411ebeedd45210176c9b209e00112/docs/mirrorless-github-pilot.md) |
-| C4 | Where did the privacy-heavy dear-scene campaign and mirrorless pilot each place authority? | #267 kept domain truth in local-only lineage and exact owner evidence with aggregates on GitHub; #293/PR #294 kept task intent/AC/lifecycle in the live Issue and branch/handoff in the sprint. | [dear-scene #267](https://github.com/sungjunlee/dear-scene/issues/267), [dear-scene #293](https://github.com/sungjunlee/dear-scene/issues/293), [dear-scene PR #294](https://github.com/sungjunlee/dear-scene/pull/294), [pilot evidence](https://github.com/sungjunlee/dev-backlog/blob/dc23b96f07a411ebeedd45210176c9b209e00112/docs/mirrorless-github-pilot.md) |
+| C4 | Where did the privacy-heavy consumer-B campaign and mirrorless pilot each place authority? | #267 kept domain truth in local-only lineage and exact owner evidence with aggregates on GitHub; #293/PR #294 kept task intent/AC/lifecycle in the live Issue and branch/handoff in the sprint. | consumer-B#267, consumer-B#293, consumer-B PR#294, [pilot evidence](https://github.com/sungjunlee/dev-backlog/blob/dc23b96f07a411ebeedd45210176c9b209e00112/docs/mirrorless-github-pilot.md) |
 | C5 | What were the quantitative and lossless results of the aibris mirrorless pilot? | AC 5/5 and open state in 0.69 seconds, sprint branch/handoff, close dry-run exit 0, zero task/completed mirror diff, and PR #172 closed #171. | [aibris #171](https://github.com/sungjunlee/aibris/issues/171), [aibris PR #172](https://github.com/sungjunlee/aibris/pull/172), [`0f22c48`](https://github.com/sungjunlee/aibris/commit/0f22c4868eb0259dbe3b868937a29312cf3870ac) |
-| C6 | What were the dear-scene pilot's quantitative results, and how were pre-existing doctor findings handled? | AC 5/5 and open state in 0.71 seconds, close dry-run exit 0, zero mirror diff, and PR #294 closed #293; unrelated M5 doctor findings were isolated from the passing pilot track. | [dear-scene #293](https://github.com/sungjunlee/dear-scene/issues/293), [dear-scene PR #294](https://github.com/sungjunlee/dear-scene/pull/294), [`7ac2196`](https://github.com/sungjunlee/dear-scene/commit/7ac21961853aa21a504515becd3241772e05c3fa) |
+| C6 | What were the consumer-B pilot's quantitative results, and how were pre-existing doctor findings handled? | AC 5/5 and open state in 0.71 seconds, close dry-run exit 0, zero mirror diff, and PR #294 closed #293; unrelated M5 doctor findings were isolated from the passing pilot track. | consumer-B#293, consumer-B PR#294, `7ac2196` |
 
 ## Scoring
 
@@ -162,7 +167,7 @@ uses the frozen Issue/PR subset described above.
 | D2 | 5,312 / 2 | `dev-backlog#291`, `dev-backlog!300`, `2d46ae1` | match/0 | 0.571 / 1 | `dev-backlog#291`, `dev-backlog!300`, `dev-relay!1055` | 2/2 |
 | D3 | 4,672 / 2 | `dev-backlog#311`, `dev-backlog!314`, `6e30430` | match/0 | 0.859 / 1 | `dev-backlog!314`, `dev-backlog#311`, `dev-backlog!351` | 2/2 |
 | D4 | 3,304 / 2 | `dev-backlog#340`, `dev-backlog!343`, `89cffbb` | match/0 | 1.164 / 1 | `dev-backlog#340`, `dev-backlog!343`, `dev-backlog#345` | 2/2 |
-| D5 | 4,167 / 2 | `dev-backlog#345`, `dev-backlog!351`, `0eab284` | match/0 | 0.645 / 1 | `dev-backlog#345`, `dev-backlog!351`, `dear-scene#267` | 2/2 |
+| D5 | 4,167 / 2 | `dev-backlog#345`, `dev-backlog!351`, `0eab284` | match/0 | 0.645 / 1 | `dev-backlog#345`, `dev-backlog!351`, `consumer-B#267` | 2/2 |
 | D6 | 7,927 / 2 | `dev-backlog#346`, `dev-backlog!352`, `d7f8edc` | match/0 | 0.843 / 1 | `dev-backlog#346`, `dev-backlog!352`, `dev-relay#1116` | 2/2 |
 | D7 | 6,964 / 3 | `dev-backlog#347`, `dev-backlog!353`, `pilot` | match/0 | 0.953 / 1 | `dev-backlog#347`, `dev-backlog#278`, `dev-backlog!343` | 1/2 |
 | R1 | 11,239 / 3 | `dev-relay#955`, `dev-relay!1051`, `df0d007` | match/0 | 1.013 / 1 | `dev-relay#955`, `dev-relay!1055`, `dev-relay#956` | 2/3 |
@@ -172,12 +177,12 @@ uses the frozen Issue/PR subset described above.
 | R5 | 6,249 / 2 | `dev-relay#1091`, `dev-relay!1094`, `4e7d041` | match/0 | 0.383 / 1 | `dev-relay!1094`, `dev-relay#1091`, `dev-relay!1092` | 2/2 |
 | R6 | 13,351 / 2 | `dev-relay#1106`, `dev-relay!1124`, `3632390` | match/0 | 0.801 / 1 | `dev-relay!1124`, `dev-relay!1051`, `dev-relay#1106` | 2/2 |
 | R7 | 7,605 / 2 | `dev-relay#1116`, `dev-relay!1120`, `3546d97` | match/0 | 0.874 / 1 | `dev-relay#1116`, `dev-relay!1120`, `dev-relay#1089` | 2/2 |
-| C1 | 2,467 / 1 | `aibris#139` | match/0 | 0.708 / 1 | `aibris#139`, `dear-scene#267`, `dev-relay#955` | 1/1 |
-| C2 | 3,651 / 1 | `dear-scene#267` | match/0 | 0.786 / 1 | `dear-scene#267`, `aibris#139`, `dev-relay!1055` | 1/1 |
+| C1 | 2,467 / 1 | `aibris#139` | match/0 | 0.708 / 1 | `aibris#139`, `consumer-B#267`, `dev-relay#955` | 1/1 |
+| C2 | 3,651 / 1 | `consumer-B#267` | match/0 | 0.786 / 1 | `consumer-B#267`, `aibris#139`, `dev-relay!1055` | 1/1 |
 | C3 | 7,560 / 3 | `aibris#139`, `aibris!172`, `pilot` | match/0 | 0.640 / 1 | `dev-backlog#347`, `aibris#171`, `aibris!172` | 2/3 |
-| C4 | 8,077 / 3 | `dear-scene#267`, `dear-scene!294`, `pilot` | match/0 | 0.174 / 1 | `dear-scene#267`, `dev-backlog#347`, `dear-scene#293` | 2/3 |
+| C4 | 8,077 / 3 | `consumer-B#267`, `consumer-B!294`, `pilot` | match/0 | 0.174 / 1 | `consumer-B#267`, `dev-backlog#347`, `consumer-B#293` | 2/3 |
 | C5 | 6,057 / 2 | `aibris#171`, `aibris!172` | match/0 | 0.168 / 1 | `aibris#171`, `dev-backlog#347`, `aibris!172` | 2/2 |
-| C6 | 5,686 / 2 | `dear-scene#293`, `dear-scene!294` | match/0 | 0.558 / 1 | `dear-scene!294`, `dear-scene#293`, `dev-backlog#347` | 2/2 |
+| C6 | 5,686 / 2 | `consumer-B#293`, `consumer-B!294` | match/0 | 0.558 / 1 | `consumer-B!294`, `consumer-B#293`, `dev-backlog#347` | 2/2 |
 
 The Arm B median recomputes to 5,952 ms and two calls. The conservative Arm C
 median recomputes to 0.794 ms and one local call; its hit column sums to 37/41,
@@ -198,7 +203,7 @@ SHA-256, injects one missing source, and requires the post-failure SHA-256 and
 mtime to remain identical. Temporary report bytes are not copied into this
 repository.
 
-The Day-0 failure probe replaced one dear-scene source with a nonexistent
+The Day-0 failure probe replaced one consumer-B source with a nonexistent
 source. GraphQL exited 2. Before and after, the report SHA-256 was the exact
 value above, mtime epoch was `1785504674`, size was 321,273 bytes, and no
 candidate file remained. The previous report was therefore preserved without
