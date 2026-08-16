@@ -2,6 +2,11 @@
 
 Issue: [#347](https://github.com/sungjunlee/dev-backlog/issues/347)
 
+Privacy note: private consumer repositories appear under stable aliases
+(`consumer-A` … `consumer-E`, mapping kept outside this public repo, applied
+2026-08-16); public consumers keep their real names. Aliased mentions are not
+linked.
+
 This runbook proves that live GitHub Issues plus optional sprint files preserve
 task intent and execution continuity without `backlog/tasks/` or
 `backlog/completed/`. Run two sprints across two or three consuming
@@ -99,18 +104,18 @@ active sprints and established the recovery baseline.
 | Repository | Active sprint / task | Orientation (base/post) | Calls (base/post) | AC / task spec / lifecycle / handoff | Mirror writes | Resolver blockers |
 | --- | --- | ---: | ---: | --- | ---: | ---: |
 | `sungjunlee/aibris` | `2026-07-agent-state-store-coverage` / `#139` | 0.88 s / 1.94 s | 2 / 2 | pass / pass / pass / pass | 0 | 0 |
-| `sungjunlee/dear-scene` | `2026-06-m5-concierge-pilot` / `#267` | 0.50 s / 1.96 s | 2 / 2 | pass / pass / pass / pass | 0 | 0 |
+| `consumer-B` | `2026-06-m5-concierge-pilot` / `#267` | 0.50 s / 1.96 s | 2 / 2 | pass / pass / pass / pass | 0 | 0 |
 
 The baseline totals combine `status` plus mirror grep (aibris: 0.87 s +
-0.01 s; dear-scene: 0.40 s + 0.10 s). Mirrorless totals combine `status` plus
-the live resolver (aibris: 0.87 s + 1.07 s; dear-scene: 0.40 s + 1.56 s).
+0.01 s; consumer-B: 0.40 s + 0.10 s). Mirrorless totals combine `status` plus
+the live resolver (aibris: 0.87 s + 1.07 s; consumer-B: 0.40 s + 1.56 s).
 Mirrorless was slower in both observations, but #347 has no speed gate and the
 live read removed stale-authority risk.
 
 - aibris recovered all eight live AC with source revision prefix
   `sha256:97685a`, recovered its in-flight branch pointer, passed doctor, and
   left the worktree clean.
-- dear-scene exposed material drift: the legacy mirror contained seven AC with
+- consumer-B exposed material drift: the legacy mirror contained seven AC with
   four checked, while the live Issue contained eight AC, all unchecked, with
   source digest prefix `267882`. The live Issue correctly won. Doctor also
   reported a pre-existing sprint-shape failure and two unmoored/stale warnings;
@@ -120,7 +125,7 @@ live read removed stale-authority risk.
   fixture (no `tasks/` or `completed/`) exited zero and printed
   `No legacy task mirrors required`.
 
-No resolver-related blocking incident occurred. The dear-scene authority drift
+No resolver-related blocking incident occurred. The consumer-B authority drift
 is positive evidence for removing mirrors from orientation, not a reason to
 restore mirror fallback. Both observations were read-only orientation episodes,
 so they performed no lifecycle state transition and wrote neither a mirror nor
@@ -136,11 +141,11 @@ merged a closing PR, and re-resolved the canonical lifecycle as `closed`.
 | Repository | Issue → PR | Live orientation | AC after completion | Sprint close | Lifecycle | Manual Issue writes | Sprint writes | Mirror writes | Blocking incidents |
 | --- | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: |
 | `sungjunlee/aibris` | [#171](https://github.com/sungjunlee/aibris/issues/171) → [#172](https://github.com/sungjunlee/aibris/pull/172) | 0.69 s | 5/5 | exit 0 | open → closed | 2 | 2 commits | 0 | 0 |
-| `sungjunlee/dear-scene` | [#293](https://github.com/sungjunlee/dear-scene/issues/293) → [#294](https://github.com/sungjunlee/dear-scene/pull/294) | 0.71 s | 5/5 | exit 0 | open → closed | 2 | 2 commits | 0 | 0 |
+| `consumer-B` | #293 → #294 | 0.71 s | 5/5 | exit 0 | open → closed | 2 | 2 commits | 0 | 0 |
 
 - aibris passed every pilot-track doctor check. Its portfolio emitted only the
   informational warning caused by the pre-existing scopeless active sprint.
-- dear-scene passed every pilot-track doctor check. Its overall doctor failure
+- consumer-B passed every pilot-track doctor check. Its overall doctor failure
   and two warnings belonged to the pre-existing M5 sprint and were unchanged
   by the pilot.
 - Both closing PRs merged, both Issues closed through their PR relationship,
