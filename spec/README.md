@@ -14,7 +14,8 @@ Use `spec-charter` for `charter.md`, `spec-system-map` for `system-map.md`, and 
 
 `spec/*` files hold durable project, system, and capability contracts. Task
 acceptance criteria stay in GitHub Issues; legacy `backlog/tasks/` files are
-non-authoritative migration fallbacks. Complex execution context stays in
+explicit one-way diagnostic/rollback exports, never read back as task truth.
+Complex execution context stays in
 `backlog/sprints/`; Relay Done Criteria, rubrics, and review notes stay in
 dev-relay run artifacts.
 

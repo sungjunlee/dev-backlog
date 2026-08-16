@@ -129,9 +129,10 @@ gh issue view 42 --json comments --jq '.comments[-3:][] | "\(.author.login): \(.
 The measured #349 pilot confirmed that Priority, Iteration, and Target Date
 projection works, but required more writes and reconciliation than the existing
 milestone + labels + sprint Plan workflow. Projects are therefore not an
-adopted dev-backlog profile. See
-[`docs/github-projects-projection-pilot.md`](../../../docs/github-projects-projection-pilot.md)
-for the capability matrix, failure evidence, and decision.
+adopted dev-backlog profile. The capability matrix, failure evidence, and
+decision are recorded in the source repository's
+`docs/github-projects-projection-pilot.md` (source checkout only — not bundled
+with the installed skill).
 
 An operator may still use a manually configured Project as an external view:
 

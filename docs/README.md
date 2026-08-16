@@ -32,3 +32,12 @@ behavior.
 | [`unattended-consumer-pilot.md`](unattended-consumer-pilot.md) | Session contract pilot for unattended consumer sessions (issue #238). |
 | [`plans/2026-07-16-windows-portability-design.md`](plans/2026-07-16-windows-portability-design.md) | Windows portability design (shipped in 0.8.0). |
 | [`superpowers/`](superpowers/) | 2026-05 superpowers adoption analysis for the charter reference axis (superseded by the in-repo spec axis and the craftkit `spec-*` skills). |
+
+## Removed
+
+Deleted docs stay reachable through git history and release tags. Completed
+sprint files are immutable and may still reference these by their old paths.
+
+| File | Removed by | Last published version |
+| --- | --- | --- |
+| `tracker-adapter-design.md` | #348 subtraction (PR #354, commit `3865a37`) | [v0.9.0](https://github.com/sungjunlee/dev-backlog/blob/v0.9.0/docs/tracker-adapter-design.md) |

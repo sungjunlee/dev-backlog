@@ -235,9 +235,6 @@ function scanCommentMentions(snapshot) {
   return dedupeEdges(edges);
 }
 
-
-
-
 function scanMergedPrLinks(snapshot) {
   const edges = [];
 
@@ -270,9 +267,6 @@ function scanMergedPrLinks(snapshot) {
 
   return dedupeEdges(edges);
 }
-
-
-
 
 function compareEdges(left, right) {
   return left.from - right.from || left.to - right.to || left.kind.localeCompare(right.kind);
@@ -338,7 +332,7 @@ function formatEdge(edge) {
     return `#${edge.from} ${edge.kind} ${prLabel}${mergedAt}`;
   }
 
-  const snippet = typeof edge.evidence === "object" ? edge.evidence.snippet || edge.evidence.phrase : edge.evidence;
+  const snippet = typeof edge.evidence === "object" ? edge.evidence.snippet : edge.evidence;
   return `#${edge.from} ${edge.kind} #${edge.to} ${snippet}`;
 }
 

@@ -12,7 +12,12 @@ bash "$skill_dir/scripts/next.sh"
 node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 ```
 
-## Full inventory
+## Operator inventory
+
+Entry-point scripts an operator or agent invokes directly. Internal modules
+(`tracker-capability.js`, `tracker-status-list.js`, `github-milestones.js`,
+`legacy-tracker.js`, and similar) are implementation details consumed by these
+entry points and are intentionally not listed.
 
 - `scripts/setup-dev-backlog.js [project-name] [--tracker github] [--non-interactive] [--json]` — persist GitHub as the canonical task authority and create only `sprints/`.
 - `scripts/init.sh [project-name]` — bootstrap `backlog/` with `.tracker` and directories.
@@ -38,5 +43,6 @@ fallback; any other value fails. With neither, GitHub remains the deterministic
 default. Setup pins the legacy GitHub selection to `.tracker` without editing
 `config.yml`. Task files exist only as explicit one-way legacy exports.
 
-Retained seams and compatibility evidence are single-sourced in
-[`docs/compatibility-subtraction.md`](../../../docs/compatibility-subtraction.md).
+Retained seams and compatibility evidence are single-sourced in the source
+repository's `docs/compatibility-subtraction.md` (source checkout only — not
+bundled with the installed skill).
