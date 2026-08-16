@@ -17,7 +17,8 @@ related behavior.
 | [`historical-retrieval-shadow.md`](historical-retrieval-shadow.md) | Active shadow benchmark (epic #350, open) comparing legacy mirror grep vs live sources vs disposable reports before any project-memory product decision. Amended 2026-08-16 (#364). | epic #350 |
 | [`mirrorless-github-pilot.md`](mirrorless-github-pilot.md) | Runbook proving live GitHub Issues plus sprint files need no `backlog/tasks/` or `backlog/completed/` (#347). Retirement candidate once #350 closes — the shadow doc cites it only through pinned commit links. | `historical-retrieval-shadow.md` (pinned links) |
 | [`spec-system-design.md`](spec-system-design.md) | Layered spec-system architecture (charter → system-map → capabilities → learnings) and mutation discipline. | `spec/capabilities.md` |
-| [`o3-drill-2026-08-16.md`](o3-drill-2026-08-16.md) | Timed on-track drill across 5 consumer repos — the proof behind charter rev 14's O3 `implemented` status (#363). | `spec/charter.md` |
+| [`spec-history.md`](spec-history.md) | Archive of the spec axis's externalized history: rev-14 objective texts with statuses/proofs, charter and capability Decisions rows, and moved Learnings (#377). | `spec/charter.md`, `spec/capabilities.md`, `spec/README.md` |
+| [`o3-drill-2026-08-16.md`](o3-drill-2026-08-16.md) | Timed on-track drill across 5 consumer repos — the proof behind charter rev 14's O3 `implemented` status (#363). | `docs/spec-history.md` |
 | [`conformance/`](conformance/) | Dated cross-model conformance runs for prompt-judged surfaces (#367); retention rule in its README. | `conformance/README.md`, #367 |
 
 ## Removed

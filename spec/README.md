@@ -10,6 +10,11 @@ Durable project-level specs live here. Root docs stay focused on entrypoints and
 
 Use `spec-charter` for `charter.md`, `spec-system-map` for `system-map.md`, and `spec-grill` for `capabilities.md`. These authoring skills ship with [craftkit](https://github.com/sungjunlee/craftkit) (`npx skills add sungjunlee/craftkit`), not with this repo.
 
+These files hold living contracts only. Retired objectives, superseded
+Decisions rows, and moved Learnings are archived in
+[`../docs/spec-history.md`](../docs/spec-history.md); git history is the
+authoritative record.
+
 ## Boundary
 
 `spec/*` files hold durable project, system, and capability contracts. Task

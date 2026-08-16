@@ -14,6 +14,9 @@
  *     capability.
  *   - `component:` is one primary routing handle. Comma-separated values fail
  *     with guidance to keep secondary touches in sprint prose.
+ *   - Sprints with `status: completed` are immutable history and are skipped:
+ *     a retired capability slug referenced only by completed sprints is not an
+ *     issue.
  *   - Graceful no-op when spec/capabilities.md is absent (skill is opt-in).
  *
  * Exit codes:
@@ -138,6 +141,9 @@ function findIssues(sprintFiles, declared, { readFile = fs.readFileSync } = {}) 
   const issues = [];
   for (const file of sprintFiles) {
     const content = readFile(file, "utf-8");
+    // Completed sprints are immutable history; their `component:` may point at
+    // a since-retired capability slug without constituting a routing issue.
+    if (parseSprintStatus(content) === "completed") continue;
     const components = parseSprintComponents(content);
     if (components.length === 0) continue;
     const { errors, invalid } = classifyComponents(components, declared);

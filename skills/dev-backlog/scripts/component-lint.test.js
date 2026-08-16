@@ -209,6 +209,19 @@ describe("findIssues", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("skips completed sprints referencing retired capability slugs", () => {
+    const declared = parseCapabilityNames(SAMPLE_CAPABILITIES);
+    const issues = findIssues(["completed.md", "active.md"], declared, {
+      readFile: (file) =>
+        file === "completed.md"
+          ? "---\nstatus: completed\ncomponent: retired-cap\n---\n"
+          : "---\nstatus: active\ncomponent: typo-cap\n---\n",
+    });
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].sprintFile, "active.md");
+    assert.deepEqual(issues[0].unknown, ["typo-cap"]);
+  });
 });
 
 describe("lintComponents", () => {

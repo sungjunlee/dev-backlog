@@ -9,8 +9,11 @@
  *   - missing  : the ID is not in the charter at all (removed; IDs are never reused)
  *   - deferred : the ID exists but is marked [deferred]; sprints should not target
  *                deferred objectives
- * Charter statuses are [validated], [active], [implemented], and [deferred];
+ * Charter objective lines may be status-free (`- O10 — ...`, targetable) or carry
+ * a legacy status of [validated], [active], [implemented], or [deferred];
  * only [deferred] objectives are not targetable by sprints.
+ * Sprints with `status: completed` are immutable history and are skipped:
+ * a retired charter ID referenced only by completed sprints is not drift.
  *
  * Graceful no-op when spec/charter.md and legacy CHARTER.md are absent.
  *
@@ -100,10 +103,20 @@ function parseCharterObjectives(content) {
   const objectives = new Map();
   const lines = content.split("\n");
   for (const line of lines) {
-    const match = line.match(/^- (O\d+) \[(validated|active|implemented|deferred)\]/);
-    if (match) objectives.set(match[1], match[2]);
+    const match = line.match(
+      /^- (O\d+)(?: \[(validated|active|implemented|deferred)\])?(?:\s|$)/,
+    );
+    // A status-free line (`- O10 — ...`) is targetable; record it as "listed".
+    if (match) objectives.set(match[1], match[2] ?? "listed");
   }
   return objectives;
+}
+
+function parseSprintStatus(content) {
+  const frontmatter = parseFrontmatter(content);
+  if (!frontmatter) return "";
+  const match = frontmatter.match(/^status:\s*["']?([^"'\n]+)["']?\s*$/m);
+  return match ? match[1].trim() : "";
 }
 
 function listSprintFiles(sprintsDir, { readdir = fs.readdirSync, fileExists = fs.existsSync } = {}) {
@@ -118,6 +131,9 @@ function findDrift(sprintFiles, charterObjectives, { readFile = fs.readFileSync 
   const drift = [];
   for (const file of sprintFiles) {
     const content = readFile(file, "utf-8");
+    // Completed sprints are immutable history; their references may point at
+    // since-retired charter IDs without constituting drift.
+    if (parseSprintStatus(content) === "completed") continue;
     const ids = parseSprintObjectives(content);
     const missing = [];
     const deferred = [];
@@ -222,6 +238,7 @@ module.exports = {
   parseSprintObjectives,
   hasObjectivesField,
   parseCharterObjectives,
+  parseSprintStatus,
   resolveCharterPath,
   listSprintFiles,
   findDrift,

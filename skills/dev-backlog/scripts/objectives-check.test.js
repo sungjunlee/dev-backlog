@@ -119,6 +119,19 @@ describe("parseCharterObjectives", () => {
   it("returns empty map when no objectives lines present", () => {
     assert.equal(parseCharterObjectives("# Charter\n\nNo objectives here.").size, 0);
   });
+
+  it("accepts status-free objective lines as targetable", () => {
+    const map = parseCharterObjectives(
+      "- O10 — GitHub Issues are the standalone authority.\n- O6 [deferred] later\n",
+    );
+    assert.equal(map.get("O10"), "listed");
+    assert.equal(map.get("O6"), "deferred");
+    assert.equal(map.size, 2);
+  });
+
+  it("does not match malformed IDs like O10x", () => {
+    assert.equal(parseCharterObjectives("- O10x broken line\n").size, 0);
+  });
 });
 
 describe("listSprintFiles", () => {
@@ -149,6 +162,19 @@ describe("findDrift", () => {
       readFile: () => "---\nobjectives: [O8]\n---\n",
     });
     assert.deepEqual(drift, []);
+  });
+
+  it("skips completed sprints referencing retired IDs", () => {
+    const charterObjectives = parseCharterObjectives("- O10 — current predicate\n");
+    const drift = findDrift(["completed.md", "active.md"], charterObjectives, {
+      readFile: (file) =>
+        file === "completed.md"
+          ? "---\nstatus: completed\nobjectives: [O8, O9]\n---\n"
+          : "---\nstatus: active\nobjectives: [O99]\n---\n",
+    });
+    assert.equal(drift.length, 1);
+    assert.equal(drift[0].sprintFile, "active.md");
+    assert.deepEqual(drift[0].missing, ["O99"]);
   });
 
   it("detects missing and deferred references per sprint", () => {
