@@ -16,7 +16,7 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 ## Plan
 
 ### Batch 1 — Deadline-bound gate amendment
-- [ ] #364 Amend the historical-retrieval-shadow gates before the 2026-08-28 decision (1d)
+- [x] #364 Amend the historical-retrieval-shadow gates before the 2026-08-28 decision (1d) → commit 5a1e8ce (direct to main)
 
 ### Batch 2 — O3 resolution
 - [ ] #363 Resolve charter O3 this cycle: measured on-track drill or demote into the O5 reassess loop (2d)
@@ -33,3 +33,4 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 
 ## Progress
 - 2026-08-16: Sprint opened from triage report 2026-08-16. Milestone 20 created; #363/#364/#367 assigned. Doctor clean at open (mixed-axis disjoint from the #350 wait track).
+- 2026-08-16: Batch 1 complete. #364 shadow-gate amendments A1 (auto no-go under 10 organic) + A2 (marginal recall/error over Arm B replaces the 20%-faster bar) landed in commit 5a1e8ce, direct to main per the narrow-scope direct-fix pattern; both node suites 0 fail, smoke 190/190. Pre-registration notice posted on #350; issue #364 closed. Sprint-adjacent: #361 dated capture plan posted + standing nudge added to `_context.md` (0/10, first-entry math means a 2026-08-28 go is already impossible — realistic paths are a ≤2026-09-11 decision or A1 auto no-go). Next: Batch 2 (#363 O3 resolution — Option A drill preferred).

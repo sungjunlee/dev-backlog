@@ -21,6 +21,10 @@
 - No `skills/` file may carry an unconditional required-read of a cross-repo `../spec-charter/references/` path — it dangles for adopters without craftkit. Consumption-side spec degradation lives in the in-bundle `references/spec-fallback.md`; craftkit's `spec-charter` is the when-installed authoring home. `smoke-test.sh` GATE_A2A3 enforces this (2026-07 adoption-hardening, #254/#255)
 - Sprint spec fields are optional: `sprint-init.js` omits `objectives:`/`component:` when the backing spec file is absent; `backlog-doctor` soft-warns only when the ACTIVE sprint drops a field while its spec exists. Existing `objectives: []`/`component: ""` stay valid (no migration) (#258)
 
+## Standing Nudges
+
+- Until #350 decides (window 2026-08-28 → 2026-09-11): any REAL historical question answered during work must be logged at that moment as a JSONL comment on #350 (shape: `docs/historical-retrieval-shadow.md` §Organic shadow log; IDs O-001↑). Benchmark reruns don't count; entries cannot be backfilled or manufactured (amendment A1). #361 tracks the count — 0/10 as of 2026-08-16. Remove this section when #350 closes.
+
 ## Known Gotchas
 
 - Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision; it does not refresh a task mirror. Rollback/diagnostic export is explicit via `sync-pull.js --legacy-export --update`: it refreshes task frontmatter and, for machine-managed issues whose **incoming GitHub body** starts with the `<!-- dev-backlog:progress-issue month=` marker, also refreshes the markdown body; every other exported mirror keeps its existing body.
