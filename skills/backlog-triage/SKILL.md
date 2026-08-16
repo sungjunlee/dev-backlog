@@ -143,6 +143,12 @@ Model-judged actions (`--model-actions`) are a JSON array of action objects. Sec
 ]
 ```
 
+Judgment guardrails (wire-valid is not enough — 2026-08-16 conformance run, #374):
+
+- Issues whose bodies declare mutual exclusivity (paired decision branches) must not both receive milestone or priority scheduling — propose at most relationship edges and leave both unscheduled until their deciding gate resolves.
+- An existing milestone that is active or explicitly wait-gated is closed to new scope: never propose `assign-milestone` into it; cluster new work under a new candidate sprint name.
+- Edge direction: `A blocks B` = B cannot proceed until A resolves; `A depends-on B` = A cannot proceed until B resolves. The kinds are inverses — emit one edge per fact, in the direction the evidence phrase states (`references/relationships.md`).
+
 Useful scripts:
 
 - `scripts/triage-collect.js [--repo OWNER/REPO] [--limit N] [--json] [--dry-run] [--with-comments] [--with-closed-issues]` — fetch open issues and write `backlog/triage/.cache/<ISO-timestamp>.json`; `--with-comments` hydrates comment bodies and `--with-closed-issues` enriches the snapshot with recent closed issues for the model's duplicate judgment, see `references/classification.md`.

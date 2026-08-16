@@ -76,6 +76,14 @@ Blocking, dependency, and duplication require reading issue intent, so they are 
 
 `args.kind` must be one of the script's deterministic kinds plus the semantic kinds below; `triage-report.js` rejects unknown kinds.
 
+Direction convention (fixed 2026-08-16 after the cross-model conformance run
+observed opposite conventions for the same fact): `A blocks B` (`from: A`,
+`to: B`) means B cannot proceed until A resolves; `A depends-on B` means A
+cannot proceed until B resolves. The two kinds are inverses — emit exactly one
+edge per underlying fact, choosing the kind and direction that match the
+evidence phrase (`Blocks #N` → `blocks`; `blocked by #N` / `depends on #N` →
+`depends-on`). Never emit both an edge and its inverse.
+
 ### `blocks`
 
 - Read `issue.body` and comment bodies for explicit statements that issue X blocks issue Y, or closes it once completed.
