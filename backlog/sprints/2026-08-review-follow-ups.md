@@ -19,7 +19,7 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 - [x] #364 Amend the historical-retrieval-shadow gates before the 2026-08-28 decision (1d) → commit 5a1e8ce (direct to main)
 
 ### Batch 2 — O3 resolution
-- [~] #363 Resolve charter O3 this cycle: measured on-track drill or demote into the O5 reassess loop (2d) [evidence:docs/o3-drill-2026-08-16.md] — drill done, awaiting human-gated charter amend
+- [x] #363 Resolve charter O3 this cycle: measured on-track drill or demote into the O5 reassess loop (2d) [evidence:docs/o3-drill-2026-08-16.md] → charter rev 14 (O3 implemented, user-approved 2026-08-16)
 
 ### Batch 3 — Conformance net
 - [ ] #367 SKILL.md conformance suite: periodic fresh-session evals on Claude and Codex + doc-drift check (3d)
@@ -35,3 +35,4 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 - 2026-08-16: Sprint opened from triage report 2026-08-16. Milestone 20 created; #363/#364/#367 assigned. Doctor clean at open (mixed-axis disjoint from the #350 wait track).
 - 2026-08-16: Batch 1 complete. #364 shadow-gate amendments A1 (auto no-go under 10 organic) + A2 (marginal recall/error over Arm B replaces the 20%-faster bar) landed in commit 5a1e8ce, direct to main per the narrow-scope direct-fix pattern; both node suites 0 fail, smoke 190/190. Pre-registration notice posted on #350; issue #364 closed. Sprint-adjacent: #361 dated capture plan posted + standing nudge added to `_context.md` (0/10, first-entry math means a 2026-08-28 go is already impossible — realistic paths are a ≤2026-09-11 decision or A1 auto no-go). Next: Batch 2 (#363 O3 resolution — Option A drill preferred).
 - 2026-08-16: Batch 2 drill executed (#363 Option A). 5 consumer repos timed: median 4.8 s agent wall-clock, worst 7.5 s — 5-minute bar holds by two orders of magnitude where the O-predicate axis exists (4/5 assessable; sjlee-ops prose charter is structurally out of the method's denominator). Bonus finding: dear-scene has a 25-day stale-active m5 sprint. Evidence: `docs/o3-drill-2026-08-16.md`. Proposed O3 active → implemented amend posted on #363; charter untouched pending the human gate. #363 stays `[~]` until the amend decision.
+- 2026-08-16: User approved the O3 amend ("권장대로 진행") — charter rev 13 → 14: O3 `[active]` → `[implemented]` with the drill as proof and the spec-charter-axis denominator; Decisions row appended (human gate satisfied by explicit approval). #363 closed. Batch 2 complete. Next: Batch 3 (#367) starting with the deterministic doc-drift check, fresh-session evals after.

@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-08-15
-revision: 13
+last_amended: 2026-08-16
+revision: 14
 ---
 
 # dev-backlog Charter
@@ -41,7 +41,7 @@ ecosystem — 17 consumer repos other than this one, 18 known consumers counting
 it (as of 2026-07-28); each objective cites its own denominator. None of it is
 independent external-team adoption.
 - O1 [validated] For complex work admitted to a sprint, Claude Code, Codex, and humans read the same active sprint file as the single execution-continuity state · src: user (adoption 2026-07-27: 146 sprints across 17 repos other than this one)
-- O3 [active]    A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user
+- O3 [implemented] A user can answer "is this project still on track?" in under 5 minutes against a stable per-project reference axis (`spec/charter.md`) · src: user (proof: agent-run timed drill 2026-08-16, `docs/o3-drill-2026-08-16.md` — median 4.8 s / worst 7.5 s agent wall-clock, ≈1–2 min human-scaled estimate; denominator: 5 drilled of 6 local consumer repos carrying `spec/charter.md`, 4/5 assessable — prose-charter repos without the O-predicate axis are outside the method. Path to `[validated]`: the drill recurs at ≥2 dated reassess reports or one human-run end-to-end confirmation)
 - O4 [validated] Open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage · src: user (proof: backlog-doctor PR #226 + sprint-close signal PR #229; live automatic catches 2026-07-03/04 — deferred-O5 objective reference at sprint open, unmoored `[~]` signals at close; adoption 2026-07-27: `backlog/triage/` reports in 7 repos other than this one)
 - O5 [validated] Closing a sprint runs `backlog-doctor`; when doctor emits warnings or 3+ sprints have closed since the last dated reassess report (`backlog/triage/YYYY-MM-DD-reassess.md`), the close summary recommends `spec-charter reassess`. Report-only: unattended sessions may run reassess but never amend · src: user (proof: first full cycle 2026-07-04 — close signal → `backlog/triage/2026-07-04-reassess.md` → human-gated amend revision 5; adoption 2026-07-27: dated reassess reports in 3 repos other than this one — survival-alpha, beopsuny-skill, aibris)
 - O6 [deferred]  `/goal` completion-condition auto-emission from `spec/charter.md` + active sprint — deferred to a follow-up spec
@@ -70,3 +70,4 @@ independent external-team adoption.
 | 2026-07-31 | GitHub Issues become the sole task-definition/lifecycle authority; sprints are admitted by execution complexity, while tracker generalization and task mirrors leave the target product boundary | measured adoption found 0 of 17 consumers selecting a non-default tracker and all 18 known consumers on GitHub; preserving unused generality would prolong dual-state and compatibility cost without user evidence. O8/O9 cease to direct product work but remain implemented historical IDs so completed sprint references still resolve | 2026-07-11 configured-tracker direction; 2026-07-28 O8 retention |
 | 2026-07-31 | Remove the zero-adopter local tracker; retain Backlog.md only as explicit one-way legacy import/export | mirrorless GitHub execution covers create/read/update/close and sprint continuity without task directories or optional ecosystem tools, so the unused local substrate has no remaining product or portability invariant | 2026-07-26 local JSON authority decision |
 | 2026-07-31 | Relay, Matt Pocock skills, GitHub Projects, Backlog.md compatibility, and retrieval/memory experiments remain optional projections or techniques | the standalone Issue → PR and complex-sprint paths must survive without ecosystem dependencies; projections cannot acquire write authority, and memory requires a separate measured gate | — |
+| 2026-08-16 | O3 moves `[active]` → `[implemented]` on the 2026-08-16 timed drill; its denominator is consumer repos carrying a spec-charter-format predicate axis | agent-run drill across 5 consumer repos (#363 Option A): median 4.8 s wall-clock, worst 7.5 s, 4/5 assessable — the one miss (sjlee-ops) has a prose charter with no O-predicate axis, making the axis format the method's precondition rather than a failure of the 5-minute bar; human gate satisfied by explicit user approval 2026-08-16 on the #363 proposal | — |
