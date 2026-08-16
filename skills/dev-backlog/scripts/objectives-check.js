@@ -29,6 +29,7 @@ const {
   resolveCharterPath,
 } = require("./spec-paths.js");
 const { toPortablePath } = require("./portable-path.js");
+const { parseSprintStatus } = require("./sprint-status.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
 
@@ -99,24 +100,30 @@ function hasObjectivesField(content) {
   return Boolean(frontmatter) && /^objectives:/m.test(frontmatter);
 }
 
+// Two explicit objective-line forms, nothing in between:
+//   legacy: `- O3 [active] predicate ...`  (known statuses only)
+//   lean:   `- O10 — predicate ...`        (status-free, em-dash separator)
+// Bare IDs (`- O10 prose`), unknown statuses (`- O10 [bogus]`), and malformed
+// spacing (`- O10 [deferred]later`) do not parse — a drift check must not
+// guess. IDs are never reused, so on a duplicate ID the first line wins;
+// a later contradictory line cannot silently flip e.g. deferred → targetable.
+const LEGACY_OBJECTIVE_RE = /^- (O\d+) \[(validated|active|implemented|deferred)\](?: |$)/;
+const LEAN_OBJECTIVE_RE = /^- (O\d+) — \S/;
+
 function parseCharterObjectives(content) {
   const objectives = new Map();
   const lines = content.split("\n");
   for (const line of lines) {
-    const match = line.match(
-      /^- (O\d+)(?: \[(validated|active|implemented|deferred)\])?(?:\s|$)/,
-    );
-    // A status-free line (`- O10 — ...`) is targetable; record it as "listed".
-    if (match) objectives.set(match[1], match[2] ?? "listed");
+    const legacy = line.match(LEGACY_OBJECTIVE_RE);
+    if (legacy) {
+      if (!objectives.has(legacy[1])) objectives.set(legacy[1], legacy[2]);
+      continue;
+    }
+    const lean = line.match(LEAN_OBJECTIVE_RE);
+    // A status-free lean line is targetable; record it as "listed".
+    if (lean && !objectives.has(lean[1])) objectives.set(lean[1], "listed");
   }
   return objectives;
-}
-
-function parseSprintStatus(content) {
-  const frontmatter = parseFrontmatter(content);
-  if (!frontmatter) return "";
-  const match = frontmatter.match(/^status:\s*["']?([^"'\n]+)["']?\s*$/m);
-  return match ? match[1].trim() : "";
 }
 
 function listSprintFiles(sprintsDir, { readdir = fs.readdirSync, fileExists = fs.existsSync } = {}) {

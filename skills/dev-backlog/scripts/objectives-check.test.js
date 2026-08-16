@@ -132,6 +132,24 @@ describe("parseCharterObjectives", () => {
   it("does not match malformed IDs like O10x", () => {
     assert.equal(parseCharterObjectives("- O10x broken line\n").size, 0);
   });
+
+  it("rejects bare prose, unknown statuses, malformed spacing, and indentation", () => {
+    const map = parseCharterObjectives(
+      [
+        "- O11 prose without a separator",
+        "- O12 [bogus] unknown status",
+        "- O13 [deferred]later missing space",
+        "  - O14 — indented line",
+        "- O15 — ",
+      ].join("\n"),
+    );
+    assert.equal(map.size, 0);
+  });
+
+  it("keeps the first occurrence on duplicate IDs", () => {
+    const map = parseCharterObjectives("- O5 [deferred] first\n- O5 [active] second\n");
+    assert.equal(map.get("O5"), "deferred");
+  });
 });
 
 describe("listSprintFiles", () => {

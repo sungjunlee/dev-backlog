@@ -46,6 +46,23 @@ it("keeps the living charter status-free with history externalized", () => {
   assert.match(charter, /docs\/spec-history\.md/);
 });
 
+it("archives the moved spec history without content loss", () => {
+  const specHistory = fs.readFileSync(path.join(ROOT, "docs/spec-history.md"), "utf8");
+
+  // Retired backlog-sync block survives verbatim, not as a summary.
+  assert.match(specHistory, /^## Capability: backlog-sync$/m);
+  assert.match(specHistory, /refuses before provider access or task-file materialization/);
+  assert.match(specHistory, /byte-identical task files on the second run/);
+  assert.match(specHistory, /<!-- dev-backlog:progress-issue month= -->/);
+  assert.match(specHistory, /`sprint-mirror` is removed/);
+
+  // Rev-14 objective texts (with statuses/proofs) and retired IDs survive.
+  for (const id of ["O1", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10"]) {
+    assert.match(specHistory, new RegExp(`^- ${id} \\[`, "m"));
+  }
+  assert.match(specHistory, /docs\/o3-drill-2026-08-16\.md/);
+});
+
 it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {
   const markdown = fs.readFileSync(
     path.join(ROOT, "skills/dev-backlog/references/integration-contract.md"),

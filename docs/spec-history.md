@@ -66,16 +66,44 @@ direction predicates in the living charter. Objective IDs are never reused.
 | 2026-07-31 | Relay, Matt Pocock skills, GitHub Projects, Backlog.md compatibility, and retrieval/memory experiments remain optional projections or techniques | the standalone Issue → PR and complex-sprint paths must survive without ecosystem dependencies; projections cannot acquire write authority, and memory requires a separate measured gate | — |
 | 2026-08-16 | O3 moves `[active]` → `[implemented]` on the 2026-08-16 timed drill; its denominator is consumer repos carrying a spec-charter-format predicate axis | agent-run drill across 5 consumer repos (#363 Option A): median 4.8 s wall-clock, worst 7.5 s, 4/5 assessable — the one miss (consumer-C) has a prose charter with no O-predicate axis, making the axis format the method's precondition rather than a failure of the 5-minute bar; human gate satisfied by explicit user approval 2026-08-16 on the #363 proposal | — |
 
-## Retired capability: backlog-sync
+## Retired capability: backlog-sync — final block, verbatim
 
 Removed as a standalone capability on 2026-08-16; the surviving contract — the
 explicit one-way `sync-pull --legacy-export` diagnostic/rollback surface and
 the "human-authored provider content is untouchable" bright line — was absorbed
-into `tracker-task-truth`. Full final block text: commit
-[`4fea158`](https://github.com/sungjunlee/dev-backlog/blob/4fea158/spec/capabilities.md).
+into `tracker-task-truth`. The complete final block follows verbatim.
 
-### Decisions (moved)
+## Capability: backlog-sync
 
+**Goal:** Legacy task projections remain safe and read-only while live GitHub task resolution replaces them; no projection gains independent write authority.
+
+**In-scope:**
+- `sync-pull.js --legacy-export` (with and without `--update`), task-file frontmatter, and adapter-provided task identity
+- AC checkbox preservation in task bodies for non-machine-managed issues
+- Idempotent re-runs in both directions against unchanged state
+
+**Out-of-scope:**
+- Canonical task ownership and lifecycle (`tracker-task-truth` capability)
+- Writing to human-authored provider content (task bodies without a dev-backlog machine marker, comments, labels, state)
+- Publishing sprint or progress state to the provider — removed 2026-07-28; the sprint file is the shared read surface
+- Cross-repo mirroring
+- New mirror features or bidirectional compatibility work
+
+### Expected Behaviors
+- `sync-pull` without `--legacy-export` refuses before provider access or task-file materialization.
+- `sync-pull --legacy-export` on a fresh checkout produces `backlog/tasks/*.md` with no token prompt beyond `gh auth` already being valid.
+- `sync-pull --legacy-export --update` refreshes frontmatter while leaving AC checkbox state intact, **except** for issues whose incoming body starts with the `<!-- dev-backlog:progress-issue month= -->` marker — those are intentionally overwritten because their bodies are machine-managed.
+- Running `sync-pull --legacy-export` twice against unchanged GitHub state produces byte-identical task files on the second run.
+
+### Hard Constraints
+- Never write to human-authored provider content: task bodies without a dev-backlog machine marker, comments, labels, and issue state are untouchable.
+- Never overwrite a non-machine-managed task body during `--update`; only frontmatter is replaced.
+- Never read a task projection as authority, dual-write task state, or make a mirror required for the core Issue → PR or complex-sprint path.
+
+### Learnings
+(empty at retirement — no entries between the markers)
+
+### Decisions
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-05-23 | `--update` preserves AC bodies for everything except machine-managed `progress-issue` markers | local AC checkboxes are user state; machine-managed bodies have no user state to lose | — |

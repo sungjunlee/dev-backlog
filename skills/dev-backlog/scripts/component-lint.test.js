@@ -215,7 +215,7 @@ describe("findIssues", () => {
     const issues = findIssues(["completed.md", "active.md"], declared, {
       readFile: (file) =>
         file === "completed.md"
-          ? "---\nstatus: completed\ncomponent: retired-cap\n---\n"
+          ? '---\nstatus: "completed" # closed 2026-07\ncomponent: retired-cap\n---\n'
           : "---\nstatus: active\ncomponent: typo-cap\n---\n",
     });
     assert.equal(issues.length, 1);

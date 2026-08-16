@@ -27,6 +27,7 @@
 const fs = require("fs");
 const path = require("path");
 const { toPortablePath } = require("./portable-path.js");
+const { parseSprintStatus } = require("./sprint-status.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
 const DEFAULT_CAPABILITIES_PATH = path.join("spec", "capabilities.md");
@@ -151,13 +152,6 @@ function findIssues(sprintFiles, declared, { readFile = fs.readFileSync } = {}) 
     issues.push({ sprintFile: file, components, unknown: errors, invalid });
   }
   return issues;
-}
-
-function parseSprintStatus(content) {
-  const frontmatter = parseFrontmatter(content);
-  if (!frontmatter) return "";
-  const match = frontmatter.match(/^status:\s*["']?([^"'\n]+)["']?\s*$/m);
-  return match ? match[1].trim() : "";
 }
 
 function countSprintRouting(sprintFiles, { readFile = fs.readFileSync } = {}) {
