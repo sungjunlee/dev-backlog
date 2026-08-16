@@ -1,0 +1,324 @@
+[
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 361,
+    "args": {
+      "value": "high",
+      "reason": "Body calls it the only load-bearing task in the repo right now: the #350 organic question log is 0/10 at the halfway mark and the first entry must land by ~2026-08-28 or #350 cannot decide inside its own window (depends-on edge 350->361)"
+    },
+    "summary": "Set priority:high on #361 \u2014 load-bearing #350 log; 0/10 at halfway, first entry due ~2026-08-28",
+    "evidence": "Explicit load-bearing callout, decision-window deadline, participates in depends-on edge from #350"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 364,
+    "args": {
+      "value": "high",
+      "reason": "Gate defects (thin-data auto no-go, trivially-passable latency bar) must be amended before the 2026-08-28 #350 decision, not after \u2014 otherwise the decision is structurally invalid or goodharted (blocks edge 364->350)"
+    },
+    "summary": "Set priority:high on #364 \u2014 shadow-gate amendments must land before the 2026-08-28 #350 decision",
+    "evidence": "Explicit pre-decision deadline, participates in blocks edge to #350, pre-registered-amendment framing"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 370,
+    "args": {
+      "value": "high",
+      "reason": "Cut v0.10.0 now for shipped-but-untagged contract changes since v0.9.0 (mirrorless default #347/#353, GitHub-only tracker #348/#354, effective-spec resolver #352, triage judgment-to-prompt #358); v1.0.0 reserved for the #350 decision bundle per the milestone ritual"
+    },
+    "summary": "Set priority:high on #370 \u2014 cut v0.10.0 now for the shipped simplification wave",
+    "evidence": "Explicit now instruction, release hygiene for untagged shipped changes, review ranked next move #3"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 371,
+    "args": {
+      "value": "medium",
+      "reason": "Owed O5 reassess at the current sprint close hits the 3-close threshold exactly; report-only but must not drift \u2014 it consumes #363 and #368 as pending checkpoint inputs plus the reassess-input methodology fix"
+    },
+    "summary": "Set priority:medium on #371 \u2014 owed 3-close O5 reassess at sprint close",
+    "evidence": "Standing obligation with exact threshold, depends-on edges from #371 to #363/#368"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 363,
+    "args": {
+      "value": "medium",
+      "reason": "Zombie O3 objective flagged [HIGH] independently by the direction/strategy review and the Codex second opinion; must be resolved this cycle either way (timed drill or demote into O5) as an input to the sprint-close reassess"
+    },
+    "summary": "Set priority:medium on #363 \u2014 resolve zombie O3 this cycle (measure or demote)",
+    "evidence": "Flagged independently by both review streams, required input to #371 reassess"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 366,
+    "args": {
+      "value": "medium",
+      "reason": "Mirrorless pilot proved fail-loud correctness but not resilience; no contract for rate-limit budgets, auth expiry, or partial outage across orient/work/triage \u2014 CodeRabbit rate-limited 3x during #360 makes external limits a real operating condition"
+    },
+    "summary": "Set priority:medium on #366 \u2014 GitHub resilience acceptance matrix + operator runbook",
+    "evidence": "Empirical rate-limit nudge, core GitHub-native authority path, review recommendation #1"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 367,
+    "args": {
+      "value": "medium",
+      "reason": "Triage judgment moved to prompt guidance in #358, so deterministic tests cannot catch model-conformance drift; a periodic fresh-session conformance suite plus doc-drift check closes the judgment-omission gap"
+    },
+    "summary": "Set priority:medium on #367 \u2014 fresh-session conformance suite + doc-drift check",
+    "evidence": "Model-variance risk named in review blind-spot list; verifies this pipeline's own judgment layer"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 372,
+    "args": {
+      "value": "medium",
+      "reason": "Unsupported suggested_action values silently drop stale candidates from the report with no warning \u2014 a silent data-loss path that violates the repo fail-loud posture; small scoped fix in validateStaleResult"
+    },
+    "summary": "Set priority:medium on #372 \u2014 warn on dropped stale candidates, restore fail-loud",
+    "evidence": "Repo fail-loud posture; negligible impact today but silent drop violates it"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 369,
+    "args": {
+      "value": "medium",
+      "reason": "External-adoption goal is undecided while the 430-line README/badge/CI surface is sized for external adopters; bus-factor 1 across design, release, and consumer knowledge ([HIGH] concern) \u2014 decide goal or right-size the public surface and record it"
+    },
+    "summary": "Set priority:medium on #369 \u2014 decide external-adoption goal or right-size public surface",
+    "evidence": "HIGH-flagged bus-factor and surface mismatch, decision shapes charter posture"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 368,
+    "args": {
+      "value": "medium",
+      "reason": "Multi-track sits implemented-not-validated with only dogfood evidence; the adoption checkpoint is a required input to the #371 reassess at this sprint close and applies the same evidence-gate that killed local"
+    },
+    "summary": "Set priority:medium on #368 \u2014 multi-track adoption checkpoint at next reassess",
+    "evidence": "Required input to #371, applies validated-bar vocabulary from charter"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 373,
+    "args": {
+      "value": "low",
+      "reason": "Human-gated documentation residue deliberately excluded from #360; no timing pressure \u2014 decide local-era Learning clause trimming and the O1 wording clarification, record the choice"
+    },
+    "summary": "Set priority:low on #373 \u2014 spec-surface human-gated residues",
+    "evidence": "Deliberately deferred from #360, doc-only, both options defensible"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 361,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "shadow-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #361 \u2014 organic log must be live before the 2026-08-28 #350 decision",
+    "evidence": "First entry due ~2026-08-28, inside the decision window"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 362,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "shadow-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #362 \u2014 no-go closeout executes at the #350 decision (milestone 19 close, v1.0.0, sprint close)",
+    "evidence": "Checklist executes the milestone closeout itself at decision time"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 364,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "shadow-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #364 \u2014 gate amendment is a pre-decision prerequisite for the 2026-08-28 decision",
+    "evidence": "Explicit before-the-decision deadline inside this milestone window"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 365,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "shadow-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #365 \u2014 go-branch proposal executes at the #350 decision",
+    "evidence": "Entry point for project memory gated on the in-window #350 decision"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 370,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "shadow-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #370 \u2014 v0.10.0 cut now; v1.0.0 reserved for the milestone-close bundle",
+    "evidence": "v1.0.0 explicitly reserved for #350 decision + milestone 19 close ritual"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 363,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "sprint-close-reassess",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #363 \u2014 O3 resolution this cycle feeds the sprint-close reassess",
+    "evidence": "Required checkpoint input to #371, resolve it this cycle"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 368,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "sprint-close-reassess",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #368 \u2014 adoption checkpoint runs at the next reassess (this sprint close)",
+    "evidence": "Checkpoint scheduled at the current sprint close per body"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 371,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "sprint-close-reassess",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #371 \u2014 owed O5 reassess at this sprint close (3-close threshold)",
+    "evidence": "Owed at the current sprint close, which is this milestone's close"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 350,
+      "to": 361,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "or the epic cannot decide inside its own window",
+        "snippet": "With the 2-week span requirement, the first entry must land by ~2026-08-28 or the epic cannot decide inside its own window"
+      }
+    },
+    "summary": "Depends-on edge 350 -> 361 \u2014 #350 decision requires the \u226510-entry organic question log"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 364,
+      "to": 350,
+      "kind": "blocks",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "should be amended before the 2026-08-28 decision",
+        "snippet": "Two gate defects in docs/historical-retrieval-shadow.md should be amended before the 2026-08-28 decision, not after"
+      }
+    },
+    "summary": "Blocks edge 364 -> 350 \u2014 gate amendments must precede the #350 decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 350,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "If the #350 shadow benchmark decision lands no-go",
+        "snippet": "If the #350 shadow benchmark decision lands no-go (Arm B suffices), execute a clean closeout"
+      }
+    },
+    "summary": "Depends-on edge 362 -> 350 \u2014 no-go closeout branch executes only after the #350 decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 365,
+      "to": 350,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "If the #350 shadow benchmark decision lands go",
+        "snippet": "If the #350 shadow benchmark decision lands go, this is the entry point for admitting project memory"
+      }
+    },
+    "summary": "Depends-on edge 365 -> 350 \u2014 go-branch proposal executes only after the #350 decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 370,
+      "to": 350,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "Reserve v1.0.0 for the bundled ritual: #350 decision",
+        "snippet": "Reserve v1.0.0 for the bundled ritual: #350 decision + milestone 19 close + O5 reassess + sprint close"
+      }
+    },
+    "summary": "Depends-on edge 370 -> 350 \u2014 v1.0.0 cut waits for the #350 decision bundle"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 371,
+      "to": 363,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "O3 resolution (separate issue)",
+        "snippet": "Feed the reassess the pending checkpoint items: O3 resolution (separate issue), multi-track adoption checkpoint (separate issue)"
+      }
+    },
+    "summary": "Depends-on edge 371 -> 363 \u2014 reassess consumes the O3 resolution as a checkpoint input"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 371,
+      "to": 368,
+      "kind": "depends-on",
+      "confidence": 1,
+      "evidence": {
+        "phrase": "multi-track adoption checkpoint (separate issue)",
+        "snippet": "Feed the reassess the pending checkpoint items: O3 resolution (separate issue), multi-track adoption checkpoint (separate issue)"
+      }
+    },
+    "summary": "Depends-on edge 371 -> 368 \u2014 reassess consumes the multi-track adoption checkpoint"
+  }
+]

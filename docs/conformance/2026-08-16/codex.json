@@ -1,0 +1,289 @@
+[
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 361,
+      "to": 350,
+      "kind": "blocks",
+      "evidence": {
+        "phrase": "the first entry must land by ~2026-08-28 or the epic cannot decide inside its own window"
+      }
+    },
+    "summary": "Blocks edge 361 -> 350 - the organic-question log is required for an in-window decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": {
+        "phrase": "If the #350 shadow benchmark decision lands no-go"
+      }
+    },
+    "summary": "Depends-on edge 362 -> 350 - the no-compiler closeout is gated by the #350 no-go decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 364,
+      "to": 350,
+      "kind": "blocks",
+      "evidence": {
+        "phrase": "should be amended before the 2026-08-28 decision, not after"
+      }
+    },
+    "summary": "Blocks edge 364 -> 350 - the benchmark gates must be amended before the decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 365,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": {
+        "phrase": "If the #350 shadow benchmark decision lands go"
+      }
+    },
+    "summary": "Depends-on edge 365 -> 350 - project-memory admission is gated by the #350 go decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 370,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": {
+        "phrase": "Reserve v1.0.0 for the bundled ritual: #350 decision + milestone 19 close + O5 reassess + sprint close"
+      }
+    },
+    "summary": "Depends-on edge 370 -> 350 - the v1.0.0 release bundle waits for the #350 decision"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 361,
+    "args": {
+      "value": "high",
+      "reason": "The first organic entry is due around 2026-08-28, and missing it prevents #350 from deciding within its measurement window."
+    },
+    "summary": "Set priority:high on #361 - time-critical, load-bearing input to the #350 decision"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 363,
+    "args": {
+      "value": "high",
+      "reason": "O3 has remained active for months without a proof plan or owning sprint, and two independent reviews flagged the unresolved objective."
+    },
+    "summary": "Set priority:high on #363 - resolve the long-running proof-free O3 objective this cycle"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 364,
+    "args": {
+      "value": "high",
+      "reason": "Both gate defects must be pre-registered before the 2026-08-28 decision to prevent thin-data and trivially-passable criteria from invalidating the benchmark."
+    },
+    "summary": "Set priority:high on #364 - repair benchmark gates before the fixed decision date"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 366,
+    "args": {
+      "value": "medium",
+      "reason": "GitHub-backed paths have correctness coverage but no tested failure contract for rate limits, expired authentication, or partial outages."
+    },
+    "summary": "Set priority:medium on #366 - close the documented resilience gap in gh-backed paths"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 367,
+    "args": {
+      "value": "medium",
+      "reason": "Prompt-owned triage judgment is not covered by deterministic tests, and recent cleanup found agent-facing documentation drifting behind deleted scripts."
+    },
+    "summary": "Set priority:medium on #367 - add cross-model conformance and documentation-drift coverage"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 369,
+    "args": {
+      "value": "high",
+      "reason": "The project presents an external-adopter-sized public surface without any external validation, leaving a high-rated strategic goal and bus-factor decision unresolved."
+    },
+    "summary": "Set priority:high on #369 - decide whether external adoption is a real project goal"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 370,
+    "args": {
+      "value": "high",
+      "reason": "Multiple shipped contract changes remain untagged since v0.9.0, while the issue explicitly calls for cutting v0.10.0 now."
+    },
+    "summary": "Set priority:high on #370 - release the already-shipped simplification wave now"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 371,
+    "args": {
+      "value": "high",
+      "reason": "Closing the current sprint reaches the O5 three-close threshold exactly, so the reassess is owed as part of that close."
+    },
+    "summary": "Set priority:high on #371 - perform the threshold-triggered O5 reassess at sprint close"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 372,
+    "args": {
+      "value": "low",
+      "reason": "The silent-drop behavior violates fail-loud policy, but the body states its current impact is negligible because stale JSON is a transient same-run intermediate."
+    },
+    "summary": "Set priority:low on #372 - preserve fail-loud behavior for a currently negligible edge case"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 361,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "350-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #361 - required evidence collection for the remaining #350 decision"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 362,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "350-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #362 - prepared no-go closeout for the current milestone"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 364,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "350-decision",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #364 - pre-decision gate amendment for #350"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 370,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "release-closeout",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #370 - release work tied to the simplification wave and #350 closeout bundle"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 371,
+    "args": {
+      "name": "2026-08 GitHub-native core simplification"
+    },
+    "cluster": "release-closeout",
+    "sprintName": "2026-08 GitHub-native core simplification",
+    "summary": "Assign 2026-08 GitHub-native core simplification to #371 - O5 reassess is due when the current sprint closes"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 363,
+    "args": {
+      "name": "2026-09 Charter evidence and adoption"
+    },
+    "cluster": "charter-evidence",
+    "sprintName": "2026-09 Charter evidence and adoption",
+    "summary": "Assign 2026-09 Charter evidence and adoption to #363 - resolve O3 with measurement or an explicit charter decision"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 368,
+    "args": {
+      "name": "2026-09 Charter evidence and adoption"
+    },
+    "cluster": "charter-evidence",
+    "sprintName": "2026-09 Charter evidence and adoption",
+    "summary": "Assign 2026-09 Charter evidence and adoption to #368 - next-reassess multi-track adoption checkpoint"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 369,
+    "args": {
+      "name": "2026-09 Charter evidence and adoption"
+    },
+    "cluster": "charter-evidence",
+    "sprintName": "2026-09 Charter evidence and adoption",
+    "summary": "Assign 2026-09 Charter evidence and adoption to #369 - decide and test or right-size the external-adoption goal"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 373,
+    "args": {
+      "name": "2026-09 Charter evidence and adoption"
+    },
+    "cluster": "charter-residue",
+    "sprintName": "2026-09 Charter evidence and adoption",
+    "summary": "Assign 2026-09 Charter evidence and adoption to #373 - resolve remaining human-gated spec and wording decisions"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 366,
+    "args": {
+      "name": "2026-09 GitHub-path reliability"
+    },
+    "cluster": "runtime-resilience",
+    "sprintName": "2026-09 GitHub-path reliability",
+    "summary": "Assign 2026-09 GitHub-path reliability to #366 - acceptance coverage and runbooks for gh failure modes"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 367,
+    "args": {
+      "name": "2026-09 GitHub-path reliability"
+    },
+    "cluster": "conformance",
+    "sprintName": "2026-09 GitHub-path reliability",
+    "summary": "Assign 2026-09 GitHub-path reliability to #367 - cross-model contract and documentation conformance"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 372,
+    "args": {
+      "name": "2026-09 GitHub-path reliability"
+    },
+    "cluster": "fail-loud",
+    "sprintName": "2026-09 GitHub-path reliability",
+    "summary": "Assign 2026-09 GitHub-path reliability to #372 - eliminate a silent failure in triage reporting"
+  }
+]

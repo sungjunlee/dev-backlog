@@ -1,0 +1,176 @@
+[
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 361, "to": 350, "kind": "blocks", "evidence": { "phrase": "the first entry must land by ~2026-08-28 or the epic cannot decide inside its own window" } },
+    "summary": "Blocks edge 361 -> 350 — the organic-log deadline gates whether #350 can decide inside its own window"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 364, "to": 350, "kind": "blocks", "evidence": { "phrase": "should be amended before the 2026-08-28 decision, not after" } },
+    "summary": "Blocks edge 364 -> 350 — the gate-defect amendment must land before #350's decision, not after"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 362, "to": 350, "kind": "depends-on", "evidence": { "phrase": "If the #350 shadow benchmark decision lands no-go (Arm B suffices...), execute a clean closeout" } },
+    "summary": "Depends-on edge 362 -> 350 — the no-compiler closeout only executes if #350 resolves no-go"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 365, "to": 350, "kind": "depends-on", "evidence": { "phrase": "If the #350 shadow benchmark decision lands go..., this is the entry point for admitting project memory" } },
+    "summary": "Depends-on edge 365 -> 350 — the project-memory proposal only executes if #350 resolves go"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 370, "to": 350, "kind": "depends-on", "evidence": { "phrase": "Reserve v1.0.0 for the bundled ritual: #350 decision + milestone 19 close + O5 reassess + sprint close" } },
+    "summary": "Depends-on edge 370 -> 350 — the v1.0.0 tag is explicitly reserved for the #350 decision bundle"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 371, "to": 363, "kind": "depends-on", "evidence": { "phrase": "Feed the reassess the pending checkpoint items: O3 resolution (separate issue)" } },
+    "summary": "Depends-on edge 371 -> 363 — the O5 reassess explicitly needs the O3 resolution as an input"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": { "from": 371, "to": 368, "kind": "depends-on", "evidence": { "phrase": "multi-track adoption checkpoint (separate issue)" } },
+    "summary": "Depends-on edge 371 -> 368 — the O5 reassess explicitly needs the multi-track adoption checkpoint as an input"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 361,
+    "args": { "value": "high", "reason": "Body states this is \"the only load-bearing task in the repo right now\" and the first log entry must land by ~2026-08-28 or #350 cannot decide inside its own window." },
+    "summary": "Set priority:high on #361 — sole load-bearing task ahead of the #350 2026-08-28 decision window"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 364,
+    "args": { "value": "high", "reason": "Two gate defects (auto no-go on thin data, trivially-passable latency criterion) must be amended before the 2026-08-28 decision, not after, per the issue's own framing." },
+    "summary": "Set priority:high on #364 — gate amendment must land before the #350 2026-08-28 decision"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 363,
+    "args": { "value": "high", "reason": "Flagged independently by two 2026-08-15 reviews: direction/strategy review tags it \"[HIGH, \\\"zombie objective\\\", recommendation #1]\" and Codex second opinion raises it as its recommendation #3." },
+    "summary": "Set priority:high on #363 — flagged HIGH (\"zombie objective\") independently by two 2026-08-15 reviews"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 369,
+    "args": { "value": "high", "reason": "Direction/strategy review tags it \"[HIGH, concern #2 + recommendation #3]\"; Codex second opinion separately raises the bus-factor-1 risk as its recommendation #3." },
+    "summary": "Set priority:high on #369 — flagged HIGH (bus-factor-1 / external-adoption risk) by both reviews"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 368,
+    "args": { "value": "low", "reason": "Source review explicitly tags this \"[LOW, concern #5 + recommendation #6]\"." },
+    "summary": "Set priority:low on #368 — source review explicitly tags this concern LOW"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 372,
+    "args": { "value": "low", "reason": "Body states \"Impact is negligible today (stale JSON is a transient same-run intermediate)\" despite the fail-loud-posture concern." },
+    "summary": "Set priority:low on #372 — body states impact is negligible today"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 361,
+    "args": { "name": "2026-08-shadow-decision-readiness" },
+    "sprintName": "2026-08-shadow-decision-readiness",
+    "cluster": "350-shadow-decision",
+    "summary": "Assign 2026-08-shadow-decision-readiness to #361 — directly gates the #350 2026-08-28 decision window"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 364,
+    "args": { "name": "2026-08-shadow-decision-readiness" },
+    "sprintName": "2026-08-shadow-decision-readiness",
+    "cluster": "350-shadow-decision",
+    "summary": "Assign 2026-08-shadow-decision-readiness to #364 — gate amendment required before the #350 decision lands"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 363,
+    "args": { "name": "2026-08-charter-o3-o5-reassess" },
+    "sprintName": "2026-08-charter-o3-o5-reassess",
+    "cluster": "charter-reassess",
+    "summary": "Assign 2026-08-charter-o3-o5-reassess to #363 — O3 resolution is a named input to the owed O5 reassess"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 368,
+    "args": { "name": "2026-08-charter-o3-o5-reassess" },
+    "sprintName": "2026-08-charter-o3-o5-reassess",
+    "cluster": "charter-reassess",
+    "summary": "Assign 2026-08-charter-o3-o5-reassess to #368 — multi-track adoption checkpoint is a named input to the owed O5 reassess"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 371,
+    "args": { "name": "2026-08-charter-o3-o5-reassess" },
+    "sprintName": "2026-08-charter-o3-o5-reassess",
+    "cluster": "charter-reassess",
+    "summary": "Assign 2026-08-charter-o3-o5-reassess to #371 — the owed O5 reassess itself, due at the 3-close threshold"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 370,
+    "args": { "name": "2026-08-release-v0.10.0" },
+    "sprintName": "2026-08-release-v0.10.0",
+    "cluster": "release",
+    "summary": "Assign 2026-08-release-v0.10.0 to #370 — ships the accumulated simplification wave now, separate from the reserved v1.0.0 bundle"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 366,
+    "args": { "name": "2026-08-github-resilience-conformance" },
+    "sprintName": "2026-08-github-resilience-conformance",
+    "cluster": "quality",
+    "summary": "Assign 2026-08-github-resilience-conformance to #366 — Codex second opinion recommendation #1 from the same 2026-08-15 review"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 367,
+    "args": { "name": "2026-08-github-resilience-conformance" },
+    "sprintName": "2026-08-github-resilience-conformance",
+    "cluster": "quality",
+    "summary": "Assign 2026-08-github-resilience-conformance to #367 — Codex second opinion recommendation #2 from the same 2026-08-15 review"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 369,
+    "args": { "name": "2026-08-adoption-spec-residues" },
+    "sprintName": "2026-08-adoption-spec-residues",
+    "cluster": "human-gated-decisions",
+    "summary": "Assign 2026-08-adoption-spec-residues to #369 — human-gated external-adoption decision filed the same day"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 373,
+    "args": { "name": "2026-08-adoption-spec-residues" },
+    "sprintName": "2026-08-adoption-spec-residues",
+    "cluster": "human-gated-decisions",
+    "summary": "Assign 2026-08-adoption-spec-residues to #373 — human-gated spec residue decisions filed the same day"
+  }
+]

@@ -1,0 +1,368 @@
+[
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 361,
+      "to": 350,
+      "kind": "blocks",
+      "evidence": { "phrase": "requires **≥10 organic historical questions** logged as JSONL comments on #350 ... 0 entries at the halfway mark" }
+    },
+    "summary": "Blocks edge 361 -> 350 — the organic question log is the evidence gate #350 cannot decide without"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 364,
+      "to": 350,
+      "kind": "blocks",
+      "evidence": { "phrase": "Two gate defects ... should be amended **before** the 2026-08-28 decision, not after" }
+    },
+    "summary": "Blocks edge 364 -> 350 — gate amendments are pre-registered and must land before the #350 decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": { "phrase": "If the #350 shadow benchmark decision lands **no-go** (Arm B suffices ...)" }
+    },
+    "summary": "Depends-on edge 362 -> 350 — no-go closeout only executes on the #350 decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 365,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": { "phrase": "nothing here is executed without the #350 evidence gate passing first" }
+    },
+    "summary": "Depends-on edge 365 -> 350 — go-branch is gated on the #350 evidence decision"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 365,
+      "to": 364,
+      "kind": "depends-on",
+      "evidence": { "phrase": "Arm C shows marginal recall/error value over Arm B under the amended criteria" }
+    },
+    "summary": "Depends-on edge 365 -> 364 — the go criteria referenced are the amended ones from #364"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 365,
+      "kind": "mentions",
+      "evidence": { "phrase": "Mutually exclusive with the go-branch issue." }
+    },
+    "summary": "Mutually-exclusive pair 362 <-> 365 — exactly one decision branch survives 2026-08-28 (no issue number in either body, so no deterministic mention exists)"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 370,
+      "kind": "depends-on",
+      "evidence": { "phrase": "Cut v1.0.0 as the bundled release ritual (see the v0.10.0/v1.0.0 tagging issue)" }
+    },
+    "summary": "Depends-on edge 362 -> 370 — the closeout's v1.0.0 step is the tagging plan owned by #370"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 362,
+      "to": 371,
+      "kind": "depends-on",
+      "evidence": { "phrase": "Run the O5 reassess owed at the sprint close (3-close threshold reached)" }
+    },
+    "summary": "Depends-on edge 362 -> 371 — the closeout checklist includes the owed O5 reassess tracked by #371"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 363,
+      "to": 371,
+      "kind": "blocks",
+      "evidence": { "phrase": "Feed the reassess the pending checkpoint items: O3 resolution (separate issue)" }
+    },
+    "summary": "Blocks edge 363 -> 371 — O3 resolution is a named input to the owed reassess"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 368,
+      "to": 371,
+      "kind": "blocks",
+      "evidence": { "phrase": "multi-track adoption checkpoint (separate issue)" }
+    },
+    "summary": "Blocks edge 368 -> 371 — the multi-track adoption checkpoint is a named reassess input"
+  },
+  {
+    "section": "relationship",
+    "verb": "edge",
+    "args": {
+      "from": 370,
+      "to": 350,
+      "kind": "depends-on",
+      "evidence": { "phrase": "Reserve **v1.0.0** for the bundled ritual: #350 decision + milestone 19 close + O5 reassess + sprint close" }
+    },
+    "summary": "Depends-on edge 370 -> 350 — the v1.0.0 half of the tagging plan waits on the #350 decision bundle"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 361,
+    "args": {
+      "value": "high",
+      "reason": "0/10 organic questions at the halfway mark with a hard first-entry deadline of ~2026-08-28; body calls it \"the only load-bearing task in the repo right now\" and the review ranked it #1"
+    },
+    "summary": "Set priority:high on #361 — deadline-bound evidence gate for #350, ranked #1 next move"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 364,
+    "args": {
+      "value": "high",
+      "reason": "Pre-registered gate amendment must land before the 2026-08-28 decision; body documents a trivially-passable latency criterion and missing thin-data no-go (goodharting risk)"
+    },
+    "summary": "Set priority:high on #364 — must precede the #350 decision to stay a valid pre-registration"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 363,
+    "args": {
+      "value": "high",
+      "reason": "Flagged HIGH as a \"zombie objective\" by the direction/strategy review and independently by the Codex second opinion; a proof-gated charter cannot carry a proof-free active O3 indefinitely"
+    },
+    "summary": "Set priority:high on #363 — HIGH severity, flagged independently by two reviewers"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 369,
+    "args": {
+      "value": "high",
+      "reason": "Direction/strategy review HIGH (concern #2 + recommendation #3) plus Codex bus-factor finding; the public surface is sized for adopters no validation has ever involved"
+    },
+    "summary": "Set priority:high on #369 — HIGH-severity external-adoption/bus-factor decision"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 371,
+    "args": {
+      "value": "medium",
+      "reason": "The 3-close O5 threshold is hit exactly at the current sprint close, so it is date-bound but procedural (report-only, amend stays human-gated)"
+    },
+    "summary": "Set priority:medium on #371 — owed reassess triggers at the imminent sprint close"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 370,
+    "args": {
+      "value": "medium",
+      "reason": "Five shipped-but-untagged contract changes since v0.9.0 (#347/#353, #348/#354, #352, #358, #360); release hygiene, no correctness impact"
+    },
+    "summary": "Set priority:medium on #370 — untagged shipped contract changes accumulating"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 366,
+    "args": {
+      "value": "medium",
+      "reason": "Codex second opinion recommendation #1; the mirrorless pilot proved correctness but not resilience, and the PR #360 cycle showed real rate-limiting three times"
+    },
+    "summary": "Set priority:medium on #366 — top Codex recommendation with observed rate-limit evidence"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 367,
+    "args": {
+      "value": "medium",
+      "reason": "Codex second opinion recommendation #2; after #358 moved judgment to prompt guidance, only the wire validator catches model drift and nothing measures omission"
+    },
+    "summary": "Set priority:medium on #367 — covers the model-conformance gap opened by #358"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 368,
+    "args": {
+      "value": "low",
+      "reason": "Direction/strategy review scored it LOW (concern #5 + recommendation #6); it is a checkpoint to run at the next reassess, not standalone work"
+    },
+    "summary": "Set priority:low on #368 — LOW-severity checkpoint riding on the reassess"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 372,
+    "args": {
+      "value": "low",
+      "reason": "Body states impact is negligible today because stale JSON is a transient same-run intermediate; it is a fail-loud posture fix, filed as a non-blocking round-2 observation"
+    },
+    "summary": "Set priority:low on #372 — self-declared negligible impact, non-blocking observation"
+  },
+  {
+    "section": "priority",
+    "verb": "set-priority",
+    "issueNumber": 373,
+    "args": {
+      "value": "low",
+      "reason": "Both residues are explicitly human-gated and the body states either choice on the Learnings trim is defensible; no correctness or schedule pressure"
+    },
+    "summary": "Set priority:low on #373 — human-gated wording/bookkeeping residues"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 361,
+    "args": { "name": "2026-08 shadow decision readiness" },
+    "cluster": "pre-decision readiness",
+    "sprintName": "2026-08 shadow decision readiness",
+    "summary": "Assign 2026-08 shadow decision readiness to #361 — must produce log entries before the 2026-08-28 window opens"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 364,
+    "args": { "name": "2026-08 shadow decision readiness" },
+    "cluster": "pre-decision readiness",
+    "sprintName": "2026-08 shadow decision readiness",
+    "summary": "Assign 2026-08 shadow decision readiness to #364 — gate amendment is only valid if pre-registered before the decision"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 362,
+    "args": { "name": "2026-09 #350 decision bundle" },
+    "cluster": "decision bundle",
+    "sprintName": "2026-09 #350 decision bundle",
+    "summary": "Assign 2026-09 #350 decision bundle to #362 — no-go branch of the post-decision ritual"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 365,
+    "args": { "name": "2026-09 #350 decision bundle" },
+    "cluster": "decision bundle",
+    "sprintName": "2026-09 #350 decision bundle",
+    "summary": "Assign 2026-09 #350 decision bundle to #365 — go branch of the post-decision ritual"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 370,
+    "args": { "name": "2026-09 #350 decision bundle" },
+    "cluster": "decision bundle",
+    "sprintName": "2026-09 #350 decision bundle",
+    "summary": "Assign 2026-09 #350 decision bundle to #370 — v1.0.0 is explicitly reserved for this bundle"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 371,
+    "args": { "name": "2026-09 #350 decision bundle" },
+    "cluster": "decision bundle",
+    "sprintName": "2026-09 #350 decision bundle",
+    "summary": "Assign 2026-09 #350 decision bundle to #371 — the owed O5 reassess is a named step of the same close ritual"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 363,
+    "args": { "name": "2026-09 charter reassess inputs" },
+    "cluster": "charter/spec axis",
+    "sprintName": "2026-09 charter reassess inputs",
+    "summary": "Assign 2026-09 charter reassess inputs to #363 — O3 resolution feeds the owed reassess"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 368,
+    "args": { "name": "2026-09 charter reassess inputs" },
+    "cluster": "charter/spec axis",
+    "sprintName": "2026-09 charter reassess inputs",
+    "summary": "Assign 2026-09 charter reassess inputs to #368 — adoption checkpoint is due at the next reassess"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 369,
+    "args": { "name": "2026-09 charter reassess inputs" },
+    "cluster": "charter/spec axis",
+    "sprintName": "2026-09 charter reassess inputs",
+    "summary": "Assign 2026-09 charter reassess inputs to #369 — external-adoption decision lands as a charter Decisions row"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 373,
+    "args": { "name": "2026-09 charter reassess inputs" },
+    "cluster": "charter/spec axis",
+    "sprintName": "2026-09 charter reassess inputs",
+    "summary": "Assign 2026-09 charter reassess inputs to #373 — human-gated spec-surface residues resolve alongside the reassess"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 366,
+    "args": { "name": "2026-09 gh resilience and conformance" },
+    "cluster": "engineering hardening",
+    "sprintName": "2026-09 gh resilience and conformance",
+    "summary": "Assign 2026-09 gh resilience and conformance to #366 — failure-mode matrix for gh-backed paths"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 367,
+    "args": { "name": "2026-09 gh resilience and conformance" },
+    "cluster": "engineering hardening",
+    "sprintName": "2026-09 gh resilience and conformance",
+    "summary": "Assign 2026-09 gh resilience and conformance to #367 — conformance suite closes the post-#358 model-drift gap"
+  },
+  {
+    "section": "milestone",
+    "verb": "assign-milestone",
+    "issueNumber": 372,
+    "args": { "name": "2026-09 gh resilience and conformance" },
+    "cluster": "engineering hardening",
+    "sprintName": "2026-09 gh resilience and conformance",
+    "summary": "Assign 2026-09 gh resilience and conformance to #372 — fail-loud fix in the same triage pipeline the conformance suite exercises"
+  },
+  {
+    "section": "obsolete",
+    "verb": "revisit",
+    "issueNumber": 362,
+    "args": {
+      "reason": "Pre-filed contingent branch, explicitly \"mutually exclusive with the go-branch issue\" (#365) — revisit right after the #350 decision (2026-08-28 to 2026-09-11); if the decision lands go, this issue becomes obsolete and should be closed then, not now"
+    },
+    "summary": "Revisit #362 after the #350 decision — contingent branch that one decision outcome will render obsolete"
+  },
+  {
+    "section": "obsolete",
+    "verb": "revisit",
+    "issueNumber": 365,
+    "args": {
+      "reason": "Pre-filed contingent branch, explicitly \"mutually exclusive with the no-go closeout issue\" (#362) — revisit right after the #350 decision; if the decision lands no-go, this issue becomes obsolete and should be closed then, not now"
+    },
+    "summary": "Revisit #365 after the #350 decision — contingent branch that one decision outcome will render obsolete"
+  }
+]
