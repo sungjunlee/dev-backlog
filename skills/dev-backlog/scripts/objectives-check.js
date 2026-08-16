@@ -9,8 +9,11 @@
  *   - missing  : the ID is not in the charter at all (removed; IDs are never reused)
  *   - deferred : the ID exists but is marked [deferred]; sprints should not target
  *                deferred objectives
- * Charter statuses are [validated], [active], [implemented], and [deferred];
+ * Charter objective lines may be status-free (`- O10 — ...`, targetable) or carry
+ * a legacy status of [validated], [active], [implemented], or [deferred];
  * only [deferred] objectives are not targetable by sprints.
+ * Sprints with `status: completed` are immutable history and are skipped:
+ * a retired charter ID referenced only by completed sprints is not drift.
  *
  * Graceful no-op when spec/charter.md and legacy CHARTER.md are absent.
  *
@@ -26,6 +29,7 @@ const {
   resolveCharterPath,
 } = require("./spec-paths.js");
 const { toPortablePath } = require("./portable-path.js");
+const { parseSprintStatus } = require("./sprint-status.js");
 
 const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
 
@@ -96,12 +100,28 @@ function hasObjectivesField(content) {
   return Boolean(frontmatter) && /^objectives:/m.test(frontmatter);
 }
 
+// Two explicit objective-line forms, nothing in between:
+//   legacy: `- O3 [active] predicate ...`  (known statuses only)
+//   lean:   `- O10 — predicate ...`        (status-free, em-dash separator)
+// Bare IDs (`- O10 prose`), unknown statuses (`- O10 [bogus]`), and malformed
+// spacing (`- O10 [deferred]later`) do not parse — a drift check must not
+// guess. IDs are never reused, so on a duplicate ID the first line wins;
+// a later contradictory line cannot silently flip e.g. deferred → targetable.
+const LEGACY_OBJECTIVE_RE = /^- (O\d+) \[(validated|active|implemented|deferred)\](?: |$)/;
+const LEAN_OBJECTIVE_RE = /^- (O\d+) — \S/;
+
 function parseCharterObjectives(content) {
   const objectives = new Map();
   const lines = content.split("\n");
   for (const line of lines) {
-    const match = line.match(/^- (O\d+) \[(validated|active|implemented|deferred)\]/);
-    if (match) objectives.set(match[1], match[2]);
+    const legacy = line.match(LEGACY_OBJECTIVE_RE);
+    if (legacy) {
+      if (!objectives.has(legacy[1])) objectives.set(legacy[1], legacy[2]);
+      continue;
+    }
+    const lean = line.match(LEAN_OBJECTIVE_RE);
+    // A status-free lean line is targetable; record it as "listed".
+    if (lean && !objectives.has(lean[1])) objectives.set(lean[1], "listed");
   }
   return objectives;
 }
@@ -118,6 +138,9 @@ function findDrift(sprintFiles, charterObjectives, { readFile = fs.readFileSync 
   const drift = [];
   for (const file of sprintFiles) {
     const content = readFile(file, "utf-8");
+    // Completed sprints are immutable history; their references may point at
+    // since-retired charter IDs without constituting drift.
+    if (parseSprintStatus(content) === "completed") continue;
     const ids = parseSprintObjectives(content);
     const missing = [];
     const deferred = [];
@@ -222,6 +245,7 @@ module.exports = {
   parseSprintObjectives,
   hasObjectivesField,
   parseCharterObjectives,
+  parseSprintStatus,
   resolveCharterPath,
   listSprintFiles,
   findDrift,

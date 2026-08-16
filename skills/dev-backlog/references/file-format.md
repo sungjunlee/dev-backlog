@@ -127,8 +127,8 @@ Sprint files (`backlog/sprints/*.md`) carry `objectives:` and `component:` along
 
 | Field | Optional? | Omission semantics |
 | --- | --- | --- |
-| `objectives:` | yes | Omitted entirely when neither `spec/charter.md` nor legacy root `CHARTER.md` exists. A present-but-unknown Objective ID is a hard failure (`objectives-check.js`). |
-| `component:` | yes | Omitted entirely when `spec/capabilities.md` does not exist. A present value must resolve to exactly one `## Capability:` slug (`component-lint.js`). |
+| `objectives:` | yes | Omitted entirely when neither `spec/charter.md` nor legacy root `CHARTER.md` exists. A present-but-unknown Objective ID is a hard failure (`objectives-check.js`) — except in `status: completed` sprints, which are immutable history and may reference retired IDs. |
+| `component:` | yes | Omitted entirely when `spec/capabilities.md` does not exist. A present value must resolve to exactly one `## Capability:` slug (`component-lint.js`) — except in `status: completed` sprints, which may reference retired slugs. |
 
 `sprint-init.js` emits each field only when its backing spec file is present, so a cold adopter with no `spec/` gets a clean sprint with neither key. An older sprint that still carries an empty `objectives: []` / `component: ""` stays valid — this is omission-on-generate, not a migration. `backlog-doctor.js` warns (soft, non-blocking) only when the **active** sprint omits a field while its spec file exists. Full semantics live in [`spec-fallback.md`](spec-fallback.md); the authoritative contract table is in [SKILL.md](../SKILL.md).
 
