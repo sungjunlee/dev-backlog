@@ -22,7 +22,7 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 - [x] #363 Resolve charter O3 this cycle: measured on-track drill or demote into the O5 reassess loop (2d) [evidence:docs/o3-drill-2026-08-16.md] → charter rev 14 (O3 implemented, user-approved 2026-08-16)
 
 ### Batch 3 — Conformance net
-- [~] #367 SKILL.md conformance suite: periodic fresh-session evals on Claude and Codex + doc-drift check (3d) [evidence:docs/conformance/2026-08-16-model-actions.md] — doc-drift net in CI; 4-channel model-actions conformance run done; cadence accepted; residual AC: full Eval-Prompts cross-model run at the next cadence checkpoint
+- [~] #367 SKILL.md conformance suite: periodic fresh-session evals on Claude and Codex + doc-drift check (3d) — doc-drift net in CI; 4-channel model-actions conformance run done (evidence: docs/conformance/2026-08-16-model-actions.md); cadence accepted; residual AC: full Eval-Prompts cross-model run at the next cadence checkpoint [run:conformance-2026-08-16]
 
 ## Running Context
 - Track axis: `scope:` globs, deliberately mixed-axis against the active `2026-07-github-native-core-simplification` track (`component: "tracker-task-truth"`) — `scopesOverlap` treats mixed axes as disjoint, and that track's only remaining item is the `[~] #350` decision wait, not code. Do not touch that track's state from here.
