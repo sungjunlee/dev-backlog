@@ -34,6 +34,7 @@ entry points and are intentionally not listed.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
 - `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn. JSON includes top-level `reassess_signal`.
 - `scripts/context-hook.sh [backlog-dir]` — one-line active-sprint summary for a Claude Code PreToolUse hook (portfolio line for N tracks); silent when no active sprint.
+- `scripts/doc-drift-check.js [--root PATH] [--json]` — source-repo maintenance net (#367): verify every `.js`/`.sh` script name mentioned in `skills/*/SKILL.md`, `skills/*/references/*.md`, and `backlog/sprints/_context.md` resolves to a file under a skill's `scripts/`; dangling mentions fail. Filename-level only; its test runs the live-repo check in CI.
 
 ## Tracker routing
 
