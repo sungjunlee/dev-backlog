@@ -130,9 +130,9 @@ The measured #349 pilot confirmed that Priority, Iteration, and Target Date
 projection works, but required more writes and reconciliation than the existing
 milestone + labels + sprint Plan workflow. Projects are therefore not an
 adopted dev-backlog profile. The capability matrix, failure evidence, and
-decision are recorded in the source repository's
-`docs/github-projects-projection-pilot.md` (source checkout only — not bundled
-with the installed skill).
+decision are recorded in the retired pilot doc, reachable in the source
+repository's git history at
+[v0.10.0](https://github.com/sungjunlee/dev-backlog/blob/v0.10.0/docs/github-projects-projection-pilot.md).
 
 An operator may still use a manually configured Project as an external view:
 
