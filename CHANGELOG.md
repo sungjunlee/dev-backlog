@@ -6,6 +6,22 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-16
+
+Headline: **the GitHub-native core simplification wave.** GitHub Issues become the standalone task-definition and lifecycle authority behind an explicit contract; task specs resolve live with no mirror layer; the pilot that proved it retires required mirrors; and the zero-adopter compatibility machinery goes with them. GitHub Projects was measured as a planning projection and deliberately declined. Triage judgment moves from scripts to the prompt with a deterministic wire validator. Semver: minor bump, 0.9.0 → 0.10.0 — the GitHub path is behavior-compatible throughout; the removals had zero measured adopters. **v1.0.0 is reserved** for the #350 decision bundle (decision + milestone 19 close + O5 reassess + sprint close) so the 1.0 cut cannot precede the milestone's own evidence gate ([#370](https://github.com/sungjunlee/dev-backlog/issues/370)).
+
+### Added
+
+- **GitHub-native authority contract** — `references/authority-contract.md` fixes the reduced product boundary: sole-owner state routing, sprint admission by execution complexity (not duration or estimate), and optional ecosystem integrations that can never acquire write authority. Closes [#345](https://github.com/sungjunlee/dev-backlog/issues/345) / PR [#351](https://github.com/sungjunlee/dev-backlog/pull/351).
+- **Live effective-task-spec resolver** — `effective-task-spec.js` resolves task intent, AC, lifecycle, source ref, and a stable SHA-256 content digest from the live Issue (or one explicit `spec_ref`), with no task-mirror consultation and fail-closed behavior when the authority cannot resolve. Closes [#346](https://github.com/sungjunlee/dev-backlog/issues/346) / PR [#352](https://github.com/sungjunlee/dev-backlog/pull/352).
+- **Doc-drift check** — `doc-drift-check.js` fails when agent-facing docs (`SKILL.md`, `references/*.md`, `_context.md`) mention a `.js`/`.sh` script that no longer exists under a skill's `scripts/`; its test suite carries a live-repo assertion so CI enforces the net continuously. First slice of the conformance suite ([#367](https://github.com/sungjunlee/dev-backlog/issues/367)).
+
+### Changed
+
+- **Docs/spec cleanup after the 2026-08-15 4-way review** — fixed bundle-escaping doc links, pruned dead `progress-sync` gotchas, resolved dangling `tracker-adapter-design.md` references via the v0.9.0 tag, and amended the charter to rev 13 (evidence-scope denominators; O8/O9 historical stubs). PR [#360](https://github.com/sungjunlee/dev-backlog/pull/360).
+- **Shadow-gate amendments A1/A2 (pre-registered)** — the #350 protocol now auto-no-goes on fewer than 10 organic questions, and Arm C is scored on marginal recall/error over Arm B instead of the caching-measuring 20%-faster bar. Closes [#364](https://github.com/sungjunlee/dev-backlog/issues/364).
+- **Charter rev 14 — O3 `implemented`** — the 5-minute on-track answer is proven by a timed drill across 5 consumer repos (`docs/o3-drill-2026-08-16.md`); the denominator is repos carrying a spec-charter-format predicate axis. Closes [#363](https://github.com/sungjunlee/dev-backlog/issues/363).
+
 ### Removed
 
 - **backlog-triage judgment heuristics** — replaced ~265 lines of semantic judgment (`scanPhraseEdges`/`scanBlocks`/`scanDependsOn`, title-Jaccard duplicates in relate/stale, and rule-based `buildPriorityActions`/`buildMilestoneActions`) with prompt-level rubric guidance. Scripts now emit deterministic signals only (mentions, merged-PR links, dates, labels); the model's judged blocks/depends-on/duplicate edges and priority/milestone proposals enter the report through the new `triage-report.js --model-actions PATH`, keeping anchors, dedupe, and the Apply Checklist deterministic. Net −491 script/test lines. Closes [#358](https://github.com/sungjunlee/dev-backlog/issues/358).
@@ -13,6 +29,11 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 - **Monthly Progress sync and sprint issue publication** — removed 3,758 lines of scripts and dedicated tests after their intended adoption windows finished. Only one monthly issue was ever created (`Progress: April 2026`, #46; none in May–July), and the four sprint issues (#230, #234, #237, #239) were all created on 2026-07-03/04 with none since. No core lifecycle script or dev-relay integration invokes either feature, and `task-progress-reporting` accumulated no Learnings. Closes [#340](https://github.com/sungjunlee/dev-backlog/issues/340).
 - **Required task mirrors** — the GitHub-native core now resolves task specification, AC, and lifecycle directly from live Issues. Fresh setup and complete sprint execution require no `backlog/tasks/` or `backlog/completed/`; `sync-pull --legacy-export` remains an explicit one-way diagnostic/rollback boundary. Closes [#347](https://github.com/sungjunlee/dev-backlog/issues/347).
 - **Zero-adopter local tracker and generic compatibility machinery** — measured adoption found 0 of 17 consumers selecting a non-default tracker and GitHub remotes in all 18 known consumers. The local JSON store, local lifecycle tests, and generic/local design surface are removed; GitHub failure is fail-loud with no fallback, while Backlog.md remains manual import/explicit export compatibility only. Closes [#348](https://github.com/sungjunlee/dev-backlog/issues/348).
+
+### Notes
+
+- **GitHub Projects: measured and declined.** A live pilot (private Project #5, real Issues #345–#350, two planning cycles) showed no repeated value over milestones + labels — cycle 2 needed four writes plus a read-back (45.8 s) where milestones + labels read the same six Issues in one 4.0 s call, and the sprint Plan already held execution order. No Project profile or abstraction ships. Closes [#349](https://github.com/sungjunlee/dev-backlog/issues/349) / PR [#355](https://github.com/sungjunlee/dev-backlog/pull/355).
+- The #350 shadow benchmark (historical-retrieval memory decision) remains open by design; its decision window opens 2026-08-28 and v1.0.0 waits for that bundle.
 
 ## [0.9.0] — 2026-07-27
 
