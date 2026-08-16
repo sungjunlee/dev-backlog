@@ -99,9 +99,14 @@ answer and ranked pointers are ready. Tool calls count user-visible GitHub,
 Git, filesystem-search, or compiled-report query boundaries. Report compilation
 and repair are maintenance, not query time, and are recorded separately.
 
-Arm C must beat the better usable baseline's median elapsed time or median tool
-calls by at least 20%. It must also retain at least 90% top-3 recall, have zero
-major errors, and project to no more than 15 minutes of maintenance per month.
+Arm C is scored on marginal retrieval value over Arm B only: it must retain at
+least 90% top-3 recall, show a marginal recall or error-rate improvement over
+Arm B on the organic question set, have zero major errors, and project to no
+more than 15 minutes of maintenance per month. Median elapsed time and tool
+calls are still recorded as diagnostics but are not a go criterion: the
+original 20%-faster bar compared a pre-compiled local file (0.794 ms) against
+live network calls (5.952 s), which any cached artifact clears — it measured
+caching, not retrieval value. *(Amended 2026-08-16 — see Amendments A2.)*
 
 ## Day-0 results
 
@@ -210,7 +215,42 @@ manual evidence comment to #350 with this JSONL-compatible shape:
 
 The decision requires at least ten organic questions covering dev-backlog,
 dev-relay, and consumer repositories, at least two weeks between first and last
-real reuse, and no decision before 2026-08-28. If live sources remain sufficient,
-close #350 with no compiler. If Arm C wins every gate, propose a separate
-`project-memory` skill and human-gated charter amendment; do not productize it
-inside this issue.
+real reuse, and no decision before 2026-08-28. Fewer than ten organic questions
+at the decision date is an **automatic no-go**: either extend the shadow window
+with a dated note, or close #350 with "Arm B suffices". The null result — no
+compiler admitted — is the pre-declared, expected, and acceptable outcome;
+neither thin data nor a retroactively manufactured "organic" log can produce a
+go. *(Amended 2026-08-16 — see Amendments A1.)* If live sources remain
+sufficient, close #350 with no compiler. If Arm C wins every gate, propose a
+separate `project-memory` skill and human-gated charter amendment; do not
+productize it inside this issue.
+
+## Amendments
+
+The protocol above is frozen by design; changes are pre-registered here with
+date and rationale before the decision window opens, analogous to a human-gated
+charter amendment. Operative text is edited in place and marked with its
+amendment ID.
+
+- **A1 (2026-08-16) — auto no-go on thin data.** Original text allowed a
+  decision whose organic-reuse precondition was silently unmet or met by
+  after-the-fact labeling. Amended: fewer than ten organic questions at the
+  decision date is an automatic no-go (extend the window or close with "Arm B
+  suffices"), and the null result is pre-declared acceptable. Rationale:
+  goodharting risk — 0/10 organic entries at the halfway mark made a
+  thin-data or manufactured-"organic" go structurally possible. Source: #364;
+  2026-08-15 direction/strategy review concern #4.
+- **A2 (2026-08-16) — latency criterion replaced by marginal value.** Original
+  text required Arm C to beat the better usable baseline's median elapsed time
+  or tool calls by at least 20%. Amended: Arm C is scored on marginal recall /
+  error rate over Arm B only; latency and tool-call medians remain recorded
+  diagnostics. Rationale: the 20% bar compared a warm local file read
+  (0.794 ms) with live network retrieval (5.952 s) — any cached artifact
+  passes, so the criterion measured caching, not retrieval value. The Day-0
+  table's "clears the synthetic thresholds" claim is correspondingly
+  historical: it reflects the pre-amendment gate set. Source: #364; 2026-08-15
+  direction/strategy review recommendation #2.
+- Amendment authority: #350's go criteria in the issue body retain their
+  original wording as filed history; where they conflict with A1/A2, this
+  amended protocol governs the decision. Recorded on #350 by comment at
+  amendment time.
