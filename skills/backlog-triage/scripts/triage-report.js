@@ -405,7 +405,9 @@ function formatStaleEvidence(candidate) {
 
 function staleCandidateToAction(candidate) {
   // triage-stale.js only ever emits suggested_action "close"; revisit and
-  // close-duplicate reach the obsolete section through --model-actions.
+  // close-duplicate reach the obsolete section through --model-actions. Older
+  // stale JSON can still carry those values — findUnsupportedStaleCandidates
+  // surfaces the drop instead of letting it happen silently.
   if (candidate.suggested_action !== "close") return null;
 
   return {
@@ -428,6 +430,19 @@ function buildObsoleteActions(stale, { protectedIssueNumbers = new Set() } = {})
   );
 }
 
+function findUnsupportedStaleCandidates(stale) {
+  if (!stale || !Array.isArray(stale.candidates)) return [];
+  return stale.candidates.filter((candidate) => staleCandidateToAction(candidate) === null);
+}
+
+function formatUnsupportedStaleWarning(candidate) {
+  return `Dropped stale candidate #${candidate.number} (suggested_action="${candidate.suggested_action}"): unsupported action, no auto-action generated.`;
+}
+
+function renderUnsupportedStaleWarnings(unsupported) {
+  return unsupported.map((candidate) => `> [warn] ${formatUnsupportedStaleWarning(candidate)}`);
+}
+
 function renderActionBlocks(actions, { withEvidence = false } = {}) {
   const lines = [];
   for (const action of actions) {
@@ -441,7 +456,7 @@ function renderActionBlocks(actions, { withEvidence = false } = {}) {
   return lines;
 }
 
-function renderObsoleteCandidates(stale, actions) {
+function renderObsoleteCandidates(stale, actions, unsupported = []) {
   const lines = ["## Obsolete Candidates"];
 
   if (!stale && actions.length === 0) {
@@ -449,13 +464,22 @@ function renderObsoleteCandidates(stale, actions) {
     return lines.join("\n");
   }
 
-  if (actions.length === 0) {
+  if (actions.length === 0 && unsupported.length === 0) {
     lines.push("_(none)_", "", DEFERRED_OBSOLETE_MARKER);
     return lines.join("\n");
   }
 
-  lines.push(...renderActionBlocks(actions, { withEvidence: true }));
-  if (lines[lines.length - 1] === "") lines.pop();
+  if (actions.length > 0) {
+    lines.push(...renderActionBlocks(actions, { withEvidence: true }));
+    if (lines[lines.length - 1] === "") lines.pop();
+  } else {
+    lines.push("_(none)_");
+  }
+
+  if (unsupported.length > 0) {
+    lines.push("", ...renderUnsupportedStaleWarnings(unsupported));
+  }
+
   lines.push("", DEFERRED_OBSOLETE_MARKER);
   return lines.join("\n");
 }
@@ -548,6 +572,7 @@ function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintC
     ...buildObsoleteActions(stale, { protectedIssueNumbers }),
     ...modelObsoleteActions.filter((action) => !protectedIssueNumbers.has(action.issueNumber)),
   ]);
+  const unsupportedStaleCandidates = findUnsupportedStaleCandidates(stale);
 
   const modelRelationships = modelActions.filter((action) => action.section === "relationship");
   const mergedRelate = mergeModelRelationships(relate, modelRelationships);
@@ -559,7 +584,7 @@ function buildReportModel({ snapshot, snapshotPath, relate, stale, activeSprintC
   const sections = [
     { key: "classification", title: "Classification", markdown: renderClassification(snapshot) },
     { key: "relationships", title: "Relationships", markdown: renderRelationships(mergedRelate, issueIndex) },
-    { key: "obsolete", title: "Obsolete Candidates", markdown: renderObsoleteCandidates(stale, obsoleteActions) },
+    { key: "obsolete", title: "Obsolete Candidates", markdown: renderObsoleteCandidates(stale, obsoleteActions, unsupportedStaleCandidates) },
     { key: "priority", title: "Priority Proposals", markdown: renderPriorityProposals(priorityActions) },
     { key: "milestone", title: "Milestone Suggestions", markdown: renderMilestoneSuggestions(milestoneActions) },
     { key: "apply", title: "Apply Checklist", markdown: renderApplyChecklist(allActions) },
@@ -768,6 +793,9 @@ function main() {
 
   try {
     inputs = loadInputs(options);
+    for (const candidate of findUnsupportedStaleCandidates(inputs.stale)) {
+      console.error(`[warn] ${formatUnsupportedStaleWarning(candidate)}`);
+    }
     reportModel = buildReportModel({
       snapshot: inputs.snapshot,
       snapshotPath: options.snapshotPath,
@@ -810,6 +838,8 @@ module.exports = {
   mergeModelRelationships,
   formatStaleEvidence,
   staleCandidateToAction,
+  findUnsupportedStaleCandidates,
+  formatUnsupportedStaleWarning,
   buildReportModel,
   renderReport,
   resolveOutputPath,

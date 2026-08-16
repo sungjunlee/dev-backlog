@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { analyzeSnapshot: analyzeRelationships } = require("./triage-relate.js");
 const { analyzeSnapshot: analyzeStale } = require("./triage-stale.js");
 const {
@@ -14,6 +14,9 @@ const {
   writeReportFile,
   formatStaleEvidence,
   staleCandidateToAction,
+  findUnsupportedStaleCandidates,
+  formatUnsupportedStaleWarning,
+  validateStaleResult,
   collectActiveSprintIssueNumbers,
   loadModelActions,
   validateModelAction,
@@ -352,6 +355,87 @@ describe("renderer helpers", () => {
     assert.doesNotMatch(obsolete, /triage:close #105/);
   });
 
+  it("does not hard-reject stale JSON with an unsupported suggested_action", () => {
+    const result = { candidates: [{ number: 110, suggested_action: "revisit", reason: "needs a second look" }] };
+    assert.deepEqual(validateStaleResult(result, "fixtures/stale.json"), result);
+  });
+
+  it("warns (does not silently drop) stale candidates with an unsupported suggested_action", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+        {
+          number: 108,
+          title: "Old revisit candidate from a prior stale run",
+          reason: "flagged for follow-up review",
+          suggested_action: "revisit",
+          evidence: { milestone: null },
+        },
+        {
+          number: 109,
+          title: "Old merge-into candidate from a prior stale run",
+          reason: "looks like a duplicate",
+          suggested_action: "merge-into:#50",
+          evidence: { milestone: null },
+        },
+      ],
+    };
+
+    const unsupported = findUnsupportedStaleCandidates(stale);
+    assert.equal(unsupported.length, 2);
+    assert.deepEqual(unsupported.map((candidate) => candidate.number).sort(), [108, 109]);
+    assert.match(formatUnsupportedStaleWarning(unsupported[0]), /#108.*suggested_action="revisit"/);
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    // The supported candidate still renders as a normal close action.
+    assert.match(obsolete, /triage:close #104/);
+    // The unsupported candidates are named, not silently dropped.
+    assert.match(obsolete, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+    assert.match(obsolete, /\[warn\] Dropped stale candidate #109 \(suggested_action="merge-into:#50"\)/);
+  });
+
+  it("renders no warning line when all stale candidates use the supported suggested_action", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+      ],
+    };
+
+    assert.deepEqual(findUnsupportedStaleCandidates(stale), []);
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.match(obsolete, /triage:close #104/);
+    assert.doesNotMatch(obsolete, /\[warn\]/);
+  });
+
   it("model actions drive priority and milestone proposals; none are invented without them", () => {
     const snapshot = {
       generated: "2026-04-18T01:30:00.000Z",
@@ -601,6 +685,42 @@ describe("triage-report integration chain", () => {
         }),
       /snapshot|parse|json|malformed/i
     );
+  });
+
+  it("warns on stderr and in the report when stale JSON carries an unsupported suggested_action", () => {
+    fs.writeFileSync(
+      stalePath,
+      `${JSON.stringify(
+        {
+          snapshot: snapshotPath,
+          generated: "2026-04-18T01:30:00.000Z",
+          thresholdDays: 60,
+          candidates: [
+            {
+              number: 108,
+              title: "Old revisit candidate from a prior stale run",
+              reason: "flagged for follow-up review",
+              suggested_action: "revisit",
+              evidence: { milestone: null },
+            },
+          ],
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(__dirname, "triage-report.js"), "--snapshot", snapshotPath, "--stale", stalePath, "--out", reportPath],
+      { cwd: repoRoot, encoding: "utf-8" }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    assert.match(markdown, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
   });
 });
 
