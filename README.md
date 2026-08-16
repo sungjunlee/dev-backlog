@@ -403,7 +403,7 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \
 
 ## Docs
 
-- [Project docs index](docs/README.md) — PRDs, pilots, and design records
+- [Project docs index](docs/README.md) — design and pilot records, with a Living/Removed index (removed docs stay reachable via release tags)
 - [Agent execution contract](skills/dev-backlog/SKILL.md)
 - [Authority and routing contract](skills/dev-backlog/references/authority-contract.md)
 - [Process guide](skills/dev-backlog/references/process.md)
