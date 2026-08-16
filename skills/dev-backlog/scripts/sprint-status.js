@@ -13,7 +13,9 @@
  */
 
 function extractFrontmatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  // The terminator must be a whole `---` line; `---oops` or `----` is body
+  // text, and a document that never closes its frontmatter has none.
+  const match = content.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
   return match ? match[1] : null;
 }
 

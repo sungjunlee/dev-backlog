@@ -24,6 +24,13 @@ describe("parseSprintStatus", () => {
     assert.notEqual(parseSprintStatus(fm("status: completed'")), "completed");
   });
 
+  it("requires a whole-line frontmatter terminator", () => {
+    assert.equal(parseSprintStatus("---\nstatus: completed\n---oops\n"), "");
+    assert.equal(parseSprintStatus("---\nstatus: completed\n----\n"), "");
+    assert.equal(parseSprintStatus("---\nstatus: completed\n"), "");
+    assert.equal(parseSprintStatus("---\nstatus: completed\n---"), "completed");
+  });
+
   it("returns empty for missing frontmatter, missing key, or comment-only value", () => {
     assert.equal(parseSprintStatus("# no frontmatter\nstatus: completed\n"), "");
     assert.equal(parseSprintStatus("---\nmilestone: x\n---\nbody"), "");
