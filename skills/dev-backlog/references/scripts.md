@@ -44,6 +44,4 @@ fallback; any other value fails. With neither, GitHub remains the deterministic
 default. Setup pins the legacy GitHub selection to `.tracker` without editing
 `config.yml`. Task files exist only as explicit one-way legacy exports.
 
-Retained seams and compatibility evidence are single-sourced in the source
-repository's `docs/compatibility-subtraction.md` (source checkout only — not
-bundled with the installed skill).
+Routing and optional-export boundaries live in `authority-contract.md`.

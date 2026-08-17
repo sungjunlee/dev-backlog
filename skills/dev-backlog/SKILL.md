@@ -1,7 +1,7 @@
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|sync|complete] [issue-number]"
-description: Manage GitHub-backed sprint execution and explicit legacy exports. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+description: Manage GitHub-backed sprint execution. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires git, Node.js 18+, and gh CLI. Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
@@ -42,14 +42,13 @@ are single-sourced in [`references/authority-contract.md`](references/authority-
 backlog/.tracker (one line: github)
   -> GitHub Issues canonical; no task-file directory required
 
-backlog/tasks/ + completed/ <- optional one-way legacy exports
 backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
 backlog/sprints/ <- optional complex-execution hub
 ```
 
 - One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
-- Task files are one-way legacy exports and are never read back as truth. GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file.
+- GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file. Optional-export and exclusion boundaries live in `references/authority-contract.md`.
 - A missing `.tracker` file accepts only the legacy value `github` from `config.yml`, then uses the zero-migration GitHub compatibility default. Any other value fails; runtime failure never changes selection.
 - Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
 - Completed sprints stay as the permanent execution record.
@@ -76,7 +75,7 @@ Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` 
 | `component: "slug"` | Primary capability handle, relay-Learnings routing, and the track-scope key | Resolves to one capability whose `## Learnings` block receives relay-merge entries; omit the field entirely when no capabilities file exists. |
 | `scope: ["glob"]` | Explicit path-glob track scope when no component axis fits (one axis per track, never both; never inferred) | Optional; declared via `sprint-init.js --scope`. When more than one track is active, every track must declare an axis or the doctor draws an informational warn. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
-| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and complete `#N` or `{PREFIX}-N[.M]` ref. |
+| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
 | `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
 
@@ -88,7 +87,7 @@ Plan checkbox states:
 | `[~]` | In-flight: dispatched, PR under review, or actively worked | Manual or dev-relay |
 | `[x]` | Done: merged or completed | Manual or dev-relay after verification |
 
-Full sprint and task-file examples live in `references/file-format.md`.
+Full sprint examples live in `references/file-format.md`.
 
 ## Execution Path
 
@@ -144,13 +143,14 @@ For a whole sprint:
 
 1. Run `sprint-close.sh`; it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary.
 2. Set `status: completed` and write a final Progress entry.
-3. If legacy task mirrors exist, archive matching checked mirrors as a
-   compatibility cleanup only. Their absence is the normal mirrorless path and
-   never blocks close; task lifecycle remains in GitHub.
+3. Close does not require task directories. If checked legacy export files
+   exist, archive them as compatibility cleanup only; task lifecycle remains
+   in GitHub.
 4. Promote project-level Running Context entries to `_context.md`.
 5. Leave the sprint file in place as the permanent record.
 
-`sprint-close.sh` prints `backlog-doctor.js`'s `reassess_signal`, which recommends `spec-charter reassess` when the doctor warns/fails or 3+ sprints have closed since the last dated reassess report — full accounting in `references/integration-contract.md` § Backlog Doctor JSON Surface. Unattended sessions may run `reassess` (report-only) but must never run `amend`.
+`sprint-close.sh` prints `backlog-doctor.js` JSON including `reassess_signal`.
+Unattended sessions must never `amend` `spec/*`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -187,7 +187,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - `scripts/init.sh` — bootstrap `backlog/`.
 - `scripts/setup-dev-backlog.js` — persist `github` without migrating task files.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC,
-  lifecycle, source, and stable digest without consulting task mirrors.
+  lifecycle, source, and stable digest from the live Issue (or one explicit
+  `spec_ref`).
 - `scripts/sync-pull.js --legacy-export` — opt-in rollback/diagnostic export;
   never part of setup, orient, plan, work, or complete.
 - `scripts/sprint-init.js` — create a milestone-backed sprint when supported.
@@ -199,9 +200,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 - `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
 - `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Sync/Quick Fix/Unplanned Work/Next workflow.
-- `references/file-format.md` — Backlog.md-compatible config/task format and sprint examples.
-- `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and sync.
-- `references/workflow-patterns.md` — planning, bug triage, feature breakdown, retrospectives.
+- `references/file-format.md` — sprint file shape, `.tracker`, and config.
+- `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.
 - `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
@@ -213,13 +213,13 @@ Core scripts (full flag inventory in `references/scripts.md`):
 - "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name latest Progress, and return the first unchecked batch.
 - "Plan a sprint whose scope overlaps a track that is already `status: active`." Expected: refuse, naming the conflicting track — declare a disjoint `component:`/`scope:` or complete the conflicting track first. Disjoint scopes are NOT refused; they open a second track.
 - "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically; `backlog-doctor` passes because scopes are disjoint.
-- "Cold adopter: a repo with open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
-- "Cold adopter: a repo with one self-contained GitHub issue but no `backlog/`, no spec axis, and no Relay." Expected: use the Issue → PR path without requiring a sprint, mirror, Projects board, generated memory, or optional skill.
-- "Work issue #42 with no task mirror and three live Issue AC checkboxes." Expected: run the effective task-spec resolver, verify its source digest and every AC, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
-- "Fresh online session with no task mirror." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; an explicit `spec_ref` wins when present.
-- "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: recover execution continuity and every in-flight `[~]` owner/pointer from `status.sh --json`/`next.sh --json`, but stop before task execution or AC/lifecycle claims because the live task cannot resolve; never read a legacy mirror as fallback.
-- "Close a sprint with Running Context that applies to future work and no task mirrors." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
+- "Repo with no spec axis: open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint." Expected: bootstrap `backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
+- "Repo with no spec axis: one self-contained GitHub issue, no `backlog/`, and no Relay." Expected: use the Issue → PR path without requiring a sprint, Projects board, generated memory, or optional skill.
+- "Work issue #42 with no local task files and three live Issue AC checkboxes." Expected: run the effective task-spec resolver, verify its source digest and every AC, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
+- "Fresh online session with no local task files." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; an explicit `spec_ref` wins when present.
+- "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: recover execution continuity and every in-flight `[~]` owner/pointer from `status.sh --json`/`next.sh --json`, but stop before task execution or AC/lifecycle claims because the live task cannot resolve; never read a legacy export as fallback.
+- "Close a sprint with Running Context that applies to future work and no local task files." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
 - "GitHub Issue changed during work." Expected: re-run the live effective
-  task-spec resolver and review a changed source revision; do not create a task
-  mirror. Only an explicit rollback/diagnostic request runs
+  task-spec resolver and review a changed source revision; do not write a
+  local task file. Only an explicit rollback/diagnostic request runs
   `sync-pull.js --legacy-export`, with no background mutation.

@@ -1,30 +1,20 @@
 # Project Specs
 
-Durable project-level specs live here. Root docs stay focused on entrypoints and agent instructions.
+Living contracts only. History: [`../docs/spec-history.md`](../docs/spec-history.md)
+and git.
 
 | File | Role |
 | --- | --- |
-| [`charter.md`](charter.md) | Why the project exists, what good looks like, Objectives, and project-wide Decisions. |
-| [`system-map.md`](system-map.md) | High-level system shape: boundaries, flows, storage/external systems, invariants, and pointers. |
-| [`capabilities.md`](capabilities.md) | Capability contracts: Goal, Scope, Expected Behaviors, Hard Constraints, Learnings, and Decisions. |
+| [`charter.md`](charter.md) | Why this exists, Objectives, project-wide Decisions. |
+| [`system-map.md`](system-map.md) | Current system shape and invariants. |
+| [`capabilities.md`](capabilities.md) | Per-capability Goal, scope, behaviors, constraints. |
 
-Use `spec-charter` for `charter.md`, `spec-system-map` for `system-map.md`, and `spec-grill` for `capabilities.md`. These authoring skills ship with [craftkit](https://github.com/sungjunlee/craftkit) (`npx skills add sungjunlee/craftkit`), not with this repo.
+Authoring skills (`spec-charter`, `spec-system-map`, `spec-grill`) live in
+[craftkit](https://github.com/sungjunlee/craftkit). This repo consumes the
+files; it does not ship the skills.
 
-These files hold living contracts only. Retired objectives, superseded
-Decisions rows, and moved Learnings are archived in
-[`../docs/spec-history.md`](../docs/spec-history.md); git history is the
-authoritative record.
+## Mutation
 
-## Boundary
-
-`spec/*` files hold durable project, system, and capability contracts. Task
-acceptance criteria stay in GitHub Issues; legacy `backlog/tasks/` files are
-explicit one-way diagnostic/rollback exports, never read back as task truth.
-Complex execution context stays in
-`backlog/sprints/`; Relay Done Criteria, rubrics, and review notes stay in
-dev-relay run artifacts.
-
-Spec skills may read task AC and sprint evidence to understand current reality, but they must not copy issue-specific AC, frozen Done Criteria, or review notes into durable specs.
-
-The complete state routing and optional-integration boundary is
-[`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
+Human-gated: charter direction and capability Goal/Scope/Behaviors/Hard Constraints.
+Decisions append-only (superseded rows → `docs/spec-history.md`). Learnings append
+between `LEARN` markers. Do not copy Issue AC, sprint checkboxes, or review notes.

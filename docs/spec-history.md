@@ -20,7 +20,20 @@ Append rule: this file is an archive. New decisions land in `spec/charter.md`
 or a capability's `### Decisions` table first and move here only in a later
 human-gated compaction pass.
 
+## Charter rev 16 — living-objective retirement (2026-08-17)
+
+Issue [#379](https://github.com/sungjunlee/dev-backlog/issues/379). Living
+Objectives are O10, O1, O4. Retired from the living charter (IDs never reused):
+
+- O3 — a user can answer "is this project still on track?" in under 5 minutes from this file plus the active sprint state (last living text, rev 15)
+- O5 — closing a sprint runs `backlog-doctor`, and the close summary recommends a human-gated `spec-charter reassess` when warranted; automation toward `spec/*` stays report-only (last living text, rev 15)
+
+O1 living wording changed from "single execution-continuity state" to "shared
+execution-continuity state (one file per admitted track; not a unique-sprint-count
+invariant)". Final status-ladder texts for O3/O5 remain in the rev-14 list below.
+
 ## Charter rev 14 — final Objectives (with statuses and proofs)
+
 
 The `[active] → [implemented] → [validated]` ladder, proofs, denominators, and
 adoption counts were retired on 2026-08-16. Final texts:
@@ -40,7 +53,7 @@ independent external-team adoption.
 - O9 [implemented] Historical (superseded by O10, 2026-07-31; retained so sprint references resolve): exactly one configured adapter owned task truth during the tracker-seam phase · src: user (proof: PRs #282/#298/#301/#303; see Decisions 2026-07-31)
 - O10 [active] GitHub Issues are the standalone task-definition and lifecycle authority; simple Issue → PR work is sprint-free, while complex work preserves continuity in one admitted sprint per track without task mirrors, dual writes, or required ecosystem integrations · src: user (adoption evidence 2026-07-27: 0 of 17 other consumer repos selected a non-default tracker; 2026-07-28: all 18 known consumer repos had a GitHub remote)
 
-Retired IDs: O6, O7, O8, O9. O1, O3, O4, O5, and O10 continue as status-free
+Retired IDs: O3, O5, O6, O7, O8, O9. O1, O4, and O10 continue as status-free
 direction predicates in the living charter. Objective IDs are never reused.
 
 ## Charter Decisions — rows through rev 14
@@ -121,13 +134,15 @@ into `tracker-task-truth`. The complete final block follows verbatim.
 
 ## Capability: tracker-task-truth — moved history
 
-### Decisions (moved; the 2026-07-31 rows remain current-defining and stay in the living file)
+### Decisions (moved)
 
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-07-11 | Admit `tracker-task-truth` as a separate capability from `backlog-sync` | canonical ownership and task lifecycle are required in every mode; mirroring and publication are optional transport behaviors | — |
 | 2026-07-26 | Make `backlog/local-tracker.json` the sole local task authority and derive both Markdown directories from it | one atomic JSON store removes Markdown/YAML round-trip and close-compensation machinery while satisfying the no-co-authority constraint directly | canonical local Markdown shape from PR #298 |
 | 2026-07-27 | Move tracker selection to `backlog/.tracker`; `config.yml` becomes a read-only legacy fallback that is never written | the selection tokenizer existed only to write one key into user-owned YAML safely, so not writing removes its reason to exist and preserves user bytes permanently; the legacy read refuses authority-obscuring shapes rather than decoding them | tracker key in `config.yml` from PR #301 |
+| 2026-07-31 | Narrow the target capability to live GitHub Issue authority and freeze adapter/mirror expansion | 0 of 17 observed consumers selected a non-default tracker, and all 18 known consumers had a GitHub remote; compatibility remains only long enough to stage resolver and mirrorless pilots safely | 2026-07-11 generic configured-tracker target |
+| 2026-07-31 | Remove the zero-adopter local tracker and retain Backlog.md only as one-way legacy import/export | the mirrorless GitHub pilot and optional-integration absence tests preserve the complete core path while deleting an unmeasured storage substrate | 2026-07-26 local JSON authority; staged local compatibility in the preceding 2026-07-31 decision |
 
 ### Learnings (moved; all describe the removed tracker-seam code)
 

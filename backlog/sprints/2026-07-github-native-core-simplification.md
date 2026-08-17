@@ -1,6 +1,6 @@
 ---
 milestone: 2026-08 GitHub-native core simplification
-status: active
+status: completed
 started: 2026-07-31
 due: TBD
 objectives: [O10]
@@ -28,7 +28,7 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - [x] #348 Subtract zero-adopter tracker and compatibility machinery (5d) → PR #354 (merged)
 
 ### Batch 5 — Evidence-gated memory decision
-- [~] #350 Benchmark historical retrieval before admitting project memory (4–6 week shadow period; earliest decision 2026-08-28) [run:memory-shadow-2026-07-31] [branch:codex/historical-retrieval-shadow]
+- [x] #362 #350 no-go closeout (Arm B suffices) — decided 2026-08-17 (A1); shadow concluded; no compiler or committed artifact
 
 ## Running Context
 - GitHub Issues are canonical task definitions and lifecycle state for this milestone; sprint files carry only complex execution continuity.
@@ -61,3 +61,6 @@ Make GitHub Issues the standalone task authority, preserve sprint continuity for
 - 2026-07-31: #349 completed via PR #355. All 6 AC are checked, Linux/Windows CI passed, and private pilot Project #5 was closed without deletion after preserving 6/6 Issues and 18/18 final values. Started #350 implementation support on `codex/historical-retrieval-shadow`; the real reuse gate still cannot complete before 2026-08-28.
 - 2026-07-31: #350 Day-0 froze 20 gold questions across dev-backlog, dev-relay, and consumer repositories. Legacy mirrors cover only 2/20; live sources returned 20/20 top-3 hits with zero major errors at a 5.952 s / 2-call median.
 - 2026-07-31: #350's non-committed Arm C compiled 34 sources in 19.111 s, returned 20/20 question hits and 37/41 exact gold pointers with zero major errors, and projected 6.27 min/month maintenance. A missing-source probe exited non-zero with identical report SHA-256, mtime, and size. These synthetic results do not replace the 4–6 week organic reuse gate.
+- 2026-08-17: #350 decided **no-go** (A1: 0/10 organic; 2026-08-28 go already impossible). Closeout is #362. Do not wait for 2026-08-28. v1.0.0 is not part of this closeout. Spec compaction (#379) absorbs the O5 reassess.
+- 2026-08-17: #362 complete. Shadow doc concluded; `_context.md` organic-log nudge removed; authority-contract retrieval row records no-go. Closing this track. No compiled memory artifact exists in the repo.
+- 2026-08-17: Sprint closed. 6/6 tasks completed.

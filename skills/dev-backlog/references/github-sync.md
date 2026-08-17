@@ -1,7 +1,6 @@
 # GitHub Sync Reference
 
-`gh` CLI patterns for operating the live GitHub authority. The historical
-task-file projection is documented last as rollback/diagnostic export only.
+`gh` CLI patterns for operating the live GitHub authority.
 
 ## Label Setup (once per repo)
 
@@ -30,11 +29,11 @@ gh label create "type:chore" -c "e4e669"
 # Simple issue
 gh issue create -t "Implement OAuth2" -l "type:feature,priority:high" -m "Sprint W13"
 
-# With body file (for longer descriptions)
-gh issue create -t "Title" -F backlog/tasks/draft.md -l "labels" -m "milestone"
+# With a body file (for longer descriptions)
+gh issue create -t "Title" -F description.md -l "labels" -m "milestone"
 
-# Get the created issue number
-gh issue create -t "Title" -l "labels" --json number -q .number
+# Capture the created issue URL (`gh issue create` does not support --json)
+url=$(gh issue create -t "Title" -l "labels")
 ```
 
 ## Reading Issues Live

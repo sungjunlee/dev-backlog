@@ -27,13 +27,11 @@ for (const file of SURFACES) {
 
 it("records compatibility subtraction in current decisions and release notes", () => {
   const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
-  const capabilities = read("spec/capabilities.md");
   const specHistory = read("docs/spec-history.md");
   const changelog = read("CHANGELOG.md").split("## [0.9.0]")[0];
 
-  assert.match(capabilities, /Remove the zero-adopter local tracker/);
-  assert.match(capabilities, /2026-07-26 local JSON authority/);
   assert.match(specHistory, /Remove the zero-adopter local tracker/);
+  assert.match(specHistory, /2026-07-26 local JSON authority/);
   assert.match(changelog, /Required task mirrors/);
   assert.match(changelog, /Zero-adopter local tracker/);
   assert.doesNotMatch(changelog, /task mirrors under `backlog\/tasks\/` remain core/);
@@ -87,18 +85,20 @@ it("records the measured Projects decision without adding a core profile", () =>
   assert.match(sync, /blob\/v0\.10\.0\/docs\/github-projects-projection-pilot\.md/);
 });
 
-it("keeps historical retrieval as a measured disposable shadow", () => {
+it("records the historical-retrieval shadow as a concluded no-go", () => {
   const markdown = fs.readFileSync(
     path.join(ROOT, "docs/historical-retrieval-shadow.md"),
     "utf8",
   );
 
-  assert.match(markdown, /The shadow is active/);
+  assert.match(markdown, /The shadow is concluded/);
+  assert.match(markdown, /no-go/);
+  assert.match(markdown, /Arm B suffices/);
   assert.match(markdown, /No compiled report, topic graph, search index/);
   assert.match(markdown, /20\/20 \(100%\)/);
   assert.match(markdown, /37\/41 Issue\/PR pointers/);
   assert.match(markdown, /1 local query \+ 0\.05 amortized external compile/);
-  assert.match(markdown, /no decision before 2026-08-28/);
+  assert.match(markdown, /originally no decision before 2026-08-28/);
   assert.match(markdown, /project-memory.*human-gated charter amendment/si);
   assert.match(markdown, /outside the\s+repository/);
 });

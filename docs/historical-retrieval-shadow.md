@@ -13,16 +13,21 @@ Earliest decision: 2026-08-28 (four weeks)
 
 Six-week boundary: 2026-09-11
 
+Decided: 2026-08-17 — **no-go** (A1). Closeout: [#362](https://github.com/sungjunlee/dev-backlog/issues/362).
+
 ## Status
 
-The shadow is active. Day-0 fixes the questions, scoring, source-bearing live
-baseline, and disposable-report protocol. It does not make a product decision.
-At least ten organic questions across all three repository classes and at least
-two weeks of real reuse are still required before the earliest decision date.
+The shadow is concluded. Decision: **no-go**. Arm B (live GitHub Issues/PRs, Git
+history, spec/sprint/docs) suffices. No compiler, no `project-memory` skill, no
+human-gated charter amendment for retrieval, no committed artifact.
+
+A1 made a 2026-08-28 go impossible: the organic log stayed 0/10. Waiting until
+the calendar date would not change the result. The second-start lightening wave
+took the pre-declared null outcome early.
 
 No compiled report, topic graph, search index, or automatic per-PR memory is
-committed. Retrieval output is disposable evidence and never authoritative
-current status.
+committed. Retrieval output was disposable evidence and never authoritative
+current status. That invariant held through closeout.
 
 ## Arms and authority boundary
 
@@ -218,17 +223,17 @@ manual evidence comment to #350 with this JSONL-compatible shape:
 {"question_id":"O-001","repo_class":"dev-backlog","observed_at":"RFC3339","organic":true,"arm":"B","elapsed_ms":0,"tool_calls":0,"top3_sources":[],"gold_hits":0,"major_errors":0,"minor_errors":0,"compiled_at":null,"sources_through":null,"human_verified_at":"RFC3339","maintenance_minutes":0}
 ```
 
-The decision requires at least ten organic questions covering dev-backlog,
+The decision required at least ten organic questions covering dev-backlog,
 dev-relay, and consumer repositories, at least two weeks between first and last
-real reuse, and no decision before 2026-08-28. Fewer than ten organic questions
-at the decision date is an **automatic no-go**: either extend the shadow window
-with a dated note, or close #350 with "Arm B suffices". The null result — no
-compiler admitted — is the pre-declared, expected, and acceptable outcome;
-neither thin data nor a retroactively manufactured "organic" log can produce a
-go. *(Amended 2026-08-16 — see Amendments A1.)* If live sources remain
-sufficient, close #350 with no compiler. If Arm C wins every gate, propose a
-separate `project-memory` skill and human-gated charter amendment; do not
-productize it inside this issue.
+real reuse, and originally no decision before 2026-08-28. Fewer than ten organic
+questions at the decision date is an **automatic no-go**. The null result — no
+compiler admitted — was the pre-declared, expected, and acceptable outcome.
+*(Amended 2026-08-16 — see Amendments A1.)*
+
+**2026-08-17 closeout:** organic log 0/10 → A1 auto no-go. #350 closed with
+"Arm B suffices". The mutually exclusive go-branch (#365: `project-memory` skill
++ human-gated charter amendment) was closed as not planned. Do not productize a
+compiler inside this archive.
 
 ## Amendments
 

@@ -1,10 +1,8 @@
 # Process
 
 Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
-the same core cycle through GitHub Issues. The retained seam and subtraction
-proof are recorded in the dev-backlog source repository at
-`docs/compatibility-subtraction.md` (source checkout only — not bundled with
-the installed skill).
+the same core cycle through GitHub Issues. Routing and optional-export
+boundaries live in `authority-contract.md`.
 
 ## Setup — Choose Canonical Task Truth
 
@@ -35,8 +33,7 @@ Call `adapter.list({ state, limit })`, `adapter.read(selector)`,
 sprint Plan. Runtime selectors are `#N`. These exported adapter methods are the stable core lifecycle
 API; shell/Node scripts such as `status.sh`, `sync-pull.js`, and
 `sprint-close.sh` are workflow boundaries around it, not substitutes for task
-create/read/update/close. Low-level storage and provider argv remain owned by
-the linked Compatibility Subtraction record.
+create/read/update/close.
 
 For Work and AC verification, use the higher-level read boundary:
 
@@ -50,7 +47,8 @@ and a stable SHA-256 `source_revision`/`source_digest`. An explicit repository
 relative `spec_ref` wins when the Issue contains
 `<!-- dev-backlog:spec_ref path/to/spec.md -->`; otherwise the live Issue body
 is selected. A failed Issue read or explicit-spec load stops execution. The
-resolver never reads `backlog/tasks/` or `backlog/completed/`.
+resolver reads the live Issue (or one explicit `spec_ref`); it does not read
+task files.
 
 ## Orient — Starting a Session
 
@@ -67,7 +65,7 @@ resolver never reads `backlog/tasks/` or `backlog/completed/`.
 
 1. Call the configured adapter's required `create` operation.
 2. Use its returned `#N` ref in the current sprint Plan when in scope.
-3. Continue directly from the created Issue; do not create a task mirror.
+3. Continue directly from the created Issue.
 
 ## Plan — Sprint
 
@@ -82,8 +80,8 @@ When starting a new sprint:
 ## Work — Execute a Batch
 
 1. Resolve each task through `effective-task-spec.js`; record or retain its
-   `source_ref` and `source_revision` in the work handoff. Do not read a task
-   mirror. A live-read failure is a stop condition.
+   `source_ref` and `source_revision` in the work handoff. A live-read failure
+   is a stop condition.
 2. Read the current batch and Running Context only when the work has an
    admitted sprint.
 3. Update neutral task state through the configured adapter.
@@ -110,9 +108,9 @@ For the whole sprint:
 
 1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
 2. The command sets `status: completed`, appends final Progress, and prints the
-   doctor/reassess summary. In mirrorless GitHub mode it neither requires nor
-   creates task directories. When checked legacy GitHub mirrors happen to
-   exist, it archives only those compatibility files.
+   doctor/reassess summary. Close does not require or create task directories.
+   When checked legacy GitHub export files happen to exist, it archives only
+   those files.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
 ## Sync / Legacy Export — Explicit and One-Way
@@ -151,5 +149,5 @@ Create a sprint only when execution context needs to span work or sessions.
 ## Next — What to Work On
 
 1. Read the active sprint and find the first unchecked batch (`next.sh --track <slug>` selects one track when a portfolio is active).
-2. If it is done, list open Issues or start the next sprint.
+2. If it is done, list open Issues; create a sprint only when complexity admission applies.
 3. Present the batch with its exact normalized refs and total estimate.

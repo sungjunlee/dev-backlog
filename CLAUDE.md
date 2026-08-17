@@ -22,30 +22,30 @@ skills/
     scripts/               ← Deterministic helpers (node + bash)
 ```
 
-The `spec-charter`, `spec-system-map`, and `spec-grill` skills moved to
-[craftkit](https://github.com/sungjunlee/craftkit); this repo consumes their
-output files (`spec/charter.md`, `spec/system-map.md`, `spec/capabilities.md`)
-but no longer ships the skills themselves.
+The `spec-charter`, `spec-system-map`, and `spec-grill` authoring skills live
+in [craftkit](https://github.com/sungjunlee/craftkit); this repo consumes
+`spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` and does
+not ship those skills.
 
 ## Key Design Decisions
 
 - **GitHub Issues = sole task authority** — task definition, AC, and lifecycle
   resolve from the live Issue (`effective-task-spec.js`);
-  no task-file directory required, no local mirror to read back
+  no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
 - **Multi-track sprints** — concurrent `status: active` tracks must declare
   provably disjoint scopes (`component:` or `scope:` globs, one shared
   `scopesOverlap` predicate); overlap fails loud
-- **Deliberate mutations only** — no hidden sync. GitHub writes are explicit;
-  `sync-pull --legacy-export` (Backlog.md-shaped task mirrors) exists solely as
-  a rollback/diagnostic export and never authorizes execution
+- **Deliberate mutations only** — no hidden sync. GitHub writes are explicit.
+  Routing and optional-export boundaries live in
+  `skills/dev-backlog/references/authority-contract.md`.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
   through validated wire contracts (`--model-actions` JSON, anchor comments);
   scripts own everything checkable
 
-## Two-Layer Architecture
+## Architecture
 
 ```
 GitHub Issues (what: definition, AC, lifecycle)
