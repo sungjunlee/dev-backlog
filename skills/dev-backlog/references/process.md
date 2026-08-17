@@ -149,5 +149,5 @@ Create a sprint only when execution context needs to span work or sessions.
 ## Next — What to Work On
 
 1. Read the active sprint and find the first unchecked batch (`next.sh --track <slug>` selects one track when a portfolio is active).
-2. If it is done, list open Issues or start the next sprint.
+2. If it is done, list open Issues; create a sprint only when complexity admission applies.
 3. Present the batch with its exact normalized refs and total estimate.
