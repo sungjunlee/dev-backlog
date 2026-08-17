@@ -78,7 +78,7 @@ new measured adoption evidence and an explicit authority-contract amendment.
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
 | Backlog.md | Optional one-way legacy format compatibility | Human-reviewed Markdown may be imported into a GitHub Issue; `--legacy-export` may emit diagnostic/rollback snapshots; task files are never read as runtime authority and Backlog.md tooling is not required |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
-| Retrieval/memory experiments | Optional, report-only evidence tools | Must remain reproducible projections until the separate benchmark meets its quantitative go/no-go gate |
+| Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 
 ## Cold-adopter invariant
 

@@ -1,142 +1,62 @@
 # File Format Reference
 
-Task files are explicit legacy exports compatible with the
-[Backlog.md](https://github.com/MrLesk/Backlog.md) task format. Runtime never
-reads them as task specification or lifecycle authority.
+Sprint files, tracker selection, and config. Optional Backlog.md-shaped
+exports are a short legacy note at the end — never a runtime format.
 
-## Frontmatter Fields
+## Sprint file
 
-### Core
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | string | Yes | Legacy export ref `{PREFIX}-{N}` derived from the GitHub issue number |
-| `title` | string | Yes | Brief, action-oriented description |
-| `status` | string | Yes | Current state (see Status Values below) |
-
-### Classification
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `labels` | string[] | Categorization labels (maps to GitHub labels only in GitHub mode) |
-| `priority` | string | `low`, `medium`, `high`, `critical` |
-| `assignee` | string[] | Assigned people (`@username`) |
-
-### Relationships
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `dependencies` | string[] | Task IDs that must complete first (e.g., `[BACK-38]`) |
-
-### Dates
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `created_date` | string | Creation date (`YYYY-MM-DD`) |
-| `updated_date` | string | Last update (`YYYY-MM-DD HH:MM`) |
-
-## Status Values
-
-Default set (configurable in `config.yml`):
-
-| Status | GitHub mapping | Meaning |
-|--------|-------------|---------|
-| `To Do` | `status:todo` | Not started |
-| `In Progress` | `status:in-progress` | Active work |
-| `Done` | — | Completed (issue closed) |
-
-Extended set (if using more granular tracking):
-
-| Status | GitHub mapping | Meaning |
-|--------|-------------|---------|
-| `Blocked` | `status:blocked` | Waiting on external dependency |
-| `In Review` | `status:in-review` | PR under review |
-
-## Filename Convention
-
-```text
-{PREFIX}-{N[.M]} - {Title-Slug}.md
-```
-
-Examples:
-- `BACK-42 - Implement-OAuth2-flow.md`
-- `PROJ-7 - Fix-login-timeout.md`
-- `BACK-100.2 - Create-HTTP-server-module.md` (sub-task)
-
-The prefix comes from `config.yml` (`task_prefix`). The integer part is the
-GitHub issue number. Decimal IDs are accepted only when parsing historical
-Backlog.md files; they are not runtime task identities.
-
-## Body Structure
-
-Task files are one-way legacy exports from GitHub Issues.
-Notes, decisions, and cross-task context still go in the **sprint file**
-(`backlog/sprints/`), not here.
+Each active sprint lives at `backlog/sprints/YYYY-MM-<topic>.md`. Section
+semantics and checkbox states are in [SKILL.md](../SKILL.md).
 
 ```markdown
-## Description
-[Synced from GitHub issue body — includes any checkboxes from the issue]
+---
+milestone: Sprint W13
+status: active
+started: 2026-03-22
+due: 2026-03-28
+objectives: [O10]
+component: "auth-system"
+---
+
+# Auth + API Foundation
+
+## Goal
+Users can log in and access protected API endpoints.
+
+## Plan
+### Batch 1 - DB + seed
+- [x] #38 DB schema setup (~15min)
+
+### Batch 2 - Core auth
+- [~] #42 OAuth2 flow (~2hr) -> PR #87 (reviewing)
+
+### Batch 3 - Hardening
+- [ ] #43 Rate limiting (~30min)
+
+## Running Context
+- argon2 for hashing
+
+## Progress
+- 2026-03-22 AM: Batch 1 done.
 ```
 
-`sync-pull.js --legacy-export` wraps an Issue body in `## Description`. The
-Issue body is authoritative; hand-edited export bytes are never parsed back
-into task truth.
-
-## Effective Task Specification
-
-Work and completion resolve task input through `effective-task-spec.js`, never
-through this mirror format. The canonical task body is the default selected
-specification. To select a repository document explicitly, put exactly one
-marker in the canonical task body:
-
-```markdown
-<!-- dev-backlog:spec_ref docs/tasks/oauth-rollout.md -->
-```
-
-`spec_ref` is repository-relative. The resolver fails closed when it is
-missing, unreadable, outside the repository, or duplicated with a conflicting
-value; it does not fall back to the Issue body or a task mirror. Agent Briefs
-and ecosystem documents may be proposed as candidates, but they become
-authoritative only through this explicit marker.
-
-The resolver returns the selected content as `effective_spec`, task-list items
-from `AC:BEGIN/END` (preferred), an Acceptance Criteria heading, or a legacy
-body-wide fallback, plus normalized `lifecycle`, `source_ref`, and stable
-SHA-256 `source_revision`/`source_digest`.
-
-For a human-reviewed Backlog.md import or export, you can optionally add structured AC markers:
-
-```markdown
-## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [ ] Condition 1
-- [x] Condition 2 (checked off during work)
-<!-- AC:END -->
-```
-
-The `<!-- AC:BEGIN/END -->` markers enable machine parsing by the Backlog.md CLI. Without them, acceptance criteria still work as plain checkboxes — the file reads fine either way.
-
-Import is intentionally manual and one-way: review compatible Markdown, then
-create or amend a GitHub Issue. No runtime command treats a file edit as an
-Issue update. Notes, technical decisions, and running context belong in an
-admitted sprint file.
-
-## Sprint Frontmatter (spec-axis fields)
-
-Sprint files (`backlog/sprints/*.md`) carry `objectives:` and `component:` alongside `milestone:` / `status:` / `started:` / `due:`. Both spec-axis fields are **optional**:
+`objectives:` and `component:` are **optional**:
 
 | Field | Optional? | Omission semantics |
 | --- | --- | --- |
 | `objectives:` | yes | Omitted entirely when neither `spec/charter.md` nor legacy root `CHARTER.md` exists. A present-but-unknown Objective ID is a hard failure (`objectives-check.js`) — except in `status: completed` sprints, which are immutable history and may reference retired IDs. |
 | `component:` | yes | Omitted entirely when `spec/capabilities.md` does not exist. A present value must resolve to exactly one `## Capability:` slug (`component-lint.js`) — except in `status: completed` sprints, which may reference retired slugs. |
 
-`sprint-init.js` emits each field only when its backing spec file is present, so a cold adopter with no `spec/` gets a clean sprint with neither key. An older sprint that still carries an empty `objectives: []` / `component: ""` stays valid — this is omission-on-generate, not a migration. `backlog-doctor.js` warns (soft, non-blocking) only when the **active** sprint omits a field while its spec file exists. Full semantics live in [`spec-fallback.md`](spec-fallback.md); the authoritative contract table is in [SKILL.md](../SKILL.md).
+`sprint-init.js` emits each field only when its backing spec file is present.
+An older sprint that still carries `objectives: []` / `component: ""` stays
+valid. `backlog-doctor.js` warns (soft) only when the **active** sprint omits a
+field while its spec file exists. Full semantics: [`spec-fallback.md`](spec-fallback.md).
 
-## Sprint Plan
+Order Plan items into parallel-safe batches. An empty `## Plan` is valid until
+issues are selected; every nonblank, non-heading Plan line must parse as a
+task item.
 
-Order planned tasks into parallel-safe batches. Group small tasks (~30min or less) for one session only when they can run in the same wave. An empty `## Plan` is valid until issues are selected; do not add prose or placeholder checkboxes because every nonblank, non-heading Plan line must parse as a task item.
-
-## Tracker Selection
+## Tracker selection
 
 `backlog/.tracker` contains exactly one newline-terminated selection:
 
@@ -161,26 +81,37 @@ statuses: ["To Do", "In Progress", "Done"]
 
 `config.yml` remains the read-only source for Backlog.md settings such as
 `task_prefix`; setup never creates, rewrites, or removes fields from it.
+dev-backlog reads `task_prefix`, `default_status`, and `statuses`;
+`project_name` is retained as metadata.
 
-dev-backlog also reads `task_prefix`, `default_status`, and `statuses`;
-`project_name` is retained as metadata. Other Backlog.md config fields are not
-consumed by dev-backlog.
+## Effective task specification
 
-## Sub-tasks
+Work and completion resolve task input through `effective-task-spec.js`. The
+canonical task body is the default selected specification. To select a
+repository document explicitly, put exactly one marker in the Issue body:
 
-Hierarchical IDs use decimal notation:
-- `BACK-42` — parent task
-- `BACK-42.1` — first sub-task
-- `BACK-42.2` — second sub-task
+```markdown
+<!-- dev-backlog:spec_ref docs/tasks/oauth-rollout.md -->
+```
 
-Sub-tasks get their own files: `BACK-42.1 - Subtask-title.md`
+`spec_ref` is repository-relative. The resolver fails closed when it is
+missing, unreadable, outside the repository, or duplicated with a conflicting
+value; it does not fall back to another document. Optional AC markers:
 
-## Backlog.md One-Way Legacy Compatibility
+```markdown
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] Condition 1
+- [x] Condition 2
+<!-- AC:END -->
+```
+
+Without the markers, acceptance criteria still work as plain checkboxes.
+
+## Optional legacy export
 
 `sync-pull.js --legacy-export` may write `backlog/tasks/` in a
-Backlog.md-compatible shape for diagnosis or rollback. The Backlog.md CLI may
-recognize those files, but it is not installed, invoked, or required by
-dev-backlog. To import historical compatible Markdown, a human must review it
-and explicitly create or amend the corresponding GitHub Issue.
-
-The `backlog/sprints/` directory is a custom addition for sprint execution tracking. Backlog.md CLI ignores it (only scans `tasks/`, `completed/`, `drafts/`, `decisions/`, `docs/`). This is safe — sprints/ won't interfere with CLI operations.
+Backlog.md-compatible shape for diagnosis or rollback. Those files are never
+read as task truth. Import is human-reviewed Markdown into a GitHub Issue.
+Exported filenames look like `{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are
+historical parse-only, not runtime identities.

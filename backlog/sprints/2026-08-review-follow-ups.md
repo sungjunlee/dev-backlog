@@ -1,6 +1,6 @@
 ---
 milestone: 2026-08 review follow-ups
-status: active
+status: completed
 started: 2026-08-16
 due: 2026-08-28
 scope: ["docs/**", "spec/**", "skills/**"]
@@ -22,7 +22,7 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 - [x] #363 Resolve charter O3 this cycle: measured on-track drill or demote into the O5 reassess loop (2d) [evidence:docs/o3-drill-2026-08-16.md] → charter rev 14 (O3 implemented, user-approved 2026-08-16)
 
 ### Batch 3 — Conformance net
-- [~] #367 SKILL.md conformance suite: periodic fresh-session evals on Claude and Codex + doc-drift check (3d) — doc-drift net in CI; 4-channel model-actions conformance run done (evidence: docs/conformance/2026-08-16-model-actions.md); cadence accepted; residual AC: full Eval-Prompts cross-model run at the next cadence checkpoint [run:conformance-2026-08-16]
+- [x] #367 SKILL.md conformance suite: periodic fresh-session evals on Claude and Codex + doc-drift check (3d) — sprint AC done (doc-drift + 4-channel run + cadence). Residual Eval-Prompts run stays on the open epic as standing cadence, not this sprint. [run:conformance-2026-08-16]
 
 ## Running Context
 - Track axis: `scope:` globs, deliberately mixed-axis against the active `2026-07-github-native-core-simplification` track (`component: "tracker-task-truth"`) — `scopesOverlap` treats mixed axes as disjoint, and that track's only remaining item is the `[~] #350` decision wait, not code. Do not touch that track's state from here.
@@ -38,3 +38,5 @@ The 2026-08-15 review's this-cycle findings are closed out: the #350 shadow gate
 - 2026-08-16: User approved the O3 amend ("권장대로 진행") — charter rev 13 → 14: O3 `[active]` → `[implemented]` with the drill as proof and the spec-charter-axis denominator; Decisions row appended (human gate satisfied by explicit approval). #363 closed. Batch 2 complete. Next: Batch 3 (#367) starting with the deterministic doc-drift check, fresh-session evals after.
 - 2026-08-16: Batch 3 started (#367). `doc-drift-check.js` + 10-test suite landed: scans skills/*/SKILL.md, references/*.md, and _context.md for `.js`/`.sh` mentions against the scripts/ inventory; live repo clean (18 docs / 62 scripts / 0 dangling); the test suite includes a live-repo assertion so CI now carries the net permanently. Registered in references/scripts.md. Remaining: fresh-session conformance evals on Claude + Codex, cross-model comparison, cadence decision (proposal posted on #367: per release-tag + at reassess boundaries; dated reports under docs/conformance/).
 - 2026-08-16: Sprint-free siblings + Batch 3 conformance run, executed via agent fan-out per user direction. #370 closed (v0.10.0 tagged at 65fcb7c with the wave's missing CHANGELOG entries; v1.0.0 reserved). #372 closed (735fc41, implemented by a sonnet subagent, reviewed + verified locally: triage 101 / node 382 / smoke 190 all green). #367 conformance run: 4 channels (opus, sonnet, codex gpt-5.6-sol, pi deepseek-v4-flash) over the frozen 2026-08-16 snapshot — wire 4/4 PASS, judgment sonnet ≥ codex > opus > pi, 3 rubric fixes identified (docs/conformance/2026-08-16-model-actions.md, commit 0021651). Cadence accepted. #367 residual: full Eval-Prompts cross-model run at the next cadence checkpoint — the sprint's only open item.
+- 2026-08-17: Batch 3 closed for this sprint. #367 remaining Eval-Prompts run is standing cadence on the epic (unassigned from milestone 20). Closing this track so the second-start lightening sprint can take `docs/**` / `spec/**` / `skills/**`. #350 no-go is executing on the github-native track via #362, not here.
+- 2026-08-17: Sprint closed. 3/3 tasks completed.

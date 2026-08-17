@@ -1,12 +1,16 @@
 # dev-backlog Capabilities
 
-The middle layer between [`charter.md`](charter.md) and the active sprint. Each block describes one subsystem-worth of work with a frozen-ish contract and a structurally bounded live-feedback channel.
+The middle layer between [`charter.md`](charter.md) and the active sprint.
 
-Mutation discipline matches [`docs/spec-system-design.md`](../docs/spec-system-design.md): Goal/Scope/Behaviors/HardConstraints are human-gated via `spec-grill`; `## Learnings` is appended only by a bounded `append-learnings` writer between magic markers; `### Decisions` is append-only by convention, and superseded rows move to [`../docs/spec-history.md`](../docs/spec-history.md) only in human-gated compaction passes.
+Capability headings are routing handles. Sprint `component:` names exactly one
+slug. Concurrent active tracks partition by `component:` equality or by
+`scope:` globs — one axis per track, never both.
 
-Capability headings are strict routing handles. Use one lowercase slug after `## Capability:` and point sprint `component:` frontmatter at exactly one of those slugs; put secondary touches in sprint prose. `component:` also serves as a track's scope key: concurrent active tracks partition by `component:` equality — or by explicit `scope:` path globs when no component axis fits — one axis per track, never both.
+Retired capabilities (history in [`../docs/spec-history.md`](../docs/spec-history.md)):
+`backlog-sync`; `spec-charter` / `spec-system-map` / `spec-grill` (skills moved
+to craftkit). Completed sprints that name a retired slug are not re-linted.
 
-Retired capabilities (history in [`../docs/spec-history.md`](../docs/spec-history.md)): `backlog-sync` (2026-08-16, absorbed into `tracker-task-truth` as the legacy-export constraint); `spec-charter`/`spec-system-map`/`spec-grill` blocks (2026-07-05, skills moved to craftkit). Completed sprints referencing a retired slug are immutable history and are not re-linted.
+Mutation: [`README.md`](README.md) § Mutation.
 
 ---
 
@@ -44,9 +48,8 @@ Retired capabilities (history in [`../docs/spec-history.md`](../docs/spec-histor
 ### Decisions
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
-| 2026-07-31 | Narrow the target capability to live GitHub Issue authority and freeze adapter/mirror expansion | 0 of 17 observed consumers selected a non-default tracker, and all 18 known consumers had a GitHub remote; compatibility remains only long enough to stage resolver and mirrorless pilots safely | 2026-07-11 generic configured-tracker target |
-| 2026-07-31 | Remove the zero-adopter local tracker and retain Backlog.md only as one-way legacy import/export | the mirrorless GitHub pilot and optional-integration absence tests preserve the complete core path while deleting an unmeasured storage substrate | 2026-07-26 local JSON authority; staged local compatibility in the preceding 2026-07-31 decision |
 | 2026-08-16 | Absorb `backlog-sync` into this capability as the legacy-export behavior/constraint set (#377) | one diagnostic flag does not warrant a standalone capability contract; the bright line ("human-authored provider content is untouchable", exports never read back) belongs with the authority it protects | standalone `backlog-sync` capability |
+| 2026-08-17 | Freeze the leftover export/compat runtime: no new features on `sync-pull`, `legacy-tracker.js`, or `{PREFIX}-N` parsing without a measured consumer (#379) | these are deletable compatibility seams, not a product to grow | implicit seam expansion |
 
 ---
 
@@ -78,16 +81,16 @@ Retired capabilities (history in [`../docs/spec-history.md`](../docs/spec-histor
 
 ### Learnings
 <!-- LEARN:BEGIN -->
-- 2026-07-03 (milestone 10, PRs #221-#227): execution-substrate sprint delivered via 7 relay runs — JSON read surfaces, actor-agnostic consumption contract, backlog-doctor, recovery gate; key lesson: commit the sprint file at open or dispatch worktrees cannot see it
-- 2026-07-05 (run #issue-247-20260705054603535-f8fa8f1d): Bash scripts must parse flags position-independently like the Node scripts; positional-first ${1:-default} broke flag-only invocation (sprint-close) [PR #251]
+- 2026-07-03 (milestone 10, PRs #221-#227): commit the sprint file at open or dispatch worktrees cannot see it
+- 2026-07-05 (PR #251): Bash scripts must parse flags position-independently like the Node scripts
 <!-- LEARN:END -->
 
 ### Decisions
 | date | decision | rationale | supersedes |
 | --- | --- | --- | --- |
 | 2026-07-12 | Replace the single-active-sprint invariant with track-partitioned scope disjointness (epic #289; human-gated pass #294) | disjoint-scope tracks remove the false serialization of unrelated work while overlap stays fail-loud through one shared predicate; single-track behavior is byte-identical (G4) | pre-#289 "exactly one active sprint" behavior |
-| 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | the pair rule under-warned: one scopeless track next to a declared one is exactly the unprovable state the warning exists for, and B is also the shorter rule to state — "when more than one track is active, every track must declare an axis". Verified against all 18 consuming repos: zero `active_sprint` verdict changes, so single-track repos stay silent | 2026-07-12 pair-rule warning |
-| 2026-07-31 | Admit sprints by execution complexity, not duration; keep simple Issue → PR work sprint-free | the validated sprint kernel solves continuity and handoff, but requiring it for single-threaded work adds state without resolving a continuity problem | implicit sprint-for-all-work routing |
+| 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | one scopeless track next to a declared one is exactly the unprovable state; when more than one track is active, every track must declare an axis | 2026-07-12 pair-rule warning |
+| 2026-07-31 | Admit sprints by execution complexity, not duration; keep simple Issue → PR work sprint-free | requiring a sprint for single-threaded work adds state without resolving a continuity problem | implicit sprint-for-all-work routing |
 
 ---
 
