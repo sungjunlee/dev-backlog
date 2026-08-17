@@ -91,7 +91,7 @@ canonical task body is the default selected specification. To select a
 repository document explicitly, put exactly one marker in the Issue body:
 
 ```markdown
-<!-- dev-backlog:spec_ref docs/tasks/oauth-rollout.md -->
+<!-- dev-backlog:spec_ref docs/oauth-rollout.md -->
 ```
 
 `spec_ref` is repository-relative. The resolver fails closed when it is

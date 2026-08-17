@@ -1,15 +1,8 @@
 # GitHub-native authority and routing contract
 
-This is the product contract for the 2026-08 GitHub-native core simplification
-milestone. The zero-adopter local tracker has been removed. Task files remain
-only as an explicit one-way legacy import/export boundary.
-
-The contract is based on the 2026-07-27 adoption review: all 17 observed
-consumer repositories used the default GitHub path, and 0 of 17 selected a
-non-default tracker. A follow-up check on 2026-07-28 found that all 18 then
-known consumer repositories had a GitHub remote. The evidence supports a
-GitHub-native core; it does not support another generic tracker or mirror
-abstraction.
+GitHub Issues own task specification and lifecycle. A sprint file exists only
+when execution needs continuity beyond one Issue and its PR. Task files remain
+an explicit one-way legacy import/export boundary, never runtime authority.
 
 ## Authority and routing table
 
@@ -68,6 +61,8 @@ The core product excludes:
 Do not add tracker providers, bidirectional compatibility machinery,
 task-mirror lifecycle features, or a committed memory/compiler layer without
 new measured adoption evidence and an explicit authority-contract amendment.
+Measured adoption: 0 of 17 selected a non-default tracker; all 18 then-known
+consumers had a GitHub remote. That evidence froze the GitHub-native core.
 
 ## Optional boundaries
 
@@ -80,7 +75,7 @@ new measured adoption evidence and an explicit authority-contract amendment.
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 
-## Cold-adopter invariant
+## No-spec / no-Relay invariant
 
 A repository with GitHub Issues but no `backlog/`, no `spec/`, and no Relay
 installation must be able to:

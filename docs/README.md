@@ -15,7 +15,7 @@ related behavior.
 | --- | --- | --- |
 | [`compatibility-subtraction.md`](compatibility-subtraction.md) | Subtraction proof for the removed zero-adopter local tracker and generic compatibility machinery (#348). Retirement candidate in #381. | #381 |
 | [`historical-retrieval-shadow.md`](historical-retrieval-shadow.md) | Concluded #350 shadow: **no-go** 2026-08-17 (A1, Arm B suffices). Retirement candidate in #381. | #362, #381 |
-| [`mirrorless-github-pilot.md`](mirrorless-github-pilot.md) | Runbook proving live GitHub Issues plus sprint files need no `backlog/tasks/` or `backlog/completed/` (#347). Retirement candidate once #350 closes — the shadow doc cites it only through pinned commit links. | `historical-retrieval-shadow.md` (pinned links) |
+| [`mirrorless-github-pilot.md`](mirrorless-github-pilot.md) | Runbook proving live GitHub Issues plus sprint files need no `backlog/tasks/` or `backlog/completed/` (#347). Retirement candidate in #381 — the shadow doc cites it only through pinned commit links. | `historical-retrieval-shadow.md` (pinned links) |
 | [`spec-history.md`](spec-history.md) | Archive of the spec axis's externalized history: rev-14 objective texts with statuses/proofs, charter and capability Decisions rows, and moved Learnings (#377, #379). | `spec/charter.md`, `spec/capabilities.md`, `spec/README.md` |
 | [`o3-drill-2026-08-16.md`](o3-drill-2026-08-16.md) | Timed on-track drill across 5 consumer repos — the proof behind charter rev 14's O3 `implemented` status (#363). | `docs/spec-history.md` |
 | [`conformance/`](conformance/) | Dated cross-model conformance runs for prompt-judged surfaces (#367); retention rule in its README. | `conformance/README.md`, #367 |

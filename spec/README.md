@@ -15,13 +15,6 @@ files; it does not ship the skills.
 
 ## Mutation
 
-- Charter Problem/Approach/Non-Goals/Objectives: human-gated.
-- Charter and capability Decisions: append-only; superseded rows move to
-  `docs/spec-history.md` in a compaction pass.
-- Capability Goal/Scope/Behaviors/Hard Constraints: human-gated.
-- Capability Learnings: append-only between `LEARN` markers when a writer exists.
-
-Do not copy Issue AC, sprint checkboxes, or review notes into `spec/*`.
-
-Task truth stays in GitHub Issues. Complex execution stays in `backlog/sprints/`.
-Routing: [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
+Human-gated: charter direction and capability Goal/Scope/Behaviors/Hard Constraints.
+Decisions append-only (superseded rows → `docs/spec-history.md`). Learnings append
+between `LEARN` markers. Do not copy Issue AC, sprint checkboxes, or review notes.

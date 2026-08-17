@@ -10,7 +10,7 @@ Retired capabilities (history in [`../docs/spec-history.md`](../docs/spec-histor
 `backlog-sync`; `spec-charter` / `spec-system-map` / `spec-grill` (skills moved
 to craftkit). Completed sprints that name a retired slug are not re-linted.
 
-Mutation: [`README.md`](README.md) § Mutation.
+Mutation: [`spec/README.md`](README.md) § Mutation.
 
 ---
 
