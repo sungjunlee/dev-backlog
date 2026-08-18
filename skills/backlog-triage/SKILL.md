@@ -72,7 +72,7 @@ Required sections:
 - `## Obsolete Candidates` — anchored close/revisit proposals with evidence.
 - `## Priority Proposals` — model-judged anchored priority proposals with rationale (delivered via `--model-actions`).
 - `## Milestone Suggestions` — model-judged anchored milestone proposals grouped into candidate sprint clusters (delivered via `--model-actions`).
-- `## Alignment` — objective coverage, orphan work, neglected objectives, contradictions, and proposed charter changes; when no charter exists, record that alignment was skipped.
+- `## Alignment` — objective coverage, orphan work, uncovered objectives, contradictions, and proposed charter changes; when no charter exists, record that alignment was skipped.
 - `## Decision Review` — `Do Now`, `Shape First`, `Defer`, and `Drop / Close`.
 - `## Apply Checklist` — consolidated review surface for every anchored action.
 
@@ -89,7 +89,7 @@ Full section examples and rubric details live in `references/classification.md`,
 | AC checkboxes inside issue bodies (`AC:BEGIN` / `AC:END`) | `dev-backlog` |
 | Open-issue classification, relationships, stale flags | `backlog-triage` |
 | Charter alignment of open issues | `backlog-triage` report; mutations route to `spec-charter` |
-| Capability/system-map concerns | `backlog-triage` report; mutations route to `spec-grill` or `spec-system-map` |
+| Capability/system-map concerns | `backlog-triage` report; mutations route to `spec-grill` or `spec-charter` (`map`) |
 | Priority/milestone proposals and accepted mutations | `backlog-triage` |
 | Post-triage sprint planning | `dev-backlog` |
 
