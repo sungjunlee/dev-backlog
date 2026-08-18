@@ -31,7 +31,7 @@ If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
 github --non-interactive`; see `references/file-format.md`. Never infer a
 tracker from availability.
 
-Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md`), `spec-system-map` (`spec/system-map.md`), and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
+Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
 The state ownership, compatibility, and optional-integration boundary
 are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).

@@ -22,10 +22,10 @@ skills/
     scripts/               ← Deterministic helpers (node + bash)
 ```
 
-The `spec-charter`, `spec-system-map`, and `spec-grill` authoring skills live
-in [craftkit](https://github.com/sungjunlee/craftkit); this repo consumes
+The `spec-charter` and `spec-grill` authoring skills live in
+[craftkit](https://github.com/sungjunlee/craftkit); this repo consumes
 `spec/charter.md`, `spec/system-map.md`, and `spec/capabilities.md` and does
-not ship those skills.
+not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
