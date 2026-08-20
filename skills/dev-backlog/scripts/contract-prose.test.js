@@ -86,19 +86,14 @@ it("records the measured Projects decision without adding a core profile", () =>
 });
 
 it("records the historical-retrieval shadow as a concluded no-go", () => {
-  const markdown = fs.readFileSync(
-    path.join(ROOT, "docs/historical-retrieval-shadow.md"),
-    "utf8",
-  );
+  const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
+  const changelog = fs.readFileSync(path.join(ROOT, "CHANGELOG.md"), "utf8")
+    .split("## [0.9.0]")[0];
 
-  assert.match(markdown, /The shadow is concluded/);
-  assert.match(markdown, /no-go/);
-  assert.match(markdown, /Arm B suffices/);
-  assert.match(markdown, /No compiled report, topic graph, search index/);
-  assert.match(markdown, /20\/20 \(100%\)/);
-  assert.match(markdown, /37\/41 Issue\/PR pointers/);
-  assert.match(markdown, /1 local query \+ 0\.05 amortized external compile/);
-  assert.match(markdown, /originally no decision before 2026-08-28/);
-  assert.match(markdown, /project-memory.*human-gated charter amendment/si);
-  assert.match(markdown, /outside the\s+repository/);
+  assert.match(charter, /#350 historical-retrieval shadow is \*\*no-go\*\*/);
+  assert.match(charter, /Arm B \(live sources\) suffices/);
+  assert.match(charter, /no compiler, no project-memory skill, no committed retrieval artifact/);
+  assert.match(changelog, /Historical-retrieval shadow closed no-go/);
+  assert.match(changelog, /Arm B \(live GitHub\/Git\/spec\/sprint sources\)/);
+  assert.doesNotMatch(changelog, /task mirrors under `backlog\/tasks\/` remain core/);
 });
