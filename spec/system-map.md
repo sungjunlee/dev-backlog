@@ -24,7 +24,7 @@ a product surface (#350 no-go).
   Routing table: [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
 - Sprint files own only admitted complex execution state.
 - `skills/backlog-triage/` owns advisory grooming; GitHub mutation is explicit (`--apply`).
-- `spec/*` changes are human-gated. History lives in `docs/spec-history.md` and git.
+- `spec/*` changes are human-gated. History lives in git (`4fea158` last pre-restructure charter).
 
 ## Core Flows
 

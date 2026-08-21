@@ -1,6 +1,6 @@
 ---
-last_amended: 2026-08-17
-revision: 16
+last_amended: 2026-08-21
+revision: 17
 ---
 
 # dev-backlog Charter
@@ -36,10 +36,10 @@ hot path small enough to start again.
 - O1 — for admitted complex work, Claude Code, Codex, and humans read the same active sprint file as the shared execution-continuity state (one file per admitted track; not a unique-sprint-count invariant).
 - O4 — open-issue drift (orphan work, neglected objectives, contradictions) is detectable without manual triage.
 
-Retired IDs (O3, O5–O9), the pre-2026-08-16 status ladder, and all proof/adoption
-evidence live in [`docs/spec-history.md`](../docs/spec-history.md).
+Retired IDs (never reuse): O3, O5–O9. Full texts: git
+[`4fea158`](https://github.com/sungjunlee/dev-backlog/blob/4fea158/spec/charter.md).
 
-## Decisions          <!-- Tier 3 · History (append-only; rows through rev 14 moved to docs/spec-history.md) -->
+## Decisions          <!-- Tier 3 · History (append-only; rows through rev 14 live at git 4fea158) -->
 | date       | decision | rationale | supersedes |
 | ---------- | -------- | --------- | ---------- |
 | 2026-08-16 | The charter drops the proof-gate status ceremony: Objectives become status-free direction predicates; statuses, proofs, denominators, adoption counts, and prior Decisions rows move to `docs/spec-history.md` (#377) | the `[active]→[implemented]→[validated]` ladder generated synthetic measurement work (timed drills, cross-repo counts, reassess bookkeeping) whose upkeep cost exceeded its single-maintainer evidence value — one proof drill even leaked private-consumer details into this public repo; git, CHANGELOG, and docs/ already record history | rev-14 objective statuses; charter Decisions rows through rev 14 |
@@ -47,3 +47,4 @@ evidence live in [`docs/spec-history.md`](../docs/spec-history.md).
 | 2026-08-17 | #350 historical-retrieval shadow is **no-go**: Arm B (live sources) suffices; no compiler, no project-memory skill, no committed retrieval artifact (#362) | amendment A1 required ≥10 organic questions; the log stayed 0/10, so a 2026-08-28 go was already impossible | 2026-07-31 memory-requires-a-measured-gate holding pattern |
 | 2026-08-17 | Freeze leftover compatibility runtime: no new features on `sync-pull --legacy-export`, `legacy-tracker.js`, or `{PREFIX}-N` parsing without a measured consumer | those seams survived #348 as deletable compatibility, not as a product surface; expanding them recreates the generality the GitHub-native core removed | implicit "keep the seams warm" |
 | 2026-08-17 | Living Objectives are O10, O1, O4 only. O3 and O5 retire (texts in `docs/spec-history.md`). O1 wording is *shared* state per admitted track, not sprint count (#379) | O3/O5 kept generating the measurement ceremony rev 15 stopped paying for; O1's "single" predates multi-track (#373) | rev-15 five-objective set; O1 "single execution-continuity state" |
+| 2026-08-21 | Working-tree spec archive retired: never-reuse list stays in the charter; full retired texts live at git `4fea158`. `docs/spec-history.md` is Removed (#385) | the living tree only needs the never-reuse constraint; a verbatim archive duplicated git | `docs/spec-history.md` as the living history home |

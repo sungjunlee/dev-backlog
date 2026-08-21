@@ -1,7 +1,8 @@
 # Project Specs
 
-Living contracts only. History: [`../docs/spec-history.md`](../docs/spec-history.md)
-and git.
+Living contracts only. Retired Objective IDs (O3, O5–O9) are never reused;
+full texts live at git
+[`4fea158`](https://github.com/sungjunlee/dev-backlog/blob/4fea158/spec/charter.md).
 
 | File | Role |
 | --- | --- |
@@ -17,5 +18,6 @@ does not ship the skills.
 ## Mutation
 
 Human-gated: charter direction and capability Goal/Scope/Behaviors/Hard Constraints.
-Decisions append-only (superseded rows → `docs/spec-history.md`). Learnings append
-between `LEARN` markers. Do not copy Issue AC, sprint checkboxes, or review notes.
+Decisions append-only (historical rows stay in the table; git is the archive).
+Learnings append between `LEARN` markers. Do not copy Issue AC, sprint
+checkboxes, or review notes.

@@ -26,39 +26,21 @@ for (const file of SURFACES) {
 }
 
 it("records compatibility subtraction in current decisions and release notes", () => {
-  const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
-  const specHistory = read("docs/spec-history.md");
-  const changelog = read("CHANGELOG.md").split("## [0.9.0]")[0];
+  const changelog = fs.readFileSync(path.join(ROOT, "CHANGELOG.md"), "utf8").split("## [0.9.0]")[0];
+  const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
 
-  assert.match(specHistory, /Remove the zero-adopter local tracker/);
-  assert.match(specHistory, /2026-07-26 local JSON authority/);
+  assert.match(charter, /Freeze leftover compatibility runtime/);
   assert.match(changelog, /Required task mirrors/);
   assert.match(changelog, /Zero-adopter local tracker/);
   assert.doesNotMatch(changelog, /task mirrors under `backlog\/tasks\/` remain core/);
 });
 
-it("keeps the living charter status-free with history externalized", () => {
+it("keeps the living charter status-free with retired IDs pinned in git", () => {
   const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
   assert.match(charter, /^- O10 — /m);
   assert.doesNotMatch(charter, /^- O\d+ \[(?:validated|active|implemented|deferred)\]/m);
-  assert.match(charter, /docs\/spec-history\.md/);
-});
-
-it("archives the moved spec history without content loss", () => {
-  const specHistory = fs.readFileSync(path.join(ROOT, "docs/spec-history.md"), "utf8");
-
-  // Retired backlog-sync block survives verbatim, not as a summary.
-  assert.match(specHistory, /^## Capability: backlog-sync$/m);
-  assert.match(specHistory, /refuses before provider access or task-file materialization/);
-  assert.match(specHistory, /byte-identical task files on the second run/);
-  assert.match(specHistory, /<!-- dev-backlog:progress-issue month= -->/);
-  assert.match(specHistory, /`sprint-mirror` is removed/);
-
-  // Rev-14 objective texts (with statuses/proofs) and retired IDs survive.
-  for (const id of ["O1", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10"]) {
-    assert.match(specHistory, new RegExp(`^- ${id} \\[`, "m"));
-  }
-  assert.match(specHistory, /docs\/o3-drill-2026-08-16\.md/);
+  assert.match(charter, /Retired IDs \(never reuse\): O3, O5[–-]O9/);
+  assert.match(charter, /4fea158/);
 });
 
 it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {
