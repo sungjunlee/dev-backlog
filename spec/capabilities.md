@@ -6,10 +6,10 @@ Capability headings are routing handles. Sprint `component:` names exactly one
 slug. Concurrent active tracks partition by `component:` equality or by
 `scope:` globs — one axis per track, never both.
 
-Retired capabilities (never restore as living contracts; last texts at git
-[`4fea158`](https://github.com/sungjunlee/dev-backlog/blob/4fea158/spec/capabilities.md)):
-`backlog-sync`; `spec-charter` / `spec-system-map` / `spec-grill` (skills moved
-to craftkit). Completed sprints that name a retired slug are not re-linted.
+Retired capabilities (never restore as living contracts): `backlog-sync` last
+text at git [`4fea158`](https://github.com/sungjunlee/dev-backlog/blob/4fea158/spec/capabilities.md);
+`spec-charter` / `spec-system-map` / `spec-grill` (skills moved to craftkit).
+Completed sprints that name a retired slug are not re-linted.
 
 Mutation: [`spec/README.md`](README.md) § Mutation.
 

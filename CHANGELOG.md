@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **#386 review follow-up** — restore the second-start-lightening sprint close that `5754e63` dropped, pin `4fea158` to `backlog-sync` only, and scope the never-reuse contract test to the Objectives blob URL. Closes [#387](https://github.com/sungjunlee/dev-backlog/issues/387).
 - **Route spec-axis mutations through craftkit 0.4.0 skill names** — `spec-charter` owns `spec/charter.md` and `spec/system-map.md` (`map` mode); `spec-grill` owns `spec/capabilities.md`. Alignment reports use `uncovered objective` for missing coverage.
 - **Current-product docs** — SKILL.md / CLAUDE.md / process.md describe the GitHub + sprint loop instead of the subtraction history; `file-format.md` is sprint-first; `github-sync.md` no longer shows `gh issue create --json` or `backlog/tasks/draft.md`; `_context.md` drops other-repo harness gotchas. Closes [#380](https://github.com/sungjunlee/dev-backlog/issues/380).
 - **README right-sized to a personal-toolkit quick start** — install, the default Issue → PR loop, and when to open a sprint. Drops the subtraction-proof / upgrade-history / multi-track tutorial surface. Closes [#369](https://github.com/sungjunlee/dev-backlog/issues/369).
