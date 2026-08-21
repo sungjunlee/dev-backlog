@@ -37,10 +37,14 @@ it("records compatibility subtraction in current decisions and release notes", (
 
 it("keeps the living charter status-free with retired IDs pinned in git", () => {
   const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
+  const objectives = charter.split(/^## Decisions\b/m)[0];
   assert.match(charter, /^- O10 — /m);
   assert.doesNotMatch(charter, /^- O\d+ \[(?:validated|active|implemented|deferred)\]/m);
-  assert.match(charter, /Retired IDs \(never reuse\): O3, O5[–-]O9/);
-  assert.match(charter, /4fea158/);
+  assert.match(objectives, /Retired IDs \(never reuse\): O3, O5[–-]O9/);
+  assert.match(
+    objectives,
+    /https:\/\/github\.com\/sungjunlee\/dev-backlog\/blob\/4fea158\/spec\/charter\.md/,
+  );
 });
 
 it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {

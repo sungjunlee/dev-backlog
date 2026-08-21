@@ -1,6 +1,6 @@
 ---
 milestone: 2026-08 second-start lightening
-status: active
+status: completed
 started: 2026-08-17
 due: TBD
 scope: ["spec/**", "docs/**", "README.md", "CLAUDE.md", "skills/**"]
@@ -41,3 +41,4 @@ The repo's hot path matches the product: GitHub Issues + complexity-triggered sp
 - 2026-08-17: Batch 2 complete. README is install + Issue → PR + when to open a sprint (~125 lines). No living `compatibility-subtraction` pointer. Discovery still finds `dev-backlog` and `backlog-triage`. Next: Batch 3 #380.
 - 2026-08-17: Batch 3 complete. SKILL/CLAUDE/process describe the current loop; `file-format.md` is sprint-first; `github-sync.md` no longer shows `create --json` or `draft.md`; `_context.md` drops other-repo harness gotchas; `workflow-patterns.md` removed. SKILL.md 224 lines. Node 495 pass / 1 skip; smoke 190/190; doc-drift OK. Next: Batch 4 #381.
 - 2026-08-19: Batch 4 complete. o3-drill, mirrorless-github-pilot, compatibility-subtraction, and historical-retrieval-shadow Removed (pinned `9b2160c`). Living: spec-history + conformance. Stale triage cache dropped (kept latest). Next: close this sprint when the user wants.
+- 2026-08-21: Sprint closed. 4/4 tasks completed.
