@@ -37,13 +37,27 @@ it("records compatibility subtraction in current decisions and release notes", (
 
 it("keeps the living charter status-free with retired IDs pinned in git", () => {
   const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
-  const objectives = charter.split(/^## Decisions\b/m)[0];
+  const afterObjectives = charter.split(/^## Objectives\b/m);
+  assert.equal(afterObjectives.length, 2, "charter must have one ## Objectives heading");
+  const between = afterObjectives[1].split(/^## Decisions\b/m);
+  assert.equal(between.length, 2, "charter must have ## Decisions after ## Objectives");
+  const objectives = between[0];
   assert.match(charter, /^- O10 — /m);
   assert.doesNotMatch(charter, /^- O\d+ \[(?:validated|active|implemented|deferred)\]/m);
   assert.match(objectives, /Retired IDs \(never reuse\): O3, O5[–-]O9/);
   assert.match(
     objectives,
     /https:\/\/github\.com\/sungjunlee\/dev-backlog\/blob\/4fea158\/spec\/charter\.md/,
+  );
+});
+
+it("pins backlog-sync history at 4fea158 without claiming spec-* texts", () => {
+  const capabilities = fs.readFileSync(path.join(ROOT, "spec/capabilities.md"), "utf8");
+  const retired = capabilities.split(/^## Capability:/m)[0];
+  assert.match(retired, /`backlog-sync` last\s+text at git \[`4fea158`\]/);
+  assert.match(
+    retired,
+    /`spec-charter` \/ `spec-system-map` \/ `spec-grill` \(skills moved to craftkit\)/,
   );
 });
 
