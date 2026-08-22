@@ -79,6 +79,11 @@ exit /b 1
 EOF
 }
 
+ISOLATED_GH_PRELOAD="$SCRIPT_DIR/isolated-gh-preload.cjs"
+isolated_node() {
+NODE_OPTIONS="--require=${ISOLATED_GH_PRELOAD}${NODE_OPTIONS:+ ${NODE_OPTIONS}}" node "$@"
+}
+
 # ============================================================
 # backlog-doctor live-repo smoke test
 # ============================================================
@@ -1176,7 +1181,7 @@ mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks"
 git -C "$COLD_INIT_DIR" init -q
 install_isolated_gh "$COLD_INIT_DIR"
 set +e
-INIT_JSON=$(cd "$COLD_INIT_DIR" && PATH="$COLD_INIT_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
+INIT_JSON=$(cd "$COLD_INIT_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
 set -e
 if printf "%s" "$INIT_JSON" | node -e '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
@@ -1340,7 +1345,7 @@ git -C "$MT_LIFE_DIR" init -q
 install_isolated_gh "$MT_LIFE_DIR"
 mt_write_sprint "$MT_LIFE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && PATH="$MT_LIFE_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
+OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: disjoint second-track init exit code" "$STATUS" "0"
@@ -1352,7 +1357,7 @@ if (!/^scope: \["src\/billing\/\*\*"\]$/m.test(j.content)) process.exit(1);
 '
 
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && PATH="$MT_LIFE_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
+OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: overlapping-scope init exit code" "$STATUS" "1"
@@ -1364,7 +1369,7 @@ mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints"
 git -C "$MT_INIT_SOLO_DIR" init -q
 install_isolated_gh "$MT_INIT_SOLO_DIR"
 set +e
-OUT=$(cd "$MT_INIT_SOLO_DIR" && PATH="$MT_INIT_SOLO_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
+OUT=$(cd "$MT_INIT_SOLO_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
 STATUS=$?
 set -e
 assert_equals "multi-track G4 #292: single-track init dry-run exit code" "$STATUS" "0"
