@@ -14,6 +14,7 @@ here.
 | File | What it records | Referenced by |
 | --- | --- | --- |
 | [`conformance/`](conformance/) | Dated cross-model conformance runs for prompt-judged surfaces (#367); retention rule in its README. | `conformance/README.md`, #367 |
+| [`github-resilience.md`](github-resilience.md) | `gh` call inventory, fail-loud failure matrix, and operator runbook (#366). | #366 |
 
 ## Removed
 
