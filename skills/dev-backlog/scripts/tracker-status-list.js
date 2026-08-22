@@ -2,6 +2,7 @@
 
 const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
+const { isIsolatedGithubError } = require("./github-milestones.js");
 
 function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
   const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
@@ -17,17 +18,30 @@ function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
   ].join("\t"));
 }
 
+function isStatusFallbackError(error) {
+  if (isIsolatedGithubError(error) || error.name === "TrackerConfigurationError") {
+    return true;
+  }
+  const text = String(error.stderr || "") + String(error.message || "");
+  return /GH_TOKEN/.test(text)
+    || /To use GitHub CLI in a GitHub Actions workflow/.test(text)
+    || /gh auth login/.test(text);
+}
+
 function main() {
   try {
     process.stdout.write(`${listStatusRows(process.argv[2]).join("\n")}\n`);
   } catch (error) {
-    const message = error?.tracker
-      ? `(tracker unavailable: ${error.message})`
-      : "(gh not available)";
-    process.stdout.write(`${message}\n`);
+    if (isStatusFallbackError(error)) {
+      process.stdout.write("(gh not available)\n");
+      return;
+    }
+    // Fail loud (#366): provider failures surface stderr and exit non-zero.
+    process.stderr.write(String(error.stderr || error.message) + "\n");
+    process.exitCode = 1;
   }
 }
 
 if (require.main === module) main();
 
-module.exports = { listStatusRows };
+module.exports = { listStatusRows, isStatusFallbackError };

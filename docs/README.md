@@ -14,6 +14,7 @@ here.
 | File | What it records | Referenced by |
 | --- | --- | --- |
 | [`conformance/`](conformance/) | Dated cross-model conformance runs for prompt-judged surfaces (#367); retention rule in its README. | `conformance/README.md`, #367 |
+| [`github-resilience.md`](github-resilience.md) | Fail-loud GitHub contract (#366): gh call inventory by class, FAKE_GH_FAIL failure modes, operator runbook; decision — no automatic retry, no fallback authority. | #366 |
 
 ## Removed
 
