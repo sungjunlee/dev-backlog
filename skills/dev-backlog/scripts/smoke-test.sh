@@ -1153,10 +1153,16 @@ if (bad.length !== 0) process.exit(1);
 # Use a fresh spec-less dir with an empty sprints/ so init isn't refused as a
 # second active sprint.
 COLD_INIT_DIR="$TEST_DIR/cold-init"
-mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks"
+mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks" "$COLD_INIT_DIR/bin"
 git -C "$COLD_INIT_DIR" init -q
+cat >"$COLD_INIT_DIR/bin/gh" <<'EOF'
+#!/bin/sh
+echo "unable to expand placeholder in path: no git remotes found" >&2
+exit 1
+EOF
+chmod +x "$COLD_INIT_DIR/bin/gh"
 set +e
-INIT_JSON=$(cd "$COLD_INIT_DIR" && node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
+INIT_JSON=$(cd "$COLD_INIT_DIR" && PATH="$COLD_INIT_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
 set -e
 if printf "%s" "$INIT_JSON" | node -e '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
@@ -1315,11 +1321,17 @@ if (!/cannot prove disjoint/.test(c.detail.summary)) process.exit(1);
 # overlapping scope is refused naming the conflicting track. Scope is always
 # explicit via --scope (D2) — never inferred from touched paths.
 MT_LIFE_DIR="$TEST_DIR/mt-lifecycle"
-mkdir -p "$MT_LIFE_DIR/backlog/sprints"
+mkdir -p "$MT_LIFE_DIR/backlog/sprints" "$MT_LIFE_DIR/bin"
 git -C "$MT_LIFE_DIR" init -q
+cat >"$MT_LIFE_DIR/bin/gh" <<'EOF'
+#!/bin/sh
+echo "unable to expand placeholder in path: no git remotes found" >&2
+exit 1
+EOF
+chmod +x "$MT_LIFE_DIR/bin/gh"
 mt_write_sprint "$MT_LIFE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
+OUT=$(cd "$MT_LIFE_DIR" && PATH="$MT_LIFE_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: disjoint second-track init exit code" "$STATUS" "0"
@@ -1331,7 +1343,7 @@ if (!/^scope: \["src\/billing\/\*\*"\]$/m.test(j.content)) process.exit(1);
 '
 
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
+OUT=$(cd "$MT_LIFE_DIR" && PATH="$MT_LIFE_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: overlapping-scope init exit code" "$STATUS" "1"
@@ -1339,10 +1351,16 @@ assert_contains "multi-track #292: overlapping init names the conflicting track"
 
 # G4: first-sprint init (no active sprint yet) keeps today's text and exit code.
 MT_INIT_SOLO_DIR="$TEST_DIR/mt-init-solo"
-mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints"
+mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints" "$MT_INIT_SOLO_DIR/bin"
 git -C "$MT_INIT_SOLO_DIR" init -q
+cat >"$MT_INIT_SOLO_DIR/bin/gh" <<'EOF'
+#!/bin/sh
+echo "unable to expand placeholder in path: no git remotes found" >&2
+exit 1
+EOF
+chmod +x "$MT_INIT_SOLO_DIR/bin/gh"
 set +e
-OUT=$(cd "$MT_INIT_SOLO_DIR" && node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
+OUT=$(cd "$MT_INIT_SOLO_DIR" && PATH="$MT_INIT_SOLO_DIR/bin:$PATH" node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
 STATUS=$?
 set -e
 assert_equals "multi-track G4 #292: single-track init dry-run exit code" "$STATUS" "0"
