@@ -18,11 +18,21 @@ function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
   ].join("\t"));
 }
 
+function isStatusFallbackError(error) {
+  if (isIsolatedGithubError(error) || error.tracker || error.name === "TrackerConfigurationError") {
+    return true;
+  }
+  const text = String(error.stderr || "") + String(error.message || "");
+  return /GH_TOKEN/.test(text)
+    || /To use GitHub CLI in a GitHub Actions workflow/.test(text)
+    || /gh auth login/.test(text);
+}
+
 function main() {
   try {
     process.stdout.write(`${listStatusRows(process.argv[2]).join("\n")}\n`);
   } catch (error) {
-    if (isIsolatedGithubError(error) || error.tracker || error.name === "TrackerConfigurationError") {
+    if (isStatusFallbackError(error)) {
       process.stdout.write("(gh not available)\n");
       return;
     }
@@ -34,4 +44,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { listStatusRows };
+module.exports = { listStatusRows, isStatusFallbackError };
