@@ -107,12 +107,12 @@ if ((exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.tit
   out(query.includes("due_on") ? "2026-06-30T00:00:00Z\\n" : "7\\n");
   process.exit(0);
 }
-if (args[0] === "api" && args[1] === "repos/{owner}/{repo}/milestones?state=all" &&
-    exact(["api", "repos/{owner}/{repo}/milestones?state=all",
-      "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'])) {
-  // Honor MS: unknown milestones produce no rows; Cycle Milestone is open.
-  if (process.env.MS !== "Cycle Milestone" || state.milestoneClosed) process.exit(0);
-  out("7\\topen\\n");
+if (exact(["api", "--paginate", "repos/{owner}/{repo}/milestones?state=all&per_page=100",
+    "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'])) {
+  // Honor MS: unknown titles are empty. Already-closed Cycle Milestone is
+  // still listed with state=closed so closeMilestone can skip the PATCH.
+  if (process.env.MS !== "Cycle Milestone") process.exit(0);
+  out(state.milestoneClosed ? "7\\tclosed\\n" : "7\\topen\\n");
   process.exit(0);
 }
 if (exact(["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"])) {

@@ -47,7 +47,7 @@ function closeMilestone(milestone, execFile = execFileSync) {
   // Fail-loud (#366): a failed lookup throws so sprint-close aborts before
   // marking the local sprint completed while GitHub stays open.
   const output = execFile("gh", [
-    "api", "repos/{owner}/{repo}/milestones?state=all",
+    "api", "--paginate", "repos/{owner}/{repo}/milestones?state=all&per_page=100",
     "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv',
   ], { ...GH_EXEC_DEFAULTS, env: { ...process.env, MS: milestone } });
   const rows = String(output).split(/\r?\n/).map((value) => value.trim()).filter(Boolean);

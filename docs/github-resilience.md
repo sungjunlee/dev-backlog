@@ -19,7 +19,7 @@ plus the code paths in `github-tracker.js`, `github-milestones.js`,
 | `gh issue list … --json …` | github-tracker.js `list` | plan/status/next/sync-pull reads | 1 per list |
 | `gh issue view <n> --json …` | github-tracker.js `read`; triage-apply label pre-read | single issue read | 1 per read |
 | `gh api repos/{owner}/{repo}/milestones --jq .due_on` | github-milestones.js `getMilestoneDue` | milestone due-date lookup (sprint-init) | sprint-init total: **2** (due lookup + open-issue list) |
-| `gh api repos/{owner}/{repo}/milestones?state=all --jq '[.number, .state] | @tsv'` | github-milestones.js `closeMilestone` | milestone state lookup (sprint-close) | close-milestone total: **2**, or **1** when the milestone is already closed (lookup only, no PATCH) |
+| `gh api --paginate repos/{owner}/{repo}/milestones?state=all&per_page=100 --jq '[.number, .state] | @tsv'` | github-milestones.js `closeMilestone` | milestone state lookup (sprint-close) | close-milestone: **1+ pages** for lookup, plus **1 PATCH** or **0** when already closed |
 | `gh api graphql … totalCount` | github-tracker.js `getOpenIssueCount` | default list limit | 1 when the default limit is used |
 | `gh api graphql` paginated queries | triage-collect.js | snapshot collection (open/closed issues) | ≥1 page each for open/closed |
 | `gh api repos/…/issues/<n>/comments` | triage-collect.js `fetchIssueComments` | optional comment hydration | 0–1 per issue |
@@ -29,7 +29,7 @@ Per-command totals (healthy run, counted from source):
 | Command | gh calls |
 | --- | --- |
 | `sprint-init` | 2 (milestone due lookup + open-issue list) |
-| `sprint-close --close-milestone` | 2 — or 1 if the milestone is already closed (state=all lookup returns `closed`, no PATCH is issued) |
+| `sprint-close --close-milestone` | 1+ paginated lookup pages, plus 1 PATCH — or 0 PATCH if already closed |
 | tracker create / update / close | 1 mutation each |
 | status list (`tracker-status-list.js`) | 1 (open-issue list) |
 | `triage-apply --apply` | 1 mutation per action (+1 optional view for label pre-reads) |

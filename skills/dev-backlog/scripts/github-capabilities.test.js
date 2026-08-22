@@ -49,7 +49,7 @@ describe("GitHub optional capability transports", () => {
     assert.deepEqual(calls.map((call) => call.args), [
       ["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on'],
       ["issue", "list", "--milestone", "Batch 4", "--state", "open", "--json", "number,title,labels"],
-      ["api", "repos/{owner}/{repo}/milestones?state=all", "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'],
+      ["api", "--paginate", "repos/{owner}/{repo}/milestones?state=all&per_page=100", "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'],
       ["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/9", "-f", "state=closed"],
     ]);
     assert.equal(calls[0].options.env.MS, "Batch 4");

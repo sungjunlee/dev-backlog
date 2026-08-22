@@ -19,7 +19,7 @@ function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
 }
 
 function isStatusFallbackError(error) {
-  if (isIsolatedGithubError(error) || error.tracker || error.name === "TrackerConfigurationError") {
+  if (isIsolatedGithubError(error) || error.name === "TrackerConfigurationError") {
     return true;
   }
   const text = String(error.stderr || "") + String(error.message || "");

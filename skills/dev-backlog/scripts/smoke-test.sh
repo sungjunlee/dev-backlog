@@ -1154,6 +1154,7 @@ if (bad.length !== 0) process.exit(1);
 # second active sprint.
 COLD_INIT_DIR="$TEST_DIR/cold-init"
 mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks"
+git -C "$COLD_INIT_DIR" init -q
 set +e
 INIT_JSON=$(cd "$COLD_INIT_DIR" && node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
 set -e
@@ -1315,6 +1316,7 @@ if (!/cannot prove disjoint/.test(c.detail.summary)) process.exit(1);
 # explicit via --scope (D2) — never inferred from touched paths.
 MT_LIFE_DIR="$TEST_DIR/mt-lifecycle"
 mkdir -p "$MT_LIFE_DIR/backlog/sprints"
+git -C "$MT_LIFE_DIR" init -q
 mt_write_sprint "$MT_LIFE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
 set +e
 OUT=$(cd "$MT_LIFE_DIR" && node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
@@ -1338,6 +1340,7 @@ assert_contains "multi-track #292: overlapping init names the conflicting track"
 # G4: first-sprint init (no active sprint yet) keeps today's text and exit code.
 MT_INIT_SOLO_DIR="$TEST_DIR/mt-init-solo"
 mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints"
+git -C "$MT_INIT_SOLO_DIR" init -q
 set +e
 OUT=$(cd "$MT_INIT_SOLO_DIR" && node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
 STATUS=$?

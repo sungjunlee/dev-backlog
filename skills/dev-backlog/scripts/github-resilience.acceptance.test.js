@@ -345,4 +345,19 @@ describe("fail-loud GitHub resilience: sprint close --close-milestone", () => {
     assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: completed$/m);
     assert.equal(fixture.state().milestoneClosed, true);
   });
+
+  it("already-closed milestone succeeds with no PATCH", (t) => {
+    const fixture = prepareFixture(t, {});
+    fs.writeFileSync(path.join(fixture.root, "gh-state.json"), JSON.stringify({
+      nextIssue: 43, issues: [], milestoneClosed: true,
+    }));
+    const sprintPath = fixture.sprintFile("2026-07-cycle.md", ACTIVE_SPRINT);
+
+    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
+    assert.equal(result.status, 0, `already-closed should succeed:\n${result.stdout}\n${result.stderr}`);
+    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: completed$/m);
+    const patchCalls = fixture.calls().filter((argv) =>
+      JSON.stringify(argv) === JSON.stringify(PATCH_ARGV));
+    assert.equal(patchCalls.length, 0, "already closed must not PATCH");
+  });
 });
