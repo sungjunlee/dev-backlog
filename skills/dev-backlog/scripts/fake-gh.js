@@ -13,6 +13,7 @@
  *   partial-outage  reads succeed (issue list/view, non -X api calls);
  *                   mutations (issue create/edit/close/comment, api -X)
  *                   exit 1 with stderr "GitHub unavailable"
+ *   http-502        every call exits 1, stderr "HTTP 502 Bad Gateway"
  */
 
 const GH_SCRIPT = `#!/usr/bin/env node
@@ -27,6 +28,10 @@ const failMode = process.env.FAKE_GH_FAIL || "";
 const isReadCall =
   (args[0] === "issue" && (args[1] === "list" || args[1] === "view")) ||
   (args[0] === "api" && !args.includes("-X"));
+if (failMode === "http-502") {
+  process.stderr.write("gh: HTTP 502 Bad Gateway\\n");
+  process.exit(1);
+}
 if (failMode === "rate-limit" || failMode === "auth-expired") {
   process.stderr.write(failMode === "rate-limit"
     ? "gh: API rate limit exceeded for installation. Please wait and try again.\\n"
@@ -95,10 +100,19 @@ if (exact(["issue", "close", "42"])) {
   save(); process.exit(0);
 }
 
-if (exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on']) ||
-    exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .number'])) {
+if ((exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on']) ||
+    exact(["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .number'])) &&
+    process.env.MS === "Cycle Milestone") {
   const query = valueAfter("--jq");
   out(query.includes("due_on") ? "2026-06-30T00:00:00Z\\n" : "7\\n");
+  process.exit(0);
+}
+if (args[0] === "api" && args[1] === "repos/{owner}/{repo}/milestones?state=all" &&
+    exact(["api", "repos/{owner}/{repo}/milestones?state=all",
+      "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'])) {
+  // Honor MS: unknown milestones produce no rows; Cycle Milestone is open.
+  if (process.env.MS !== "Cycle Milestone" || state.milestoneClosed) process.exit(0);
+  out("7\\topen\\n");
   process.exit(0);
 }
 if (exact(["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"])) {

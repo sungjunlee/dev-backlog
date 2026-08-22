@@ -104,8 +104,9 @@ fi
 echo ""
 echo "=== Tracker Tasks ==="
 if command -v column >/dev/null 2>&1; then
-	node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t' ||
-		echo "(gh not available)"
+	if ! node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t'; then
+		exit 1
+	fi
 else
 	echo "(gh not available)"
 fi

@@ -21,6 +21,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { resolveBashExecutable, toBashArgs } = require("./bash-runtime.js");
 const { writeGhFixture } = require("./fake-gh-fixture.js");
+const { isIsolatedGithubError } = require("./github-milestones.js");
 
 const SCRIPTS_DIR = __dirname;
 const TRACKER_PATH = path.join(SCRIPTS_DIR, "tracker.js");
@@ -138,6 +139,108 @@ describe("fail-loud GitHub resilience: rate-limit and auth-expired", () => {
       assert.equal(fixture.state().issues[0].state, "open");
     });
   }
+});
+
+describe("isolated-environment classifier", () => {
+  it("treats only git-isolation errors as isolated", () => {
+    const isolated = [
+      "gh: unable to expand placeholder in path",
+      "gh: no git remotes found",
+      "fatal: not a git repository (or any of the parent directories)",
+    ];
+    for (const stderr of isolated) {
+      assert.equal(isIsolatedGithubError({ stderr }), true, stderr);
+      assert.equal(isIsolatedGithubError(new Error(stderr)), true, stderr);
+    }
+    const providerFailures = [
+      "gh: HTTP 502 Bad Gateway",
+      "gh: secondary rate limit triggered",
+      "gh: API rate limit exceeded",
+      "gh: connection reset by peer",
+    ];
+    for (const stderr of providerFailures) {
+      assert.equal(isIsolatedGithubError({ stderr }), false, stderr);
+      assert.equal(isIsolatedGithubError(new Error(stderr)), false, stderr);
+    }
+  });
+
+  it("http-502: sprint-init fails loud with no sprint file", (t) => {
+    const fixture = prepareFixture(t, { failMode: "http-502" });
+    const result = run(process.execPath, [
+      SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone", "--json",
+    ], fixture);
+    assert.notEqual(result.status, 0, `sprint init must fail loud:\n${result.stdout}`);
+    assert.match(`${result.stdout}${result.stderr}`, /HTTP 502/);
+    const sprintFiles = fs.existsSync(path.join(fixture.backlogDir, "sprints"))
+      ? fs.readdirSync(path.join(fixture.backlogDir, "sprints")).filter((f) => f.endsWith(".md"))
+      : [];
+    assert.deepEqual(sprintFiles, [], "no sprint file on provider failure");
+  });
+
+  it("unknown milestone: --close-milestone fails loud and leaves the sprint active with no PATCH", (t) => {
+    const fixture = prepareFixture(t, {});
+    const sprintPath = fixture.sprintFile("2026-07-cycle.md", [
+      "---", "milestone: DoesNotExist", "status: active", "started: 2026-07-31", "---", "",
+      "# Resilience cycle", "", "## Plan", "", "## Running Context", "", "## Progress", "",
+    ]);
+
+    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
+    assert.notEqual(result.status, 0, `expected failure, got stdout:\n${result.stdout}`);
+    assert.match(`${result.stdout}${result.stderr}`, /milestone not found: DoesNotExist/);
+    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: active$/m,
+      "local sprint must stay active when the milestone does not exist");
+    const patchCalls = fixture.calls().filter((argv) =>
+      JSON.stringify(argv) === JSON.stringify(PATCH_ARGV));
+    assert.equal(patchCalls.length, 0, "no PATCH for a nonexistent milestone");
+    assert.equal(fixture.state().milestoneClosed, false);
+  });
+
+  it("tracker-status-list.js CLI fails loud on rate-limit instead of printing a fallback row", (t) => {
+    const fixture = prepareFixture(t, { failMode: "rate-limit" });
+    const result = run(process.execPath, [
+      path.join(SCRIPTS_DIR, "tracker-status-list.js"), fixture.backlogDir,
+    ], fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /API rate limit exceeded/);
+    assert.doesNotMatch(result.stdout, /gh not available/);
+  });
+
+  it("triage-apply --apply --yes makes exactly one gh call and leaves state unchanged under rate-limit", (t) => {
+    const fixture = prepareFixture(t, { failMode: "rate-limit" });
+    const report = path.join(fixture.root, "report.md");
+    fs.writeFileSync(report, [
+      "---", "generated: 2026-07-31", "---", "",
+      "<!-- triage:close #42 reason=\"stale cleanup\" -->",
+      "- [x] Close #42 - stale cleanup",
+      "",
+    ].join("\n"));
+    const stateBefore = JSON.stringify(fixture.state());
+
+    const result = run(process.execPath, [
+      path.join(__dirname, "..", "..", "backlog-triage", "scripts", "triage-apply.js"),
+      report, "--apply", "--yes",
+    ], fixture);
+    assert.notEqual(result.status, 0, `expected failure, got stdout:\n${result.stdout}`);
+    assert.match(result.stderr, /API rate limit exceeded/);
+    const calls = fixture.calls();
+    assert.equal(calls.length, 1, "exactly one gh call, no silent retry");
+    assert.deepEqual(calls[0], ["issue", "comment", "42", "-b", "stale cleanup"]);
+    assert.equal(JSON.stringify(fixture.state()), stateBefore, "GitHub state must be unchanged");
+  });
+
+  it("triage-collect --repo fails loud under rate-limit and creates no snapshot cache", (t) => {
+    const fixture = prepareFixture(t, { failMode: "rate-limit" });
+    fs.mkdirSync(path.join(fixture.backlogDir), { recursive: true });
+
+    const result = run(process.execPath, [
+      path.join(__dirname, "..", "..", "backlog-triage", "scripts", "triage-collect.js"),
+      "--repo", "acme/widgets",
+    ], fixture);
+    assert.notEqual(result.status, 0, `expected failure, got stdout:\n${result.stdout}`);
+    assert.match(result.stderr, /API rate limit exceeded/);
+    assert.equal(fs.existsSync(path.join(fixture.backlogDir, "triage", ".cache")), false,
+      "no snapshot cache file created");
+  });
 });
 
 describe("fail-loud GitHub resilience: partial-outage", () => {

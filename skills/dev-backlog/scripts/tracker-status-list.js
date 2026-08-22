@@ -2,6 +2,7 @@
 
 const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
+const { isIsolatedGithubError } = require("./github-milestones.js");
 
 function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
   const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
@@ -21,10 +22,13 @@ function main() {
   try {
     process.stdout.write(`${listStatusRows(process.argv[2]).join("\n")}\n`);
   } catch (error) {
-    const message = error?.tracker
-      ? `(tracker unavailable: ${error.message})`
-      : "(gh not available)";
-    process.stdout.write(`${message}\n`);
+    if (isIsolatedGithubError(error) || error.tracker || error.name === "TrackerConfigurationError") {
+      process.stdout.write("(gh not available)\n");
+      return;
+    }
+    // Fail loud (#366): provider failures surface stderr and exit non-zero.
+    process.stderr.write(String(error.stderr || error.message) + "\n");
+    process.exitCode = 1;
   }
 }
 

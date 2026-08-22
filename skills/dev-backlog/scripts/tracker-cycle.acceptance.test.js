@@ -189,7 +189,7 @@ function runGithubCycle(fixture) {
     ["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"],
     ["issue", "edit", "42", "--title", "Cycle task renamed"],
     ["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"],
-    ["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .number'],
+    ["api", "repos/{owner}/{repo}/milestones?state=all", "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'],
     ["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"],
     ["issue", "close", "42"],
     ["issue", "list", "--state", "closed", "--limit", "20", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"],
