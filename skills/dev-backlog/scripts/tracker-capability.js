@@ -19,11 +19,10 @@ function main() {
     const resolved = requireCapability(capability, backlogDir);
     if (operation === "require") return;
     if (operation === "close-milestone") {
-      const count = invokeCapability(resolved, "milestones", () => closeMilestone(
-        value,
-        undefined,
-        () => console.log(`Warning: Could not close milestone: ${value}`)
-      ));
+      // Fail-loud (#366): no swallow-on-PATCH-error callback. A failed
+      // milestone PATCH must exit non-zero so sprint-close refuses to mark
+      // the local sprint completed.
+      const count = invokeCapability(resolved, "milestones", () => closeMilestone(value));
       if (count > 0) console.log(`Closed milestone: ${value}`);
       return;
     }

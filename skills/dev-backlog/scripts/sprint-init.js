@@ -295,7 +295,6 @@ function createSprintFile({
     getDue = getDue || getMilestoneDue;
     getIssues = getIssues || getMilestoneIssues;
   }
-  if (!dryRun) mkdir(sprintsDir);
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const started = today.toISOString().slice(0, 10);
@@ -320,6 +319,10 @@ function createSprintFile({
   const charterPresent = hasCharter ?? detected.hasCharter;
   const capabilitiesPresent = hasCapabilities ?? detected.hasCapabilities;
 
+  // Fail-loud ordering (#366): getDue/getIssues run BEFORE any filesystem
+  // effect so a gh failure leaves no sprint file (or even sprints dir)
+  // behind. Previously getMilestoneDue/getMilestoneIssues swallowed errors
+  // as TBD/[], silently writing an empty sprint on a broken provider.
   const due = existingFile ? "TBD" : getDue(milestone);
   const issues = existingFile ? [] : getIssues(milestone);
   const content = existingFile
@@ -337,6 +340,7 @@ function createSprintFile({
       });
 
   if (!dryRun && !existingFile) {
+    mkdir(sprintsDir);
     writeFile(sprintFile, content);
   }
 

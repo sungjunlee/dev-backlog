@@ -105,6 +105,23 @@ if [ "$CB_TODO" -gt 0 ] || [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "Warning: $CB_TODO todo, $CB_IN_FLIGHT in-flight items remaining"
 fi
 
+# --- Step 0: Optional provider mutation runs BEFORE any local mutation ---
+# Fail-loud contract (#366): if the GitHub milestone cannot be closed, the
+# local sprint must remain active — never completed-with-open-milestone.
+# There is no automatic retry and no fallback authority: fix GitHub access
+# (rate limit / auth / outage) and re-run the close.
+if $CLOSE_MILESTONE && ! $DRY_RUN; then
+  CLOSE_MILESTONE_NAME=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
+  if [ -z "$CLOSE_MILESTONE_NAME" ]; then
+    echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
+    exit 1
+  fi
+  if ! node "$SCRIPT_DIR/tracker-capability.js" close-milestone milestones "$BACKLOG_DIR" "$CLOSE_MILESTONE_NAME"; then
+    echo "Refusing to mark sprint completed: GitHub milestone '$CLOSE_MILESTONE_NAME' could not be closed."
+    exit 1
+  fi
+fi
+
 # --- Step 1: Run backlog-doctor and compute the close signal ---
 # The doctor runs before the status flip. Its Node close-summary mode receives
 # the closing sprint path and counts that sprint on today's date, so dry-run
@@ -173,7 +190,8 @@ if $CLOSE_MILESTONE; then
     if $DRY_RUN; then
       echo "[dry-run] Would close milestone: $MILESTONE"
     else
-      node "$SCRIPT_DIR/tracker-capability.js" close-milestone milestones "$BACKLOG_DIR" "$MILESTONE" 2>/dev/null
+      # Already closed in Step 0 (before local mutation); confirmation only.
+      echo "Closed milestone: $MILESTONE"
     fi
   fi
 fi
