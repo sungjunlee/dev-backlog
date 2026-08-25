@@ -156,7 +156,6 @@ Useful scripts:
 - `scripts/triage-stale.js --snapshot PATH [--since N] [--json]` — deterministic stale/obsolete candidates from dates and labels.
 - `scripts/triage-report.js --snapshot PATH [--relate PATH] [--stale PATH] [--active-sprint PATH] [--model-actions PATH] [--out PATH] [--json]` — render report; model-judged actions (blocks/depends-on/duplicate edges, priority and milestone proposals) come from `--model-actions` JSON; creates `.bak` on overwrite.
 - `scripts/triage-apply.js <report.md> [--apply] [--yes] [--json]` — parse accepted anchors and execute/dry-run GitHub mutations.
-- `scripts/triage-apply.integration.test.js` — opt-in live integration test against the disposable sandbox repo; requires `TRIAGE_APPLY_INTEGRATION=1` and `GH_TOKEN`.
 
 ## References
 

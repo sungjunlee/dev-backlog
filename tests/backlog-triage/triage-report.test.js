@@ -1,0 +1,1035 @@
+const { describe, it, beforeEach, afterEach } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { execFileSync, spawnSync } = require("node:child_process");
+const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/backlog-triage/scripts");
+const { analyzeSnapshot: analyzeRelationships } = require(path.join(SKILL_SCRIPTS, "triage-relate.js"));
+const { analyzeSnapshot: analyzeStale } = require(path.join(SKILL_SCRIPTS, "triage-stale.js"));
+const {
+  parseArgs,
+  parseAnchor,
+  buildReportModel,
+  renderReport,
+  writeReportFile,
+  formatStaleEvidence,
+  staleCandidateToAction,
+  findUnsupportedStaleCandidates,
+  formatUnsupportedStaleWarning,
+  validateStaleResult,
+  collectActiveSprintIssueNumbers,
+  loadModelActions,
+  validateModelAction,
+} = require(path.join(SKILL_SCRIPTS, "triage-report.js"));
+
+function makeSnapshot() {
+  return {
+    generated: "2026-04-18T01:30:00.000Z",
+    repo: "sungjunlee/dev-backlog",
+    config_path: "backlog/triage-config.yml",
+    issues: [
+      {
+        number: 101,
+        title: "OAuth token refresh flow",
+        body: "Blocks #102. See #105 for docs follow-up.",
+        comments: [
+          {
+            author: "octocat",
+            body: "Comment follow-up in #103.",
+            createdAt: "2026-04-18T01:00:00.000Z",
+          },
+        ],
+        closing_prs: [
+          {
+            number: 88,
+            state: "MERGED",
+            mergedAt: "2026-04-18T01:15:00.000Z",
+            url: "https://github.com/sungjunlee/dev-backlog/pull/88",
+          },
+        ],
+        labels: ["type:feature", "priority:medium"],
+        createdAt: "2026-04-10T01:30:00.000Z",
+        updatedAt: "2026-04-17T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "feature", priority: "medium", status: "todo" },
+          theme: "auth",
+          age: "7-30d",
+          activity: "recent",
+          milestone: "unassigned",
+        },
+      },
+      {
+        number: 102,
+        title: "OAuth token refresh worker",
+        body: "Blocked by #101 and depends on #103.",
+        labels: ["type:feature", "priority:medium"],
+        createdAt: "2026-04-09T01:30:00.000Z",
+        updatedAt: "2026-04-16T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "feature", priority: "medium", status: "todo" },
+          theme: "auth",
+          age: "7-30d",
+          activity: "recent",
+          milestone: "unassigned",
+        },
+      },
+      {
+        number: 103,
+        title: "Audit token rotation docs",
+        body: "Related doc cleanup for auth rollout.",
+        labels: ["type:docs", "priority:low"],
+        createdAt: "2026-04-08T01:30:00.000Z",
+        updatedAt: "2026-04-14T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "docs", priority: "low", status: "todo" },
+          theme: "auth",
+          age: "7-30d",
+          activity: "warm",
+          milestone: "unassigned",
+        },
+      },
+      {
+        number: 104,
+        title: "Legacy sprint cleanup chore",
+        body: "Old backlog task that lost traction.",
+        labels: ["type:chore"],
+        createdAt: "2025-12-01T01:30:00.000Z",
+        updatedAt: "2026-01-01T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "chore", priority: "medium", status: "todo" },
+          theme: "ops",
+          age: ">90d",
+          activity: "cold",
+          milestone: "unassigned",
+        },
+      },
+      {
+        number: 105,
+        title: "Audit token rotation docs cleanup",
+        body: "wontfix after migration plan changed.",
+        labels: ["type:docs", "wontfix"],
+        createdAt: "2026-03-01T01:30:00.000Z",
+        updatedAt: "2026-04-01T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "docs", priority: "medium", status: "todo" },
+          theme: "auth",
+          age: "30-90d",
+          activity: "warm",
+          milestone: "unassigned",
+        },
+      },
+      {
+        number: 106,
+        title: "Broken import path typo",
+        body: "invalid repro; no longer reproducible.",
+        labels: ["invalid"],
+        createdAt: "2026-03-15T01:30:00.000Z",
+        updatedAt: "2026-04-05T01:30:00.000Z",
+        milestone: null,
+        buckets: {
+          label: { type: "uncategorized", priority: "medium", status: "todo" },
+          theme: "uncategorized",
+          age: "30-90d",
+          activity: "warm",
+          milestone: "unassigned",
+        },
+      },
+    ],
+  };
+}
+
+describe("parseArgs", () => {
+  it("parses the required and optional renderer flags", () => {
+    assert.deepEqual(
+      parseArgs(["--snapshot", "snapshot.json", "--relate", "relate.json", "--stale", "stale.json", "--out", "report.md", "--json"]),
+      {
+        snapshotPath: "snapshot.json",
+        relatePath: "relate.json",
+        stalePath: "stale.json",
+        activeSprintPath: undefined,
+        modelActionsPath: undefined,
+        outPath: "report.md",
+        json: true,
+      }
+    );
+  });
+
+  it("errors clearly when snapshot is missing", () => {
+    assert.match(parseArgs([]).error, /snapshot/i);
+  });
+});
+
+describe("parseAnchor", () => {
+  it("parses verbs, issue number, and quoted or bare args using the issue #65 grammar", () => {
+    const parsed = parseAnchor('<!-- triage:assign-milestone #42 name="Sprint W17" cluster=auth -->');
+    assert.deepEqual(parsed, {
+      verb: "assign-milestone",
+      issueNumber: 42,
+      argsText: 'name="Sprint W17" cluster=auth',
+      args: {
+        name: "Sprint W17",
+        cluster: "auth",
+      },
+    });
+  });
+});
+
+describe("renderer helpers", () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-report-helper-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("backs up an existing report to .bak before rewriting", () => {
+    const reportPath = path.join(tempDir, "report.md");
+    fs.writeFileSync(reportPath, "old report\n");
+
+    const first = writeReportFile(reportPath, "new report\n");
+
+    assert.equal(first.path, reportPath);
+    assert.equal(first.backupPath, `${reportPath}.bak`);
+    assert.equal(fs.readFileSync(reportPath, "utf-8"), "new report\n");
+    assert.equal(fs.readFileSync(`${reportPath}.bak`, "utf-8"), "old report\n");
+  });
+
+  it("formats stale evidence as a compact one-liner per signal kind", () => {
+    const inactive = formatStaleEvidence({
+      evidence: {
+        updatedAt: "2025-10-20T00:00:00.000Z",
+        generated: "2026-04-18T00:00:00.000Z",
+        daysSinceUpdate: 180,
+        thresholdDays: 60,
+        milestone: null,
+        labels: [],
+      },
+    });
+    assert.match(inactive, /180d since update \(threshold 60d\)/);
+    assert.match(inactive, /no milestone/);
+
+    const wontfix = formatStaleEvidence({
+      evidence: {
+        matchedLabel: "wontfix",
+        labels: ["wontfix"],
+        updatedAt: "2026-01-08T00:00:00.000Z",
+        milestone: null,
+      },
+    });
+    assert.match(wontfix, /label=wontfix/);
+    assert.match(wontfix, /updated 2026-01-08/);
+    assert.match(wontfix, /no milestone/);
+
+    const action = staleCandidateToAction({
+      number: 104,
+      title: "Legacy sprint cleanup chore",
+      reason: "labeled wontfix; explicit wontfix signal",
+      suggested_action: "close",
+      evidence: {
+        matchedLabel: "wontfix",
+        labels: ["wontfix"],
+        updatedAt: "2026-01-08T00:00:00.000Z",
+        milestone: null,
+      },
+    });
+    assert.equal(action.verb, "close");
+    assert.match(action.evidence, /label=wontfix/);
+
+    const mergedPr = formatStaleEvidence({
+      evidence: {
+        pr: { number: 88, mergedAt: "2026-04-18T01:15:00.000Z" },
+        milestone: null,
+      },
+    });
+    assert.match(mergedPr, /PR #88 merged 2026-04-18/);
+
+    const duplicate = formatStaleEvidence({
+      evidence: {
+        target: { number: 50 },
+        score: 1,
+      },
+    });
+    assert.match(duplicate, /target=#50/);
+    assert.match(duplicate, /score=1.00/);
+  });
+
+  it("collects protected issue refs only from active sprint Plan and Running Context", () => {
+    const content = [
+      "## Plan",
+      "- [ ] #101 Active task",
+      "",
+      "## Running Context",
+      "- Keep #102 open while executing.",
+      "",
+      "## Progress",
+      "- Mention #103 historically only.",
+      "",
+    ].join("\n");
+
+    assert.deepEqual([...collectActiveSprintIssueNumbers(content)].sort((left, right) => left - right), [101, 102]);
+  });
+
+  it("renders no-input placeholders for omitted relate/stale inputs", () => {
+    const model = buildReportModel({
+      snapshot: makeSnapshot(),
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+    });
+
+    const markdown = renderReport(model);
+    assert.match(markdown, /## Relationships[\s\S]*_\(no input provided\)_/);
+    assert.match(markdown, /## Obsolete Candidates[\s\S]*_\(no input provided\)_/);
+  });
+
+  it("strips conventional-commit prefixes before truncating issue titles in classification tables", () => {
+    const snapshot = makeSnapshot();
+    snapshot.issues.push({
+      number: 107,
+      title: "feat(foo): the important part is here because the keyword should stay visible in the table",
+      body: "Long title regression case.",
+      labels: ["type:feature"],
+      createdAt: "2026-04-12T01:30:00.000Z",
+      updatedAt: "2026-04-17T01:30:00.000Z",
+      milestone: null,
+      buckets: {
+        label: { type: "feature", priority: "medium", status: "todo" },
+        theme: "auth",
+        age: "7-30d",
+        activity: "recent",
+        milestone: "unassigned",
+      },
+    });
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+    });
+
+    const markdown = renderReport(model);
+    assert.match(markdown, /#107 the important part is here because the keyword /);
+    assert.doesNotMatch(markdown, /#107 feat\(foo\):/);
+  });
+
+  it("suppresses obsolete close proposals for issues protected by active sprint state", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+        {
+          number: 105,
+          title: "Audit token rotation docs cleanup",
+          reason: "labeled wontfix; explicit wontfix signal",
+          suggested_action: "close",
+          evidence: { matchedLabel: "wontfix", milestone: null },
+        },
+      ],
+    };
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+      activeSprintContent: ["## Plan", "- [ ] #104 Keep this active", "", "## Running Context", "- #105 is under review"].join("\n"),
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.doesNotMatch(obsolete, /triage:close #104/);
+    assert.doesNotMatch(obsolete, /triage:close #105/);
+  });
+
+  it("does not hard-reject stale JSON with an unsupported suggested_action", () => {
+    const result = { candidates: [{ number: 110, suggested_action: "revisit", reason: "needs a second look" }] };
+    assert.deepEqual(validateStaleResult(result, "fixtures/stale.json"), result);
+  });
+
+  it("warns (does not silently drop) stale candidates with an unsupported suggested_action", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+        {
+          number: 108,
+          title: "Old revisit candidate from a prior stale run",
+          reason: "flagged for follow-up review",
+          suggested_action: "revisit",
+          evidence: { milestone: null },
+        },
+        {
+          number: 109,
+          title: "Old merge-into candidate from a prior stale run",
+          reason: "looks like a duplicate",
+          suggested_action: "merge-into:#50",
+          evidence: { milestone: null },
+        },
+      ],
+    };
+
+    const unsupported = findUnsupportedStaleCandidates(stale);
+    assert.equal(unsupported.length, 2);
+    assert.deepEqual(unsupported.map((candidate) => candidate.number).sort(), [108, 109]);
+    assert.match(formatUnsupportedStaleWarning(unsupported[0]), /#108.*suggested_action="revisit"/);
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    // The supported candidate still renders as a normal close action.
+    assert.match(obsolete, /triage:close #104/);
+    // The unsupported candidates are named, not silently dropped.
+    assert.match(obsolete, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+    assert.match(obsolete, /\[warn\] Dropped stale candidate #109 \(suggested_action="merge-into:#50"\)/);
+  });
+
+  it("renders no warning line when all stale candidates use the supported suggested_action", () => {
+    const snapshot = makeSnapshot();
+    const stale = {
+      candidates: [
+        {
+          number: 104,
+          title: "Legacy sprint cleanup chore",
+          reason: "inactive/stale: no activity for 107 days; exceeds stale_days threshold (60); no milestone assigned",
+          suggested_action: "close",
+          evidence: { daysSinceUpdate: 107, thresholdDays: 60, milestone: null },
+        },
+      ],
+    };
+
+    assert.deepEqual(findUnsupportedStaleCandidates(stale), []);
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale,
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.match(obsolete, /triage:close #104/);
+    assert.doesNotMatch(obsolete, /\[warn\]/);
+  });
+
+  it("model actions drive priority and milestone proposals; none are invented without them", () => {
+    const snapshot = {
+      generated: "2026-04-18T01:30:00.000Z",
+      repo: "sungjunlee/dev-backlog",
+      issues: [
+        {
+          number: 201,
+          title: "Single merged issue",
+          body: "",
+          labels: ["type:feature", "priority:medium"],
+          createdAt: "2026-04-10T01:30:00.000Z",
+          updatedAt: "2026-04-17T01:30:00.000Z",
+          milestone: null,
+          buckets: {
+            label: { type: "feature", priority: "medium", status: "todo" },
+            theme: "uncategorized",
+            age: "7-30d",
+            activity: "recent",
+            milestone: "unassigned",
+          },
+        },
+      ],
+    };
+
+    const baseModel = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+    });
+    assert.equal(baseModel.anchors.some((anchor) => anchor.section === "priority"), false);
+    assert.equal(baseModel.anchors.some((anchor) => anchor.section === "milestone"), false);
+
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 201,
+          args: { value: "high", reason: "customer-reported outage" },
+          summary: "Set priority:high on #201 — customer-reported outage",
+          evidence: "customer-reported outage",
+        },
+        {
+          section: "milestone",
+          verb: "assign-milestone",
+          issueNumber: 201,
+          args: { name: "Sprint W17", cluster: "auth" },
+          cluster: "auth",
+          sprintName: "Sprint W17",
+          summary: "Assign Sprint W17 to #201 — auth cluster",
+          evidence: "auth cluster",
+        },
+      ],
+    });
+
+    assert.ok(model.anchors.some((anchor) => anchor.section === "priority" && anchor.line.includes("set-priority") && anchor.line.includes("#201")));
+    assert.ok(model.anchors.some((anchor) => anchor.section === "milestone" && anchor.line.includes("assign-milestone") && anchor.line.includes("#201")));
+
+    const priorityMarkdown = model.sections.find((section) => section.key === "priority").markdown;
+    const milestoneMarkdown = model.sections.find((section) => section.key === "milestone").markdown;
+    assert.match(priorityMarkdown, /Set priority:high on #201/);
+    assert.match(milestoneMarkdown, /Sprint W17/);
+  });
+});
+
+describe("triage-report integration chain", () => {
+  let tempDir;
+  let snapshotPath;
+  let relatePath;
+  let stalePath;
+  let reportPath;
+  let repoRoot;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-report-int-"));
+    repoRoot = path.join(tempDir, "repo");
+    fs.mkdirSync(path.join(repoRoot, "backlog"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoRoot, "backlog", "triage-config.yml"),
+      [
+        "theme_keywords:",
+        "  auth: [auth, oauth, token]",
+        "  docs: [docs, readme, guide]",
+        "  ops: [ops, cleanup, maintenance]",
+        "activity_days:",
+        "  warm: 14",
+        "  cold: 60",
+        "stale_days: 60",
+        "",
+      ].join("\n")
+    );
+
+    snapshotPath = path.join(repoRoot, "fixture-snapshot.json");
+    relatePath = path.join(repoRoot, "fixture-relate.json");
+    stalePath = path.join(repoRoot, "fixture-stale.json");
+    reportPath = path.join(repoRoot, "backlog", "triage", "2026-04-18-report.md");
+
+    const snapshot = makeSnapshot();
+    fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+
+    const relate = { edges: analyzeRelationships(snapshot) };
+    fs.writeFileSync(relatePath, `${JSON.stringify(relate, null, 2)}\n`);
+
+    const stale = analyzeStale(snapshot, { config: { stale_days: 60 } });
+    fs.writeFileSync(
+      stalePath,
+      `${JSON.stringify(
+        {
+          snapshot: snapshotPath,
+          generated: stale.generated,
+          thresholdDays: stale.thresholdDays,
+          candidates: stale.candidates,
+        },
+        null,
+        2
+      )}\n`
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("renders all report sections, well-formed anchors, and preserves the first report on re-run", () => {
+    const scriptPath = path.join(SKILL_SCRIPTS, "triage-report.js");
+    const jsonOut = execFileSync(
+      process.execPath,
+      [scriptPath, "--snapshot", snapshotPath, "--relate", relatePath, "--stale", stalePath, "--out", reportPath, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf-8",
+      }
+    );
+
+    const parsedJson = JSON.parse(jsonOut);
+    assert.ok(Array.isArray(parsedJson.sections));
+    assert.ok(Array.isArray(parsedJson.anchors));
+
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    for (const heading of [
+      "## Classification",
+      "## Relationships",
+      "## Obsolete Candidates",
+      "## Priority Proposals",
+      "## Milestone Suggestions",
+      "## Apply Checklist",
+    ]) {
+      assert.match(markdown, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+
+    assert.match(markdown, /^---\ngenerated: 2026-04-18\nrepo: sungjunlee\/dev-backlog\nsnapshot: .*fixture-snapshot\.json\nopen_issues: 6\n---/m);
+    assert.match(markdown, /<!-- triage:close #101 reason="merged closing PR detected: PR #88 merged at 2026-04-18T01:15:00.000Z" -->/);
+    assert.match(markdown, /<!-- triage:close #104 reason="inactive\/stale: no activity for 107 days; exceeds stale_days threshold \(60\); no milestone assigned" -->/);
+    assert.match(markdown, /<!-- triage:close #105 reason="labeled wontfix; explicit wontfix signal" -->/);
+    assert.match(markdown, /<!-- triage:close #106 reason="labeled invalid; explicit invalid signal" -->/);
+    assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
+    assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
+    assert.match(markdown, /comment and closing-PR relationship signals run only when snapshot v2 fields are present/);
+    assert.match(markdown, /merged closing-PR signals run only when snapshot v2 fields are present/);
+
+    // Classification groups must match Done Criteria: theme / label / age.
+    const classificationBlock = markdown.split(/^##\s+Classification/m)[1].split(/^##\s/m)[0];
+    assert.match(classificationBlock, /### By Theme/);
+    assert.match(classificationBlock, /### By Label/);
+    assert.match(classificationBlock, /### By Age/);
+    // Age buckets render in semantic order, not alphabetic.
+    const ageBlock = classificationBlock.split("### By Age")[1];
+    const ageBucketsInOrder = ["<7d", "7-30d", "30-90d", ">90d"].filter((bucket) =>
+      ageBlock.includes(`| ${bucket} |`)
+    );
+    const ageBucketsAsFound = [];
+    for (const bucket of ["<7d", "7-30d", "30-90d", ">90d"]) {
+      const idx = ageBlock.indexOf(`| ${bucket} |`);
+      if (idx >= 0) ageBucketsAsFound.push({ bucket, idx });
+    }
+    ageBucketsAsFound.sort((left, right) => left.idx - right.idx);
+    assert.deepEqual(
+      ageBucketsAsFound.map((entry) => entry.bucket),
+      ageBucketsInOrder,
+      "age buckets must render in semantic order"
+    );
+
+    // Obsolete Candidates must carry a compact evidence line per item.
+    const obsoleteBlock = markdown.split(/^##\s+Obsolete Candidates/m)[1].split(/^##\s/m)[0];
+    for (const issueNumber of [101, 104, 105, 106]) {
+      const anchorRegex = new RegExp(`<!-- triage:close #${issueNumber} [^>]*-->[\\s\\S]*?- \\[ \\] [^\\n]+\\n\\s+- _evidence: [^\\n]+_`);
+      assert.match(obsoleteBlock, anchorRegex, `expected evidence line for obsolete #${issueNumber}`);
+    }
+
+    // Apply Checklist is the surface #65 reads — every entry must be an anchor+checkbox pair,
+    // not a plain bullet. Plain bullets downgrade the cross-step contract.
+    const applyBlock = markdown.split(/^##\s+Apply Checklist/m)[1] || "";
+    const applyAnchors = [...applyBlock.matchAll(/<!--\s*triage:[\w-]+\s+#\d+[^>]*-->/g)];
+    assert.ok(
+      applyAnchors.length >= 3,
+      `Apply Checklist must carry anchored checkbox pairs for #65 — found ${applyAnchors.length} anchors`
+    );
+    for (const anchor of applyAnchors) {
+      const tail = applyBlock.slice(anchor.index + anchor[0].length);
+      assert.match(tail, /^\s*\n?\s*-\s+\[[ x]\]\s+/, `expected checkbox after Apply Checklist anchor: ${anchor[0]}`);
+    }
+
+    const lines = markdown.split(/\r?\n/);
+    const anchorLines = lines
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => line.includes("<!-- triage:"));
+    assert.ok(anchorLines.length >= 6);
+
+    for (const { line, index } of anchorLines) {
+      const parsed = parseAnchor(line);
+      assert.ok(parsed, `expected parseable anchor: ${line}`);
+
+      const nextNonBlank = lines.slice(index + 1).find((candidate) => candidate.trim() !== "");
+      assert.ok(nextNonBlank, `expected checkbox after anchor: ${line}`);
+      assert.match(nextNonBlank, /^- \[ \] /);
+    }
+
+    const firstReport = markdown;
+
+    execFileSync(
+      process.execPath,
+      [scriptPath, "--snapshot", snapshotPath, "--relate", relatePath, "--stale", stalePath, "--out", reportPath],
+      {
+        cwd: repoRoot,
+        encoding: "utf-8",
+      }
+    );
+
+    assert.equal(fs.readFileSync(`${reportPath}.bak`, "utf-8"), firstReport);
+    assert.equal(fs.readFileSync(reportPath, "utf-8"), firstReport);
+  });
+
+  it("fails clearly when snapshot JSON is malformed", () => {
+    fs.writeFileSync(snapshotPath, "{not json}\n");
+
+    assert.throws(
+      () =>
+        execFileSync(process.execPath, [path.join(SKILL_SCRIPTS, "triage-report.js"), "--snapshot", snapshotPath], {
+          cwd: repoRoot,
+          encoding: "utf-8",
+          stdio: "pipe",
+        }),
+      /snapshot|parse|json|malformed/i
+    );
+  });
+
+  it("warns on stderr and in the report when stale JSON carries an unsupported suggested_action", () => {
+    fs.writeFileSync(
+      stalePath,
+      `${JSON.stringify(
+        {
+          snapshot: snapshotPath,
+          generated: "2026-04-18T01:30:00.000Z",
+          thresholdDays: 60,
+          candidates: [
+            {
+              number: 108,
+              title: "Old revisit candidate from a prior stale run",
+              reason: "flagged for follow-up review",
+              suggested_action: "revisit",
+              evidence: { milestone: null },
+            },
+          ],
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(SKILL_SCRIPTS, "triage-report.js"), "--snapshot", snapshotPath, "--stale", stalePath, "--out", reportPath],
+      { cwd: repoRoot, encoding: "utf-8" }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    assert.match(markdown, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+  });
+});
+
+describe("loadModelActions", () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-model-actions-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function writeActions(actions) {
+    const actionsPath = path.join(tempDir, "model-actions.json");
+    fs.writeFileSync(actionsPath, `${JSON.stringify(actions, null, 2)}\n`);
+    return actionsPath;
+  }
+
+  it("loads a valid model-actions file from disk and normalizes fields", () => {
+    const actionsPath = writeActions([
+      {
+        section: "priority",
+        verb: "set-priority",
+        issueNumber: 42,
+        args: { value: "high", reason: "customer-reported outage" },
+        summary: "Set priority:high on #42 — customer-reported outage",
+        evidence: "customer-reported outage",
+      },
+      {
+        section: "milestone",
+        verb: "assign-milestone",
+        issueNumber: 43,
+        args: { name: "Sprint W34", cluster: "auth" },
+        cluster: "auth",
+        sprintName: "Sprint W34",
+        summary: "Assign Sprint W34 to #43 — auth cluster",
+      },
+    ]);
+
+    const actions = loadModelActions(actionsPath);
+    assert.equal(actions.length, 2);
+    assert.equal(actions[0].section, "priority");
+    assert.equal(actions[1].sprintName, "Sprint W34");
+  });
+
+  it("returns an empty array when no path is given", () => {
+    assert.deepEqual(loadModelActions(undefined), []);
+  });
+
+  it("rejects a non-array model-actions file", () => {
+    const actionsPath = path.join(tempDir, "model-actions.json");
+    fs.writeFileSync(actionsPath, '{"section":"priority"}\n');
+    assert.throws(() => loadModelActions(actionsPath), /expected an array/);
+  });
+
+  it("rejects unsupported section/verb combinations", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "close", issueNumber: 42, args: {}, summary: "Close #42" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /not allowed in section/);
+  });
+
+  it("rejects a malformed issueNumber", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 0, args: { value: "high" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /positive safe-integer issueNumber/);
+  });
+
+  it("rejects a missing required arg", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: {}, sprintName: "Sprint W34", summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /requires a non-empty string arg "name"/);
+  });
+
+  it("rejects null and empty-string required arg values", () => {
+    const nullValuePath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 42, args: { value: null }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(nullValuePath), /non-empty string arg "value"/);
+
+    const emptyNamePath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "" }, sprintName: "Sprint W34", summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(emptyNamePath), /non-empty string arg "name"/);
+  });
+
+  it("requires reason for obsolete close and target+reason for close-duplicate", () => {
+    const closePath = writeActions([
+      { section: "obsolete", verb: "close", issueNumber: 42, args: {}, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(closePath), /non-empty string arg "reason"/);
+
+    const dupPath = writeActions([
+      { section: "obsolete", verb: "close-duplicate", issueNumber: 42, args: { target: "#44" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(dupPath), /non-empty string arg "reason"/);
+
+    const dupTargetPath = writeActions([
+      { section: "obsolete", verb: "close-duplicate", issueNumber: 42, args: { reason: "dup" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(dupTargetPath), /non-empty string arg "target"/);
+  });
+
+  it("requires a top-level sprintName for milestone actions", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "Sprint W34" }, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /top-level sprintName/);
+  });
+
+  it("rejects a non-string sprintName (numeric) for milestone actions", () => {
+    const actionsPath = writeActions([
+      { section: "milestone", verb: "assign-milestone", issueNumber: 42, args: { name: "Sprint W34" }, sprintName: 202608, summary: "x" },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /non-empty string top-level sprintName/);
+  });
+
+  it("rejects an empty summary", () => {
+    const actionsPath = writeActions([
+      { section: "priority", verb: "set-priority", issueNumber: 42, args: { value: "high" }, summary: "  " },
+    ]);
+    assert.throws(() => loadModelActions(actionsPath), /non-empty summary/);
+  });
+
+  it("validates relationship edges with from/to/kind", () => {
+    assert.doesNotThrow(() =>
+      validateModelAction(
+        { section: "relationship", verb: "edge", args: { from: 100, to: 101, kind: "blocks", evidence: { phrase: "Blocks #101" } }, summary: "Blocks edge" },
+        0
+      )
+    );
+    assert.throws(
+      () =>
+        validateModelAction(
+          { section: "relationship", verb: "edge", args: { from: 100, to: 101, kind: "not-a-real-kind" }, summary: "x" },
+          0
+        ),
+      /unsupported kind/
+    );
+    assert.throws(
+      () => validateModelAction({ section: "relationship", verb: "edge", args: { from: 100, kind: "blocks" }, summary: "x" }, 0),
+      /args.from and args.to/
+    );
+  });
+});
+
+describe("model-action merge into report model", () => {
+  function snapshotWith(issues) {
+    return {
+      generated: "2026-04-18T01:30:00.000Z",
+      repo: "sungjunlee/dev-backlog",
+      config_path: "backlog/triage-config.yml",
+      issues,
+    };
+  }
+
+  function issue(number, overrides = {}) {
+    return {
+      number,
+      title: `Issue #${number}`,
+      body: "",
+      labels: [],
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-17T00:00:00.000Z",
+      milestone: null,
+      buckets: {
+        label: { type: "feature", priority: "medium", status: "todo" },
+        theme: "uncategorized",
+        age: "7-30d",
+        activity: "recent",
+        milestone: "unassigned",
+      },
+      ...overrides,
+    };
+  }
+
+  it("merges model relationship edges into the Relationships section", () => {
+    const snapshot = snapshotWith([issue(100), issue(101)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "relationship",
+          verb: "edge",
+          args: { from: 100, to: 101, kind: "blocks", confidence: 1, evidence: { phrase: "Blocks #101" } },
+          summary: "Blocks edge 100 -> 101",
+        },
+      ],
+    });
+
+    const relationships = model.sections.find((section) => section.key === "relationships").markdown;
+    assert.match(relationships, /#100 blocks #101/);
+  });
+
+  it("merges model obsolete actions into Obsolete Candidates even without a stale input", () => {
+    const snapshot = snapshotWith([issue(104)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "obsolete",
+          verb: "close-duplicate",
+          issueNumber: 104,
+          args: { target: "#44", reason: "open issue duplicates closed #44" },
+          summary: "Close duplicate #104 into #44 — open issue duplicates closed #44",
+        },
+      ],
+    });
+
+    const obsolete = model.sections.find((section) => section.key === "obsolete").markdown;
+    assert.match(obsolete, /triage:close-duplicate #104/);
+    assert.match(obsolete, /Close duplicate #104 into #44/);
+  });
+
+  it("dedupes with the apply contract key (verb, issueNumber, args) across sections", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "obsolete",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage (dup)",
+        },
+      ],
+    });
+
+    const apply = model.sections.find((section) => section.key === "apply").markdown;
+    assert.equal((apply.match(/triage:set-priority #42/g) || []).length, 1);
+  });
+
+  it("dedupes two same-key actions inside the priority section itself", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage (duplicate)",
+        },
+      ],
+    });
+
+    const priority = model.sections.find((section) => section.key === "priority").markdown;
+    assert.equal((priority.match(/triage:set-priority #42/g) || []).length, 1);
+  });
+
+  it("dedupes args that differ only by key order or whitespace, matching apply normalization", () => {
+    const snapshot = snapshotWith([issue(42)]);
+    const model = buildReportModel({
+      snapshot,
+      snapshotPath: "fixtures/snapshot.json",
+      relate: null,
+      stale: null,
+      modelActions: [
+        {
+          section: "priority",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { value: "high", reason: "outage" },
+          summary: "Set priority:high on #42 — outage",
+        },
+        {
+          section: "obsolete",
+          verb: "set-priority",
+          issueNumber: 42,
+          args: { reason: " outage ", value: "high" },
+          summary: "Set priority:high on #42 — outage (reordered/trimmed dup)",
+        },
+      ],
+    });
+
+    const apply = model.sections.find((section) => section.key === "apply").markdown;
+    assert.equal((apply.match(/triage:set-priority #42/g) || []).length, 1);
+  });
+});

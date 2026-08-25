@@ -1,0 +1,439 @@
+const { describe, it, beforeEach, afterEach } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const path = require("path");
+const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const {
+  slugify,
+  escapeYaml,
+  scopesOverlap,
+  readConfig,
+  readTriageConfig,
+  parseSimpleYaml,
+  estimateSize,
+  fetchOpenIssues,
+  CONFIG_DEFAULTS,
+  TRIAGE_CONFIG_DEFAULTS,
+} = require(path.join(SKILL_SCRIPTS, "lib.js"));
+
+// --- slugify ---
+
+describe("slugify", () => {
+  it("converts spaces to hyphens and lowercases", () => {
+    assert.equal(slugify("Auth System"), "auth-system");
+  });
+
+  it("removes special characters", () => {
+    assert.equal(slugify("OAuth2 (flow)"), "oauth2-flow");
+    assert.equal(slugify("hello@world!"), "hello-world");
+  });
+
+  it("collapses multiple hyphens", () => {
+    assert.equal(slugify("a---b"), "a-b");
+  });
+
+  it("trims leading and trailing hyphens", () => {
+    assert.equal(slugify("-hello-"), "hello");
+  });
+
+  it("lowercases output", () => {
+    assert.equal(slugify("Hello World"), "hello-world");
+  });
+
+  it("returns empty for non-ASCII-only input", () => {
+    assert.equal(slugify("인증 시스템"), "");
+  });
+
+  it("handles mixed ASCII and non-ASCII", () => {
+    assert.equal(slugify("OAuth2 인증"), "oauth2");
+  });
+
+  it("returns empty for empty input", () => {
+    assert.equal(slugify(""), "");
+  });
+});
+
+// --- escapeYaml ---
+
+describe("escapeYaml", () => {
+  it("returns plain text unchanged", () => {
+    assert.equal(escapeYaml("simple text"), "simple text");
+  });
+
+  it("quotes text with colons", () => {
+    assert.equal(escapeYaml("key: value"), "'key: value'");
+  });
+
+  it("quotes text with special chars", () => {
+    assert.equal(escapeYaml("hello #world"), "'hello #world'");
+    assert.equal(escapeYaml("a & b"), "'a & b'");
+    assert.equal(escapeYaml("100%"), "'100%'");
+  });
+
+  it("escapes single quotes by doubling", () => {
+    assert.equal(escapeYaml("it's here"), "'it''s here'");
+  });
+
+  it("quotes text with leading/trailing whitespace", () => {
+    assert.equal(escapeYaml(" padded "), "' padded '");
+  });
+});
+
+// --- estimateSize ---
+
+describe("estimateSize", () => {
+  it("returns ~30min for bug labels", () => {
+    assert.equal(estimateSize(["bug"]), "~30min");
+    assert.equal(estimateSize(["type:bug"]), "~30min");
+  });
+
+  it("returns ~15min for chore labels", () => {
+    assert.equal(estimateSize(["chore"]), "~15min");
+    assert.equal(estimateSize(["type:chore"]), "~15min");
+  });
+
+  it("returns ~1hr for feature labels", () => {
+    assert.equal(estimateSize(["feature"]), "~1hr");
+    assert.equal(estimateSize(["type:feature"]), "~1hr");
+  });
+
+  it("returns ~1hr for refactor labels", () => {
+    assert.equal(estimateSize(["refactor"]), "~1hr");
+    assert.equal(estimateSize(["type:refactor"]), "~1hr");
+  });
+
+  it("returns ~20min for docs labels", () => {
+    assert.equal(estimateSize(["docs"]), "~20min");
+    assert.equal(estimateSize(["documentation"]), "~20min");
+    assert.equal(estimateSize(["type:docs"]), "~20min");
+  });
+
+  it("returns correct size for size:S/M/L", () => {
+    assert.equal(estimateSize(["size:S"]), "~15min");
+    assert.equal(estimateSize(["size:M"]), "~1hr");
+    assert.equal(estimateSize(["size:L"]), "~2hr");
+  });
+
+  it("size labels override type labels", () => {
+    assert.equal(estimateSize(["bug", "size:L"]), "~2hr");
+    assert.equal(estimateSize(["size:S", "type:feature"]), "~15min");
+  });
+
+  it("returns empty for unrecognized labels", () => {
+    assert.equal(estimateSize(["priority:high"]), "");
+    assert.equal(estimateSize([]), "");
+  });
+});
+
+// --- readConfig ---
+
+describe("readConfig", () => {
+  const tmpDir = path.join(__dirname, "__tmp_config_test__");
+
+  beforeEach(() => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns defaults when config file is missing", () => {
+    const config = readConfig(path.join(tmpDir, "nonexistent"));
+    assert.equal(config.tracker, "github");
+    assert.equal(config.task_prefix, CONFIG_DEFAULTS.task_prefix);
+    assert.equal(config.default_status, CONFIG_DEFAULTS.default_status);
+  });
+
+  it("reads an explicit tracker while preserving the github compatibility default", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), "tracker: local\n");
+    assert.equal(readConfig(tmpDir).tracker, "local");
+
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
+    const compatibilityConfig = readConfig(tmpDir);
+    assert.equal(compatibilityConfig.tracker, "github");
+    assert.equal(compatibilityConfig.task_prefix, "PROJ");
+  });
+
+  it("strips only quote-aware YAML separation comments", () => {
+    assert.deepEqual(
+      parseSimpleYaml([
+        "tracker: local # keep",
+        "plain: value#suffix",
+        "single: 'it''s # inside' # outside",
+        'double: "say \\"#\\" here" # outside',
+        "count: 75 # outside",
+        'items: ["one # inside", two] # outside',
+        "",
+      ].join("\n")),
+      {
+        tracker: "local",
+        plain: "value#suffix",
+        single: "it's # inside",
+        double: 'say \\"#\\" here',
+        count: 75,
+        items: ["one # inside", "two"],
+      }
+    );
+  });
+
+  it("reads quoted and unquoted tracker values with separated comments", () => {
+    for (const [line, expected] of [
+      ["tracker: local # keep\n", "local"],
+      ["tracker: 'local'\t# keep\n", "local"],
+      ['tracker: "github"  # keep\n', "github"],
+      ["tracker: local#suffix\n", "local#suffix"],
+    ]) {
+      fs.writeFileSync(path.join(tmpDir, "config.yml"), line);
+      assert.equal(readConfig(tmpDir).tracker, expected);
+    }
+  });
+
+  it("does not parse block scalar physical content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "literal: |",
+      "  tracker: github",
+      "  task_prefix: HIDDEN",
+      "folded: &copy !text >-2 # keep",
+      "  tracker: github",
+      "  task_prefix: ALSO-HIDDEN",
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
+  });
+
+  it("does not parse multiline quoted scalar content as config keys", () => {
+    const parsed = parseSimpleYaml([
+      "tracker: local",
+      "single: 'first line",
+      "  tracker: github",
+      "  it''s still quoted",
+      "  last line'",
+      'double: "first \\"still quoted',
+      "  tracker: github",
+      '  last line"',
+      "task_prefix: REAL",
+      "",
+    ].join("\n"));
+    assert.equal(parsed.tracker, "local");
+    assert.equal(parsed.task_prefix, "REAL");
+  });
+
+  it("reads task_prefix from valid config", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
+    const config = readConfig(tmpDir);
+    assert.equal(config.task_prefix, "PROJ");
+  });
+
+  it("strips surrounding quotes", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), "task_prefix: 'MY-PREFIX'\n");
+    const config = readConfig(tmpDir);
+    assert.equal(config.task_prefix, "MY-PREFIX");
+  });
+
+  it("merges file values with defaults", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'project_name: "test"\n');
+    const config = readConfig(tmpDir);
+    assert.equal(config.project_name, "test");
+    assert.equal(config.task_prefix, "BACK"); // default preserved
+  });
+
+  it("handles malformed YAML gracefully", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), "not valid yaml: [\n");
+    const config = readConfig(tmpDir);
+    // Should still parse what it can or fall back to defaults
+    assert.equal(config.task_prefix, "BACK");
+  });
+
+  it("handles empty file", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.yml"), "");
+    const config = readConfig(tmpDir);
+    assert.equal(config.task_prefix, "BACK");
+  });
+
+  it("preserves array defaults for list values", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config.yml"),
+      'statuses: ["To Do", "In Progress", "Done"]\ntask_prefix: "PROJ"\n'
+    );
+    const config = readConfig(tmpDir);
+    assert.ok(Array.isArray(config.statuses), "statuses should remain an array");
+    assert.equal(config.task_prefix, "PROJ");
+  });
+});
+
+describe("readTriageConfig", () => {
+  const tmpDir = path.join(__dirname, "__tmp_triage_config_test__");
+
+  beforeEach(() => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns nested defaults when the config file is missing", () => {
+    const config = readTriageConfig(path.join(tmpDir, "missing"));
+    assert.deepEqual(config, TRIAGE_CONFIG_DEFAULTS);
+  });
+
+  it("reads nested theme keywords and activity thresholds", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "triage-config.yml"),
+      [
+        "theme_keywords:",
+        "  auth: [auth, oauth, token]",
+        "  docs: [docs, readme]",
+        "activity_days:",
+        "  warm: 10",
+        "  cold: 45",
+        "stale_days: 75",
+        "closed_issue_days: 30",
+        "",
+      ].join("\n")
+    );
+
+    const config = readTriageConfig(tmpDir);
+
+    assert.deepEqual(config.theme_keywords, {
+      auth: ["auth", "oauth", "token"],
+      docs: ["docs", "readme"],
+    });
+    assert.deepEqual(config.activity_days, { warm: 10, cold: 45 });
+    assert.equal(config.stale_days, 75);
+    assert.equal(config.closed_issue_days, 30);
+  });
+});
+
+describe("fetchOpenIssues", () => {
+  it("uses the explicit repo and limit when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 61, title: "Collect" }]);
+    };
+
+    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", limit: 3, execFile });
+
+    assert.deepEqual(issues, [{ number: 61, title: "Collect" }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        "3",
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
+  it("uses defaultLimit without a GraphQL preflight when provided", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return JSON.stringify([{ number: 1 }, { number: 2 }]);
+    };
+
+    const issues = fetchOpenIssues({
+      repo: "sungjunlee/dev-backlog",
+      defaultLimit: 2147483647,
+      execFile,
+    });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.deepEqual(calls, [{
+      command: "gh",
+      args: [
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--limit",
+        "2147483647",
+        "--repo",
+        "sungjunlee/dev-backlog",
+        "--json",
+        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
+      ],
+      options: {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    }]);
+  });
+
+  it("resolves the limit from GraphQL when limit is omitted", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+
+      if (args[0] === "api") return "2\n";
+      if (args[0] === "issue") return JSON.stringify([{ number: 1 }, { number: 2 }]);
+      throw new Error(`Unexpected args: ${args.join(" ")}`);
+    };
+
+    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", execFile });
+
+    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[0].args, [
+      "api",
+      "graphql",
+      "-F",
+      "owner=sungjunlee",
+      "-F",
+      "name=dev-backlog",
+      "-f",
+      "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }",
+      "--jq",
+      ".data.repository.issues.totalCount",
+    ]);
+  });
+
+  it("returns an empty array without listing issues when the repo has no open issues", () => {
+    const calls = [];
+    const execFile = (command, args, options) => {
+      calls.push({ command, args, options });
+      return "0\n";
+    };
+
+    const issues = fetchOpenIssues({ execFile });
+
+    assert.deepEqual(issues, []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args[0], "api");
+  });
+});
+
+describe("scopesOverlap", () => {
+  it("component: overlaps only on exact equality", () => {
+    assert.equal(scopesOverlap({ component: "auth" }, { component: "auth" }), true);
+    assert.equal(scopesOverlap({ component: "auth" }, { component: "billing" }), false);
+  });
+
+  it("scope: globs overlap on normalized path-prefix containment", () => {
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/billing/**"] }), false);
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/auth/**"] }), true);
+    assert.equal(scopesOverlap({ scope: ["src/auth/**"] }, { scope: ["src/auth/session/**"] }), true);
+  });
+
+  it("cross-axis or scopeless pairs cannot prove overlap (false)", () => {
+    assert.equal(scopesOverlap({ component: "auth" }, { scope: ["src/auth/**"] }), false);
+    assert.equal(scopesOverlap({}, {}), false);
+    assert.equal(scopesOverlap({ component: "auth" }, {}), false);
+  });
+});

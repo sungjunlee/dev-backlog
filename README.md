@@ -112,7 +112,7 @@ priced in the [authority contract](skills/dev-backlog/references/authority-contr
 ## Maintainer checks
 
 ```bash
-node --test skills/*/scripts/*.test.js
+node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js
 bash skills/dev-backlog/scripts/smoke-test.sh
 npx --yes skills add . -l
 ```
