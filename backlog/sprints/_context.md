@@ -14,7 +14,7 @@
 ## Conventions
 
 - Prefer minimal-diff refactors over repo-wide rewrites
-- Keep `node --test skills/dev-backlog/scripts/*.test.js` green at each step of script cleanup work
+- Keep `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js` green at each step of script cleanup work
 - Treat sprint/task markdown shape as a compatibility surface for bash scripts and agent tooling
 - Commit the active sprint file to main when opening it; an untracked sprint is invisible to dispatch worktrees, and a relay executor may seed a duplicate active sprint to satisfy live checks (2026-07, Sprint execution-substrate — direct SSOT evidence for the #215 spike)
 - JSON read surfaces (`status.sh --json`, `next.sh --json` via `sprint-state.js`) and `backlog-doctor.js` are the machine path for orientation and health; extend them instead of adding new markdown parsers

@@ -67,7 +67,7 @@ amendments are human-gated — propose, apply only on explicit approval.
   aliases (mapping lives outside this repo) and never link to private repos
 - Keep README focused on the human quick start; keep `SKILL.md` under 250
   lines as the agent execution contract
-- Verify with `node --test skills/*/scripts/*.test.js` and
+- Verify with `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js` and
   `bash skills/dev-backlog/scripts/smoke-test.sh`; the test suite includes a
   doc-drift check over script mentions
 - `docs/` holds decision/proof records with a Living/Removed index in
