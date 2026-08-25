@@ -2,7 +2,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readSnapshot } = require("./triage-stale.js");
+const { analyzeSnapshot: analyzeRelationships } = require("./triage-relate.js");
+const { readSnapshot, analyzeSnapshot: analyzeStale } = require("./triage-stale.js");
 
 const ANCHOR_PATTERN = /<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->/;
 const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
@@ -758,14 +759,34 @@ function writeReportFile(outPath, markdown) {
   return { path: resolvedPath, backupPath: fs.existsSync(backupPath) ? backupPath : null };
 }
 
+function defaultRelateFromSnapshot(snapshot) {
+  return { edges: analyzeRelationships(snapshot) };
+}
+
+function defaultStaleFromSnapshot(snapshot) {
+  return analyzeStale(snapshot);
+}
+
+function loadRelateInput(options, snapshot) {
+  if (!options.relatePath) return defaultRelateFromSnapshot(snapshot);
+  return readJsonFile(options.relatePath, {
+    label: "relate JSON",
+    validate: validateRelateResult,
+  });
+}
+
+function loadStaleInput(options, snapshot) {
+  if (!options.stalePath) return defaultStaleFromSnapshot(snapshot);
+  return readJsonFile(options.stalePath, {
+    label: "stale JSON",
+    validate: validateStaleResult,
+  });
+}
+
 function loadInputs(options) {
   const snapshot = readSnapshot(options.snapshotPath);
-  const relate = options.relatePath
-    ? readJsonFile(options.relatePath, { label: "relate JSON", validate: validateRelateResult })
-    : null;
-  const stale = options.stalePath
-    ? readJsonFile(options.stalePath, { label: "stale JSON", validate: validateStaleResult })
-    : null;
+  const relate = loadRelateInput(options, snapshot);
+  const stale = loadStaleInput(options, snapshot);
   const activeSprintContent = options.activeSprintPath
     ? fs.readFileSync(path.resolve(options.activeSprintPath), "utf-8")
     : "";

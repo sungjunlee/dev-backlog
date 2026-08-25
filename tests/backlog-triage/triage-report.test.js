@@ -20,6 +20,7 @@ const {
   validateStaleResult,
   collectActiveSprintIssueNumbers,
   loadModelActions,
+  loadInputs,
   validateModelAction,
 } = require(path.join(SKILL_SCRIPTS, "triage-report.js"));
 
@@ -722,6 +723,76 @@ describe("triage-report integration chain", () => {
 
     const markdown = fs.readFileSync(reportPath, "utf-8");
     assert.match(markdown, /\[warn\] Dropped stale candidate #108 \(suggested_action="revisit"\)/);
+  });
+
+  it("derives relate and stale from the snapshot when override paths are omitted", () => {
+    const scriptPath = path.join(SKILL_SCRIPTS, "triage-report.js");
+    execFileSync(
+      process.execPath,
+      [scriptPath, "--snapshot", snapshotPath, "--out", reportPath],
+      { cwd: repoRoot, encoding: "utf-8" }
+    );
+
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
+    assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
+    assert.match(markdown, /<!-- triage:close #101 reason="merged closing PR detected: PR #88 merged at 2026-04-18T01:15:00.000Z" -->/);
+    assert.match(markdown, /<!-- triage:close #104 reason="inactive\/stale: no activity for 107 days; exceeds stale_days threshold \(60\); no milestone assigned" -->/);
+    assert.doesNotMatch(markdown, /_\(no input provided\)_/);
+  });
+
+  it("keeps explicit empty --relate/--stale overrides instead of in-process signals", () => {
+    const emptyRelatePath = path.join(repoRoot, "empty-relate.json");
+    const emptyStalePath = path.join(repoRoot, "empty-stale.json");
+    fs.writeFileSync(emptyRelatePath, `${JSON.stringify({ edges: [] }, null, 2)}\n`);
+    fs.writeFileSync(
+      emptyStalePath,
+      `${JSON.stringify({ candidates: [] }, null, 2)}\n`
+    );
+
+    execFileSync(
+      process.execPath,
+      [
+        path.join(SKILL_SCRIPTS, "triage-report.js"),
+        "--snapshot",
+        snapshotPath,
+        "--relate",
+        emptyRelatePath,
+        "--stale",
+        emptyStalePath,
+        "--out",
+        reportPath,
+      ],
+      { cwd: repoRoot, encoding: "utf-8" }
+    );
+
+    const markdown = fs.readFileSync(reportPath, "utf-8");
+    assert.match(markdown, /## Relationships\n_\(none\)_/);
+    assert.doesNotMatch(markdown, /comment-mentions/);
+    assert.doesNotMatch(markdown, /<!-- triage:close #104 /);
+  });
+});
+
+describe("loadInputs in-process defaults", () => {
+  let tempDir;
+  let snapshotPath;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-report-load-"));
+    snapshotPath = path.join(tempDir, "snapshot.json");
+    fs.writeFileSync(snapshotPath, `${JSON.stringify(makeSnapshot(), null, 2)}\n`);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("fills relate edges and stale candidates from the snapshot", () => {
+    const inputs = loadInputs({ snapshotPath });
+    assert.ok(inputs.relate.edges.some((edge) => edge.kind === "comment-mentions"));
+    assert.ok(inputs.relate.edges.some((edge) => edge.kind === "merged-pr-link"));
+    assert.ok(inputs.stale.candidates.some((candidate) => candidate.number === 104));
+    assert.ok(inputs.stale.candidates.some((candidate) => candidate.number === 101));
   });
 });
 

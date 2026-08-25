@@ -1,10 +1,10 @@
 # Relationships
 
-**Purpose.** The `## Relationships` section of the triage report maps how open issues connect to each other and to merged closing PRs. Deterministic signals come from `triage-relate.js`; semantic judgment (blocking, dependency, duplication) is the model's job and is rendered from the model's own edge JSON.
+**Purpose.** The `## Relationships` section of the triage report maps how open issues connect to each other and to merged closing PRs. Deterministic signals come from `triage-relate.js`, which `triage-report.js` runs against the snapshot by default (`--relate PATH` overrides). Semantic judgment (blocking, dependency, duplication) is the model's job and is rendered from the model's own edge JSON.
 
 ## Script-generated Edges (deterministic)
 
-`triage-relate.js` reads a previously collected issue snapshot and emits read-only edges for snapshot-resident signals that need no interpretation:
+`triage-relate.js` is the analyzer behind those default signals. It reads a collected issue snapshot and emits read-only edges for snapshot-resident signals that need no interpretation:
 
 - `mentions` from plain `#123` references in issue bodies
 - `comment-mentions` from plain `#123` references in optional issue comments

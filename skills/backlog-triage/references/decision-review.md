@@ -13,8 +13,7 @@ Read bounded evidence in this order:
 3. `spec/system-map.md` when present.
 4. Active sprint context when present, especially in-flight work and protected issue references.
 5. Issue snapshot from `triage-collect.js`.
-6. Relationship output from `triage-relate.js`.
-7. Stale or obsolete output from `triage-stale.js`.
+6. The rendered Relationships and Obsolete Candidates sections (deterministic relate/stale signals plus model-judged edges).
 
 Missing files are graceful no-ops. Say which evidence was used and which evidence was absent; do not invent spec authority.
 

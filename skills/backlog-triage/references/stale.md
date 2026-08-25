@@ -1,6 +1,6 @@
 # Stale / Obsolescence
 
-**Purpose.** `scripts/triage-stale.js` reads an issue snapshot from `triage-collect.js` and emits stale / obsolete candidates using snapshot-only signals. It does not call `gh`, re-fetch issues, or mutate anything.
+**Purpose.** `scripts/triage-stale.js` is the analyzer `triage-report.js` runs against the snapshot by default (`--stale PATH` overrides). It emits stale / obsolete candidates using snapshot-only signals. It does not call `gh`, re-fetch issues, or mutate anything.
 
 ## Implemented signals
 
