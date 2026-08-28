@@ -21,8 +21,8 @@ Default invocation. Read-only toward GitHub.
 
 1. **Collect.** Run `triage-collect.js` from the target project root. Done when one snapshot JSON exists under `backlog/triage/.cache/` and later steps use `--snapshot PATH` without re-fetching.
 2. **Judge.** Read the snapshot, the resolved charter (`spec/charter.md`, else legacy root `CHARTER.md`), optional `spec/capabilities.md` and `spec/system-map.md`, and any active sprint. Write a `--model-actions` JSON file. Done when every judged proposal is a valid action object in that file. Issues that declare mutual exclusivity stay unscheduled; never `assign-milestone` into an active or wait-gated milestone; emit one relationship edge per fact, in the direction the evidence phrase states (`references/relationships.md`).
-3. **Render.** Run `triage-report.js --snapshot PATH --model-actions PATH`. The renderer runs relate/stale against the snapshot. Pass `--relate` / `--stale` only to override those signals; pass `--active-sprint PATH` to protect in-flight Plan/Running Context issues from close. Done when the markdown report exists under `backlog/triage/` with Classification, Relationships, Obsolete Candidates, Priority Proposals, Milestone Suggestions, and Apply Checklist, and every proposal is an anchor+checkbox pair.
-4. **Align.** Insert `## Alignment` from charter evidence. Spec-axis degradation lives in `../dev-backlog/references/spec-fallback.md`. When both charter files are absent, render Alignment as skipped. When craftkit is installed, `spec-charter` `references/alignment.md` deepens the mapping — an enhancement, never required. Done when every open issue maps to ≥1 Objective or is named as an orphan, and the evidence tier is named.
+3. **Render.** Resolve any `status: active` sprint file under `backlog/sprints/`. Run `triage-report.js --snapshot PATH --model-actions PATH`, and pass `--active-sprint PATH` whenever an active sprint exists — stale close candidates now come from the snapshot by default, so omitting that flag proposes closes against in-flight Plan/Running Context issues. Pass `--relate` / `--stale` only to override those signals. Done when the markdown report exists under `backlog/triage/` with Classification, Relationships, Obsolete Candidates, Priority Proposals, Milestone Suggestions, and Apply Checklist; every proposal is an anchor+checkbox pair; and no Obsolete close targets an issue named in an active sprint Plan or Running Context.
+4. **Align.** Insert `## Alignment` after the renderer sections and before Apply Checklist. Spec-axis degradation lives in `../dev-backlog/references/spec-fallback.md`. When both charter files are absent, render Alignment as skipped. When craftkit is installed, `spec-charter` `references/alignment.md` deepens the mapping — an enhancement, never required. Done when every open issue maps to ≥1 Objective or is named as an orphan, and the evidence tier is named.
 5. **Review.** Insert `## Decision Review` using `references/decision-review.md`. Place it after Alignment and before Apply Checklist. Done when every open issue is in Do Now, Shape First, Defer, or Drop / Close, and absent spec tiers are named rather than dropped silently.
 
 Stop. Do not apply.
@@ -92,8 +92,8 @@ Resolve scripts from the installed `backlog-triage` skill directory, not from th
 
 ```bash
 skill_dir="skills/backlog-triage" # source checkout; replace with the resolved installed skill dir
-node "$skill_dir/scripts/triage-collect.js"
-node "$skill_dir/scripts/triage-report.js" --snapshot PATH --model-actions PATH
+node "$skill_dir/scripts/triage-collect.js" --dry-run --json
+node "$skill_dir/scripts/triage-report.js" --snapshot PATH --model-actions PATH [--active-sprint PATH]
 node "$skill_dir/scripts/triage-apply.js" backlog/triage/YYYY-MM-DD-report.md
 ```
 
@@ -118,6 +118,7 @@ Core scripts (full flags in each script's usage string):
 
 - "Run triage on a repo with open issues and no accepted report checkboxes." Expected: produce a report only; no GitHub mutations.
 - "Render a report from a snapshot with no `--relate` or `--stale` files." Expected: Relationships and Obsolete Candidates still include deterministic snapshot signals (mentions, merged-PR links, date/label stale).
+- "Render a report while an active sprint Plan names a stale issue." Expected: that issue is absent from Obsolete close proposals.
 - "Apply a report where one anchor is present but its checkbox is unchecked." Expected: skip that action.
 - "Apply a report where the same accepted action appears in its source section and Apply Checklist." Expected: execute one deduped mutation.
 - "Run `triage-apply.js <report.md>` without `--apply`." Expected: dry-run output only; no `gh` mutation.

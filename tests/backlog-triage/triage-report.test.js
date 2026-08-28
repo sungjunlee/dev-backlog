@@ -734,6 +734,7 @@ describe("triage-report integration chain", () => {
     );
 
     const markdown = fs.readFileSync(reportPath, "utf-8");
+    assert.match(markdown, /#101 OAuth token refresh flow mentions #102/);
     assert.match(markdown, /#101 OAuth token refresh flow comment-mentions #103 Audit token rotation docs/);
     assert.match(markdown, /#101 OAuth token refresh flow merged-pr-link PR #88; mergedAt 2026-04-18T01:15:00.000Z/);
     assert.match(markdown, /<!-- triage:close #101 reason="merged closing PR detected: PR #88 merged at 2026-04-18T01:15:00.000Z" -->/);
@@ -789,6 +790,7 @@ describe("loadInputs in-process defaults", () => {
 
   it("fills relate edges and stale candidates from the snapshot", () => {
     const inputs = loadInputs({ snapshotPath });
+    assert.ok(inputs.relate.edges.some((edge) => edge.kind === "mentions"));
     assert.ok(inputs.relate.edges.some((edge) => edge.kind === "comment-mentions"));
     assert.ok(inputs.relate.edges.some((edge) => edge.kind === "merged-pr-link"));
     assert.ok(inputs.stale.candidates.some((candidate) => candidate.number === 104));
