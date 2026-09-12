@@ -108,14 +108,15 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 ### Work
 
 Goal: verified work reflected in GitHub.
-Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC, lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, Issue body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off.
+Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC, lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, Issue body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
 Boundary: if resolution fails, diagnose it, but do not execute the task or change AC/lifecycle until live resolution succeeds.
 Done when verified work is reflected in GitHub Issue AC/lifecycle and, when admitted, sprint progress.
 
 ### Complete
 
 Goal: nothing stale left behind.
-Rail: per task, re-resolve and verify every AC against the current effective specification, then merge or commit and close the Issue (Plan item and Progress too when a sprint is admitted). Per sprint, `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
+Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close the Issue (Plan item `[x]` and Progress too when a sprint is admitted). Done for the task when the Issue is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
 ### Next
