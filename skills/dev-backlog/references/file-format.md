@@ -86,9 +86,10 @@ dev-backlog reads `task_prefix`, `default_status`, and `statuses`;
 
 ## Effective task specification
 
-Work and completion resolve task input through `effective-task-spec.js`. The
-canonical task body is the default selected specification. To select a
-repository document explicitly, put exactly one marker in the Issue body:
+Work and completion resolve task input through `effective-task-spec.js`. It
+selects, in order: an explicit `spec_ref`, a posted Issue comment starting with
+`## Agent Brief`, then the Issue body. To select a repository document
+explicitly, put exactly one marker in the Issue body:
 
 ```markdown
 <!-- dev-backlog:spec_ref docs/oauth-rollout.md -->

@@ -8,12 +8,13 @@ boundaries live in `authority-contract.md`.
 
 For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`. It creates `backlog/sprints/` and pins GitHub as the task authority; tracker selection rules live in `file-format.md`.
 
-## Required Core Lifecycle Invocation Boundary
+## Programmatic Lifecycle Boundary
 
-The official create/read/update/close boundary for operators and agents is the
-adapter exported by `scripts/tracker.js`. Resolve it from the target backlog
-directory; do not import `github-tracker.js` directly and do not select from
-runtime availability:
+Scripts and automation create/read/update/close Issues through the adapter
+exported by `scripts/tracker.js` (resolve it from the target backlog directory;
+do not import `github-tracker.js` directly). An agent working interactively
+uses `gh` directly with the patterns in `github-sync.md`; both routes write the
+same live Issue.
 
 ```js
 const path = require("node:path");
@@ -41,12 +42,12 @@ node "$skillDir/scripts/effective-task-spec.js" "#42" --repo OWNER/REPO
 
 It performs exactly one canonical adapter read and returns
 `effective_spec`, normalized `acceptance_criteria`, `lifecycle`, `source_ref`,
-and a stable SHA-256 `source_revision`/`source_digest`. An explicit repository
-relative `spec_ref` wins when the Issue contains
-`<!-- dev-backlog:spec_ref path/to/spec.md -->`; otherwise the live Issue body
-is selected. A failed Issue read or explicit-spec load stops execution. The
-resolver reads the live Issue (or one explicit `spec_ref`); it does not read
-task files.
+and a stable SHA-256 `source_revision`/`source_digest`. Source precedence, in
+order: an explicit repository-relative `spec_ref` (Issue-body marker
+`<!-- dev-backlog:spec_ref path/to/spec.md -->` or `--spec-ref`), then a posted
+Issue comment whose body starts with `## Agent Brief`, then the live Issue
+body. A failed Issue read or explicit-spec load stops execution; the resolver
+never reads task files.
 
 ## Orient — Starting a Session
 
@@ -61,8 +62,8 @@ task files.
 
 ## Create — New Tasks
 
-1. Call the configured adapter's required `create` operation.
-2. Use its returned `#N` ref in the current sprint Plan when in scope.
+1. Create the Issue with acceptance criteria (`gh issue create`, patterns in `github-sync.md`; automation uses `adapter.create`).
+2. Use its `#N` ref in the current sprint Plan when the work is admitted.
 3. Continue directly from the created Issue.
 
 ## Plan — Sprint
