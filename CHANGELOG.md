@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **Eval Prompts moved from both SKILL.md files to `tests/evals/`** — fresh-session eval prompts are test fixtures, not agent execution contract; every session paid their token cost. Prompts preserved verbatim; each `SKILL.md` References list keeps a one-line pointer. Closes [#396](https://github.com/sungjunlee/dev-backlog/issues/396).
 - **contract-prose tests now guard invariants, not historical wording** — dropped regex pins on compat-freeze, Projects-pilot, and #350 no-go phrasing already recorded in git/CHANGELOG; kept the per-surface GitHub-authority statement, local-tracker guards, and the charter structure test. Closes [#400](https://github.com/sungjunlee/dev-backlog/issues/400).
 - **backlog-triage hot path is collect → report → apply** — `triage-report.js` runs relate/stale against the snapshot by default (`--relate` / `--stale` remain overrides). SKILL.md is an ordered recipe with completion criteria; `argument-hint` and the core-script list no longer advertise relate/stale as agent-facing steps. Closes [#391](https://github.com/sungjunlee/dev-backlog/issues/391) and [#392](https://github.com/sungjunlee/dev-backlog/issues/392).
 - **Keep skill-package tests out of `npx skills add` installs** — maintainer `*.test.js` files and triage fixtures live under `tests/`; CI/`node --test` points at that tree, and a lock test fails if a `*.test.js` returns under `skills/`. Closes [#394](https://github.com/sungjunlee/dev-backlog/issues/394).
