@@ -38,10 +38,4 @@ entry points and are intentionally not listed.
 
 ## Tracker routing
 
-`backlog/.tracker` is the runtime selection authority. When it is absent, a
-legacy `tracker: github` key read from `config.yml` is the compatibility
-fallback; any other value fails. With neither, GitHub remains the deterministic
-default. Setup pins the legacy GitHub selection to `.tracker` without editing
-`config.yml`. Task files exist only as explicit one-way legacy exports.
-
-Routing and optional-export boundaries live in `authority-contract.md`.
+`backlog/.tracker` selection rules live in `file-format.md`; routing and optional-export boundaries in `authority-contract.md`.
