@@ -113,13 +113,4 @@ Core scripts (full flags in each script's usage string):
 - `../dev-backlog/references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
 - `../dev-backlog/references/spec-fallback.md` — spec-axis degradation contract (intra-bundle; always resolvable).
 - When installed, craftkit's `spec-charter` skill deepens Alignment: `references/alignment.md` and `references/spec-axis.md`. Enhancements only — never required to run triage.
-
-## Eval Prompts
-
-- "Run triage on a repo with open issues and no accepted report checkboxes." Expected: produce a report only; no GitHub mutations.
-- "Render a report from a snapshot with no `--relate` or `--stale` files." Expected: Relationships and Obsolete Candidates still include deterministic snapshot signals (mentions, merged-PR links, date/label stale).
-- "Render a report while an active sprint Plan names a stale issue." Expected: that issue is absent from Obsolete close proposals.
-- "Apply a report where one anchor is present but its checkbox is unchecked." Expected: skip that action.
-- "Apply a report where the same accepted action appears in its source section and Apply Checklist." Expected: execute one deduped mutation.
-- "Run `triage-apply.js <report.md>` without `--apply`." Expected: dry-run output only; no `gh` mutation.
-- "Re-run apply after a partial successful apply." Expected: completed actions log `already-applied` and remaining accepted actions continue safely.
+- `tests/evals/backlog-triage.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout only).
