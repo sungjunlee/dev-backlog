@@ -1,6 +1,6 @@
 ---
 name: dev-backlog
-argument-hint: "[orient|create|plan|work|next|sync|complete] [issue-number]"
+argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
 description: Manage GitHub-backed sprint execution. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires git, Node.js 18+, and gh CLI. Works on Claude Code and Codex.
 metadata:
@@ -24,12 +24,10 @@ README covers install and human quick start. This file is the agent execution co
 | "plan sprint", "make sprint", or complex work with no active sprint | `plan` | One active sprint file exists with Goal and ordered Plan; `objectives:`/`component:` are present only when their backing spec files exist. |
 | "work #N", "continue", "do next batch" | `work` | Live Issue AC is verified and lifecycle is updated; an admitted sprint is also updated when present. |
 | "next", "다음 작업" | `next` | The next actionable batch or sprint-planning need is named. |
-| "sync", "export issue mirrors" | `sync` | A deliberate legacy/rollback export is produced; it is never a prerequisite for work. |
 | "complete", "close sprint" | `complete` | Sprint/task state is finalized and rediscovery-prone context is promoted. |
 
 If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
-github --non-interactive`; see `references/file-format.md`. Never infer a
-tracker from availability.
+github --non-interactive`; see `references/file-format.md`.
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
@@ -39,18 +37,14 @@ are single-sourced in [`references/authority-contract.md`](references/authority-
 ## Core Contracts
 
 ```
-backlog/.tracker (one line: github)
-  -> GitHub Issues canonical; no task-file directory required
-
-backlog/config.yml <- Backlog.md settings; legacy tracker fallback only
-backlog/sprints/ <- optional complex-execution hub
+GitHub Issues               <- canonical task definition and lifecycle
+backlog/sprints/            <- optional complex-execution hub (one active file per track)
+backlog/sprints/_context.md <- cross-sprint project context
 ```
 
 - One active track per scope: sprints with `status: active` must declare disjoint scopes (`component:` equality or `scope:` glob collision = overlap, decided by the shared `scopesOverlap` predicate). Disjoint tracks coexist as a portfolio; overlapping tracks fail loud; most repos run a single track, which behaves exactly as before.
 - Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
-- GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file. Optional-export and exclusion boundaries live in `references/authority-contract.md`.
-- A missing `.tracker` file accepts only the legacy value `github` from `config.yml`, then uses the zero-migration GitHub compatibility default. Any other value fails; runtime failure never changes selection.
-- Optional provider capabilities are not part of the core lifecycle. Unsupported requests fail before effects through the shared typed error contract in `tracker.js`; public JSON surfaces emit one structured error and human surfaces include the same remediation.
+- GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file.
 - Completed sprints stay as the permanent execution record.
 - Backlog-side file boundaries live in `references/backlog-boundaries.md`. Spec-axis boundaries and how `objectives:`/`component:` degrade when spec files are absent live in `references/spec-fallback.md` (in-bundle, always resolvable); their durable authoring home is craftkit's `spec-charter` skill, consulted when installed. Sprint `objectives:` reference charter Objective IDs, and `component:` is one primary capability handle from `spec/capabilities.md`.
 
@@ -123,7 +117,7 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 1. Resolve the live task with `effective-task-spec.js TASK_REF`. Its
    `effective_spec`, AC, lifecycle, `source_ref`, and content digest are the
    execution input: one explicit `spec_ref` wins, otherwise the live GitHub
-   Issue body wins. If resolution fails, stop clearly; a legacy mirror may be inspected only as diagnostic/rollback evidence and cannot authorize execution or lifecycle changes.
+   Issue body wins. If resolution fails, stop and report it.
 2. If the work has an admitted sprint, read its current batch and Running Context.
 3. Mark meaningful GitHub status before work when useful.
 4. Implement directly or optionally delegate through dev-relay.
@@ -143,26 +137,13 @@ For a whole sprint:
 
 1. Run `sprint-close.sh`; it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary.
 2. Set `status: completed` and write a final Progress entry.
-3. Close does not require task directories. If checked legacy export files
-   exist, archive them as compatibility cleanup only; task lifecycle remains
-   in GitHub.
-4. Promote project-level Running Context entries to `_context.md`.
-5. Leave the sprint file in place as the permanent record.
+3. Promote project-level Running Context entries to `_context.md`.
+4. Leave the sprint file in place as the permanent record.
 
 `sprint-close.sh` prints `backlog-doctor.js` JSON including `reassess_signal`.
 Unattended sessions must never `amend` `spec/*`.
 
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
-
-### Sync / Legacy Export
-
-- GitHub core: do not pull task files. Re-resolve live task intent and AC when
-  the Issue changes.
-- GitHub rollback/diagnostics: `sync-pull.js --legacy-export` may explicitly
-  export non-authoritative mirrors. Never use them as execution input.
-- Never perform background sync or switch trackers after a failure.
-
-Done when the user can tell which direction changed and what was updated.
 
 ### Next
 
@@ -184,13 +165,10 @@ node "$skill_dir/scripts/sprint-init.js" "next-sprint" --dry-run
 
 Core scripts (full flag inventory in `references/scripts.md`):
 
-- `scripts/init.sh` — bootstrap `backlog/`.
-- `scripts/setup-dev-backlog.js` — persist `github` without migrating task files.
+- `scripts/setup-dev-backlog.js` — bootstrap `backlog/`.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC,
   lifecycle, source, and stable digest from the live Issue (or one explicit
   `spec_ref`).
-- `scripts/sync-pull.js --legacy-export` — opt-in rollback/diagnostic export;
-  never part of setup, orient, plan, work, or complete.
 - `scripts/sprint-init.js` — create a milestone-backed sprint when supported.
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
@@ -199,8 +177,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 ## References
 
 - `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
-- `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Sync/Quick Fix/Unplanned Work/Next workflow.
-- `references/file-format.md` — sprint file shape, `.tracker`, and config.
+- `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Quick Fix/Unplanned Work/Next workflow.
+- `references/file-format.md` — sprint file shape, `backlog/` config, and the optional legacy export (`sync-pull.js --legacy-export`, rollback/diagnostics only).
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.

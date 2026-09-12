@@ -4,11 +4,9 @@ Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
 the same core cycle through GitHub Issues. Routing and optional-export
 boundaries live in `authority-contract.md`.
 
-## Setup — Choose Canonical Task Truth
+## Setup
 
-1. For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`.
-2. With no `.tracker`, accept only a legacy `tracker: github` value from `config.yml`; with neither, keep the deterministic GitHub default. Setup writes `github` to `.tracker` without editing `config.yml`.
-3. Never infer selection from `gh`, authentication, remotes, existing task files, or an operation failure. Setup does not migrate task files.
+For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`. It creates `backlog/sprints/` and pins GitHub as the task authority; tracker selection rules live in `file-format.md`.
 
 ## Required Core Lifecycle Invocation Boundary
 
@@ -113,18 +111,9 @@ For the whole sprint:
    those files.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
-## Sync / Legacy Export — Explicit and One-Way
+## Legacy Export — Explicit and One-Way
 
-- **GitHub core:** there is no pull step. Re-run `effective-task-spec.js` when
-  Issue content changes and review a changed source revision.
-- **GitHub rollback/diagnostics:** `sync-pull.js --legacy-export` explicitly
-  writes non-authoritative projections. It is outside setup, orient, plan,
-  work, and complete.
-- Compatible Markdown import is human-reviewed input to create or amend a
-  GitHub Issue; it is not a runtime read path.
-- An operation failure never changes `.tracker` or makes an export authoritative.
-
-See `github-sync.md` for GitHub-only command patterns.
+There is no pull step: re-run `effective-task-spec.js` when Issue content changes. `sync-pull.js --legacy-export` writes non-authoritative Backlog.md-shaped snapshots for rollback or diagnostics only; see `file-format.md`.
 
 ## Unsupported Optional Capabilities
 
