@@ -1,6 +1,6 @@
 ---
 milestone: 2026-09 skill lightening
-status: active
+status: completed
 started: 2026-09-12
 due: TBD
 scope: ["skills/**", "tests/**", "docs/conformance/**"]
@@ -29,7 +29,7 @@ Both SKILL.md files read as goal + done-condition + deterministic rail for Fable
 - [x] #399 Reframe Execution Path as goal + Done when + rail; positive defaults (~3h) -> PR #406 merged
 
 ### Batch 5 — Measurement
-- [~] #401 Before/after conformance run on Fable 5.1 and Codex (~3h) [branch:docs/401-conformance-run]
+- [x] #401 Before/after conformance run on Fable 5.1 and Codex (~3h) -> PR #409 merged (also closed #408)
 
 ## Running Context
 - Source: 2026-09-12 review of the official Fable 5 / Opus 5 / GPT-6 Astra prompting and skill-authoring guides. Both vendors: prior-model skills are too prescriptive; conflicting skill guidance makes Astra block early; keep explicit "done" definitions; hard constraints only for irreversible/shared mutations.
@@ -46,3 +46,5 @@ Both SKILL.md files read as goal + done-condition + deterministic rail for Fable
 - 2026-09-12: Batches 1–2 done (#402, #403 by Sonnet worktree subagents; #404 by this session). SKILL.md 225 → 188 lines. Next: Batch 3 (#398).
 - 2026-09-12: Batch 3 done (#405 merged after Astra review fixes). SKILL.md 184 lines; never/only/must 1/7/1. Next: Batch 4 (#399).
 - 2026-09-12: Batch 4 done (#406 merged after Astra review #2). SKILL.md 162 lines; never/only/must 3/6/0. Next: Batch 5 (#401) — plan-level conformance on Fable 5.1 + GPT-6 Astra, before vs after.
+- 2026-09-12: Batch 5 done (#409 merged). Conformance: before-noeval == after on both models, 8 PASS / 2 PARTIAL each; #407 filed for the two over-specified expectations; #408 (backlog/ bootstrap into Plan) fixed in the same PR. SKILL.md 225 → 159 lines across the wave.
+- 2026-09-12: Sprint closed. 6/6 tasks completed.

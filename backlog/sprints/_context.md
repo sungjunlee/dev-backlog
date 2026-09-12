@@ -21,6 +21,10 @@
 - No `skills/` file may carry an unconditional required-read of a cross-repo `../spec-charter/references/` path — it dangles for adopters without craftkit. Consumption-side spec degradation lives in the in-bundle `references/spec-fallback.md`; craftkit's `spec-charter` is the when-installed authoring home. `smoke-test.sh` GATE_A2A3 enforces this (2026-07 adoption-hardening, #254/#255)
 - Sprint spec fields are optional: `sprint-init.js` omits `objectives:`/`component:` when the backing spec file is absent; `backlog-doctor` soft-warns only when the ACTIVE sprint drops a field while its spec exists. Existing `objectives: []`/`component: ""` stay valid (no migration) (#258)
 
+- SKILL.md is goal / rail / Done-when per mode (2026-09 skill-lightening, #396–#399): state a rule once, name the script that enforces it, keep hard constraints only for shared or irreversible state. Re-add prose only when a conformance run shows a repeated mistake (`docs/conformance/`), never for an anticipated risk.
+- Eval prompts live in `tests/evals/`, never in SKILL.md — the 2026-09-12 run showed an in-file Eval Prompts section is a self-contaminating answer key.
+- Cross-family review at batch boundaries (read-only `codex exec -m gpt-6-astra` on the cumulative diff) found three contradictions repetition had hidden; cheaper than per-PR review and worth keeping for prose waves.
+
 ## Known Gotchas
 
 - Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision. Rollback/diagnostic export is explicit via `sync-pull.js --legacy-export --update`.
