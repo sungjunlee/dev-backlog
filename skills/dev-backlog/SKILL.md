@@ -66,7 +66,7 @@ Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` 
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
 | `objectives: [O1]` | Charter Objective IDs advanced by the sprint | Optional; IDs resolve against `spec/charter.md`. |
 | `component: "slug"` | One capability slug from `spec/capabilities.md`; also the relay-Learnings route and a track-scope axis | Optional; resolves to one `## Capability:` heading. |
-| `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; `sprint-init.js --scope`. |
+| `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, never inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
@@ -113,8 +113,10 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 
 1. Resolve the live task with `effective-task-spec.js TASK_REF`. Its
    `effective_spec`, AC, lifecycle, `source_ref`, and content digest are the
-   execution input: one explicit `spec_ref` wins, otherwise the live GitHub
-   Issue body wins. If resolution fails, stop and report it.
+   execution input; the resolver decides source precedence (explicit
+   `spec_ref`, posted `## Agent Brief` comment, Issue body). If resolution
+   fails, diagnose it, but do not execute the task or change AC/lifecycle
+   until live resolution succeeds.
 2. If the work has an admitted sprint, read its current batch and Running Context.
 3. Mark meaningful GitHub status before work when useful.
 4. Implement directly or optionally delegate through dev-relay.
@@ -126,15 +128,15 @@ admitted, sprint progress.
 
 ### Complete
 
-Per task: all AC checked, implementation merged or committed, Plan checked, and
-Progress updated.
+Per task: re-resolve the task and verify every AC against the current
+effective specification, then merge or commit and close the Issue. When an
+admitted sprint exists, also check the Plan item and update Progress.
 
 For a whole sprint:
 
-1. Run `sprint-close.sh`; it runs `backlog-doctor.js` before the status flip and prints any reassess recommendation in the close summary.
-2. Set `status: completed` and write a final Progress entry.
-3. Promote project-level Running Context entries to `_context.md`.
-4. Leave the sprint file in place as the permanent record.
+1. Run `sprint-close.sh`; it runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation.
+2. After it succeeds, promote project-level Running Context entries to `_context.md`.
+3. Leave the sprint file in place as the permanent record.
 
 Unattended sessions never `amend` `spec/*`.
 
