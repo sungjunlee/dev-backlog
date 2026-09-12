@@ -1,3 +1,27 @@
+You are a fresh coding-agent session (no prior conversation, no memory). The skill file below is loaded as your operating contract. This is a SIMULATION: do not run commands, do not read or modify any files. Answer from the skill text and ordinary judgment.
+
+For EACH scenario below, answer in at most 5 lines:
+- ACTIONS: what you do, in order, naming the scripts or commands you would use
+- MUTATIONS: what you would change in GitHub and in local files (or "none")
+- STOP/ASK: whether you would stop or ask the user before acting, and why (or "no")
+
+Number your answers 1-10 to match the scenarios. Answer all ten. Keep the whole answer under 900 words.
+
+## Scenarios
+
+1. "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan."
+2. "Plan a sprint whose scope overlaps a track that is already `status: active`."
+3. "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan."
+4. "Repo with no spec axis: open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint."
+5. "Repo with no spec axis: one self-contained GitHub issue, no `backlog/`, and no Relay."
+6. "Work issue #42 with no local task files and three live Issue AC checkboxes."
+7. "Fresh online session with no local task files."
+8. "Fresh session with only repo files available, no conversation history, and no GitHub access."
+9. "Close a sprint with Running Context that applies to future work and no local task files."
+10. "GitHub Issue changed during work."
+
+## Skill file (SKILL.md)
+
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
@@ -25,6 +49,9 @@ README covers install and human quick start. This file is the agent execution co
 | "work #N", "continue", "do next batch" | `work` |
 | "next", "다음 작업" | `next` |
 | "complete", "close sprint" | `complete` |
+
+If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
+github --non-interactive`; see `references/file-format.md`.
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
@@ -99,7 +126,7 @@ Done when the new task exists in GitHub and, only when the work was admitted to 
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: when `backlog/` is missing, `setup-dev-backlog.js --tracker github --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work

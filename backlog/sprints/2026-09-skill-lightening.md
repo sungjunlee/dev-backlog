@@ -29,7 +29,7 @@ Both SKILL.md files read as goal + done-condition + deterministic rail for Fable
 - [x] #399 Reframe Execution Path as goal + Done when + rail; positive defaults (~3h) -> PR #406 merged
 
 ### Batch 5 — Measurement
-- [~] #401 Before/after conformance run on Fable 5.1 and Codex (~3h) -> in progress this session (plan-level harness, no PR yet)
+- [~] #401 Before/after conformance run on Fable 5.1 and Codex (~3h) [branch:docs/401-conformance-run]
 
 ## Running Context
 - Source: 2026-09-12 review of the official Fable 5 / Opus 5 / GPT-6 Astra prompting and skill-authoring guides. Both vendors: prior-model skills are too prescriptive; conflicting skill guidance makes Astra block early; keep explicit "done" definitions; hard constraints only for irreversible/shared mutations.
