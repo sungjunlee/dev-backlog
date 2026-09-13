@@ -11,3 +11,5 @@ consumed by the #367 conformance cadence rather than read on every session.
 
 - `dev-backlog.md` — prompts for the `dev-backlog` skill.
 - `backlog-triage.md` — prompts for the `backlog-triage` skill.
+
+Revised 2026-09-13 (#407): `dev-backlog.md` scenarios 3 and 7 Expected relaxed as over-specified per the 2026-09-12 conformance run.
