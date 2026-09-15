@@ -704,8 +704,23 @@ NO_COLUMN_BIN="$TEST_DIR/no-column-bin"
 NO_COLUMN_BACKLOG="$TEST_DIR/no-column-backlog"
 NODE_CALLED="$TEST_DIR/no-column-node-called"
 mkdir -p "$NO_COLUMN_BIN" "$NO_COLUMN_BACKLOG"
-ln -s "$(command -v dirname)" "$NO_COLUMN_BIN/dirname"
-ln -s "$(command -v git)" "$NO_COLUMN_BIN/git"
+# Git Bash on Windows often creates a dirname/git symlink that executes but
+# prints nothing (SCRIPT_DIR emptied). Prefer a working copy when the link is
+# unusable. PATH must still exclude `column` and keep the fake node.
+install_no_column_bin() {
+	local src="$1" dest="$2"
+	shift 2
+	local out=""
+	ln -s "$src" "$dest" 2>/dev/null || true
+	out="$("$dest" "$@" 2>/dev/null)" || out=""
+	if [ -z "$out" ]; then
+		rm -f "$dest"
+		cp "$src" "$dest"
+		chmod +x "$dest"
+	fi
+}
+install_no_column_bin "$(command -v dirname)" "$NO_COLUMN_BIN/dirname" /
+install_no_column_bin "$(command -v git)" "$NO_COLUMN_BIN/git" --version
 cat >"$NO_COLUMN_BIN/node" <<'EOF'
 #!/bin/bash
 : > "$NODE_CALLED"

@@ -14,7 +14,9 @@ RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
 
-TASK_REF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TASK_REF_SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[ "$TASK_REF_SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && TASK_REF_SCRIPT_DIR="."
+TASK_REF_SCRIPT_DIR="$(cd "$TASK_REF_SCRIPT_DIR" && pwd)"
 
 # Print valid Plan checkbox lines, optionally limited to one marker (space/~ /x).
 # Usage: checkbox_lines "$FILE" [marker]

@@ -6,7 +6,10 @@ set -euo pipefail
 #        project-name defaults to the current directory name.
 #
 PROJECT_NAME="${1:-$(basename "$(pwd)")}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` (restricted PATH / Windows Git Bash).
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 ARGS=(--project-name "$PROJECT_NAME" --non-interactive)
 
 # The historical init.sh entrypoint created a GitHub-backed fresh setup.

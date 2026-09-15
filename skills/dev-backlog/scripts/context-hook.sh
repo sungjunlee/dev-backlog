@@ -17,10 +17,13 @@ trap 'exit 0' ERR
 # Always exits 0 — must never block tool execution.
 # Uses trap ERR instead of set -e to guarantee exit 0 on any failure.
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` (restricted PATH / Windows Git Bash).
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-$DEFAULT_BACKLOG_DIR}"
+BACKLOG_DIR="${1:-${DEFAULT_BACKLOG_DIR:-.dev-backlog}}"
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then

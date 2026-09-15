@@ -3,10 +3,14 @@ set -uo pipefail
 # Project status from sprint file + GitHub + local files.
 # Usage: bash scripts/status.sh [--json] [backlog-dir]
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` — restricted PATH (Windows Git Bash) often has a
+# broken dirname symlink, which emptied SCRIPT_DIR and skipped lib.sh.
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="$DEFAULT_BACKLOG_DIR"
+BACKLOG_DIR="${DEFAULT_BACKLOG_DIR:-.dev-backlog}"
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do

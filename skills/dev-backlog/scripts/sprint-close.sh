@@ -14,10 +14,13 @@ set -uo pipefail
 #   4. Show Running Context entries (remind to promote to _context.md)
 #   5. Optionally close GitHub milestone (--close-milestone)
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` (restricted PATH / Windows Git Bash).
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="$DEFAULT_BACKLOG_DIR"
+BACKLOG_DIR="${DEFAULT_BACKLOG_DIR:-.dev-backlog}"
 DRY_RUN=false
 CLOSE_MILESTONE=false
 BACKLOG_DIR_SET=false
