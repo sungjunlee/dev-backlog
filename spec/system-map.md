@@ -10,7 +10,7 @@ GitHub Issue (spec + lifecycle + native planning fields)
         +-- simple work -----> implementation -> PR -> close
         |
         `-- complexity admission -> one active sprint file per track
-              backlog/sprints/   Plan / Running Context / Progress
+              .dev-backlog/sprints/   Plan / Running Context / Progress
 ```
 
 `backlog-triage` is an optional advisory grooming pipeline over the same Issues.
@@ -39,9 +39,9 @@ a product surface (#350 no-go).
 ## Storage And External Systems
 
 - GitHub Issues — sole task authority (`gh`; tests use an argv recorder).
-- `backlog/sprints/` — admitted execution state; completed sprints are history.
+- `.dev-backlog/sprints/` — admitted execution state; completed sprints are history.
 - `spec/*` — durable direction when present.
-- `backlog/.tracker` — `github`. A missing file accepts only a legacy
+- `.dev-backlog/.tracker` — `github`. A missing file accepts only a legacy
   `tracker: github` config key, then defaults to GitHub.
 
 ## Project-Wide Invariants

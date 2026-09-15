@@ -2,6 +2,9 @@
 # Shared library for dev-backlog bash scripts.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
+# Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
+DEFAULT_BACKLOG_DIR=".dev-backlog"
+
 # Legacy GitHub checkbox regex aliases — integration contract with dev-relay.
 # Core shell consumers use checkbox_lines/count_checkboxes below, which delegate
 # task-ref grammar to task-ref.js and therefore also accept configured local refs.
@@ -11,7 +14,11 @@ RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
 
-TASK_REF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve without `dirname`; normalize Windows backslashes before `%/*`.
+_src="${BASH_SOURCE[0]//\\//}"
+TASK_REF_SCRIPT_DIR="${_src%/*}"
+[ "$TASK_REF_SCRIPT_DIR" = "$_src" ] && TASK_REF_SCRIPT_DIR="."
+TASK_REF_SCRIPT_DIR="$(cd "$TASK_REF_SCRIPT_DIR" && pwd)"
 
 # Print valid Plan checkbox lines, optionally limited to one marker (space/~ /x).
 # Usage: checkbox_lines "$FILE" [marker]

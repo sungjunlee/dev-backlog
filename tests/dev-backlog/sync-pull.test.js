@@ -6,6 +6,10 @@ const os = require("os");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
+  LEGACY_EXPORT_DIR,
+  LEGACY_TASKS_DIR,
+} = require(path.join(SKILL_SCRIPTS, "execution-root.js"));
+const {
   statusFromLabels,
   priorityFromLabels,
   structureBody,
@@ -21,13 +25,17 @@ function materializationCliFixture(
 ) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-materialize-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const backlogDir = path.join(root, "backlog");
+  const executionDir = path.join(root, ".dev-backlog");
+  const backlogDir = path.join(root, LEGACY_EXPORT_DIR);
   if (!fresh) {
-    fs.mkdirSync(backlogDir);
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
+    fs.mkdirSync(executionDir);
+    fs.writeFileSync(path.join(executionDir, ".tracker"), "github\n");
   }
-  const tasksPath = path.join(backlogDir, "tasks");
-  if (unsafeTasks) fs.writeFileSync(tasksPath, "sentinel\n");
+  const tasksPath = path.join(root, LEGACY_TASKS_DIR);
+  if (unsafeTasks) {
+    fs.mkdirSync(backlogDir, { recursive: true });
+    fs.writeFileSync(tasksPath, "sentinel\n");
+  }
 
   const preload = path.join(root, "preload.cjs");
   fs.writeFileSync(preload, `
@@ -276,9 +284,9 @@ describe("legacy export CLI boundary", () => {
   it("wraps provider read failure in one JSON document without materializing files", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-provider-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-    const backlogDir = path.join(root, "backlog");
-    fs.mkdirSync(backlogDir);
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
+    const executionDir = path.join(root, ".dev-backlog");
+    fs.mkdirSync(executionDir);
+    fs.writeFileSync(path.join(executionDir, ".tracker"), "github\n");
 
     const result = spawnSync(
       process.execPath,
@@ -292,16 +300,16 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_SOURCE_UNAVAILABLE");
     assert.match(document.error.message, /^gh error:/);
     assert.match(document.error.remediation, /provider authentication/);
-    assert.deepEqual(fs.readdirSync(root), ["backlog"]);
-    assert.deepEqual(fs.readdirSync(backlogDir), [".tracker"]);
+    assert.deepEqual(fs.readdirSync(root), [".dev-backlog"]);
+    assert.deepEqual(fs.readdirSync(executionDir), [".tracker"]);
   });
 
   it("keeps provider failure actionable in human mode", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-provider-human-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-    const backlogDir = path.join(root, "backlog");
-    fs.mkdirSync(backlogDir);
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
+    const executionDir = path.join(root, ".dev-backlog");
+    fs.mkdirSync(executionDir);
+    fs.writeFileSync(path.join(executionDir, ".tracker"), "github\n");
 
     const result = spawnSync(
       process.execPath,
@@ -313,7 +321,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /^gh error:/);
     assert.match(result.stderr, /provider authentication/);
-    assert.deepEqual(fs.readdirSync(backlogDir), [".tracker"]);
+    assert.deepEqual(fs.readdirSync(executionDir), [".tracker"]);
   });
 
   it("wraps unsafe task-path materialization failure as JSON without changing the path", (t) => {
@@ -331,7 +339,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.match(document.error.message, /Unsafe task export path/);
     assert.equal(fs.readFileSync(fixture.tasksPath, "utf8"), "sentinel\n");
-    assert.deepEqual(fs.readdirSync(fixture.backlogDir).sort(), [".tracker", "tasks"]);
+    assert.deepEqual(fs.readdirSync(fixture.backlogDir).sort(), ["tasks"]);
   });
 
   it("wraps task write failure as JSON and removes an empty directory it created", (t) => {
@@ -349,7 +357,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.match(document.error.message, /injected task write failure/);
     assert.equal(fs.existsSync(fixture.tasksPath), false);
-    assert.deepEqual(fs.readdirSync(fixture.backlogDir), [".tracker"]);
+    assert.equal(fs.existsSync(fixture.backlogDir), false);
   });
 
   it("keeps materialization failure actionable in human mode", (t) => {

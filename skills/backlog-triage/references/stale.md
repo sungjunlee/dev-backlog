@@ -11,7 +11,7 @@
 | `invalid` | Issue has an `invalid` label (case-insensitive) | `labeled <matchedLabel>; explicit invalid signal` | `close` |
 | `merged-closing-pr` | Optional `closing_prs[]` includes `state: "MERGED"` and non-empty `mergedAt` | `merged closing PR detected: PR #<n> merged at <mergedAt>` | `close` |
 
-`stale_days` comes from `backlog/triage-config.yml` unless `--since N` is passed, in which case the CLI override wins.
+`stale_days` comes from `.dev-backlog/triage-config.yml` unless `--since N` is passed, in which case the CLI override wins.
 
 Issues with any milestone are exempt from the `inactive` signal even if they are older than the threshold.
 

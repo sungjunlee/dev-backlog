@@ -20,7 +20,7 @@ Entry-point scripts an operator or agent invokes directly. Internal modules
 entry points and are intentionally not listed.
 
 - `scripts/setup-dev-backlog.js [project-name] [--tracker github] [--non-interactive] [--json]` — persist GitHub as the canonical task authority and create only `sprints/`.
-- `scripts/init.sh [project-name]` — bootstrap `backlog/` with `.tracker` and directories.
+- `scripts/init.sh [project-name]` — bootstrap `.dev-backlog/` with `.tracker` and directories.
 - `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `process.md`.
 - `scripts/effective-task-spec.js TASK_REF [--repo OWNER/REPO] [--spec-ref PATH] [--backlog-dir PATH] [--root PATH]` — resolve the configured live task into effective spec, normalized AC/lifecycle, selected source, and stable SHA-256 revision/digest. Source precedence: explicit `spec_ref` (body marker `<!-- dev-backlog:spec_ref PATH -->` or `--spec-ref`), then a posted `## Agent Brief` comment, then the Issue body. Any authority/spec load failure stops without a task-mirror fallback.
 - `scripts/next.sh [--json] [--track slug] [backlog-dir]` — show the next actionable batch; N disjoint active tracks render a portfolio, `--track` selects one.
@@ -34,8 +34,8 @@ entry points and are intentionally not listed.
 - `scripts/capabilities-doctor.js [--capabilities PATH] [--json] [--strict]` — check `spec/capabilities.md` compactness and Learnings markers.
 - `scripts/backlog-doctor.js [--json] [--stale-days N] [backlog-dir]` — aggregate backlog health checks; hard violations fail, soft execution signals warn. JSON includes top-level `reassess_signal`.
 - `scripts/context-hook.sh [backlog-dir]` — one-line active-sprint summary for a Claude Code PreToolUse hook (portfolio line for N tracks); silent when no active sprint.
-- `scripts/doc-drift-check.js [--root PATH] [--json]` — source-repo maintenance net (#367): verify every `.js`/`.sh` script name mentioned in `skills/*/SKILL.md`, `skills/*/references/*.md`, and `backlog/sprints/_context.md` resolves to a file under a skill's `scripts/`; dangling mentions fail. Filename-level only; its test runs the live-repo check in CI.
+- `scripts/doc-drift-check.js [--root PATH] [--json]` — source-repo maintenance net (#367): verify every `.js`/`.sh` script name mentioned in `skills/*/SKILL.md`, `skills/*/references/*.md`, and `.dev-backlog/sprints/_context.md` resolves to a file under a skill's `scripts/`; dangling mentions fail. Filename-level only; its test runs the live-repo check in CI.
 
 ## Tracker routing
 
-`backlog/.tracker` selection rules live in `file-format.md`; routing and optional-export boundaries in `authority-contract.md`.
+`.dev-backlog/.tracker` selection rules live in `file-format.md`; routing and optional-export boundaries in `authority-contract.md`.

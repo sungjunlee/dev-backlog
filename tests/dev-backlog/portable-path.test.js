@@ -16,17 +16,17 @@ describe("portable path boundaries", () => {
 
   it("normalizes repository-relative display paths but preserves outside paths", () => {
     assert.equal(
-      repoDisplayPath("C:\\repo", "C:\\repo\\backlog\\config.yml", path.win32),
-      "backlog/config.yml"
+      repoDisplayPath("C:\\repo", "C:\\repo\\.dev-backlog\\config.yml", path.win32),
+      ".dev-backlog/config.yml"
     );
     assert.equal(repoDisplayPath("C:\\repo", "D:\\outside.yml", path.win32), "D:\\outside.yml");
   });
 
   it("normalizes default relative config paths and preserves absolute config paths", () => {
-    assert.equal(configDisplayPath("backlog"), "backlog/config.yml");
+    assert.equal(configDisplayPath(".dev-backlog"), ".dev-backlog/config.yml");
     assert.equal(
-      configDisplayPath("C:\\repo\\backlog", "config.yml", path.win32),
-      "C:\\repo\\backlog\\config.yml"
+      configDisplayPath("C:\\repo\\.dev-backlog", "config.yml", path.win32),
+      "C:\\repo\\.dev-backlog\\config.yml"
     );
   });
 });

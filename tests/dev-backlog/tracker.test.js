@@ -54,7 +54,7 @@ describe("GitHub-only authority selection", () => {
 
   it("uses .tracker when present and rejects a retired local selection", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-github-only-"));
-    const backlogDir = path.join(root, "backlog");
+    const backlogDir = path.join(root, ".dev-backlog");
     fs.mkdirSync(backlogDir);
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 

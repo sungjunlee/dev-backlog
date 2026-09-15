@@ -10,17 +10,23 @@ trap 'exit 0' ERR
 #   "hooks": {
 #     "PreToolUse": [{
 #       "matcher": "Write|Edit|NotebookEdit",
-#       "command": "bash /path/to/scripts/context-hook.sh /path/to/backlog"
+#       "command": "bash /path/to/scripts/context-hook.sh /path/to/.dev-backlog"
 #     }]
 #   }
 #
 # Always exits 0 — must never block tool execution.
 # Uses trap ERR instead of set -e to guarantee exit 0 on any failure.
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` (restricted PATH / Windows Git Bash).
+# Normalize backslashes first: `%/*` only strips `/`, so a Windows path
+# would otherwise equal BASH_SOURCE and fall back to `.` (the caller's cwd).
+_src="${BASH_SOURCE[0]//\\//}"
+SCRIPT_DIR="${_src%/*}"
+[ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-backlog}"
+BACKLOG_DIR="${1:-${DEFAULT_BACKLOG_DIR:-.dev-backlog}}"
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then

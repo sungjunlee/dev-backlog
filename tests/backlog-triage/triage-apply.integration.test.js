@@ -155,7 +155,7 @@ function buildReport(issueNumbers, runId) {
     "---",
     "generated: 2026-04-18",
     `repo: ${SANDBOX_REPO}`,
-    "snapshot: backlog/triage/.cache/2026-04-18T10-00-00Z.json",
+    "snapshot: .dev-backlog/triage/.cache/2026-04-18T10-00-00Z.json",
     "open_issues: 7",
     "---",
     "",
@@ -236,7 +236,7 @@ describe("triage-apply integration", () => {
       };
 
       const runId = `integration-${Date.now()}`;
-      const reportPath = path.join(sandboxClone, "backlog", "triage", "integration-report.md");
+      const reportPath = path.join(sandboxClone, ".dev-backlog", "triage", "integration-report.md");
       fs.mkdirSync(path.dirname(reportPath), { recursive: true });
       fs.writeFileSync(reportPath, `${buildReport(issueNumbers, runId)}\n`);
 
@@ -277,7 +277,7 @@ describe("triage-apply integration", () => {
       const milestoneIssue = readIssue(sandboxClone, issueNumbers.milestone);
       assert.equal(milestoneIssue.milestone?.title || null, SANDBOX_MILESTONE);
 
-      const logPath = path.join(sandboxClone, "backlog", "triage", "2026-04-18-apply.log");
+      const logPath = path.join(sandboxClone, ".dev-backlog", "triage", "2026-04-18-apply.log");
       assert.equal(fs.existsSync(logPath), true);
     }
   );

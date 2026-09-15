@@ -20,7 +20,7 @@ describe("readSprintState", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dev-backlog-state-"));
-    backlogDir = path.join(tmpDir, "backlog");
+    backlogDir = path.join(tmpDir, ".dev-backlog");
   });
 
   afterEach(() => {
@@ -217,7 +217,7 @@ started: 2026-07-01
 describe("parseSprintContent", () => {
   it("marks unmoored in-flight items without trace pointers", () => {
     const state = parseSprintContent({
-      sprintPath: "backlog/sprints/unmoored.md",
+      sprintPath: ".dev-backlog/sprints/unmoored.md",
       content: `---
 status: active
 started: 2026-07-01
@@ -242,7 +242,7 @@ started: 2026-07-01
 
   it("treats missing sections as empty surfaces", () => {
     const state = parseSprintContent({
-      sprintPath: "backlog/sprints/sparse.md",
+      sprintPath: ".dev-backlog/sprints/sparse.md",
       content: "---\nstatus: active\n---\n",
       today: new Date("2026-07-03T00:00:00Z"),
     });
@@ -256,7 +256,7 @@ started: 2026-07-01
 
   it("uses progress date before started date, then null for in-flight age", () => {
     const withStarted = parseSprintContent({
-      sprintPath: "backlog/sprints/age.md",
+      sprintPath: ".dev-backlog/sprints/age.md",
       content: `---
 status: active
 started: 2026-06-30
@@ -284,7 +284,7 @@ started: 2026-06-30
     ]);
 
     const withoutDate = parseSprintContent({
-      sprintPath: "backlog/sprints/no-age.md",
+      sprintPath: ".dev-backlog/sprints/no-age.md",
       content: `---
 status: active
 ---
@@ -305,7 +305,7 @@ status: active
 
   it("matches local Progress refs exactly across parents and decimal subtasks", () => {
     const state = parseSprintContent({
-      sprintPath: "backlog/sprints/local-age.md",
+      sprintPath: ".dev-backlog/sprints/local-age.md",
       taskPrefix: "BACK",
       content: `---
 status: active

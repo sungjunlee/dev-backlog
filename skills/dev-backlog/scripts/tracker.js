@@ -9,6 +9,10 @@ const { createGithubAdapter } = require("./github-tracker.js");
 const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
+const {
+  DEFAULT_BACKLOG_DIR,
+  TRACKER_SELECTION_FILE,
+} = require("./execution-root.js");
 
 const TRACKER_KEYS = Object.freeze(["github"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
@@ -28,8 +32,6 @@ const CAPABILITY_NAMES = Object.freeze([
 ]);
 const UNSUPPORTED_CAPABILITY_CODE = "TRACKER_CAPABILITY_UNSUPPORTED";
 
-const DEFAULT_BACKLOG_DIR = "backlog";
-const TRACKER_SELECTION_FILE = ".tracker";
 
 class TrackerConfigurationError extends Error {
   constructor(value) {
@@ -60,7 +62,7 @@ class TrackerUnavailableError extends Error {
   constructor(tracker, reason, options = {}) {
     super(
       `Configured tracker "${tracker}" is unavailable: ${reason}. ` +
-        `Restore that tracker or change backlog/${TRACKER_SELECTION_FILE} explicitly; ` +
+        `Restore that tracker or change ${DEFAULT_BACKLOG_DIR}/${TRACKER_SELECTION_FILE} explicitly; ` +
         "no fallback was attempted.",
       options
     );

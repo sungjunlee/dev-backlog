@@ -30,8 +30,9 @@ const {
 } = require("./spec-paths.js");
 const { toPortablePath } = require("./portable-path.js");
 const { parseSprintStatus } = require("./sprint-status.js");
+const { defaultSprintsDir } = require("./execution-root.js");
 
-const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
+const DEFAULT_SPRINTS_DIR = defaultSprintsDir();
 
 function usage() {
   return "Usage: objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]";

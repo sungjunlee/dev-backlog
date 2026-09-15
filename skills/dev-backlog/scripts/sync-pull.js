@@ -2,9 +2,11 @@
 /**
  * Legacy/export-only projection of open GitHub issues to backlog/tasks/.
  *
- * This is not part of setup, orient, plan, work, or complete. New GitHub
- * repositories should not run it. The CLI requires --legacy-export so an
- * operator cannot accidentally reintroduce task mirrors on the core path.
+ * That path is a Backlog.md-shaped diagnostic/rollback export, not the skill
+ * execution root (`.dev-backlog/`). This is not part of setup, orient, plan,
+ * work, or complete. New GitHub repositories should not run it. The CLI
+ * requires --legacy-export so an operator cannot accidentally reintroduce
+ * task mirrors on the core path.
  *
  * Usage: node scripts/sync-pull.js --legacy-export [PREFIX]
  *
@@ -30,6 +32,7 @@ const {
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
+const { DEFAULT_BACKLOG_DIR, LEGACY_TASKS_DIR } = require("./execution-root.js");
 const {
   parseTaskFileName,
   parseTaskRef,
@@ -424,7 +427,7 @@ function main() {
 
   let issues;
   try {
-    issues = loadOpenIssues({ limit: options.limit, config, backlogDir: "backlog" });
+    issues = loadOpenIssues({ limit: options.limit, config, backlogDir: DEFAULT_BACKLOG_DIR });
   } catch (e) {
     const prefix = e?.tracker ? "tracker error" : "gh error";
     const stableCode = typeof e?.code === "string" && e.code.includes("_")
@@ -442,7 +445,7 @@ function main() {
   if (!issues.length) {
     if (options.json) {
       console.log(JSON.stringify(makeResult({
-        tasksDir: path.join("backlog", "tasks"),
+        tasksDir: LEGACY_TASKS_DIR,
         prefix: options.prefix,
         update: options.update,
         dryRun: options.dryRun,
@@ -458,7 +461,7 @@ function main() {
   try {
     result = run({
       issues,
-      tasksDir: path.join("backlog", "tasks"),
+      tasksDir: LEGACY_TASKS_DIR,
       prefix: options.prefix,
       update: options.update,
       dryRun: options.dryRun,

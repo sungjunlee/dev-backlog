@@ -51,6 +51,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | --- | --- | --- | --- |
 | 2026-08-16 | Absorb `backlog-sync` into this capability as the legacy-export behavior/constraint set (#377) | one diagnostic flag does not warrant a standalone capability contract; the bright line ("human-authored provider content is untouchable", exports never read back) belongs with the authority it protects | standalone `backlog-sync` capability |
 | 2026-08-17 | Freeze the leftover export/compat runtime: no new features on `sync-pull`, `legacy-tracker.js`, or `{PREFIX}-N` parsing without a measured consumer (#379) | these are deletable compatibility seams, not a product to grow | implicit seam expansion |
+| 2026-09-15 | Skill execution root is `.dev-backlog/` so it does not collide with Backlog.md's `backlog/` layout (`tasks/`, `docs/`, `config.yml`). The skill does not read `backlog/tasks/` and does not write it except explicit `sync-pull --legacy-export` (diagnostic/rollback). Sprint close does not archive `backlog/tasks/` (#412) | sharing `backlog/` made "natural Backlog.md support" false from day one; one execution root, no dual-write | implicit `backlog/` as skill root |
 
 ---
 
@@ -59,7 +60,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 **Goal:** An agent or human resuming work mid-session reads the active sprint file and acts on its in-flight items without re-asking what is going on.
 
 **In-scope:**
-- `backlog/sprints/*.md` body + frontmatter (status, milestone, objectives, and the track-scope key: `component:` or `scope:`)
+- `.dev-backlog/sprints/*.md` body + frontmatter (status, milestone, objectives, and the track-scope key: `component:` or `scope:`)
 - Checkbox state machine: `[ ]` not started → `[~]` in flight → `[x]` done
 - `sprint-init.js`, `sprint-close.sh`, `find_active_sprint`/`resolve_track`, `next.sh`, `status.sh`
 
@@ -92,6 +93,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-07-12 | Replace the single-active-sprint invariant with track-partitioned scope disjointness (epic #289; human-gated pass #294) | disjoint-scope tracks remove the false serialization of unrelated work while overlap stays fail-loud through one shared predicate; single-track behavior is byte-identical (G4) | pre-#289 "exactly one active sprint" behavior |
 | 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | one scopeless track next to a declared one is exactly the unprovable state; when more than one track is active, every track must declare an axis | 2026-07-12 pair-rule warning |
 | 2026-07-31 | Admit sprints by execution complexity, not duration; keep simple Issue → PR work sprint-free | requiring a sprint for single-threaded work adds state without resolving a continuity problem | implicit sprint-for-all-work routing |
+| 2026-09-15 | Sprint files, tracker pin, skill config, and triage artifacts live under `.dev-backlog/` (#412) | keep execution continuity off Backlog.md's `backlog/` tree; one root, no dual-write | implicit `backlog/sprints` as the sprint hub |
 
 ---
 

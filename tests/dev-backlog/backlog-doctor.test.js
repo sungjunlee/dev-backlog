@@ -101,7 +101,7 @@ ${plan}
 function seedCleanRepo(repoRoot, sprintContent = sprint()) {
   write(path.join(repoRoot, "spec", "charter.md"), charter());
   write(path.join(repoRoot, "spec", "capabilities.md"), capabilities());
-  write(path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"), sprintContent);
+  write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"), sprintContent);
 }
 
 function completedSprint({
@@ -126,7 +126,7 @@ function check(report, name) {
 describe("parseArgs", () => {
   it("uses the documented defaults", () => {
     const parsed = parseArgs([]);
-    assert.equal(parsed.backlogDir, "backlog");
+    assert.equal(parsed.backlogDir, ".dev-backlog");
     assert.equal(parsed.staleDays, 7);
     assert.equal(parsed.json, false);
   });
@@ -182,9 +182,9 @@ describe("runDoctor", () => {
 
   it("warns with remediation when config.yml keeps a stale tracker key", () => {
     seedCleanRepo(repoRoot);
-    write(path.join(repoRoot, "backlog", ".tracker"), "local\n");
+    write(path.join(repoRoot, ".dev-backlog", ".tracker"), "local\n");
     write(
-      path.join(repoRoot, "backlog", "config.yml"),
+      path.join(repoRoot, ".dev-backlog", "config.yml"),
       "project_name: fixture\ntracker: github\n"
     );
 
@@ -200,7 +200,7 @@ describe("runDoctor", () => {
 
   it("fails when two active tracks share the same component (scope overlap, #293)", () => {
     seedCleanRepo(repoRoot);
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-second.md"), sprint());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-second.md"), sprint());
 
     const report = runDoctor({ repoRoot });
 
@@ -211,11 +211,11 @@ describe("runDoctor", () => {
 
   it("passes disjoint-scope active tracks as a portfolio and fans per-sprint checks out per track (#293)", () => {
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-auth.md"),
       sprintNoSpecFields({ scope: '["src/auth/**"]' }),
     );
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-billing.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-billing.md"),
       sprintNoSpecFields({ scope: '["src/billing/**"]' }),
     );
 
@@ -234,7 +234,7 @@ describe("runDoctor", () => {
   });
 
   it("passes a single scopeless active track because there is nothing to be disjoint from (#337)", () => {
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
@@ -243,13 +243,13 @@ describe("runDoctor", () => {
   });
 
   it("passes a mirrorless GitHub backlog with no tasks or completed directories (#347)", () => {
-    write(path.join(repoRoot, "backlog", ".tracker"), "github\n");
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", ".tracker"), "github\n");
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
-    assert.equal(fs.existsSync(path.join(repoRoot, "backlog", "tasks")), false);
-    assert.equal(fs.existsSync(path.join(repoRoot, "backlog", "completed")), false);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".dev-backlog", "tasks")), false);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".dev-backlog", "completed")), false);
     assert.equal(check(report, "active_sprint").status, "pass");
     assert.equal(check(report, "sprint_shape").status, "pass");
     assert.equal(report.exit_hint, "pass");
@@ -258,11 +258,11 @@ describe("runDoctor", () => {
 
   it("tags per-track verdicts so a warn names the track it belongs to (#293)", () => {
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-auth.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-auth.md"),
       sprintNoSpecFields({ scope: '["src/auth/**"]', plan: "- [~] #1 Needs a pointer" }),
     );
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-billing.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-billing.md"),
       sprintNoSpecFields({ scope: '["src/billing/**"]' }),
     );
 
@@ -278,11 +278,11 @@ describe("runDoctor", () => {
 
   it("fails when active tracks overlap via nested scope globs (#293)", () => {
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-auth-a.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-auth-a.md"),
       sprintNoSpecFields({ scope: '["src/auth/**"]' }),
     );
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-auth-b.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-auth-b.md"),
       sprintNoSpecFields({ scope: '["src/auth/api/**"]' }),
     );
 
@@ -291,18 +291,18 @@ describe("runDoctor", () => {
     assert.equal(check(report, "active_sprint").status, "fail");
     assert.match(check(report, "active_sprint").detail.summary, /Active tracks overlap on scope/);
     assert.deepEqual(check(report, "active_sprint").detail.overlapping_files, [
-      "backlog/sprints/2026-07-auth-a.md",
-      "backlog/sprints/2026-07-auth-b.md",
+      ".dev-backlog/sprints/2026-07-auth-a.md",
+      ".dev-backlog/sprints/2026-07-auth-b.md",
     ]);
     assert.equal(exitCodeFor(report), 1);
   });
 
   it("warns informationally when one of two active tracks is scopeless (#337)", () => {
     write(
-      path.join(repoRoot, "backlog", "sprints", "2026-07-declared.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-declared.md"),
       sprintNoSpecFields({ scope: '["src/declared/**"]' }),
     );
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-scopeless.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-scopeless.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
@@ -310,15 +310,15 @@ describe("runDoctor", () => {
     assert.equal(activeCheck.status, "warn");
     assert.equal(activeCheck.informational, true);
     assert.deepEqual(activeCheck.detail.scopeless_files, [
-      "backlog/sprints/2026-07-scopeless.md",
+      ".dev-backlog/sprints/2026-07-scopeless.md",
     ]);
     assert.match(activeCheck.detail.summary, /2026-07-scopeless\.md/);
     assert.equal(report.reassess_signal.fired, false);
   });
 
   it("still warns informationally when both active tracks are scopeless (#293, #337)", () => {
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-two.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-two.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
@@ -373,7 +373,7 @@ describe("runDoctor", () => {
   });
 
   it("passes when spec files are absent and the sprint omits both fields (cold adopter, B3)", () => {
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"), sprintNoSpecFields());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
@@ -467,7 +467,7 @@ describe("runDoctor", () => {
   it("warns when _context.md exceeds the documented line threshold without failing", () => {
     seedCleanRepo(repoRoot);
     write(
-      path.join(repoRoot, "backlog", "sprints", "_context.md"),
+      path.join(repoRoot, ".dev-backlog", "sprints", "_context.md"),
       Array.from({ length: 201 }, (_, i) => `line ${i + 1}`).join("\n"),
     );
 
@@ -492,15 +492,15 @@ describe("buildReassessSignal", () => {
 
   it("fires when the closing sprint reaches three completed sprints with no reassess reports (no-reports-exist: all completed sprints count)", () => {
     seedCleanRepo(repoRoot);
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint());
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-one.md"), completedSprint());
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-two.md"), completedSprint());
 
     const doctorReport = runDoctor({ repoRoot });
     const signal = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
-      closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
+      closingSprintPath: path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"),
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
@@ -514,8 +514,8 @@ describe("buildReassessSignal", () => {
   it("stays quiet between sprints: the informational zero-active warn does not fire the signal", () => {
     write(path.join(repoRoot, "spec", "charter.md"), charter());
     write(path.join(repoRoot, "spec", "capabilities.md"), capabilities());
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
-    write(path.join(repoRoot, "backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
+    write(path.join(repoRoot, ".dev-backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
 
     const doctorReport = runDoctor({ repoRoot });
     const activeCheck = doctorReport.checks.find((check) => check.name === "active_sprint");
@@ -525,7 +525,7 @@ describe("buildReassessSignal", () => {
 
     const signal = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
       today: new Date("2026-07-04T00:00:00Z"),
     });
@@ -541,40 +541,40 @@ describe("buildReassessSignal", () => {
     // Two sprints closed strictly before the report date; they would not be
     // enough to fire on their own, but the point under test is the sprint
     // closing *today*, on the same date as the report itself.
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
-    write(path.join(repoRoot, "backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
+    write(path.join(repoRoot, ".dev-backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
 
     const doctorReport = runDoctor({ repoRoot });
     const signal = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
       // Closing sprint's accounting date is "today" == the report's own date.
-      closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
+      closingSprintPath: path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"),
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
     assert.equal(doctorReport.exit_hint, "pass");
     assert.equal(signal.fired, false);
     assert.equal(signal.sprints_since_last_report, 0);
-    assert.equal(signal.latest_report, "backlog/triage/2026-07-03-reassess.md");
+    assert.equal(signal.latest_report, ".dev-backlog/triage/2026-07-03-reassess.md");
     assert.match(signal.reason, /doctor clean/);
     assert.match(signal.reason, /0\/3 sprint\(s\) closed since last reassess/);
   });
 
   it("accumulates strictly-later closes day by day and fires once three are reached", () => {
     seedCleanRepo(repoRoot);
-    write(path.join(repoRoot, "backlog", "triage", "2026-07-01-reassess.md"), "# Reassess\n");
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-two.md"), completedSprint({ closed: "2026-07-02" }));
-    write(path.join(repoRoot, "backlog", "sprints", "2026-07-three.md"), completedSprint({ closed: "2026-07-03" }));
+    write(path.join(repoRoot, ".dev-backlog", "triage", "2026-07-01-reassess.md"), "# Reassess\n");
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-two.md"), completedSprint({ closed: "2026-07-02" }));
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-three.md"), completedSprint({ closed: "2026-07-03" }));
 
     const doctorReport = runDoctor({ repoRoot });
 
     // Two strictly-later closes: below threshold, quiet.
     const belowThreshold = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
       today: new Date("2026-07-03T00:00:00Z"),
     });
@@ -584,9 +584,9 @@ describe("buildReassessSignal", () => {
     // A third strictly-later close (the sprint being closed today) tips it to fired.
     const atThreshold = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
-      closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
+      closingSprintPath: path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"),
       today: new Date("2026-07-04T00:00:00Z"),
     });
     assert.equal(atThreshold.sprints_since_last_report, 3);
@@ -601,7 +601,7 @@ describe("buildReassessSignal", () => {
         plan: "- [~] #1 Needs a pointer",
       }),
     );
-    write(path.join(repoRoot, "backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
+    write(path.join(repoRoot, ".dev-backlog", "triage", "2026-07-03-reassess.md"), "# Reassess\n");
 
     const doctorReport = runDoctor({
       repoRoot,
@@ -609,9 +609,9 @@ describe("buildReassessSignal", () => {
     });
     const signal = buildReassessSignal({
       repoRoot,
-      backlogDir: "backlog",
+      backlogDir: ".dev-backlog",
       doctorReport,
-      closingSprintPath: path.join(repoRoot, "backlog", "sprints", "2026-07-test.md"),
+      closingSprintPath: path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"),
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
@@ -650,8 +650,8 @@ describe("reassess_signal on the doctor JSON surface", () => {
 
   it("no reports exist: all completed sprints count toward the threshold", () => {
     seedCleanRepo(repoRoot);
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
-    write(path.join(repoRoot, "backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-one.md"), completedSprint({ closed: "2026-06-01" }));
+    write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-06-two.md"), completedSprint({ closed: "2026-06-02" }));
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
@@ -669,7 +669,7 @@ describe("reassess_signal on the doctor JSON surface", () => {
 
   it("the close path consumes the same single accounting function -- runCloseSummary exposes only doctor_report, and its reassess_signal equals an equivalent direct runDoctor() call", () => {
     seedCleanRepo(repoRoot);
-    const closingSprintPath = path.join(repoRoot, "backlog", "sprints", "2026-07-test.md");
+    const closingSprintPath = path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md");
     const today = new Date("2026-07-03T00:00:00Z");
 
     const closeResult = runCloseSummary({ repoRoot, closingSprintPath, today });

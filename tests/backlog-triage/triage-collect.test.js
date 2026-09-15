@@ -326,7 +326,7 @@ describe("collectSnapshot", () => {
     const written = JSON.parse(fs.readFileSync(expectedPath, "utf-8"));
     assert.equal(written.schema_version, 2);
     assert.equal(written.repo, "sungjunlee/dev-backlog");
-    assert.equal(written.config_path, "backlog/triage-config.yml");
+    assert.equal(written.config_path, ".dev-backlog/triage-config.yml");
     assert.equal(written.issues.length, 1);
     assert.deepEqual(written.issues[0].closing_prs, []);
 

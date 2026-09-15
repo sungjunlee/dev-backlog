@@ -50,7 +50,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 ```
 GitHub Issues (what: definition, AC, lifecycle)
       ↕ gh CLI
-backlog/sprints/ (how: batches, running context, progress)
+.dev-backlog/sprints/ (how: batches, running context, progress)
 ```
 
 ## Project Spec Home

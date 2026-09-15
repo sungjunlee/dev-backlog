@@ -10,7 +10,7 @@ metadata:
 # Dev Backlog
 
 Real job: keep GitHub Issues as task-definition and lifecycle truth while using
-`backlog/sprints/` only when complex execution needs a shared continuity,
+`.dev-backlog/sprints/` only when complex execution needs a shared continuity,
 progress, or handoff record.
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, deterministic rails, and stop conditions.
@@ -34,12 +34,12 @@ are single-sourced in [`references/authority-contract.md`](references/authority-
 ## Core Contracts
 
 ```
-GitHub Issues               <- canonical task definition and lifecycle
-backlog/sprints/            <- optional complex-execution hub (one active file per track)
-backlog/sprints/_context.md <- cross-sprint project context
+GitHub Issues                    <- canonical task definition and lifecycle
+.dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
+.dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
 
-- Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
+- Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
 - GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file.
 - Completed sprints stay as the permanent execution record.
 - Sprint frontmatter (`objectives:`, `component:`, `scope:`) and how each field degrades when its spec file is absent: `references/file-format.md`.
@@ -56,7 +56,7 @@ continues to own task specification and lifecycle.
 
 ## Sprint File Contract
 
-Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` carries:
+Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>.md` carries:
 
 | Section / field | Purpose | Completion check |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ Done when the new task exists in GitHub and, only when the work was admitted to 
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: when `backlog/` is missing, `setup-dev-backlog.js --tracker github --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js --tracker github --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
@@ -136,7 +136,7 @@ Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/`
 
 Core scripts (full flag inventory in `references/scripts.md`):
 
-- `scripts/setup-dev-backlog.js` — bootstrap `backlog/`.
+- `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC,
   lifecycle, source, and stable digest from the live Issue (or one explicit
   `spec_ref`).
@@ -149,7 +149,7 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 - `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
 - `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Quick Fix/Unplanned Work/Next workflow.
-- `references/file-format.md` — sprint file shape, `backlog/` config, and the optional legacy export (`sync-pull.js --legacy-export`, rollback/diagnostics only).
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional legacy export (`sync-pull.js --legacy-export`, rollback/diagnostics only).
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.

@@ -2,9 +2,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readTriageConfig } = require("../../dev-backlog/scripts/lib");
+const { readTriageConfig, DEFAULT_BACKLOG_DIR } = require("../../dev-backlog/scripts/lib");
 
-const DEFAULT_BACKLOG_DIR = "backlog";
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_STALE_DAYS = 60;
 

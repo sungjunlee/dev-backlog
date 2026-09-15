@@ -22,6 +22,7 @@ const fs = require("fs");
 const path = require("path");
 const { renderTaskRef } = require("./task-ref.js");
 const { slugify, estimateSize, readConfig, sprintScopeKey, scopesOverlap } = require("./lib");
+const { defaultSprintsDir } = require("./execution-root.js");
 const { parseFrontmatter } = require("./sprint-state.js");
 const { parseCapabilityNames } = require("./component-lint.js");
 const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
@@ -271,7 +272,7 @@ function createSprintFile({
   component,
   scope,
   dryRun,
-  sprintsDir = path.join("backlog", "sprints"),
+  sprintsDir = defaultSprintsDir(),
   today = new Date(),
   repoRoot = process.cwd(),
   fileExists = fs.existsSync,

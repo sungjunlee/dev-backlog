@@ -9,7 +9,7 @@
  *
  * Behavior:
  *   - Reads spec/capabilities.md and collects "## Capability: <slug>" headers.
- *   - For each backlog/sprints/*.md, extracts `component:` from frontmatter.
+ *   - For each .dev-backlog/sprints/*.md, extracts `component:` from frontmatter.
  *   - Reports sprints whose component value does not match any declared
  *     capability.
  *   - `component:` is one primary routing handle. Comma-separated values fail
@@ -28,8 +28,9 @@ const fs = require("fs");
 const path = require("path");
 const { toPortablePath } = require("./portable-path.js");
 const { parseSprintStatus } = require("./sprint-status.js");
+const { defaultSprintsDir } = require("./execution-root.js");
 
-const DEFAULT_SPRINTS_DIR = path.join("backlog", "sprints");
+const DEFAULT_SPRINTS_DIR = defaultSprintsDir();
 const DEFAULT_CAPABILITIES_PATH = path.join("spec", "capabilities.md");
 
 function usage() {

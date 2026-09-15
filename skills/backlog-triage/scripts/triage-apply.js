@@ -15,7 +15,9 @@ const {
 const { ANCHOR_PATTERN, parseAnchor } = require("./triage-report.js");
 const { runGh: runGithubCommand } = require("./triage-github.js");
 
-const DEFAULT_TRIAGE_DIR = path.join("backlog", "triage");
+const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
+
+const DEFAULT_TRIAGE_DIR = defaultTriageDir();
 const CHECKBOX_PATTERN = /^\s*-\s+\[([ xX])\]\s+/;
 const SUPPORTED_VERBS = new Set([
   "close",
@@ -823,7 +825,7 @@ function execute(argv = process.argv.slice(2), deps = {}) {
       || ((argvToRun) => runGh(argvToRun, { execFile: deps.execFile || execFileSync }));
     try {
       resolved = resolveConfiguredTracker(
-        deps.trackerConfig || readConfig(path.join(cwd, "backlog")),
+        deps.trackerConfig || readConfig(path.join(cwd, DEFAULT_BACKLOG_DIR)),
         { execFile: execFileFromRunGh(providerRunGh) }
       );
       for (const capability of requiredCapabilitiesForActions(deduped)) {

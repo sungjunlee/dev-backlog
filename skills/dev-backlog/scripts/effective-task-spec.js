@@ -14,6 +14,7 @@ const path = require("node:path");
 
 const { readConfig } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
+const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
 
 const GITHUB_RESOLUTION_FIELDS =
   "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url,comments";
@@ -522,7 +523,7 @@ function resolveEffectiveTaskSpec(resolved, taskRef, {
 }
 
 function parseCli(argv) {
-  const options = { backlogDir: "backlog", rootDir: process.cwd() };
+  const options = { backlogDir: DEFAULT_BACKLOG_DIR, rootDir: process.cwd() };
   let taskRef;
   const takeValue = (flag, index) => {
     const value = argv[index + 1];

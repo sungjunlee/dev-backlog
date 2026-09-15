@@ -2,7 +2,7 @@
   "_comment": "Exercises the implemented stale signals only: inactive+old without milestone, milestone exemption for inactive+old, fresh issue exclusion, explicit wontfix, and explicit invalid.",
   "generated": "2026-08-01T00:00:00.000Z",
   "repo": "sungjunlee/dev-backlog",
-  "config_path": "backlog/triage-config.yml",
+  "config_path": ".dev-backlog/triage-config.yml",
   "issues": [
     {
       "number": 500,

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const { readConfig } = require("./lib.js");
+const { readConfig, DEFAULT_BACKLOG_DIR } = require("./lib.js");
 const { resolveConfiguredTracker } = require("./tracker.js");
 const { isIsolatedGithubError } = require("./github-milestones.js");
 
-function listStatusRows(backlogDir = "backlog", { execFile } = {}) {
+function listStatusRows(backlogDir = DEFAULT_BACKLOG_DIR, { execFile } = {}) {
   const resolved = resolveConfiguredTracker(readConfig(backlogDir), { execFile, backlogDir });
   return resolved.adapter.list({
     state: "open",

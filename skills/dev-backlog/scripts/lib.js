@@ -12,6 +12,7 @@ const {
   getOpenIssueCount: getGithubOpenIssueCount,
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
+const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
 
 // Progress-issue publication was removed (#340); this marker survives only to
 // recognize legacy machine-managed issue bodies in sync-pull/triage-collect.
@@ -216,17 +217,20 @@ function readYamlConfig(configPath, defaults) {
 }
 
 /**
- * Read backlog/config.yml with simple YAML key: value parsing.
+ * Read `.dev-backlog/config.yml` with simple YAML key: value parsing.
  * Returns merged config (file values override defaults).
  * Gracefully falls back to defaults on missing/malformed file.
  */
 function readConfig(backlogDir) {
-  return readYamlConfig(path.join(backlogDir || "backlog", "config.yml"), CONFIG_DEFAULTS);
+  return readYamlConfig(
+    path.join(backlogDir || DEFAULT_BACKLOG_DIR, "config.yml"),
+    CONFIG_DEFAULTS
+  );
 }
 
 function readTriageConfig(backlogDir) {
   return readYamlConfig(
-    path.join(backlogDir || "backlog", "triage-config.yml"),
+    path.join(backlogDir || DEFAULT_BACKLOG_DIR, "triage-config.yml"),
     TRIAGE_CONFIG_DEFAULTS
   );
 }
@@ -331,6 +335,7 @@ module.exports = {
   estimateSize,
   CONFIG_DEFAULTS,
   TRIAGE_CONFIG_DEFAULTS,
+  DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
   OPEN_ISSUE_JSON_FIELDS,
   getOpenIssueCount,

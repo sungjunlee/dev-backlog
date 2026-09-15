@@ -66,7 +66,7 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
   --tracker github --non-interactive
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system"
 bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
-bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh backlog
+bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh
 ```
 
 Close the sprint explicitly only when a sprint was admitted.

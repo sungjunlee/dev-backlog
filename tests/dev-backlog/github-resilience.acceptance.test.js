@@ -76,7 +76,7 @@ const SEEDED_ISSUE = {
 
 function prepareFixture(t, { failMode, seedIssue = false } = {}) {
   const root = makeRoot(t, `gh-resilience-${failMode || "ok"}-`);
-  const backlogDir = path.join(root, "backlog");
+  const backlogDir = path.join(root, ".dev-backlog");
   fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
   fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
   const gh = writeGhFixture(root);

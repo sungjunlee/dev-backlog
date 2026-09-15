@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { readConfig } = require("./lib.js");
+const { readConfig, DEFAULT_BACKLOG_DIR } = require("./lib.js");
 const {
   invokeCapability,
   resolveConfiguredTracker,
@@ -8,13 +8,13 @@ const {
 } = require("./tracker.js");
 const { closeMilestone } = require("./github-milestones.js");
 
-function requireCapability(capability, backlogDir = "backlog") {
+function requireCapability(capability, backlogDir = DEFAULT_BACKLOG_DIR) {
   const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
   return invokeCapability(resolved, capability, () => resolved);
 }
 
 function main() {
-  const [operation, capability, backlogDir = "backlog", value] = process.argv.slice(2);
+  const [operation, capability, backlogDir = DEFAULT_BACKLOG_DIR, value] = process.argv.slice(2);
   try {
     const resolved = requireCapability(capability, backlogDir);
     if (operation === "require") return;

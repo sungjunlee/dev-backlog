@@ -8,7 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseSimpleYaml, readConfig, scopesOverlap } = require("./lib.js");
+const { parseSimpleYaml, readConfig, scopesOverlap, DEFAULT_BACKLOG_DIR } = require("./lib.js");
 const {
   containsTaskRef,
   githubIssueNumber,
@@ -19,7 +19,6 @@ const {
 // single-sprint fields are retained (sole element when exactly one is active,
 // null when a portfolio) so v1 consumers keep working. See PRD §5.2 / R5.
 const SCHEMA_VERSION = 2;
-const DEFAULT_BACKLOG_DIR = "backlog";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const RUN_ID_RE = /\[run:([^\]]+)\]$/;

@@ -4,12 +4,19 @@ set -uo pipefail
 # Zero LLM cost — pure file parsing.
 #
 # Usage: bash scripts/next.sh [--json] [backlog-dir]
-#        backlog-dir defaults to ./backlog
+#        backlog-dir defaults to ./.dev-backlog
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve without `dirname` — restricted PATH (Windows Git Bash) often has a
+# broken dirname symlink, which emptied SCRIPT_DIR and skipped lib.sh.
+# Normalize backslashes first: `%/*` only strips `/`, so a Windows path
+# would otherwise equal BASH_SOURCE and fall back to `.` (the caller's cwd).
+_src="${BASH_SOURCE[0]//\\//}"
+SCRIPT_DIR="${_src%/*}"
+[ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="backlog"
+BACKLOG_DIR="${DEFAULT_BACKLOG_DIR:-.dev-backlog}"
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do
@@ -32,7 +39,7 @@ fi
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then
-  echo "No backlog/sprints/ directory. Run init.sh first."
+  echo "No $SPRINTS_DIR directory. Run init.sh first."
   exit 1
 fi
 

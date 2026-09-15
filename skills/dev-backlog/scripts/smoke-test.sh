@@ -400,8 +400,8 @@ assert_contains "find: multiple active lists second" "$(cat "$ERR")" "active-b.m
 # next.sh integration tests
 # ============================================================
 
-mkdir -p "$TEST_DIR/backlog/sprints"
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+mkdir -p "$TEST_DIR/.dev-backlog/sprints"
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -433,7 +433,7 @@ Test the checkbox parsing.
 - 2026-03-30: Batch 1 done.
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "next: progress count" "$OUT" "2/5 done"
 assert_contains "next: in-flight count" "$OUT" "1 in-flight"
 assert_contains "next: remaining count" "$OUT" "2 remaining"
@@ -441,14 +441,14 @@ assert_contains "next: shows in-flight item" "$OUT" "[~] #3"
 assert_contains "next: shows next batch item" "$OUT" "[ ] #4"
 assert_not_contains "next: does not show done items as next" "$OUT" "[ ] #1"
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "status: shows in-flight" "$OUT" "1 in-flight"
 assert_contains "status: shows in-flight item" "$OUT" "[~] #3"
 assert_contains "status: shows next up" "$OUT" "Next up:"
 assert_contains "status: shows sprint name" "$OUT" "2026-03-test"
 assert_contains "status: shows percentage" "$OUT" "40%"
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/status.sh" --json "$TEST_DIR/.dev-backlog")
 assert_json_eval "status json: structured state" "$OUT" '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 if (
@@ -465,7 +465,7 @@ if (
 ) process.exit(1);
 '
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/.dev-backlog")
 assert_json_eval "next json: next batch" "$OUT" '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 if (
@@ -479,7 +479,7 @@ if (
 '
 
 # --- All done ---
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -501,16 +501,16 @@ All done test.
 ## Progress
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "all-done: ready to close" "$OUT" "All items checked"
 assert_contains "all-done: 2/2" "$OUT" "2/2 done"
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "status all-done: ready message" "$OUT" "ready to close sprint"
 assert_contains "status all-done: 100%" "$OUT" "100%"
 
 # --- All in-flight ---
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -532,13 +532,13 @@ All dispatched.
 ## Progress
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "all-inflight: shows in-flight" "$OUT" "2 in-flight"
 assert_contains "all-inflight: 0 remaining" "$OUT" "0 remaining"
 assert_not_contains "all-inflight: not ready to close" "$OUT" "All items checked"
 
 # --- Flat plan (no batch headers) ---
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -561,7 +561,7 @@ Flat plan.
 ## Progress
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "flat: counts correct" "$OUT" "1/3 done"
 assert_contains "flat: in-flight" "$OUT" "1 in-flight"
 assert_contains "flat: remaining" "$OUT" "1 remaining"
@@ -569,7 +569,7 @@ assert_contains "flat: shows in-flight item" "$OUT" "[~] #2"
 assert_contains "flat: shows next item" "$OUT" "[ ] #3"
 
 # --- Malformed sprint file (missing frontmatter) ---
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 status: active
 
 # No Frontmatter Sprint
@@ -578,26 +578,26 @@ status: active
 - [ ] #1 Task A
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "malformed: still finds active" "$OUT" "Sprint:"
 assert_contains "malformed: counts tasks" "$OUT" "0/1 done"
 
 # --- No active sprint ---
-rm "$TEST_DIR/backlog/sprints/2026-03-test.md"
-cat >"$TEST_DIR/backlog/sprints/2026-02-past.md" <<'EOF'
+rm "$TEST_DIR/.dev-backlog/sprints/2026-03-test.md"
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-02-past.md" <<'EOF'
 ---
 status: completed
 ---
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "no-active: message" "$OUT" "No active sprint"
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "status no-active: message" "$OUT" "no active sprint"
 
 # --- Multiple active sprints ---
-cat >"$TEST_DIR/backlog/sprints/2026-03-active-a.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-active-a.md" <<'EOF'
 ---
 status: active
 ---
@@ -606,7 +606,7 @@ status: active
 - [ ] #1 Task A
 EOF
 
-cat >"$TEST_DIR/backlog/sprints/2026-03-active-b.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-active-b.md" <<'EOF'
 ---
 status: active
 ---
@@ -618,7 +618,7 @@ EOF
 # Two scopeless active tracks are disjoint-by-default (cannot prove overlap):
 # a portfolio, not an error (#291). Overlap is handled as fail-loud below.
 set +e
-OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "next portfolio: exit code" "$STATUS" "0"
@@ -626,13 +626,13 @@ assert_contains "next portfolio: header" "$OUT" "active tracks (portfolio)"
 assert_contains "next portfolio: lists first" "$OUT" "2026-03-active-a"
 assert_contains "next portfolio: lists second" "$OUT" "2026-03-active-b"
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "status portfolio: header" "$OUT" "active tracks (portfolio)"
 assert_contains "status portfolio: lists first" "$OUT" "2026-03-active-a"
 assert_contains "status portfolio: lists second" "$OUT" "2026-03-active-b"
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "next json portfolio: exit code" "$STATUS" "0"
@@ -642,18 +642,18 @@ if (j.schema_version !== 2 || j.active_sprint !== null) process.exit(1);
 if (!Array.isArray(j.active_sprints) || j.active_sprints.length !== 2) process.exit(1);
 '
 
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "hook portfolio: line" "$OUT" "[Sprint portfolio] 2 tracks active"
 
 # --track selects one disjoint track (single render, other track excluded)
-OUT=$(bash "$SCRIPT_DIR/next.sh" --track 2026-03-active-a "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/next.sh" --track 2026-03-active-a "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "next --track: shows selected track" "$OUT" "2026-03-active-a"
 assert_not_contains "next --track: excludes other track" "$OUT" "Task B"
 
-rm "$TEST_DIR/backlog/sprints/2026-03-active-a.md" "$TEST_DIR/backlog/sprints/2026-03-active-b.md"
+rm "$TEST_DIR/.dev-backlog/sprints/2026-03-active-a.md" "$TEST_DIR/.dev-backlog/sprints/2026-03-active-b.md"
 
 # Overlapping scope (same component) is fail-loud in JSON mode (#291).
-cat >"$TEST_DIR/backlog/sprints/2026-03-ov-a.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-ov-a.md" <<'EOF'
 ---
 status: active
 component: "shared-thing"
@@ -662,7 +662,7 @@ component: "shared-thing"
 ## Plan
 - [ ] #1 Task A
 EOF
-cat >"$TEST_DIR/backlog/sprints/2026-03-ov-b.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-ov-b.md" <<'EOF'
 ---
 status: active
 component: "shared-thing"
@@ -672,27 +672,27 @@ component: "shared-thing"
 - [ ] #2 Task B
 EOF
 set +e
-OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/next.sh" --json "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "next json overlap: fail-loud exit code" "$STATUS" "1"
 assert_contains "next json overlap: message" "$OUT" "Active tracks overlap on scope"
-rm "$TEST_DIR/backlog/sprints/2026-03-ov-a.md" "$TEST_DIR/backlog/sprints/2026-03-ov-b.md"
+rm "$TEST_DIR/.dev-backlog/sprints/2026-03-ov-a.md" "$TEST_DIR/.dev-backlog/sprints/2026-03-ov-b.md"
 
 # --- status.sh: local files section ---
-mkdir -p "$TEST_DIR/backlog/tasks"
-cat >"$TEST_DIR/backlog/tasks/BACK-1.md" <<'EOF'
+mkdir -p "$TEST_DIR/.dev-backlog/tasks"
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.md" <<'EOF'
 ---
 status: To Do
 ---
 EOF
-cat >"$TEST_DIR/backlog/tasks/BACK-2.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-2.md" <<'EOF'
 ---
 status: In Progress
 ---
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "status: task count" "$OUT" "Tasks: 2 total"
 assert_contains "status: todo count" "$OUT" "1 To Do"
 assert_contains "status: inprog count" "$OUT" "1 In Progress"
@@ -704,8 +704,23 @@ NO_COLUMN_BIN="$TEST_DIR/no-column-bin"
 NO_COLUMN_BACKLOG="$TEST_DIR/no-column-backlog"
 NODE_CALLED="$TEST_DIR/no-column-node-called"
 mkdir -p "$NO_COLUMN_BIN" "$NO_COLUMN_BACKLOG"
-ln -s "$(command -v dirname)" "$NO_COLUMN_BIN/dirname"
-ln -s "$(command -v git)" "$NO_COLUMN_BIN/git"
+# Git Bash on Windows often creates a dirname/git symlink that executes but
+# prints nothing (SCRIPT_DIR emptied). Prefer a working copy when the link is
+# unusable. PATH must still exclude `column` and keep the fake node.
+install_no_column_bin() {
+	local src="$1" dest="$2"
+	shift 2
+	local out=""
+	ln -s "$src" "$dest" 2>/dev/null || true
+	out="$("$dest" "$@" 2>/dev/null)" || out=""
+	if [ -z "$out" ]; then
+		rm -f "$dest"
+		cp "$src" "$dest"
+		chmod +x "$dest"
+	fi
+}
+install_no_column_bin "$(command -v dirname)" "$NO_COLUMN_BIN/dirname" /
+install_no_column_bin "$(command -v git)" "$NO_COLUMN_BIN/git" --version
 cat >"$NO_COLUMN_BIN/node" <<'EOF'
 #!/bin/bash
 : > "$NODE_CALLED"
@@ -730,7 +745,7 @@ assert_not_contains "status no-column: no EPIPE" "$OUT" "EPIPE"
 # ============================================================
 
 # Restore active sprint for hook tests
-cat >"$TEST_DIR/backlog/sprints/2026-03-test.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
 ---
 milestone: Test Sprint
 status: active
@@ -755,31 +770,31 @@ Test context hook.
 ## Progress
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "hook: sprint name" "$OUT" "[Sprint: 2026-03-test]"
 assert_contains "hook: done count" "$OUT" "2/5 done"
 assert_contains "hook: in-flight" "$OUT" "1 in-flight"
 assert_contains "hook: next item" "$OUT" "Next: #4 Rate limiting"
 
 # Hook exits 0
-bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog"
+bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog"
 assert_equals "hook: exit code 0" "$?" "0"
 
 # No active sprint — silent exit 0
-rm "$TEST_DIR/backlog/sprints/2026-03-test.md"
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+rm "$TEST_DIR/.dev-backlog/sprints/2026-03-test.md"
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
 assert_equals "hook: no sprint = empty" "$OUT" ""
-bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog"
+bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog"
 assert_equals "hook: no sprint exit 0" "$?" "0"
 
 # No sprints dir — silent exit 0
-rm -rf "$TEST_DIR/backlog/sprints"
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+rm -rf "$TEST_DIR/.dev-backlog/sprints"
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
 assert_equals "hook: no dir = empty" "$OUT" ""
 
 # All done — no next item
-mkdir -p "$TEST_DIR/backlog/sprints"
-cat >"$TEST_DIR/backlog/sprints/2026-03-done.md" <<'EOF'
+mkdir -p "$TEST_DIR/.dev-backlog/sprints"
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-done.md" <<'EOF'
 ---
 status: active
 ---
@@ -789,7 +804,7 @@ status: active
 - [x] #2 Task B
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/backlog")
+OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "hook all-done: count" "$OUT" "2/2 done"
 assert_not_contains "hook all-done: no Next" "$OUT" "Next:"
 
@@ -842,10 +857,10 @@ assert_equals "contract: Known Gotchas heading" \
 # ============================================================
 
 # Setup fresh environment for sprint-close tests
-rm -rf "$TEST_DIR/backlog"
-mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+rm -rf "$TEST_DIR/.dev-backlog"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
 
-cat >"$TEST_DIR/backlog/sprints/2026-03-auth.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md" <<'EOF'
 ---
 milestone: Auth Sprint
 status: active
@@ -871,14 +886,14 @@ Ship auth.
 EOF
 
 # Create matching task files
-cat >"$TEST_DIR/backlog/tasks/BACK-1 - db-schema.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - db-schema.md" <<'EOF'
 ---
 id: BACK-1
 title: DB schema
 status: In Progress
 ---
 EOF
-cat >"$TEST_DIR/backlog/tasks/BACK-2 - oauth-flow.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-2 - oauth-flow.md" <<'EOF'
 ---
 id: BACK-2
 title: OAuth flow
@@ -886,7 +901,7 @@ status: In Progress
 ---
 EOF
 # Task not in sprint — should NOT be moved
-cat >"$TEST_DIR/backlog/tasks/BACK-99 - unrelated.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-99 - unrelated.md" <<'EOF'
 ---
 id: BACK-99
 title: Unrelated
@@ -894,7 +909,7 @@ status: To Do
 ---
 EOF
 
-cat >"$TEST_DIR/backlog/sprints/2026-03-other-active.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-other-active.md" <<'EOF'
 ---
 status: active
 ---
@@ -904,17 +919,17 @@ status: active
 EOF
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "close multiple-active: exit code" "$STATUS" "1"
 assert_contains "close multiple-active: refuses ambiguous close" "$OUT" "Refusing to close an ambiguous sprint"
 assert_contains "close multiple-active: lists first" "$OUT" "2026-03-auth.md"
 assert_contains "close multiple-active: lists second" "$OUT" "2026-03-other-active.md"
-rm "$TEST_DIR/backlog/sprints/2026-03-other-active.md"
+rm "$TEST_DIR/.dev-backlog/sprints/2026-03-other-active.md"
 
 # --- dry-run test ---
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" --dry-run 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --dry-run 2>&1)
 assert_contains "close dry-run: would set completed" "$OUT" "Would set status: completed"
 assert_contains "close dry-run: would move task" "$OUT" "BACK-1"
 assert_contains "close dry-run: shows context entries" "$OUT" "argon2"
@@ -922,8 +937,8 @@ assert_contains "close dry-run: runs doctor" "$OUT" "=== Backlog Doctor (pre-clo
 assert_contains "close dry-run: doctor result appears" "$OUT" "[PASS] active_sprint"
 assert_contains "close dry-run: reassess verdict appears" "$OUT" "Reassess signal:"
 # Verify nothing actually changed
-assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
-assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "3"
+assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
+assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | wc -l | tr -d ' ')" "3"
 
 # --- dry-run flag/order parsing tests ---
 set +e
@@ -933,36 +948,36 @@ set -e
 assert_equals "close dry-run flag-only: exit code" "$STATUS" "0"
 assert_contains "close dry-run flag-only: would set completed" "$OUT" "Would set status: completed"
 assert_contains "close dry-run flag-only: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
-assert_contains "close dry-run flag-only: defaults to backlog" "$OUT" "backlog/sprints/2026-03-auth.md"
-assert_contains "close dry-run flag-only: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+assert_contains "close dry-run flag-only: defaults to .dev-backlog" "$OUT" ".dev-backlog/sprints/2026-03-auth.md"
+assert_contains "close dry-run flag-only: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --dry-run "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --dry-run "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "close dry-run flag-first positional: exit code" "$STATUS" "0"
 assert_contains "close dry-run flag-first positional: would set completed" "$OUT" "Would set status: completed"
 assert_contains "close dry-run flag-first positional: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
-assert_contains "close dry-run flag-first positional: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+assert_contains "close dry-run flag-first positional: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --bogus "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" --bogus "$TEST_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "close unknown flag: exit code" "$STATUS" "1"
 assert_contains "close unknown flag: message" "$OUT" "Unknown argument: --bogus"
-assert_contains "close unknown flag: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+assert_contains "close unknown flag: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" "$TEST_DIR/other-backlog" --dry-run 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" "$TEST_DIR/other-backlog" --dry-run 2>&1)
 STATUS=$?
 set -e
 assert_equals "close extra positional: exit code" "$STATUS" "1"
 assert_contains "close extra positional: message" "$OUT" "Unexpected argument: $TEST_DIR/other-backlog"
-assert_contains "close extra positional: file unchanged" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "active"
+assert_contains "close extra positional: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
 
 # --- actual close ---
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close: set completed" "$OUT" "status: completed"
 assert_contains "close: moved tasks" "$OUT" "BACK-1"
 assert_contains "close: context reminder" "$OUT" "argon2"
@@ -970,18 +985,18 @@ assert_contains "close: doctor result appears" "$OUT" "[PASS] active_sprint"
 assert_contains "close: reassess verdict appears" "$OUT" "Reassess signal:"
 
 # Verify sprint file updated
-assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-auth.md")" "completed"
+assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "completed"
 
 # Verify tasks moved
-assert_equals "close: tasks dir has 1 left" "$(ls "$TEST_DIR/backlog/tasks/" | wc -l | tr -d ' ')" "1"
-assert_equals "close: unrelated stayed" "$(ls "$TEST_DIR/backlog/tasks/")" "BACK-99 - unrelated.md"
-assert_equals "close: completed has 2" "$(ls "$TEST_DIR/backlog/completed/" | wc -l | tr -d ' ')" "2"
+assert_equals "close: tasks dir has 1 left" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | wc -l | tr -d ' ')" "1"
+assert_equals "close: unrelated stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/")" "BACK-99 - unrelated.md"
+assert_equals "close: completed has 2" "$(ls "$TEST_DIR/.dev-backlog/completed/" | wc -l | tr -d ' ')" "2"
 
 # --- mirrorless GitHub close (#346): no task file or archive directory required ---
-rm -rf "$TEST_DIR/backlog"
-mkdir -p "$TEST_DIR/backlog/sprints"
-printf 'github\n' >"$TEST_DIR/backlog/.tracker"
-cat >"$TEST_DIR/backlog/sprints/2026-03-mirrorless.md" <<'EOF'
+rm -rf "$TEST_DIR/.dev-backlog"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints"
+printf 'github\n' >"$TEST_DIR/.dev-backlog/.tracker"
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-mirrorless.md" <<'EOF'
 ---
 status: active
 ---
@@ -999,19 +1014,19 @@ Close from live task lifecycle and sprint continuity only.
 ## Progress
 EOF
 
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close mirrorless: set completed" "$OUT" "status: completed"
 assert_contains "close mirrorless: reports no mirror requirement" "$OUT" "No legacy task mirrors required"
 assert_equals "close mirrorless: does not create tasks directory" \
-	"$(test -d "$TEST_DIR/backlog/tasks" && echo yes || echo no)" "no"
+	"$(test -d "$TEST_DIR/.dev-backlog/tasks" && echo yes || echo no)" "no"
 assert_equals "close mirrorless: sprint completed" \
-	"$(grep '^status:' "$TEST_DIR/backlog/sprints/2026-03-mirrorless.md")" "status: completed"
+	"$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-mirrorless.md")" "status: completed"
 
 # --- ambiguous issue number test (#1 must not match #11) ---
-rm -rf "$TEST_DIR/backlog"
-mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
+rm -rf "$TEST_DIR/.dev-backlog"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
 
-cat >"$TEST_DIR/backlog/sprints/2026-03-ambig.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-ambig.md" <<'EOF'
 ---
 status: active
 ---
@@ -1024,29 +1039,29 @@ status: active
 ## Progress
 EOF
 
-cat >"$TEST_DIR/backlog/tasks/BACK-1 - short-task.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - short-task.md" <<'EOF'
 ---
 id: BACK-1
 ---
 EOF
-cat >"$TEST_DIR/backlog/tasks/BACK-11 - longer-task.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-11 - longer-task.md" <<'EOF'
 ---
 id: BACK-11
 ---
 EOF
 
-bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" >/dev/null 2>&1
-assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
-assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
+bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
+assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
+assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
 
 # --- local decimal closeout (BACK-1.2 must not match BACK-1.20) ---
-rm -rf "$TEST_DIR/backlog"
-mkdir -p "$TEST_DIR/backlog/sprints" "$TEST_DIR/backlog/tasks" "$TEST_DIR/backlog/completed"
-printf 'local\n' >"$TEST_DIR/backlog/.tracker"
-cat >"$TEST_DIR/backlog/config.yml" <<'EOF'
+rm -rf "$TEST_DIR/.dev-backlog"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
+printf 'local\n' >"$TEST_DIR/.dev-backlog/.tracker"
+cat >"$TEST_DIR/.dev-backlog/config.yml" <<'EOF'
 task_prefix: BACK
 EOF
-cat >"$TEST_DIR/backlog/sprints/2026-03-local.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-local.md" <<'EOF'
 ---
 status: active
 ---
@@ -1061,23 +1076,23 @@ Close one local subtask.
 
 ## Progress
 EOF
-cat >"$TEST_DIR/backlog/tasks/BACK-1.2 - short-subtask.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.2 - short-subtask.md" <<'EOF'
 ---
 id: BACK-1.2
 ---
 EOF
-cat >"$TEST_DIR/backlog/tasks/BACK-1.20 - longer-subtask.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.20 - longer-subtask.md" <<'EOF'
 ---
 id: BACK-1.20
 ---
 EOF
 
-bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" >/dev/null 2>&1
-assert_equals "local close: BACK-1.2 moved" "$(ls "$TEST_DIR/backlog/completed/" | grep -c 'BACK-1.2 ')" "1"
-assert_equals "local close: BACK-1.20 stayed" "$(ls "$TEST_DIR/backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
+bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
+assert_equals "local close: BACK-1.2 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" | grep -c 'BACK-1.2 ')" "1"
+assert_equals "local close: BACK-1.20 stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
 
 # --- no active sprint ---
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
 # ============================================================
@@ -1121,8 +1136,8 @@ gated_assert() {
 # Build a genuinely spec-less project: run scripts with cwd inside it so spec
 # resolution finds nothing (scripts resolve their own path via SCRIPT_DIR).
 COLD_DIR="$TEST_DIR/cold-adopter"
-mkdir -p "$COLD_DIR/backlog/sprints" "$COLD_DIR/backlog/tasks" "$COLD_DIR/backlog/completed"
-cat >"$COLD_DIR/backlog/sprints/2026-01-cold.md" <<'EOF'
+mkdir -p "$COLD_DIR/.dev-backlog/sprints" "$COLD_DIR/.dev-backlog/tasks" "$COLD_DIR/.dev-backlog/completed"
+cat >"$COLD_DIR/.dev-backlog/sprints/2026-01-cold.md" <<'EOF'
 ---
 milestone: cold fixture
 status: active
@@ -1177,7 +1192,7 @@ if (bad.length !== 0) process.exit(1);
 # Use a fresh spec-less dir with an empty sprints/ so init isn't refused as a
 # second active sprint.
 COLD_INIT_DIR="$TEST_DIR/cold-init"
-mkdir -p "$COLD_INIT_DIR/backlog/sprints" "$COLD_INIT_DIR/backlog/tasks"
+mkdir -p "$COLD_INIT_DIR/.dev-backlog/sprints" "$COLD_INIT_DIR/.dev-backlog/tasks"
 git -C "$COLD_INIT_DIR" init -q
 install_isolated_gh "$COLD_INIT_DIR"
 set +e
@@ -1246,9 +1261,9 @@ EOF
 # (1) Disjoint portfolio. HEAD: doctor active_sprint FAILS (any 2 actives).
 #     Target (#291+#293): disjoint scopes → active_sprint PASS.
 MT_DISJOINT_DIR="$TEST_DIR/mt-disjoint"
-mkdir -p "$MT_DISJOINT_DIR/backlog/sprints"
-mt_write_sprint "$MT_DISJOINT_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
-mt_write_sprint "$MT_DISJOINT_DIR/backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
+mkdir -p "$MT_DISJOINT_DIR/.dev-backlog/sprints"
+mt_write_sprint "$MT_DISJOINT_DIR/.dev-backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+mt_write_sprint "$MT_DISJOINT_DIR/.dev-backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
 set +e
 OUT=$(cd "$MT_DISJOINT_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
 set -e
@@ -1263,9 +1278,9 @@ gated_assert "multi-track: doctor passes on two disjoint-scope active tracks (#2
 #     "Multiple active sprint files found"; target (#293) emits the specific
 #     "Active tracks overlap on scope". Key on the message, not exit code.
 MT_OVERLAP_DIR="$TEST_DIR/mt-overlap"
-mkdir -p "$MT_OVERLAP_DIR/backlog/sprints"
-mt_write_sprint "$MT_OVERLAP_DIR/backlog/sprints/2026-07-auth-a.md" "AuthA" 3 '["src/auth/**"]'
-mt_write_sprint "$MT_OVERLAP_DIR/backlog/sprints/2026-07-auth-b.md" "AuthB" 4 '["src/auth/**"]'
+mkdir -p "$MT_OVERLAP_DIR/.dev-backlog/sprints"
+mt_write_sprint "$MT_OVERLAP_DIR/.dev-backlog/sprints/2026-07-auth-a.md" "AuthA" 3 '["src/auth/**"]'
+mt_write_sprint "$MT_OVERLAP_DIR/.dev-backlog/sprints/2026-07-auth-b.md" "AuthB" 4 '["src/auth/**"]'
 set +e
 OUT=$(cd "$MT_OVERLAP_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
 set -e
@@ -1299,9 +1314,9 @@ if (tags[0] !== "2026-07-auth" || tags[1] !== "2026-07-billing") process.exit(1)
 # (2c) Two scopeless active tracks: cannot prove disjoint → informational warn,
 #      never a fail (#293; matches the between-sprints informational stance).
 MT_SCOPELESS_DIR="$TEST_DIR/mt-scopeless"
-mkdir -p "$MT_SCOPELESS_DIR/backlog/sprints"
+mkdir -p "$MT_SCOPELESS_DIR/.dev-backlog/sprints"
 for slug in one two; do
-	cat >"$MT_SCOPELESS_DIR/backlog/sprints/2026-07-$slug.md" <<EOF
+	cat >"$MT_SCOPELESS_DIR/.dev-backlog/sprints/2026-07-$slug.md" <<EOF
 ---
 milestone: mt
 status: active
@@ -1340,10 +1355,10 @@ if (!/cannot prove disjoint/.test(c.detail.summary)) process.exit(1);
 # overlapping scope is refused naming the conflicting track. Scope is always
 # explicit via --scope (D2) — never inferred from touched paths.
 MT_LIFE_DIR="$TEST_DIR/mt-lifecycle"
-mkdir -p "$MT_LIFE_DIR/backlog/sprints"
+mkdir -p "$MT_LIFE_DIR/.dev-backlog/sprints"
 git -C "$MT_LIFE_DIR" init -q
 install_isolated_gh "$MT_LIFE_DIR"
-mt_write_sprint "$MT_LIFE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+mt_write_sprint "$MT_LIFE_DIR/.dev-backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
 set +e
 OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
 STATUS=$?
@@ -1365,7 +1380,7 @@ assert_contains "multi-track #292: overlapping init names the conflicting track"
 
 # G4: first-sprint init (no active sprint yet) keeps today's text and exit code.
 MT_INIT_SOLO_DIR="$TEST_DIR/mt-init-solo"
-mkdir -p "$MT_INIT_SOLO_DIR/backlog/sprints"
+mkdir -p "$MT_INIT_SOLO_DIR/.dev-backlog/sprints"
 git -C "$MT_INIT_SOLO_DIR" init -q
 install_isolated_gh "$MT_INIT_SOLO_DIR"
 set +e
@@ -1378,28 +1393,28 @@ assert_contains "multi-track G4 #292: single-track init dry-run text" "$OUT" "[d
 # close: --track picks one track out of a portfolio; ambiguous close still
 # refuses (now with a --track hint); a no-match selector fails loud.
 MT_CLOSE_DIR="$TEST_DIR/mt-close"
-mkdir -p "$MT_CLOSE_DIR/backlog/sprints"
-mt_write_sprint "$MT_CLOSE_DIR/backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
-mt_write_sprint "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
+mkdir -p "$MT_CLOSE_DIR/.dev-backlog/sprints"
+mt_write_sprint "$MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
+mt_write_sprint "$MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-billing.md" "Billing" 2 '["src/billing/**"]'
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/.dev-backlog" 2>&1)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: ambiguous close exit code" "$STATUS" "1"
 assert_contains "multi-track #292: ambiguous close refuses" "$OUT" "Refusing to close an ambiguous sprint"
 assert_contains "multi-track #292: ambiguous close suggests --track" "$OUT" "Pass --track <slug> to close one track."
 
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track 2026-07-billing --dry-run 2>&1)
-assert_contains "multi-track #292: close --track dry-run targets the selected track" "$OUT" "Would set status: completed in $MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md"
-assert_contains "multi-track #292: close --track dry-run leaves files untouched" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md")" "active"
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/.dev-backlog" --track 2026-07-billing --dry-run 2>&1)
+assert_contains "multi-track #292: close --track dry-run targets the selected track" "$OUT" "Would set status: completed in $MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-billing.md"
+assert_contains "multi-track #292: close --track dry-run leaves files untouched" "$(grep '^status:' "$MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-billing.md")" "active"
 
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track 2026-07-billing 2>&1)
-assert_contains "multi-track #292: close --track closes the selected track" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-billing.md")" "completed"
-assert_contains "multi-track #292: close --track leaves the other track active" "$(grep '^status:' "$MT_CLOSE_DIR/backlog/sprints/2026-07-auth.md")" "active"
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/.dev-backlog" --track 2026-07-billing 2>&1)
+assert_contains "multi-track #292: close --track closes the selected track" "$(grep '^status:' "$MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-billing.md")" "completed"
+assert_contains "multi-track #292: close --track leaves the other track active" "$(grep '^status:' "$MT_CLOSE_DIR/.dev-backlog/sprints/2026-07-auth.md")" "active"
 
 set +e
-OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/backlog" --track bogus 2>&1)
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$MT_CLOSE_DIR/.dev-backlog" --track bogus 2>&1)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: close --track no-match exit code" "$STATUS" "1"
@@ -1409,8 +1424,8 @@ assert_contains "multi-track #292: close --track no-match message" "$OUT" "No ac
 #     A single active track behaves exactly as today; this is the G4 text anchor
 #     (text output only — never snapshot --json, which changes by design).
 MT_SINGLE_DIR="$TEST_DIR/mt-single"
-mkdir -p "$MT_SINGLE_DIR/backlog/sprints"
-mt_write_sprint "$MT_SINGLE_DIR/backlog/sprints/2026-07-solo.md" "Solo" 5 '["src/solo/**"]'
+mkdir -p "$MT_SINGLE_DIR/.dev-backlog/sprints"
+mt_write_sprint "$MT_SINGLE_DIR/.dev-backlog/sprints/2026-07-solo.md" "Solo" 5 '["src/solo/**"]'
 OUT=$(cd "$MT_SINGLE_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" 2>/dev/null || true)
 assert_contains "multi-track G4: single active track still reports 'Exactly one active sprint' (text)" "$OUT" "Exactly one active sprint"
 OUT=$(cd "$MT_SINGLE_DIR" && bash "$SCRIPT_DIR/next.sh" 2>/dev/null || true)

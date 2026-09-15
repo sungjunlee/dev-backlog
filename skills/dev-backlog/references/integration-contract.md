@@ -10,9 +10,9 @@ Changes to checkbox, annotation, path, or section patterns parsed by `dev-relay`
 
 Any actor consuming dev-backlog state should treat these files as the stable read surface:
 
-- `backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
-- `backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are optional legacy exports with one-way flow from GitHub. GitHub Issues are the sole task authority. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
+- `.dev-backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
+- `.dev-backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
+- `backlog/tasks/` and `backlog/completed/` are optional legacy exports with one-way flow from GitHub. They are Backlog.md-shaped paths, not the skill execution root. GitHub Issues are the sole task authority. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -32,8 +32,8 @@ Multiple active tracks are a **portfolio**, not an error; only **overlapping-sco
 
 ## Tracker Selection and Capability Error Surface
 
-`backlog/.tracker` accepts exactly one runtime authority: `github`. When absent,
-the legacy `tracker:` key in `backlog/config.yml` is read only when its value is
+`.dev-backlog/.tracker` accepts exactly one runtime authority: `github`. When absent,
+the legacy `tracker:` key in `.dev-backlog/config.yml` is read only when its value is
 also `github`; with neither, GitHub is the zero-migration default. Every other
 selection fails before provider calls or local mutation. Availability probes
 and operation failures never select another adapter. Existing GitHub `#N`,
@@ -150,7 +150,7 @@ Default human output is one line per check. `--json` emits:
 |-------|------|---------|
 | `fired` | boolean | `true` when any check above warned/failed, or when `sprints_since_last_report >= 3` (the `--reassess-threshold`, default `3`). |
 | `reason` | string | One-line human explanation combining the doctor state and the sprint count. |
-| `sprints_since_last_report` | integer | Completed sprints closed strictly after the latest `backlog/triage/YYYY-MM-DD-reassess.md` report's own date. A sprint closed on the same day as, or before, that report is treated as already covered by it and is not counted (close times aren't recorded, so same-day ordering can't be determined). With no reassess reports on disk, all completed sprints count. |
+| `sprints_since_last_report` | integer | Completed sprints closed strictly after the latest `.dev-backlog/triage/YYYY-MM-DD-reassess.md` report's own date. A sprint closed on the same day as, or before, that report is treated as already covered by it and is not counted (close times aren't recorded, so same-day ordering can't be determined). With no reassess reports on disk, all completed sprints count. |
 | `latest_report` | string or `null` | Path to the latest reassess report, or `null` if none exists. |
 
 Each `checks[]` entry has:
@@ -168,12 +168,12 @@ The doctor's own JSON schema stays at `1`; it is independent of the actor read-s
 | What | Pattern | Example |
 |------|---------|---------|
 | Legacy task exports | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
-| Active sprint | `backlog/sprints/*.md` with `status: active` | `backlog/sprints/2026-03-auth-system.md` |
-| Cross-sprint context | `backlog/sprints/_context.md` | (always this exact name) |
+| Active sprint | `.dev-backlog/sprints/*.md` with `status: active` | `.dev-backlog/sprints/2026-03-auth-system.md` |
+| Cross-sprint context | `.dev-backlog/sprints/_context.md` | (always this exact name) |
 | Legacy completed exports | `backlog/completed/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
 
 These task paths exist only when an operator requests a legacy export. **PREFIX**
-defaults to `BACK` and is configurable via `backlog/config.yml` →
+defaults to `BACK` and is configurable via `.dev-backlog/config.yml` →
 `task_prefix`; it does not select or identify a runtime provider.
 
 ## Sprint File Sections
@@ -248,7 +248,7 @@ Sprint plan items use this format:
 
 - GitHub: `#N`, where `N` is a positive decimal integer. Identity is `{ tracker: "github", id: "N", ref: "#N" }`.
 - Historical compatibility only: `{PREFIX}-N` or `{PREFIX}-N.M`, where
-  `PREFIX` is the exact `backlog/config.yml` `task_prefix` and both numeric
+  `PREFIX` is the exact `.dev-backlog/config.yml` `task_prefix` and both numeric
   components are positive integers. File-only orientation preserves identity
   `{ tracker: "local", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`; this does not
   make `local` a valid `.tracker` selection or permit lifecycle operations.

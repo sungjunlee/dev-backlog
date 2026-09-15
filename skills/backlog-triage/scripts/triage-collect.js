@@ -8,6 +8,7 @@ const {
   parseMarkerMonth,
   readConfig,
   readTriageConfig,
+  DEFAULT_BACKLOG_DIR,
 } = require("../../dev-backlog/scripts/lib");
 const {
   TRACKER_ADAPTERS,
@@ -15,10 +16,11 @@ const {
   invokeCapability,
   resolveConfiguredTracker,
 } = require("../../dev-backlog/scripts/tracker.js");
+const { defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
 const { executeGithub } = require("./triage-github.js");
 
-const CONFIG_PATH = path.posix.join("backlog", "triage-config.yml");
-const SNAPSHOT_DIR = path.join("backlog", "triage", ".cache");
+const CONFIG_PATH = path.posix.join(DEFAULT_BACKLOG_DIR, "triage-config.yml");
+const SNAPSHOT_DIR = path.join(defaultTriageDir(), ".cache");
 const TRIAGE_DEFAULT_FETCH_LIMIT = 2147483647;
 const GRAPHQL_PAGE_SIZE = 100;
 const DEFAULT_CLOSED_ISSUE_DAYS = 180;
@@ -595,14 +597,14 @@ async function collectSnapshot({
       execFile,
     }),
   });
-  const resolved = resolveConfiguredTracker(trackerConfig || readConfig("backlog"), {
+  const resolved = resolveConfiguredTracker(trackerConfig || readConfig(DEFAULT_BACKLOG_DIR), {
     adapters: { ...TRACKER_ADAPTERS, github },
   });
   invokeCapability(resolved, "pull-request-relationships", () => undefined);
   if (withComments) invokeCapability(resolved, "comments", () => undefined);
   if (withClosedIssues) invokeCapability(resolved, "closing-semantics", () => undefined);
   resolvedRepo = repo || detectRepo(execFile);
-  const triageConfig = config || readTriageConfig("backlog");
+  const triageConfig = config || readTriageConfig(DEFAULT_BACKLOG_DIR);
   const issues = resolved.adapter.list({
     repo: resolvedRepo,
     limit,

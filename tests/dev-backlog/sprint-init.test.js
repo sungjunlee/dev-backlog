@@ -232,7 +232,7 @@ describe("createSprintFile", () => {
 
     for (const { topic, issues } of cases) {
       const repoRoot = path.join(tmpDir, topic);
-      const backlogPath = path.join(repoRoot, "backlog");
+      const backlogPath = path.join(repoRoot, ".dev-backlog");
       const result = createSprintFile({
         topic,
         milestone: topic,
@@ -297,7 +297,7 @@ describe("createSprintFile", () => {
   });
 
   it("refuses --component without spec/capabilities.md before effects (#331)", () => {
-    const sprintsDir = path.join(tmpDir, "backlog", "sprints");
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
     let providerCalled = false;
     assert.throws(() => createSprintFile({
       topic: "no-axis",
@@ -314,7 +314,7 @@ describe("createSprintFile", () => {
   });
 
   it("refuses direct component + scope input before effects (#331)", () => {
-    const sprintsDir = path.join(tmpDir, "backlog", "sprints");
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
     assert.throws(() => createSprintFile({
       topic: "two-axes",
       milestone: "M",
@@ -449,7 +449,7 @@ describe("createSprintFile", () => {
     assert.equal(result.component, "unknown");
     assert.equal(result.created, false);
     assert.match(result.refusalReason, /Known components: sprint-execution, tracker-task-truth/);
-    assert.equal(fs.existsSync(path.join(tmpDir, "backlog")), false);
+    assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
   });
 
   it("creates a disjoint-scope second active track without refusal (#292)", () => {

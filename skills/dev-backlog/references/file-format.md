@@ -5,7 +5,7 @@ exports are a short legacy note at the end — never a runtime format.
 
 ## Sprint file
 
-Each active sprint lives at `backlog/sprints/YYYY-MM-<topic>.md`. Section
+Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Section
 semantics and checkbox states are in [SKILL.md](../SKILL.md).
 
 ```markdown
@@ -58,7 +58,7 @@ task item.
 
 ## Tracker selection
 
-`backlog/.tracker` contains exactly one newline-terminated selection:
+`.dev-backlog/.tracker` contains exactly one newline-terminated selection:
 
 ```text
 github
@@ -70,7 +70,7 @@ neither, it deterministically defaults to `github`. Any other value fails.
 Availability never changes selection. Setup writes `.tracker` atomically and
 never edits `config.yml`.
 
-## config.yml
+## .dev-backlog/config.yml
 
 ```yaml
 project_name: "my-project"
@@ -113,6 +113,58 @@ Without the markers, acceptance criteria still work as plain checkboxes.
 
 `sync-pull.js --legacy-export` may write `backlog/tasks/` in a
 Backlog.md-compatible shape for diagnosis or rollback. Those files are never
-read as task truth. Import is human-reviewed Markdown into a GitHub Issue.
-Exported filenames look like `{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are
-historical parse-only, not runtime identities.
+read as task truth and are not under the skill execution root. Import is
+human-reviewed Markdown into a GitHub Issue. Exported filenames look like
+`{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are historical parse-only, not
+runtime identities.
+
+## Migration from `backlog/` (one-way)
+
+Existing repos that still keep skill files under `backlog/` must move them
+once. The skill execution root is `.dev-backlog/` only. Never delete
+`backlog/tasks/`, `backlog/docs/`, or `backlog/completed/`.
+
+### Manual migrate
+
+1. Back up the repo (`git status` clean, or copy the tree).
+2. `git mv` only skill-owned names after that backup:
+
+```bash
+mkdir -p .dev-backlog
+git mv backlog/sprints .dev-backlog/sprints           # if present
+git mv backlog/.tracker .dev-backlog/.tracker         # if present
+git mv backlog/config.yml .dev-backlog/config.yml     # skill config only; see below
+git mv backlog/triage .dev-backlog/triage             # if present
+git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
+```
+
+3. Leave `backlog/tasks/`, `backlog/docs/`, and `backlog/completed/` in place
+   if they exist — those are Backlog.md or `--legacy-export` paths, not skill
+   execution.
+4. Verify the destination against the backup before removing any leftover
+   skill-owned sources. The move is not atomic: a failed `git mv` can leave
+   names on both sides. Do not treat leftover `tasks/`, `docs/`, or
+   `completed/` as skill names to delete.
+5. Remove an empty leftover `backlog/` only when nothing else needs it
+   (typically when `tasks/`, `docs/`, and `completed/` are also absent).
+
+`config.yml`: move it only when it is this skill's `tracker:` / `task_prefix`
+file. If it is a Backlog.md config or the ownership is ambiguous, leave it
+under `backlog/` and create `.dev-backlog/.tracker` via setup.
+
+### Setup auto-migrate
+
+`setup-dev-backlog.js` copies then removes those same skill-owned names when
+`.dev-backlog/` is absent and at least one skill-owned name still sits under
+`backlog/`. That path is not `git mv`, takes no backup, and is not atomic.
+It validates the leftover tracker pin first, so a refused layout is left
+untouched. If `.dev-backlog/` already exists, auto-migrate skips
+(`destination-exists`) and does not retry: leftover skill names stay under
+`backlog/` and `backlog-doctor.js` warns. They are not a second active root.
+
+A lone `backlog/config.yml` with no `sprints/`, `.tracker`, `triage/`, or
+`triage-config.yml` is left in place (Backlog.md or ambiguous); setup still
+creates `.dev-backlog/.tracker`. `config.yml` is migrated only when one of
+those skill markers is present.
+
+This is one-way: do not copy execution files back into `backlog/`.
