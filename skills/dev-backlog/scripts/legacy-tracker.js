@@ -1,13 +1,14 @@
 /**
- * Legacy tracker-selection compatibility.
+ * Leftover config.yml `tracker:` reader (setup-only).
  *
- * Tracker authority lives in `.dev-backlog/.tracker`. This module is the only reader
- * of the older `tracker:` key in `.dev-backlog/config.yml`, kept so repositories
- * configured before the move resolve to the same tracker they always did. It
- * never writes; `config.yml` bytes on disk are never touched.
+ * Tracker authority lives in `.dev-backlog/.tracker`. This module is the only
+ * reader of the older `tracker:` key in `.dev-backlog/config.yml`, kept so
+ * repositories configured before the move resolve to the same tracker they
+ * always did. It never writes; `config.yml` bytes on disk are never touched.
+ * It is not a Backlog.md layer and is not product authority.
  *
- * It is a separate module because it is a deletable unit: when legacy support is
- * dropped, this file and its tests go away together.
+ * It is a separate module because it is a deletable unit: when this leftover
+ * read is dropped, this file and its tests go away together.
  */
 
 const fs = require("node:fs");

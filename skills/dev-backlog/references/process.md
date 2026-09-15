@@ -46,7 +46,7 @@ and a stable SHA-256 `source_revision`/`source_digest`. Source precedence, in
 order: an explicit repository-relative `spec_ref` (Issue-body marker
 `<!-- dev-backlog:spec_ref path/to/spec.md -->` or `--spec-ref`), then a posted
 Issue comment whose body starts with `## Agent Brief`, then the live Issue
-body. A failed Issue read or explicit-spec load stops execution; the resolver
+body. A failed Issue read or explicit-spec load stops execution fail-closed; the resolver
 never reads task files.
 
 ## Orient — Starting a Session
@@ -107,15 +107,15 @@ For the whole sprint:
 
 1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
 2. The command sets `status: completed`, appends final Progress, and prints the
-   doctor/reassess summary. Close does not touch `backlog/tasks/` (the
-   Backlog.md / `--legacy-export` tree). If leftover mirrors exist under the
-   execution root's `tasks/` (not that Backlog.md tree), close may archive
-   only those. Close does not require or create task directories.
+   doctor/reassess summary. Close does not touch `exports/github-issues/` or
+   leftover `backlog/tasks/`. If leftover mirrors exist under the execution
+   root's `tasks/`, close may archive only those. Close does not require or
+   create task directories.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
-## Legacy Export — Explicit and One-Way
+## Diagnostic Export — Explicit and One-Way
 
-There is no pull step: re-run `effective-task-spec.js` when Issue content changes. `sync-pull.js --legacy-export` writes non-authoritative Backlog.md-shaped snapshots for rollback or diagnostics only; see `file-format.md`.
+There is no pull step: re-run `effective-task-spec.js` when Issue content changes. `sync-pull.js --legacy-export` writes non-authoritative snapshots to `exports/github-issues/` for rollback or diagnostics only; it is not a Backlog.md compatibility layer and is not on orient / plan / work / complete. See `file-format.md`.
 
 ## Unsupported Optional Capabilities
 

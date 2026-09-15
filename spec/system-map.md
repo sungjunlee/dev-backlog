@@ -2,7 +2,7 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority. No required task mirror; an optional one-way legacy export exists behind an explicit flag. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
+dev-backlog is a skill suite plus deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority. No required task mirror; an optional one-way diagnostic export exists behind an explicit flag. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
 
 ```text
 GitHub Issue (spec + lifecycle + native planning fields)
@@ -15,8 +15,8 @@ GitHub Issue (spec + lifecycle + native planning fields)
 
 `backlog-triage` is an optional advisory grooming pipeline over the same Issues.
 `spec/*` is an optional human-gated yardstick. Relay, GitHub Projects, and
-Backlog.md export are optional and non-authoritative. Retrieval/memory is not
-a product surface (#350 no-go).
+the diagnostic `exports/github-issues/` export are optional and non-authoritative.
+Retrieval/memory is not a product surface (#350 no-go).
 
 ## Runtime Boundaries
 
@@ -46,7 +46,7 @@ a product surface (#350 no-go).
 
 ## Project-Wide Invariants
 
-- One task authority. No runtime fallback, co-authority, dual write, or
+- One task authority. Fail-closed on adapter failure. No runtime fallback, co-authority, dual write, or
   background sync. GitHub unavailability never selects another store.
 - A failed live Issue read stops execution.
 - A sprint is admitted by execution complexity, never duration alone.

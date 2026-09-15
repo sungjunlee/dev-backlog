@@ -8,7 +8,7 @@
 - "Work issue #42 with no local task files and three live Issue AC checkboxes." Expected: run the effective task-spec resolver, verify its source digest and every AC, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
 - "Fresh online session with no local task files." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; resolves the task through the effective task-spec resolver (which owns source precedence).
 - "Fresh session with only repo files available, no conversation history, and no GitHub access." Expected: recover execution continuity and every in-flight `[~]` owner/pointer from `status.sh --json`/`next.sh --json`, but stop before task execution or AC/lifecycle claims because the live task cannot resolve; never read a legacy export as fallback.
-- "Close a sprint with Running Context that applies to future work and no local task files." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
+- "Close a sprint with Running Context that applies to future work and no local task files." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/`, `backlog/completed/`, or `exports/github-issues/`.
 - "GitHub Issue changed during work." Expected: re-run the live effective
   task-spec resolver and review a changed source revision; do not write a
   local task file. Only an explicit rollback/diagnostic request runs

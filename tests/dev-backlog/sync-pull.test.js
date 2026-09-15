@@ -6,7 +6,6 @@ const os = require("os");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
-  LEGACY_EXPORT_DIR,
   LEGACY_TASKS_DIR,
 } = require(path.join(SKILL_SCRIPTS, "execution-root.js"));
 const {
@@ -26,14 +25,14 @@ function materializationCliFixture(
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-materialize-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const executionDir = path.join(root, ".dev-backlog");
-  const backlogDir = path.join(root, LEGACY_EXPORT_DIR);
+  const tasksPath = path.join(root, LEGACY_TASKS_DIR);
+  const exportParentDir = path.join(root, path.dirname(LEGACY_TASKS_DIR));
   if (!fresh) {
     fs.mkdirSync(executionDir);
     fs.writeFileSync(path.join(executionDir, ".tracker"), "github\n");
   }
-  const tasksPath = path.join(root, LEGACY_TASKS_DIR);
   if (unsafeTasks) {
-    fs.mkdirSync(backlogDir, { recursive: true });
+    fs.mkdirSync(exportParentDir, { recursive: true });
     fs.writeFileSync(tasksPath, "sentinel\n");
   }
 
@@ -60,7 +59,7 @@ const path = require("node:path");
 const originalWriteFileSync = fs.writeFileSync;
 fs.writeFileSync = function (file, ...args) {
   const normalized = String(file);
-  if (normalized.includes(path.join("backlog", "tasks")) && normalized.endsWith(".md")) {
+  if (normalized.includes(path.join("exports", "github-issues")) && normalized.endsWith(".md")) {
     const error = new Error("injected task write failure");
     error.code = "EACCES";
     throw error;
@@ -73,7 +72,7 @@ const fsForMkdir = require("node:fs");
 const pathForMkdir = require("node:path");
 const originalMkdirSync = fsForMkdir.mkdirSync;
 fsForMkdir.mkdirSync = function (directory, ...args) {
-  if (String(directory).endsWith(pathForMkdir.join("backlog", "tasks"))) {
+  if (String(directory).endsWith(pathForMkdir.join("exports", "github-issues"))) {
     const error = new Error("injected tasks mkdir failure");
     error.code = "EACCES";
     throw error;
@@ -85,7 +84,7 @@ fsForMkdir.mkdirSync = function (directory, ...args) {
 
   return {
     root,
-    backlogDir,
+    exportParentDir,
     tasksPath,
     env: {
       ...process.env,
@@ -339,7 +338,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.match(document.error.message, /Unsafe task export path/);
     assert.equal(fs.readFileSync(fixture.tasksPath, "utf8"), "sentinel\n");
-    assert.deepEqual(fs.readdirSync(fixture.backlogDir).sort(), ["tasks"]);
+    assert.deepEqual(fs.readdirSync(fixture.exportParentDir).sort(), ["github-issues"]);
   });
 
   it("wraps task write failure as JSON and removes an empty directory it created", (t) => {
@@ -357,7 +356,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.match(document.error.message, /injected task write failure/);
     assert.equal(fs.existsSync(fixture.tasksPath), false);
-    assert.equal(fs.existsSync(fixture.backlogDir), false);
+    assert.equal(fs.existsSync(fixture.exportParentDir), false);
   });
 
   it("keeps materialization failure actionable in human mode", (t) => {
@@ -390,7 +389,7 @@ describe("legacy export CLI boundary", () => {
     const document = JSON.parse(result.stdout);
     assert.equal(document.mode, "legacy-export");
     assert.deepEqual(document.createdFiles, ["BACK-42 - export-me.md"]);
-    assert.deepEqual(fs.readdirSync(fixture.backlogDir), ["tasks"]);
+    assert.deepEqual(fs.readdirSync(fixture.exportParentDir), ["github-issues"]);
     assert.deepEqual(fs.readdirSync(fixture.tasksPath), ["BACK-42 - export-me.md"]);
   });
 
@@ -408,7 +407,7 @@ describe("legacy export CLI boundary", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).counts.created, 1);
-    assert.equal(fs.existsSync(fixture.backlogDir), false);
+    assert.equal(fs.existsSync(fixture.exportParentDir), false);
   });
 
   it("cleans fresh empty parent and tasks directories after an injected write failure", (t) => {
@@ -423,7 +422,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(result.status, 1);
     assert.equal(JSON.parse(result.stdout).error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.equal(fs.existsSync(fixture.tasksPath), false);
-    assert.equal(fs.existsSync(fixture.backlogDir), false);
+    assert.equal(fs.existsSync(fixture.exportParentDir), false);
   });
 
   it("cleans a fresh empty parent after an injected tasks mkdir failure", (t) => {
@@ -440,10 +439,10 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "TASK_EXPORT_MATERIALIZATION_FAILED");
     assert.match(document.error.message, /injected tasks mkdir failure/);
     assert.equal(fs.existsSync(fixture.tasksPath), false);
-    assert.equal(fs.existsSync(fixture.backlogDir), false);
+    assert.equal(fs.existsSync(fixture.exportParentDir), false);
   });
 
-  it("refuses a symlink or junction backlog parent without writing outside", (t) => {
+  it("refuses a symlink or junction export parent without writing outside", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-parent-link-"));
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-parent-outside-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -454,7 +453,7 @@ describe("legacy export CLI boundary", () => {
     try {
       fs.symlinkSync(
         outside,
-        path.join(root, "backlog"),
+        path.join(root, path.dirname(LEGACY_TASKS_DIR)),
         process.platform === "win32" ? "junction" : "dir",
       );
     } catch (error) {
@@ -500,7 +499,7 @@ childProcess.execFileSync = function (command, args, options) {
     assert.match(document.error.message, /Unsafe task export parent/);
     assert.deepEqual(fs.readdirSync(outside).sort(), [".tracker", "sentinel"]);
     assert.equal(fs.readFileSync(path.join(outside, "sentinel"), "utf8"), "unchanged\n");
-    assert.equal(fs.existsSync(path.join(outside, "tasks")), false);
+    assert.equal(fs.existsSync(path.join(outside, "github-issues")), false);
   });
 });
 

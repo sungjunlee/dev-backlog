@@ -41,6 +41,8 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 - **Deliberate mutations only** — no hidden sync. GitHub writes are explicit.
   Routing and optional-export boundaries live in
   `skills/dev-backlog/references/authority-contract.md`.
+- **Fail-closed tracker** — adapter failure never falls back to local files or
+  diagnostic export; `.tracker` is setup-only and runtime never switches adapters.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
   through validated wire contracts (`--model-actions` JSON, anchor comments);
   scripts own everything checkable

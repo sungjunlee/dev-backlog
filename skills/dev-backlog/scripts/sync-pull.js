@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Legacy/export-only projection of open GitHub issues to backlog/tasks/.
+ * Diagnostic-only projection of open GitHub issues to exports/github-issues/.
  *
- * That path is a Backlog.md-shaped diagnostic/rollback export, not the skill
- * execution root (`.dev-backlog/`). This is not part of setup, orient, plan,
- * work, or complete. New GitHub repositories should not run it. The CLI
+ * That path is not skill execution authority, not under `.dev-backlog/`, and
+ * not a Backlog.md compatibility layer. This is not part of setup, orient,
+ * plan, work, or complete. New GitHub repositories should not run it. The CLI
  * requires --legacy-export so an operator cannot accidentally reintroduce
  * task mirrors on the core path.
  *
@@ -470,7 +470,7 @@ function main() {
     printCliError({
       code: "TASK_EXPORT_MATERIALIZATION_FAILED",
       message: `task export materialization failed: ${e.message}`,
-      remediation: "Inspect backlog/tasks path safety and write permissions, then retry the explicit legacy export.",
+      remediation: "Inspect exports/github-issues path safety and write permissions, then retry the explicit diagnostic export.",
       json: jsonRequested,
     });
     process.exit(1);

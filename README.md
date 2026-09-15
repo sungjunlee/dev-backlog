@@ -97,7 +97,8 @@ Users can log in and access protected API endpoints.
 - 2026-03-22: #42 in review.
 ```
 
-Backlog.md compatibility is a one-way legacy boundary. Optional surfaces
+Diagnostic Issue snapshots (`exports/github-issues/`) are opt-in via
+`--legacy-export` and are never task authority. Optional surfaces
 (spec axis via [craftkit](https://github.com/sungjunlee/craftkit),
 [dev-relay](https://github.com/sungjunlee/dev-relay), GitHub Projects) are
 priced in the [authority contract](skills/dev-backlog/references/authority-contract.md).
