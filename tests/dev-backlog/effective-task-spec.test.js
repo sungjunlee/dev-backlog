@@ -124,7 +124,7 @@ describe("effective task spec selection", () => {
       state: "open",
       status: "In Progress",
       updated_date: "2026-07-31",
-    }, { tracker: "local" });
+    }, { tracker: "files" });
 
     const result = resolveEffectiveTaskSpec(fixture.resolved, "BACK-42", {
       specRef: "spec/tasks/42.md",
@@ -143,6 +143,39 @@ describe("effective task spec selection", () => {
       status: "In Progress",
       updated_at: "2026-07-31",
     });
+  });
+
+  it("uses non-empty CLI acceptanceCriteria for files tasks instead of scraping the body", () => {
+    const fixture = resolvedTask({
+      body: "Description without checkboxes.\n\n- [ ] Must not win from markdown.",
+      state: "open",
+      status: "To Do",
+      acceptanceCriteria: [
+        { index: 1, text: "CLI criterion", checked: false },
+        { text: "Already done", checked: true },
+        "Plain string criterion",
+      ],
+    }, { tracker: "files" });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "BACK-42");
+    assert.deepEqual(result.acceptance_criteria, [
+      { text: "CLI criterion", checked: false },
+      { text: "Already done", checked: true },
+      { text: "Plain string criterion", checked: false },
+    ]);
+  });
+
+  it("does not let a leftover acceptanceCriteria array override GitHub body checkboxes", () => {
+    const fixture = resolvedTask({
+      body: "## Acceptance Criteria\n- [ ] From the Issue body.",
+      state: "open",
+      acceptanceCriteria: [{ text: "Must not win", checked: true }],
+    });
+
+    const result = resolveEffectiveTaskSpec(fixture.resolved, "#42");
+    assert.deepEqual(result.acceptance_criteria, [
+      { text: "From the Issue body.", checked: false },
+    ]);
   });
 
   it("ignores spec_ref examples in fenced, indented, and inline code", () => {

@@ -206,7 +206,7 @@ started: 2026-07-01
       tracker, id, ref, issue_number,
     })), [
       { tracker: "github", id: "1", ref: "#1", issue_number: 1 },
-      { tracker: "local", id: "11.2", ref: "TASK-11.2", issue_number: null },
+      { tracker: "files", id: "11.2", ref: "TASK-11.2", issue_number: null },
     ]);
     assert.equal(state.plan_items[0].pr.number, 11);
     assert.equal(state.in_flight[0].age_basis_date, "2026-07-03");

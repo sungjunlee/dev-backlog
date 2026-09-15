@@ -7,7 +7,7 @@ Runtime never switches adapters. Adapter failure is fail-closed.
 ## Selection
 
 `TRACKER_KEYS` is the allowed `.tracker` / setup selection set. This release
-freezes it at `["github"]`.
+freezes it at `["github", "files"]`.
 
 - `selectTracker` / `resolveTracker` read the configured key and load that
   adapter only.
@@ -81,5 +81,7 @@ There is no silent fallback to another adapter, `backlog/tasks/`,
 and stop. Diagnostic export is opt-in (`sync-pull.js --legacy-export`) and is
 not on orient / plan / work / complete.
 
-Details of the current GitHub adapter live in `github-tracker.js`. Export
-layout: `file-format.md`. Authority routing: `authority-contract.md`.
+Details of the GitHub adapter live in `github-tracker.js`. The files adapter
+(`files-tracker.js`) talks only to the Backlog.md CLI (`backlog`); it never
+parses `backlog/tasks/*.md`. GitHub and files are never co-authority in one
+repo. Export layout: `file-format.md`. Authority routing: `authority-contract.md`.

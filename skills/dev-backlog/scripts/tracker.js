@@ -1,10 +1,10 @@
 /**
  * Configured tracker boundary. Port contract: references/adapter-ports.md.
  *
- * TRACKER_KEYS is config-only selection (this release: ["github"]). Runtime
- * never switches adapters. Availability can reject the configured adapter, but
- * it can never choose a different one. Adapter failure is fail-closed: no
- * local-file or diagnostic-export fallback.
+ * TRACKER_KEYS is config-only selection (this release: ["github", "files"]).
+ * Runtime never switches adapters. Availability can reject the configured
+ * adapter, but it can never choose a different one. Adapter failure is
+ * fail-closed: no local-file or diagnostic-export fallback.
  *
  * Required adapter own-keys are exactly REQUIRED_ADAPTER_OPERATIONS, each a
  * function. Optional capabilities are a CAPABILITY_NAMES subset and may be
@@ -12,6 +12,7 @@
  */
 
 const { createGithubAdapter } = require("./github-tracker.js");
+const { createFilesAdapter } = require("./files-tracker.js");
 const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
@@ -20,7 +21,7 @@ const {
   TRACKER_SELECTION_FILE,
 } = require("./execution-root.js");
 
-const TRACKER_KEYS = Object.freeze(["github"]);
+const TRACKER_KEYS = Object.freeze(["github", "files"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
   "availability",
   "capabilities",
@@ -239,7 +240,12 @@ function resolveConfiguredTracker(config, {
 } = {}) {
   const registered = adapters || {
     ...TRACKER_ADAPTERS,
-    github: execFile ? createGithubAdapter({ execFile }) : TRACKER_ADAPTERS.github,
+    ...(execFile
+      ? {
+          github: createGithubAdapter({ execFile }),
+          files: createFilesAdapter({ execFile }),
+        }
+      : {}),
   };
   const storedSelection = backlogDir
     ? readTrackerSelection(backlogDir, { fs: fsApi || fs })
@@ -351,6 +357,7 @@ function invokeCapability(resolved, capability, operation, ...args) {
 
 const TRACKER_ADAPTERS = Object.freeze({
   github: createGithubAdapter(),
+  files: createFilesAdapter(),
 });
 
 module.exports = {
@@ -376,4 +383,5 @@ module.exports = {
   resolveConfiguredTracker,
   invokeCapability,
   createGithubAdapter,
+  createFilesAdapter,
 };

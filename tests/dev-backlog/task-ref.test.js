@@ -21,7 +21,7 @@ describe("parseTaskRef", () => {
       ref: "#1",
     });
     assert.deepEqual(parseTaskRef("BACK-42", OPTIONS), {
-      tracker: "local",
+      tracker: "files",
       id: "42",
       ref: "BACK-42",
     });
@@ -29,7 +29,7 @@ describe("parseTaskRef", () => {
 
   it("preserves supported decimal local subtask identities", () => {
     assert.deepEqual(parseTaskRef("BACK-42.10", OPTIONS), {
-      tracker: "local",
+      tracker: "files",
       id: "42.10",
       ref: "BACK-42.10",
     });
@@ -59,12 +59,12 @@ describe("parseTaskRef", () => {
 describe("renderTaskRef", () => {
   it("renders normalized identities without changing GitHub refs", () => {
     assert.equal(renderTaskRef({ tracker: "github", id: "11" }, OPTIONS), "#11");
-    assert.equal(renderTaskRef({ tracker: "local", id: "11.2" }, OPTIONS), "BACK-11.2");
+    assert.equal(renderTaskRef({ tracker: "files", id: "11.2" }, OPTIONS), "BACK-11.2");
   });
 
   it("rejects identities outside the task-ref grammar", () => {
     assert.throws(() => renderTaskRef({ tracker: "github", id: "1.2" }, OPTIONS));
-    assert.throws(() => renderTaskRef({ tracker: "local", id: "0" }, OPTIONS));
+    assert.throws(() => renderTaskRef({ tracker: "files", id: "0" }, OPTIONS));
     assert.throws(() => renderTaskRef({ tracker: "other", id: "1" }, OPTIONS));
   });
 });
@@ -116,7 +116,7 @@ describe("Plan and task-file boundaries", () => {
   it("parses only a complete task token after a supported checkbox", () => {
     assert.deepEqual(parsePlanCheckbox("- [~] BACK-1.2 Child [branch:child]", OPTIONS), {
       checkboxState: "~",
-      identity: { tracker: "local", id: "1.2", ref: "BACK-1.2" },
+      identity: { tracker: "files", id: "1.2", ref: "BACK-1.2" },
       title: "Child [branch:child]",
     });
     assert.equal(parsePlanCheckbox("- [ ] BACK-1.2x Partial", OPTIONS), null);
@@ -129,8 +129,8 @@ describe("Plan and task-file boundaries", () => {
     }), { tracker: "github", id: "1", ref: "#1" });
     assert.deepEqual(parseTaskFileName("BACK-11.2 - child.md", {
       ...OPTIONS,
-      tracker: "local",
-    }), { tracker: "local", id: "11.2", ref: "BACK-11.2" });
+      tracker: "files",
+    }), { tracker: "files", id: "11.2", ref: "BACK-11.2" });
     assert.equal(parseTaskFileName("BACK-1x - partial.md", OPTIONS), null);
     assert.equal(parseTaskFileName("OTHER-1 - foreign.md", OPTIONS), null);
   });
@@ -140,7 +140,7 @@ describe("Plan and task-file boundaries", () => {
       tracker: "github",
     }), { tracker: "github", id: "1", ref: "#1" });
     assert.deepEqual(parseTaskFileName("BACK-11.2 - phase-3.md", {
-      tracker: "local",
-    }), { tracker: "local", id: "11.2", ref: "BACK-11.2" });
+      tracker: "files",
+    }), { tracker: "files", id: "11.2", ref: "BACK-11.2" });
   });
 });

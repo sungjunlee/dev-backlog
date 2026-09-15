@@ -2,8 +2,8 @@
 /**
  * Canonical task-reference parsing, rendering, and identity helpers.
  *
- * Task refs are complete tokens: GitHub #N or configured local PREFIX-N,
- * where local IDs may use Backlog.md decimal subtask notation (N.M).
+ * Task refs are complete tokens: GitHub #N or files PREFIX-N,
+ * where files IDs may use Backlog.md decimal subtask notation (N.M).
  * Provider metadata such as `PR #N` is intentionally outside this module.
  */
 
@@ -12,7 +12,7 @@ const path = require("path");
 
 const DEFAULT_TASK_PREFIX = "BACK";
 const GITHUB_ID_RE = /^[1-9]\d*$/;
-const LOCAL_ID_RE = /^[1-9]\d*(?:\.[1-9]\d*)?$/;
+const FILES_ID_RE = /^[1-9]\d*(?:\.[1-9]\d*)?$/;
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,10 +35,10 @@ function parseTaskRef(value, options = {}) {
   }
 
   const prefix = taskPrefix(options);
-  const localPrefix = `${prefix}-`;
-  if (!value.startsWith(localPrefix)) return null;
-  const id = value.slice(localPrefix.length);
-  return LOCAL_ID_RE.test(id) ? { tracker: "local", id, ref: value } : null;
+  const filesPrefix = `${prefix}-`;
+  if (!value.startsWith(filesPrefix)) return null;
+  const id = value.slice(filesPrefix.length);
+  return FILES_ID_RE.test(id) ? { tracker: "files", id, ref: value } : null;
 }
 
 function renderTaskRef(identity, options = {}) {
@@ -52,13 +52,13 @@ function renderTaskRef(identity, options = {}) {
   let ref;
   if (tracker === "github" && GITHUB_ID_RE.test(id)) {
     ref = `#${id}`;
-  } else if (tracker === "local" && LOCAL_ID_RE.test(id)) {
+  } else if (tracker === "files" && FILES_ID_RE.test(id)) {
     if (options.taskPrefix === undefined && typeof identity.ref === "string") {
       const suffix = `-${id}`;
       const prefix = identity.ref.endsWith(suffix)
         ? identity.ref.slice(0, -suffix.length)
         : "";
-      if (!prefix || /\s/.test(prefix)) throw new Error("invalid local task identity ref");
+      if (!prefix || /\s/.test(prefix)) throw new Error("invalid files task identity ref");
       ref = identity.ref;
     } else {
       ref = `${taskPrefix(options)}-${id}`;
@@ -149,7 +149,7 @@ function parseTaskFileName(fileName, options = {}) {
     if (!GITHUB_ID_RE.test(match[2])) return null;
     return { tracker, id: match[2], ref: `#${match[2]}` };
   }
-  if (tracker === "local") return { tracker, id: match[2], ref: match[1] };
+  if (tracker === "files") return { tracker, id: match[2], ref: match[1] };
   return null;
 }
 

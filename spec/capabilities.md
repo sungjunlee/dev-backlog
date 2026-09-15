@@ -17,28 +17,32 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 
 ## Capability: tracker-task-truth
 
-**Goal:** A repository uses live GitHub Issues as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
+**Goal:** A repository uses one configured tracker as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
 
 **In-scope:**
-- Live GitHub Issue list/read/create/update/close lifecycle
-- Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships
-- Fail-loud GitHub availability and authentication errors; adapter failure is fail-closed
+- Live GitHub Issue list/read/create/update/close lifecycle when `.tracker=github`
+- Selectable `.tracker=files` authority through the Backlog.md CLI (same seven lifecycle ops, `BACK-N` identity)
+- Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships (github)
+- Fail-loud availability and authentication errors; adapter failure is fail-closed
 - The explicit one-way diagnostic export (`sync-pull --legacy-export` → `exports/github-issues/`), as a diagnostic/rollback surface only
 
 **Out-of-scope:**
-- Synchronizing multiple canonical trackers, or new tracker adapters of any kind
+- Synchronizing multiple canonical trackers, dual-write, or co-authority (GitHub + files in one repo)
+- New tracker adapters beyond the selectable `github` and `files` keys (GitLab and others stay out)
 - Task-mirror features, generic tracker parity, or runtime tracker switching
+- Parsing or writing `backlog/tasks/*.md` as a product API (`files` talks to the Backlog.md CLI only)
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
 - Task work resolves the effective specification from the live GitHub Issue. If that read fails, execution stops fail-closed; a diagnostic snapshot may be inspected only as rollback evidence and must be human-verified against GitHub before work resumes.
-- Create, plan, work, and complete operations use the Issue's stable `#N` identity and update lifecycle state only through GitHub.
+- Create, plan, work, and complete operations use the configured tracker's stable identity (`#N` or `BACK-N`) and update lifecycle state only through that tracker.
 - Optional features report their availability explicitly; absence of Relay, Projects, Backlog.md, or the spec axis does not block the core Issue → PR path.
 - `sync-pull` refuses without `--legacy-export`; with it, the export writes `exports/github-issues/` one-way and idempotently, and `--update` refreshes frontmatter while preserving human-authored AC bodies (only machine-marker-managed bodies are overwritten).
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
-- Never treat task files, sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a GitHub failure.
+- Never treat task files, sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a configured-tracker failure.
+- Never fall back from `github` to `files` or the reverse; changing trackers is an explicit `.tracker` rewrite.
 - Never write to human-authored provider content: task bodies without a dev-backlog machine marker, comments, labels, and issue state are untouchable from the export path.
 - A diagnostic export is never required, never authoritative, never read back as execution input, and never a Backlog.md compatibility layer.
 
@@ -53,6 +57,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-08-17 | Freeze the leftover export/compat runtime: no new features on `sync-pull`, `legacy-tracker.js`, or `{PREFIX}-N` parsing without a measured consumer (#379) | these are deletable compatibility seams, not a product to grow | implicit seam expansion |
 | 2026-09-15 | Skill execution root is `.dev-backlog/` so it does not collide with Backlog.md's `backlog/` layout (`tasks/`, `docs/`, `config.yml`). The skill does not read `backlog/tasks/` and does not write it except explicit `sync-pull --legacy-export` (diagnostic/rollback). Sprint close does not archive `backlog/tasks/` (#412) | sharing `backlog/` made "natural Backlog.md support" false from day one; one execution root, no dual-write | implicit `backlog/` as skill root |
 | 2026-09-15 | Freeze tracker adapter ports; diagnostic export moves to `exports/github-issues/`; adapter failure is fail-closed with no local-file fallback (#413) | freeze the seam before files/GitLab adapters; leftover `backlog/tasks/` is not product authority and not a Backlog.md compatibility layer | #412 export still writing `backlog/tasks/` |
+| 2026-09-15 | `.tracker=files` is a first-class chosen authority via the Backlog.md CLI (#414) | same sprint loop, different substrate; CLI-only; fail-closed if the CLI is missing; never co-authority with GitHub; never parse `backlog/tasks/*.md` as a product API | GitHub-only `TRACKER_KEYS` |
 
 ---
 

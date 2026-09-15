@@ -19,7 +19,7 @@ Entry-point scripts an operator or agent invokes directly. Internal modules
 `legacy-tracker.js`, and similar) are implementation details consumed by these
 entry points and are intentionally not listed.
 
-- `scripts/setup-dev-backlog.js [project-name] [--tracker github] [--non-interactive] [--json]` — persist GitHub as the canonical task authority and create only `sprints/`.
+- `scripts/setup-dev-backlog.js [project-name] [--tracker github|files] [--non-interactive] [--json]` — persist the chosen task authority (`github` or `files`) and create only `sprints/`.
 - `scripts/init.sh [project-name]` — bootstrap `.dev-backlog/` with `.tracker` and directories.
 - `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `adapter-ports.md` and `process.md`. Adapter failure is fail-closed.
 - `scripts/effective-task-spec.js TASK_REF [--repo OWNER/REPO] [--spec-ref PATH] [--backlog-dir PATH] [--root PATH]` — resolve the configured live task into effective spec, normalized AC/lifecycle, selected source, and stable SHA-256 revision/digest. Source precedence: explicit `spec_ref` (body marker `<!-- dev-backlog:spec_ref PATH -->` or `--spec-ref`), then a posted `## Agent Brief` comment, then the Issue body. Any authority/spec load failure stops without a task-mirror fallback.

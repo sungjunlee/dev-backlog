@@ -32,13 +32,14 @@ Multiple active tracks are a **portfolio**, not an error; only **overlapping-sco
 
 ## Tracker Selection and Capability Error Surface
 
-`.dev-backlog/.tracker` accepts exactly one runtime authority: `github`. When absent,
-the legacy `tracker:` key in `.dev-backlog/config.yml` is read only when its value is
-also `github`; with neither, GitHub is the zero-migration default. Every other
-selection fails before provider calls or local mutation. Availability probes
-and operation failures never select another adapter. Existing GitHub `#N`,
-numeric `issue_number`, filenames, Markdown, argv, and provider behavior remain
-aliases with unchanged values.
+`.dev-backlog/.tracker` accepts exactly one runtime authority: `github` or
+`files`. When absent, the legacy `tracker:` key in `.dev-backlog/config.yml` is
+read only when its value is also `github` or `files`; with neither, GitHub is
+the zero-migration default. Every other selection fails before provider calls
+or local mutation. Availability probes and operation failures never select
+another adapter. Existing GitHub `#N`, numeric `issue_number`, filenames,
+Markdown, argv, and provider behavior remain aliases with unchanged values.
+Files plan refs are `BACK-N`.
 
 Optional provider capabilities are `milestones`, `pull-request-relationships`,
 `comments`, and `closing-semantics`. A GitHub transport that does not report one
@@ -247,23 +248,20 @@ Sprint plan items use this format:
 `skills/dev-backlog/scripts/task-ref.js` is the grammar owner. It accepts only complete positive refs:
 
 - GitHub: `#N`, where `N` is a positive decimal integer. Identity is `{ tracker: "github", id: "N", ref: "#N" }`.
-- Historical compatibility only: `{PREFIX}-N` or `{PREFIX}-N.M`, where
-  `PREFIX` is the exact `.dev-backlog/config.yml` `task_prefix` and both numeric
-  components are positive integers. File-only orientation preserves identity
-  `{ tracker: "local", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`; this does not
-  make `local` a valid `.tracker` selection or permit lifecycle operations.
+- Files (when `.tracker=files`): `{PREFIX}-N` or `{PREFIX}-N.M`, where
+  `PREFIX` is the exact `.dev-backlog/config.yml` `task_prefix` (default `BACK`)
+  and both numeric components are positive integers. Identity is
+  `{ tracker: "files", id: "N[.M]", ref: "{PREFIX}-N[.M]" }`.
 
 Zero, negative, partial, foreign-prefix, whitespace-suffixed, and malformed refs
-are rejected. Decimal notation is preserved only for historical Backlog.md
-subtasks, not current GitHub Issue refs. New Plan lines use `#N`.
+are rejected. Decimal notation is preserved for Backlog.md subtasks, not GitHub
+Issue refs. New Plan lines use `#N` when github is chosen and `BACK-N` when
+files is chosen.
 
 The shell `RE_CB_*` variables remain GitHub-only compatibility aliases for
 external consumers. Core `status.sh`, `next.sh`, checkbox counting, and closeout
 delegate task-ref recognition to the shared module. Machine actors should
 consume `tracker`/`id`/`ref`; `issue_number` remains an unchanged GitHub alias.
-Historical configured-prefix entries may still appear with `tracker: "local"`
-and `issue_number: null` in file-only projections, but actors must not dispatch
-or mutate them through the retired provider.
 
 ### PR annotation (appended by dev-relay)
 
