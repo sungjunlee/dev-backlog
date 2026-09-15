@@ -1,6 +1,6 @@
 # Classification
 
-**Purpose.** Document the bucketing rules `triage-collect.js` applies when it snapshots open issues — and the YAML schema (`backlog/triage-config.yml`) that parameterizes them.
+**Purpose.** Document the bucketing rules `triage-collect.js` applies when it snapshots open issues — and the YAML schema (`.dev-backlog/triage-config.yml`) that parameterizes them.
 
 ## YAML schema
 
@@ -34,7 +34,7 @@ Each snapshot has an explicit schema marker:
   "schema_version": 2,
   "generated": "2026-04-18T01:30:00.000Z",
   "repo": "owner/name",
-  "config_path": "backlog/triage-config.yml",
+  "config_path": ".dev-backlog/triage-config.yml",
   "issues": []
 }
 ```

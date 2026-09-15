@@ -17,7 +17,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="backlog"
+BACKLOG_DIR="$DEFAULT_BACKLOG_DIR"
 DRY_RUN=false
 CLOSE_MILESTONE=false
 BACKLOG_DIR_SET=false

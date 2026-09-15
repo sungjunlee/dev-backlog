@@ -18,7 +18,7 @@ function makeSnapshot(overrides = {}) {
   return {
     generated: "2026-04-18T05:00:00.000Z",
     repo: "sungjunlee/dev-backlog",
-    config_path: "backlog/triage-config.yml",
+    config_path: ".dev-backlog/triage-config.yml",
     issues: [],
     ...overrides,
   };
@@ -241,7 +241,7 @@ describe("analyzeSnapshot", () => {
   beforeEach(() => {
     originalCwd = process.cwd();
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-relate-test-"));
-    fs.mkdirSync(path.join(tempDir, "backlog"), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, ".dev-backlog"), { recursive: true });
   });
 
   afterEach(() => {

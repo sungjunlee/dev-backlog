@@ -49,7 +49,7 @@ function snapshot(root) {
 }
 
 function writeConfig(root, raw) {
-  const backlogDir = path.join(root, "backlog");
+  const backlogDir = path.join(root, ".dev-backlog");
   fs.mkdirSync(backlogDir, { recursive: true });
   const configPath = path.join(backlogDir, "config.yml");
   fs.writeFileSync(configPath, raw);
@@ -143,9 +143,9 @@ describe("GitHub-only setup real process integration", () => {
     ]);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).selection, "github");
-    assert.equal(fs.readFileSync(path.join(root, "backlog/.tracker"), "utf8"), "github\n");
-    assert.equal(fs.existsSync(path.join(root, "backlog/config.yml")), false);
-    assert.equal(fs.existsSync(path.join(root, "backlog/sprints")), true);
+    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/config.yml")), false);
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
     assert.equal(fs.existsSync(path.join(root, "backlog/tasks")), false);
   });
 
@@ -164,7 +164,7 @@ describe("GitHub-only setup real process integration", () => {
     const result = runCli(root, ["--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).selectionSource, "legacy-migration");
-    assert.equal(fs.readFileSync(path.join(root, "backlog/.tracker"), "utf8"), "github\n");
+    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
     assert.equal(fs.readFileSync(configPath, "utf8"), raw);
   });
 
@@ -180,7 +180,7 @@ describe("GitHub-only setup real process integration", () => {
       "tail: preserved",
     ].join("\r\n");
     const configPath = writeConfig(root, raw);
-    fs.writeFileSync(path.join(root, "backlog/.tracker"), "github\n");
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
     const result = runCli(root, ["--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).selection, "github");
@@ -189,22 +189,22 @@ describe("GitHub-only setup real process integration", () => {
 
   it("repairs partial structure and reruns byte-idempotently", (t) => {
     const root = makeRoot(t);
-    fs.mkdirSync(path.join(root, "backlog"));
-    fs.writeFileSync(path.join(root, "backlog/.tracker"), "github\n");
+    fs.mkdirSync(path.join(root, ".dev-backlog"));
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
     const first = runCli(root, ["--non-interactive"]);
     assert.equal(first.status, 0, first.stderr);
-    assert.equal(fs.existsSync(path.join(root, "backlog/sprints")), true);
-    const repaired = snapshot(path.join(root, "backlog"));
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
+    const repaired = snapshot(path.join(root, ".dev-backlog"));
     const second = runCli(root, ["--non-interactive"]);
     assert.equal(second.status, 0, second.stderr);
-    assert.deepEqual(snapshot(path.join(root, "backlog")), repaired);
+    assert.deepEqual(snapshot(path.join(root, ".dev-backlog")), repaired);
   });
 
   it("rejects invalid and retired local selections before effects", (t) => {
     for (const selection of ["gitlab", "local"]) {
       const root = makeRoot(t, `setup-invalid-${selection}-`);
-      fs.mkdirSync(path.join(root, "backlog"));
-      fs.writeFileSync(path.join(root, "backlog/.tracker"), `${selection}\n`);
+      fs.mkdirSync(path.join(root, ".dev-backlog"));
+      fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), `${selection}\n`);
       const before = snapshot(root);
       const result = runCli(root, ["--non-interactive"]);
       assert.notEqual(result.status, 0);
@@ -240,7 +240,7 @@ describe("GitHub-only setup real process integration", () => {
             'const fs = require("node:fs");',
             'const original = fs.renameSync;',
             'fs.renameSync = function (from, to) {',
-            '  if (String(to).replace(/\\\\/g, "/").endsWith("/backlog/.tracker")) {',
+            '  if (String(to).replace(/\\\\/g, "/").endsWith("/.dev-backlog/.tracker")) {',
             '    throw new Error("injected rename failure");',
             '  }',
             '  return original.call(this, from, to);',
@@ -253,15 +253,15 @@ describe("GitHub-only setup real process integration", () => {
       });
       assert.notEqual(result.status, 0, failure);
       assert.match(result.stderr, new RegExp(`injected ${failure} failure`));
-      assert.equal(fs.existsSync(path.join(root, "backlog")), false);
+      assert.equal(fs.existsSync(path.join(root, ".dev-backlog")), false);
     }
   });
 
   it("rejects a dangling .tracker symlink before mutation", (t) => {
     const root = makeRoot(t);
-    fs.mkdirSync(path.join(root, "backlog"));
+    fs.mkdirSync(path.join(root, ".dev-backlog"));
     try {
-      fs.symlinkSync(path.join(root, "missing"), path.join(root, "backlog/.tracker"));
+      fs.symlinkSync(path.join(root, "missing"), path.join(root, ".dev-backlog/.tracker"));
     } catch (error) {
       if (process.platform === "win32" && error.code === "EPERM") {
         t.skip("Windows symlink privilege is unavailable");
@@ -283,7 +283,7 @@ describe("GitHub-only setup real process integration", () => {
       encoding: "utf8",
     });
     assert.equal(freshRun.status, 0, freshRun.stderr);
-    assert.equal(fs.readFileSync(path.join(fresh, "backlog/.tracker"), "utf8"), "github\n");
+    assert.equal(fs.readFileSync(path.join(fresh, ".dev-backlog/.tracker"), "utf8"), "github\n");
 
     const legacy = makeRoot(t, "setup-init-legacy-");
     const configPath = writeConfig(legacy, "project_name: stable\ntracker: github\n");
@@ -293,7 +293,7 @@ describe("GitHub-only setup real process integration", () => {
       encoding: "utf8",
     });
     assert.equal(legacyRun.status, 0, legacyRun.stderr);
-    assert.equal(fs.readFileSync(path.join(legacy, "backlog/.tracker"), "utf8"), "github\n");
+    assert.equal(fs.readFileSync(path.join(legacy, ".dev-backlog/.tracker"), "utf8"), "github\n");
     assert.equal(fs.readFileSync(configPath, "utf8"), raw);
   });
 });

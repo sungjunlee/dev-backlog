@@ -23,7 +23,7 @@ function makeReport() {
     "---",
     "generated: 2026-04-18",
     "repo: sungjunlee/dev-backlog",
-    "snapshot: backlog/triage/.cache/2026-04-18T01-30-00Z.json",
+    "snapshot: .dev-backlog/triage/.cache/2026-04-18T01-30-00Z.json",
     "open_issues: 5",
     "---",
     "",
@@ -198,8 +198,8 @@ describe("execute", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-apply-"));
     repoRoot = path.join(tempDir, "repo");
-    fs.mkdirSync(path.join(repoRoot, "backlog", "triage"), { recursive: true });
-    reportPath = path.join(repoRoot, "backlog", "triage", "2026-04-18-report.md");
+    fs.mkdirSync(path.join(repoRoot, ".dev-backlog", "triage"), { recursive: true });
+    reportPath = path.join(repoRoot, ".dev-backlog", "triage", "2026-04-18-report.md");
     fs.writeFileSync(reportPath, `${makeReport()}\n`);
   });
 
@@ -350,7 +350,7 @@ describe("execute", () => {
   });
 
   it("stops close-duplicate when the comment step fails and records stderr_tail", () => {
-    const duplicateOnlyReport = path.join(repoRoot, "backlog", "triage", "duplicate-only.md");
+    const duplicateOnlyReport = path.join(repoRoot, ".dev-backlog", "triage", "duplicate-only.md");
     fs.writeFileSync(
       duplicateOnlyReport,
       [

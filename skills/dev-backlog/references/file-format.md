@@ -5,7 +5,7 @@ exports are a short legacy note at the end — never a runtime format.
 
 ## Sprint file
 
-Each active sprint lives at `backlog/sprints/YYYY-MM-<topic>.md`. Section
+Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Section
 semantics and checkbox states are in [SKILL.md](../SKILL.md).
 
 ```markdown
@@ -58,7 +58,7 @@ task item.
 
 ## Tracker selection
 
-`backlog/.tracker` contains exactly one newline-terminated selection:
+`.dev-backlog/.tracker` contains exactly one newline-terminated selection:
 
 ```text
 github
@@ -113,6 +113,36 @@ Without the markers, acceptance criteria still work as plain checkboxes.
 
 `sync-pull.js --legacy-export` may write `backlog/tasks/` in a
 Backlog.md-compatible shape for diagnosis or rollback. Those files are never
-read as task truth. Import is human-reviewed Markdown into a GitHub Issue.
-Exported filenames look like `{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are
-historical parse-only, not runtime identities.
+read as task truth and are not under the skill execution root. Import is
+human-reviewed Markdown into a GitHub Issue. Exported filenames look like
+`{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are historical parse-only, not
+runtime identities.
+
+## Migration from `backlog/` (one-way)
+
+Existing repos that still keep skill files under `backlog/` must move them
+once. The skill execution root is `.dev-backlog/` only.
+
+1. Back up the repo (`git status` clean, or copy the tree).
+2. Create `.dev-backlog/` and move only skill-owned names:
+
+```bash
+mkdir -p .dev-backlog
+git mv backlog/sprints .dev-backlog/sprints           # if present
+git mv backlog/.tracker .dev-backlog/.tracker         # if present
+git mv backlog/config.yml .dev-backlog/config.yml     # skill config only
+git mv backlog/triage .dev-backlog/triage             # if present
+git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
+```
+
+3. Leave `backlog/tasks/`, `backlog/docs/`, and `backlog/completed/` in place
+   if they exist — those are Backlog.md or `--legacy-export` paths, not skill
+   execution.
+4. Remove an empty leftover `backlog/` only when nothing else needs it.
+
+`setup-dev-backlog.js` also performs this move automatically when
+`.dev-backlog/` is absent and skill-owned files still sit under `backlog/`.
+It validates the leftover tracker pin first, so a refused layout is left
+untouched. After a successful move, delete any leftover skill names under
+`backlog/` that the script did not take (none should remain). This is
+one-way: do not copy execution files back into `backlog/`.

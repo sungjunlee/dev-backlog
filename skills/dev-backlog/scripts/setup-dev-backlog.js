@@ -3,8 +3,9 @@
 /**
  * Idempotent, tracker-aware dev-backlog setup.
  *
- * Tracker authority lives in backlog/.tracker. backlog/config.yml is read only
- * as a legacy selection fallback and is never written by this script.
+ * Tracker authority lives in `.dev-backlog/.tracker`. `.dev-backlog/config.yml`
+ * is read only as a legacy selection fallback and is never written by this
+ * script.
  */
 
 const childProcess = require("node:child_process");
@@ -12,6 +13,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline/promises");
 const { readLegacyTracker: readLegacyTrackerFile } = require("./legacy-tracker.js");
+const {
+  DEFAULT_BACKLOG_DIR,
+  LEGACY_EXPORT_DIR,
+  leftoverSkillFiles,
+  migrateLegacyExecutionRoot,
+} = require("./execution-root.js");
 
 const ALLOWED_TRACKERS = Object.freeze(["github"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
@@ -404,7 +411,27 @@ async function chooseFreshTracker(options, dependencies, cwd) {
 async function runSetup(options = {}, dependencies = {}) {
   const fsApi = dependencies.fs || fs;
   const cwd = path.resolve(options.cwd || process.cwd());
-  const backlogDir = path.join(cwd, "backlog");
+  const backlogDir = path.join(cwd, DEFAULT_BACKLOG_DIR);
+  const destStat = lstatIfPresent(backlogDir, fsApi);
+  if (!destStat) {
+    const leftover = leftoverSkillFiles(cwd, { fs: fsApi });
+    if (leftover.length > 0) {
+      const sourceDir = path.join(cwd, LEGACY_EXPORT_DIR);
+      const sourceConfig = path.join(sourceDir, "config.yml");
+      const sourceTracker = path.join(sourceDir, ".tracker");
+      const sourceState = validateExistingStructure(sourceDir, sourceConfig, sourceTracker, fsApi);
+      if (options.tracker !== undefined) {
+        assertAllowedTracker(options.tracker, "--tracker");
+      }
+      if (sourceState.trackerExists) {
+        readTrackerFile(sourceTracker, fsApi);
+      } else if (sourceState.configExists) {
+        readLegacyTracker(sourceConfig, fsApi);
+      }
+      migrateLegacyExecutionRoot(cwd, { fs: fsApi });
+    }
+  }
+
   const configPath = path.join(backlogDir, "config.yml");
   const trackerPath = path.join(backlogDir, ".tracker");
   const state = validateExistingStructure(backlogDir, configPath, trackerPath, fsApi);

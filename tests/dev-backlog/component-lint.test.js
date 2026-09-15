@@ -35,7 +35,7 @@ Goal etc.
 describe("parseArgs", () => {
   it("uses defaults", () => {
     const parsed = parseArgs([]);
-    assert.equal(parsed.sprintsDir, path.join("backlog", "sprints"));
+    assert.equal(parsed.sprintsDir, path.join(".dev-backlog", "sprints"));
     assert.equal(parsed.capabilitiesPath, path.join("spec", "capabilities.md"));
     assert.equal(parsed.json, false);
   });
@@ -243,7 +243,7 @@ describe("lintComponents", () => {
   it("flags real fixture drift end-to-end", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "comp-lint-full-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       const capPath = path.join(dir, "spec", "capabilities.md");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.mkdirSync(path.dirname(capPath), { recursive: true });
@@ -270,7 +270,7 @@ describe("lintComponents", () => {
   it("accepts a real sprint file with a valid single component", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "comp-lint-valid-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       const capPath = path.join(dir, "spec", "capabilities.md");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.mkdirSync(path.dirname(capPath), { recursive: true });
@@ -294,7 +294,7 @@ describe("lintComponents", () => {
   it("lists only truly-omitted (not empty) component sprints; omission is not an error (B3)", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "comp-lint-omit-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       const capPath = path.join(dir, "spec", "capabilities.md");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.mkdirSync(path.dirname(capPath), { recursive: true });
@@ -322,7 +322,7 @@ describe("lintComponents", () => {
 
   it("serializes Windows-style public paths with forward slashes", () => {
     const result = lintComponents({
-      sprintsDir: "C:\\repo\\backlog\\sprints",
+      sprintsDir: "C:\\repo\\.dev-backlog\\sprints",
       capabilitiesPath: "C:\\repo\\spec\\capabilities.md",
       fileExists: () => true,
       readdir: () => ["active.md"],
@@ -331,7 +331,7 @@ describe("lintComponents", () => {
         : "---\ncomponent: unknown\n---\n",
     });
     assert.equal(result.capabilitiesPath, "C:/repo/spec/capabilities.md");
-    assert.equal(result.issues[0].sprintFile, "C:/repo/backlog/sprints/active.md");
+    assert.equal(result.issues[0].sprintFile, "C:/repo/.dev-backlog/sprints/active.md");
   });
 });
 

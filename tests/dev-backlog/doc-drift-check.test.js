@@ -77,7 +77,7 @@ describe("checkDocDrift", () => {
   it("scans references/ and _context.md when present", () => {
     const root = makeFixtureRepo({ docLine: "ok" });
     write(path.join(root, "skills", "alpha", "references", "guide.md"), "call gone.sh");
-    write(path.join(root, "backlog", "sprints", "_context.md"), "also-gone.js broke once");
+    write(path.join(root, ".dev-backlog", "sprints", "_context.md"), "also-gone.js broke once");
     const docs = collectDocFiles(root).map((d) => path.relative(root, d));
     assert.equal(docs.length, 3);
     const names = checkDocDrift(root).dangling.map((d) => d.name).sort();

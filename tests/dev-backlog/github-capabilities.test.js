@@ -60,7 +60,7 @@ describe("GitHub optional capability transports", () => {
 
   it("preserves human status-list argv and row bytes through configured resolution", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "github-status-list-"));
-    const backlogDir = path.join(root, "backlog");
+    const backlogDir = path.join(root, ".dev-backlog");
     fs.mkdirSync(backlogDir);
     const { calls, execFile } = makeExec([JSON.stringify([{
       number: 275,
@@ -82,7 +82,7 @@ describe("GitHub optional capability transports", () => {
 describe("retired tracker public mutation boundaries", () => {
   it("rejects local config before sprint-init or triage provider/filesystem effects", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "retired-tracker-mutations-"));
-    const backlogDir = path.join(root, "backlog");
+    const backlogDir = path.join(root, ".dev-backlog");
     fs.mkdirSync(backlogDir);
     fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
     let providerCalls = 0;
@@ -126,7 +126,7 @@ describe("retired tracker public mutation boundaries", () => {
 
   it("rejects local selection before milestone close or sprint mutation", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "retired-tracker-close-"));
-    const backlogDir = path.join(root, "backlog");
+    const backlogDir = path.join(root, ".dev-backlog");
     const sprintsDir = path.join(backlogDir, "sprints");
     fs.mkdirSync(sprintsDir, { recursive: true });
     fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");

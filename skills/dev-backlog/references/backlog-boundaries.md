@@ -6,11 +6,11 @@ Use this as the shared boundary reference for `dev-backlog` and `backlog-triage`
 
 | File | Role | Owned by |
 | --- | --- | --- |
-| `backlog/sprints/_context.md` | Operational facts, conventions, and gotchas that would otherwise be rediscovered. | `dev-backlog` |
-| `backlog/sprints/*.md` | Complex execution Plan, Running Context, and Progress for an admitted track. | `dev-backlog` |
-| `backlog/tasks/*.md` | Non-authoritative GitHub Issue projections retained during migration. | `dev-backlog` |
-| `backlog/triage/*.md` | Derived advisory reports. | `backlog-triage` |
-| `backlog/triage/*-apply.log` | JSONL audit logs for accepted issue mutations. | `backlog-triage` |
+| `.dev-backlog/sprints/_context.md` | Operational facts, conventions, and gotchas that would otherwise be rediscovered. | `dev-backlog` |
+| `.dev-backlog/sprints/*.md` | Complex execution Plan, Running Context, and Progress for an admitted track. | `dev-backlog` |
+| `backlog/tasks/*.md` | Non-authoritative `--legacy-export` snapshots (Backlog.md-shaped; not the execution root). | `dev-backlog` (export only) |
+| `.dev-backlog/triage/*.md` | Derived advisory reports. | `backlog-triage` |
+| `.dev-backlog/triage/*-apply.log` | JSONL audit logs for accepted issue mutations. | `backlog-triage` |
 
 ## Rules
 

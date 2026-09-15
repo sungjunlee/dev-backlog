@@ -6,7 +6,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="backlog"
+BACKLOG_DIR="$DEFAULT_BACKLOG_DIR"
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do
@@ -97,7 +97,7 @@ if [ -d "$SPRINTS_DIR" ]; then
 		fi
 	fi
 else
-	echo "(no backlog/sprints/ directory)"
+	echo "(no $BACKLOG_DIR/sprints/ directory)"
 fi
 
 # --- Configured Tracker Tasks ---
@@ -120,7 +120,7 @@ if [ -d "$BACKLOG_DIR/tasks" ]; then
 	inprog=$(find "$BACKLOG_DIR/tasks" -maxdepth 1 -name "*.md" -exec grep -l "^status: .*In Progress" {} \; 2>/dev/null | wc -l | tr -d ' ')
 	echo "Tasks: $total total, $todo To Do, $inprog In Progress"
 else
-	echo "No backlog/tasks/ directory"
+	echo "No $BACKLOG_DIR/tasks/ directory"
 fi
 
 # --- Relay Runs (optional — only when dev-relay is installed) ---

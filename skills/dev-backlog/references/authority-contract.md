@@ -77,7 +77,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native core.
 
 ## No-spec / no-Relay invariant
 
-A repository with GitHub Issues but no `backlog/`, no `spec/`, and no Relay
+A repository with GitHub Issues but no `.dev-backlog/`, no `spec/`, and no Relay
 installation must be able to:
 
 1. complete a simple Issue → PR path without creating a sprint; and

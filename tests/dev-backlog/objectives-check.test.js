@@ -37,7 +37,7 @@ revision: 1
 describe("parseArgs", () => {
   it("uses defaults when nothing passed", () => {
     const parsed = parseArgs([]);
-    assert.equal(parsed.sprintsDir, path.join("backlog", "sprints"));
+    assert.equal(parsed.sprintsDir, path.join(".dev-backlog", "sprints"));
     assert.equal(parsed.charterPath, null);
     assert.equal(parsed.json, false);
   });
@@ -241,7 +241,7 @@ describe("checkObjectives", () => {
   it("uses spec/charter.md by default", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-full-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.mkdirSync(path.join(dir, "spec"), { recursive: true });
       fs.writeFileSync(path.join(dir, "spec", "charter.md"), SAMPLE_CHARTER);
@@ -267,7 +267,7 @@ describe("checkObjectives", () => {
   it("falls back to legacy root CHARTER.md", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-legacy-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.writeFileSync(path.join(dir, "CHARTER.md"), SAMPLE_CHARTER);
       const result = checkObjectives({ sprintsDir, repoRoot: dir });
@@ -294,7 +294,7 @@ describe("checkObjectives", () => {
   it("lists only truly-omitted (not empty) objectives sprints; omission is not drift (B3)", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "obj-check-omit-"));
     try {
-      const sprintsDir = path.join(dir, "backlog", "sprints");
+      const sprintsDir = path.join(dir, ".dev-backlog", "sprints");
       fs.mkdirSync(sprintsDir, { recursive: true });
       fs.mkdirSync(path.join(dir, "spec"), { recursive: true });
       fs.writeFileSync(path.join(dir, "spec", "charter.md"), SAMPLE_CHARTER);
@@ -319,7 +319,7 @@ describe("checkObjectives", () => {
     const result = checkObjectives({
       repoRoot: "C:\\repo",
       charterPath: "spec\\charter.md",
-      sprintsDir: "C:\\repo\\backlog\\sprints",
+      sprintsDir: "C:\\repo\\.dev-backlog\\sprints",
       fileExists: () => true,
       readdir: () => ["active.md"],
       readFile: (file) => String(file).includes("charter")
@@ -327,7 +327,7 @@ describe("checkObjectives", () => {
         : "---\nobjectives: [O99]\n---\n",
     });
     assert.doesNotMatch(result.charterPath, /\\/);
-    assert.equal(result.drift[0].sprintFile, "C:/repo/backlog/sprints/active.md");
+    assert.equal(result.drift[0].sprintFile, "C:/repo/.dev-backlog/sprints/active.md");
   });
 });
 

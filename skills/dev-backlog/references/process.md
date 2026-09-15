@@ -6,7 +6,7 @@ boundaries live in `authority-contract.md`.
 
 ## Setup
 
-For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`. It creates `backlog/sprints/` and pins GitHub as the task authority; tracker selection rules live in `file-format.md`.
+For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`. It creates `.dev-backlog/sprints/` and pins GitHub as the task authority; tracker selection rules live in `file-format.md`.
 
 ## Programmatic Lifecycle Boundary
 
@@ -19,7 +19,7 @@ same live Issue.
 ```js
 const path = require("node:path");
 const skillDir = "/resolved/dev-backlog-skill";
-const backlogDir = "backlog"; // or the custom backlog directory in use
+const backlogDir = ".dev-backlog"; // or the custom execution-root directory in use
 const { readConfig } = require(path.join(skillDir, "scripts/lib.js"));
 const { resolveConfiguredTracker } = require(path.join(skillDir, "scripts/tracker.js"));
 
@@ -51,8 +51,8 @@ never reads task files.
 
 ## Orient — Starting a Session
 
-1. If `backlog/` does not exist, complete **Setup**.
-2. Read `backlog/sprints/_context.md` when present.
+1. If `.dev-backlog/` does not exist, complete **Setup**.
+2. Read `.dev-backlog/sprints/_context.md` when present.
 3. Find the active sprint(s). One track: read Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `status.sh`/`next.sh` render a portfolio; pass `--track <slug>` to work one track.
 4. If no active sprint exists, list open Issues and create a sprint only when complexity admission applies.
 5. Use `status.sh --json` and `next.sh --json` for normalized `tracker`/`id`/`ref` state (`schema_version: 2`: `active_sprints[]` plus the retained single-track fields); GitHub keeps numeric `issue_number`.

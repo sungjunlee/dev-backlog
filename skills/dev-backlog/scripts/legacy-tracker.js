@@ -1,8 +1,8 @@
 /**
  * Legacy tracker-selection compatibility.
  *
- * Tracker authority lives in `backlog/.tracker`. This module is the only reader
- * of the older `tracker:` key in `backlog/config.yml`, kept so repositories
+ * Tracker authority lives in `.dev-backlog/.tracker`. This module is the only reader
+ * of the older `tracker:` key in `.dev-backlog/config.yml`, kept so repositories
  * configured before the move resolve to the same tracker they always did. It
  * never writes; `config.yml` bytes on disk are never touched.
  *

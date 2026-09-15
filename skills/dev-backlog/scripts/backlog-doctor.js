@@ -30,11 +30,12 @@ const {
   readConfig,
   sprintScopeKey,
   scopesOverlap,
+  DEFAULT_BACKLOG_DIR,
 } = require("./lib.js");
+const { leftoverSkillFiles, LEGACY_EXPORT_DIR } = require("./execution-root.js");
 const { repoDisplayPath, toPortablePath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
-const DEFAULT_BACKLOG_DIR = "backlog";
 const DEFAULT_STALE_DAYS = 7;
 const DEFAULT_REASSESS_THRESHOLD = 3;
 const CONTEXT_BLOAT_LINE_THRESHOLD = 200;
@@ -170,6 +171,10 @@ function runDoctor({
     repoRoot: root,
     backlogPath,
   });
+  const leftoverLegacyRoot = checkLeftoverLegacyRoot({
+    repoRoot: root,
+    backlogPath,
+  });
 
   // Per-sprint checks fan out per active track (PRD §5.3): 0 or 1 active keeps
   // today's single untagged run; N>1 runs each check once per track and tags
@@ -200,6 +205,7 @@ function runDoctor({
   const checks = [
     active,
     ...(staleTrackerSelection ? [staleTrackerSelection] : []),
+    ...(leftoverLegacyRoot ? [leftoverLegacyRoot] : []),
     ...perTrack.map((run) => run.objectives),
     ...perTrack.map((run) => run.component_lint),
     checkCapabilities({ repoRoot: root, capabilitiesPath }),
@@ -228,6 +234,19 @@ function runDoctor({
     exit_hint: exitHintFor(checks),
     reassess_signal: reassessSignal,
   };
+}
+
+function checkLeftoverLegacyRoot({ repoRoot, backlogPath }) {
+  const leftover = leftoverSkillFiles(repoRoot);
+  if (leftover.length === 0) return null;
+  const legacyRoot = path.resolve(repoRoot, LEGACY_EXPORT_DIR);
+  if (path.resolve(backlogPath) === legacyRoot) return null;
+  return verdict("legacy_execution_root", "warn", {
+    summary:
+      `Leftover skill files under ${LEGACY_EXPORT_DIR}/ (${leftover.join(", ")}); ` +
+      `execution root is ${DEFAULT_BACKLOG_DIR}/. See file-format.md migrate.`,
+    leftover,
+  });
 }
 
 function checkStaleTrackerSelection({ repoRoot, backlogPath }) {
@@ -924,6 +943,7 @@ if (require.main === module) main();
 
 module.exports = {
   SCHEMA_VERSION,
+  DEFAULT_BACKLOG_DIR,
   DEFAULT_STALE_DAYS,
   DEFAULT_REASSESS_THRESHOLD,
   CONTEXT_BLOAT_LINE_THRESHOLD,

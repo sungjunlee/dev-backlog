@@ -69,7 +69,7 @@ it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
 
 it("keeps both no-spec/no-Relay cold-adopter paths explicit", () => {
   const markdown = contract();
-  assert.match(markdown, /no `backlog\/`, no `spec\/`, and no Relay/);
+  assert.match(markdown, /no `\.dev-backlog\/`, no `spec\/`, and no Relay/);
   assert.match(markdown, /complete a simple Issue → PR path without creating a sprint/);
   assert.match(markdown, /create, resume, and close it using only\s+this bundle/);
 });
@@ -82,7 +82,7 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   const capabilities = read("spec/capabilities.md");
   const charter = read("spec/charter.md");
   const sprint = read(
-    "backlog/sprints/2026-07-github-native-core-simplification.md"
+    ".dev-backlog/sprints/2026-07-github-native-core-simplification.md"
   );
 
   assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);

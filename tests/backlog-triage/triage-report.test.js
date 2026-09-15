@@ -28,7 +28,7 @@ function makeSnapshot() {
   return {
     generated: "2026-04-18T01:30:00.000Z",
     repo: "sungjunlee/dev-backlog",
-    config_path: "backlog/triage-config.yml",
+    config_path: ".dev-backlog/triage-config.yml",
     issues: [
       {
         number: 101,
@@ -519,9 +519,9 @@ describe("triage-report integration chain", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-report-int-"));
     repoRoot = path.join(tempDir, "repo");
-    fs.mkdirSync(path.join(repoRoot, "backlog"), { recursive: true });
+    fs.mkdirSync(path.join(repoRoot, ".dev-backlog"), { recursive: true });
     fs.writeFileSync(
-      path.join(repoRoot, "backlog", "triage-config.yml"),
+      path.join(repoRoot, ".dev-backlog", "triage-config.yml"),
       [
         "theme_keywords:",
         "  auth: [auth, oauth, token]",
@@ -538,7 +538,7 @@ describe("triage-report integration chain", () => {
     snapshotPath = path.join(repoRoot, "fixture-snapshot.json");
     relatePath = path.join(repoRoot, "fixture-relate.json");
     stalePath = path.join(repoRoot, "fixture-stale.json");
-    reportPath = path.join(repoRoot, "backlog", "triage", "2026-04-18-report.md");
+    reportPath = path.join(repoRoot, ".dev-backlog", "triage", "2026-04-18-report.md");
 
     const snapshot = makeSnapshot();
     fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
@@ -950,7 +950,7 @@ describe("model-action merge into report model", () => {
     return {
       generated: "2026-04-18T01:30:00.000Z",
       repo: "sungjunlee/dev-backlog",
-      config_path: "backlog/triage-config.yml",
+      config_path: ".dev-backlog/triage-config.yml",
       issues,
     };
   }

@@ -9,7 +9,7 @@
  *
  * Behavior:
  *   - Doc surface: skills/<skill>/SKILL.md, skills/<skill>/references/*.md,
- *     and backlog/sprints/_context.md when present.
+ *     and .dev-backlog/sprints/_context.md when present.
  *   - Inventory: top-level files under every skills/<skill>/scripts/.
  *   - A `.js`/`.sh` token in a doc must resolve to an inventory basename.
  *   - Glob fragments (`*.test.js` → preceded by `*.`) and known non-script
@@ -24,6 +24,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { defaultSprintsDir } = require("./execution-root.js");
 
 const TOKEN_RE = /[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:js|sh)\b/g;
 const IGNORED_TOKENS = new Set(["Node.js"]);
@@ -63,7 +64,7 @@ function collectDocFiles(root) {
       }
     }
   }
-  const contextMd = path.join(root, "backlog", "sprints", "_context.md");
+  const contextMd = path.join(root, defaultSprintsDir(), "_context.md");
   if (fs.existsSync(contextMd)) docs.push(contextMd);
   return docs;
 }

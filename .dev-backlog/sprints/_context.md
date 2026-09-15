@@ -2,7 +2,7 @@
 
 ## Architecture Decisions
 
-- GitHub Issues are the source of truth; `backlog/` is the execution layer
+- GitHub Issues are the source of truth; `.dev-backlog/` is the execution layer
 - Script interfaces should stay stable unless an issue explicitly changes the CLI contract
 - Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
 - Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` is parsed by the single exact parser; legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
@@ -32,7 +32,7 @@
 - `triage-relate` relationship edges are advisory context. Even a `merged-pr-link` edge must not become a close recommendation unless `triage-stale` implements a separate conservative obsolete signal.
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.
 - `gh issue create` does not support `--json`; a `create --json ... || create -b "fallback"` chain fails the first call at flag parsing and posts the fallback placeholder as the real issue body (BACK-243 incident, 2026-07-05). Capture the URL from stdout instead.
-- Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
+- Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `.dev-backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
 - Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in `smoke-test.sh` depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
 - v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files, and do not delete `sync-pull.js` / `legacy-tracker.js` without a measured consumer (charter freeze 2026-08-17; 2026-08 second-start close).

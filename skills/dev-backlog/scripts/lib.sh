@@ -2,6 +2,9 @@
 # Shared library for dev-backlog bash scripts.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
+# Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
+DEFAULT_BACKLOG_DIR=".dev-backlog"
+
 # Legacy GitHub checkbox regex aliases — integration contract with dev-relay.
 # Core shell consumers use checkbox_lines/count_checkboxes below, which delegate
 # task-ref grammar to task-ref.js and therefore also accept configured local refs.

@@ -6,7 +6,9 @@ const { analyzeSnapshot: analyzeRelationships } = require("./triage-relate.js");
 const { readSnapshot, analyzeSnapshot: analyzeStale } = require("./triage-stale.js");
 
 const ANCHOR_PATTERN = /<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->/;
-const DEFAULT_REPORT_DIR = path.join("backlog", "triage");
+const { defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
+
+const DEFAULT_REPORT_DIR = defaultTriageDir();
 const OPTIONAL_RELATIONSHIPS_MARKER =
   "_(comment and closing-PR relationship signals run only when snapshot v2 fields are present)_";
 const DEFERRED_OBSOLETE_MARKER =

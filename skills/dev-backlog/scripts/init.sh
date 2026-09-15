@@ -12,7 +12,8 @@ ARGS=(--project-name "$PROJECT_NAME" --non-interactive)
 # The historical init.sh entrypoint created a GitHub-backed fresh setup.
 # Existing selections are passed without explicit intent so .tracker is
 # preserved and legacy config.yml selections receive the one-time migration.
-if [ ! -f "backlog/.tracker" ] && [ ! -f "backlog/config.yml" ]; then
+if [ ! -f ".dev-backlog/.tracker" ] && [ ! -f ".dev-backlog/config.yml" ] \
+  && [ ! -f "backlog/.tracker" ] && [ ! -f "backlog/config.yml" ]; then
   ARGS+=(--tracker github)
 fi
 

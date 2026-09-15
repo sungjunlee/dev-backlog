@@ -10,7 +10,7 @@ trap 'exit 0' ERR
 #   "hooks": {
 #     "PreToolUse": [{
 #       "matcher": "Write|Edit|NotebookEdit",
-#       "command": "bash /path/to/scripts/context-hook.sh /path/to/backlog"
+#       "command": "bash /path/to/scripts/context-hook.sh /path/to/.dev-backlog"
 #     }]
 #   }
 #
@@ -20,7 +20,7 @@ trap 'exit 0' ERR
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${1:-backlog}"
+BACKLOG_DIR="${1:-$DEFAULT_BACKLOG_DIR}"
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then

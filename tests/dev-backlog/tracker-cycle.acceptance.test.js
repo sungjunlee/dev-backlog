@@ -9,6 +9,10 @@ const { resolveBashExecutable, toBashArgs } = require(path.join(SKILL_SCRIPTS, "
 const { writeGhFixture } = require(path.join(SKILL_SCRIPTS, "fake-gh-fixture.js"));
 
 const SCRIPTS_DIR = SKILL_SCRIPTS;
+const {
+  DEFAULT_BACKLOG_DIR,
+  LEGACY_TASKS_DIR,
+} = require(path.join(SCRIPTS_DIR, "execution-root.js"));
 const TRACKER_PATH = path.join(SCRIPTS_DIR, "tracker.js");
 const SYNC_PATH = path.join(SCRIPTS_DIR, "sync-pull.js");
 const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
@@ -71,10 +75,8 @@ function runWorker(fixture, action, payload = {}) {
 
 function prepareGithub(t) {
   const root = makeRoot(t, "tracker-cycle-github-");
-  const backlogDir = path.join(root, "backlog");
+  const backlogDir = path.join(root, DEFAULT_BACKLOG_DIR);
   fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
-  fs.mkdirSync(path.join(backlogDir, "tasks"), { recursive: true });
-  fs.mkdirSync(path.join(backlogDir, "completed"), { recursive: true });
   const legacyConfig = [
     'project_name: "legacy-cycle"',
     'task_prefix: "BACK"',
@@ -92,7 +94,7 @@ function prepareGithub(t) {
 
 function prepareMirrorlessGithub(t) {
   const root = makeRoot(t, "tracker-cycle-github-mirrorless-");
-  const backlogDir = path.join(root, "backlog");
+  const backlogDir = path.join(root, DEFAULT_BACKLOG_DIR);
   fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
   fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
   const gh = writeGhFixture(root);
@@ -136,7 +138,7 @@ function runGithubCycle(fixture) {
     "github sync-pull"
   );
   assert.equal(pulled.createdFiles[0], "BACK-42 - cycle-task.md");
-  const taskPath = path.join(fixture.backlogDir, "tasks", pulled.createdFiles[0]);
+  const taskPath = path.join(fixture.root, LEGACY_TASKS_DIR, pulled.createdFiles[0]);
   const today = new Date().toISOString().slice(0, 10);
   assert.equal(fs.readFileSync(taskPath, "utf8"), [
     "---", "id: BACK-42", "title: Cycle task", "status: To Do", "labels: []",
@@ -168,9 +170,9 @@ function runGithubCycle(fixture) {
   assert.equal(updatedMirror.slice(updatedMirror.indexOf("\n## Description")), originalBody);
 
   finishSprint(fixture, sprintPath, { closeMilestone: true });
-  const completedPath = path.join(fixture.backlogDir, "completed", path.basename(taskPath));
-  assert.equal(fs.existsSync(taskPath), false);
-  assert.equal(fs.readFileSync(completedPath, "utf8"), updatedMirror);
+  assert.equal(fs.readFileSync(taskPath, "utf8"), updatedMirror);
+  assert.equal(fs.existsSync(path.join(fixture.backlogDir, "tasks")), false);
+  assert.equal(fs.existsSync(path.join(fixture.backlogDir, "completed")), false);
   runWorker(fixture, "close", { selector: "#42" });
   assert.equal(runWorker(fixture, "list", { state: "closed", limit: 20 })[0].ref, "#42");
   assert.equal(runWorker(fixture, "read", { selector: "#42" }).state, "closed");
