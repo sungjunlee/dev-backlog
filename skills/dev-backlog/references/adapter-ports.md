@@ -85,7 +85,9 @@ not on orient / plan / work / complete.
 Details of the GitHub adapter live in `github-tracker.js`. The files adapter
 (`files-tracker.js`) talks only to the Backlog.md CLI (`backlog`); it never
 parses `backlog/tasks/*.md`. The GitLab adapter (`gitlab-tracker.js`) talks
-only to `glab`; identities are `gitlab#N`. GitHub, files, and GitLab are never
+only to `glab`; identities are `gitlab#N`. It reports `closing-semantics` only
+— comments / Agent Brief via notes are not claimed until a notes API path
+lands; issue body remains authority. GitHub, files, and GitLab are never
 co-authority in one repo. Forgejo/Gitea share forge field shapes and are
 follow-up adapters, not implemented here. Export layout: `file-format.md`.
 Authority routing: `authority-contract.md`.

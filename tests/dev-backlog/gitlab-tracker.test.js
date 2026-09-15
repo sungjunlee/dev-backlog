@@ -80,7 +80,8 @@ describe("GitLab required lifecycle adapter", () => {
     ]);
     assert.equal(validateAdapter("gitlab", adapter), adapter);
     assert.deepEqual(adapter.availability(), { available: true });
-    assert.deepEqual(adapter.capabilities(), ["comments", "closing-semantics"]);
+    assert.deepEqual(adapter.capabilities(), ["closing-semantics"]);
+    assert.equal(adapter.capabilities().includes("comments"), false);
     assert.equal(adapter.capabilities().includes("pull-request-relationships"), false);
     assert.equal(adapter.capabilities().includes("milestones"), false);
   });
@@ -147,10 +148,8 @@ describe("GitLab required lifecycle adapter", () => {
     assert.deepEqual(calls[1].args, ["issue", "list", "--all", "--output", "json"]);
   });
 
-  it("reads one task with comments and a normalized identity", () => {
-    const issue = gitlabIssue({
-      notes: [{ id: 1, body: "## Agent Brief\nDo this." }],
-    });
+  it("reads one task with a normalized identity and without --comments", () => {
+    const issue = gitlabIssue();
     const { calls, execFile } = recordingExec([JSON.stringify(issue)]);
     const adapter = createGitlabAdapter({ execFile });
 
@@ -162,7 +161,7 @@ describe("GitLab required lifecycle adapter", () => {
     assert.deepEqual(calls, [{
       command: "glab",
       args: [
-        "issue", "view", "7", "--comments", "--output", "json",
+        "issue", "view", "7", "--output", "json",
         "--repo", "acme/widgets",
       ],
       options: GLAB_EXEC_DEFAULTS,
@@ -171,7 +170,16 @@ describe("GitLab required lifecycle adapter", () => {
     assert.equal(task.id, "7");
     assert.equal(task.ref, "gitlab#7");
     assert.equal(task.body, "body");
+    assert.deepEqual(task.comments, []);
+  });
+
+  it("normalizes notes when present in a payload without claiming comments transport", () => {
+    const task = normalizeGitlabTask(gitlabIssue({
+      notes: [{ id: 1, body: "## Agent Brief\nDo this." }],
+    }));
     assert.equal(task.comments[0].body, "## Agent Brief\nDo this.");
+    const adapter = createGitlabAdapter({ execFile: () => "glab 1.53.0\n" });
+    assert.equal(adapter.capabilities().includes("comments"), false);
   });
 
   it("creates, updates, and closes through injected execution with gitlab#N identity", () => {

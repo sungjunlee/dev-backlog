@@ -1,7 +1,7 @@
 # dev-backlog
 
-GitHub Issues as task truth + local sprint files for execution continuity, for
-Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
+Configured tracker as task truth + local sprint files for execution continuity,
+for Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
 `backlog-triage` (advisory open-issue grooming).
 
 `README.md` is the human quick start. `skills/*/SKILL.md` files are the agent
@@ -29,16 +29,14 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
-- **GitHub Issues = sole task authority** — task definition, AC, and lifecycle
-  resolve from the live Issue (`effective-task-spec.js`);
-  no task-file directory required
+- **Configured tracker = sole task authority** — GitHub Issues (`gh`) OR files (Backlog.md CLI) OR GitLab (`glab`) per `.tracker` are the live authority; never co-authority. Task definition, AC, and lifecycle resolve from the live tracker (`effective-task-spec.js`); no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
 - **Multi-track sprints** — concurrent `status: active` tracks must declare
   provably disjoint scopes (`component:` or `scope:` globs, one shared
   `scopesOverlap` predicate); overlap fails loud
-- **Deliberate mutations only** — no hidden sync. GitHub writes are explicit.
+- **Deliberate mutations only** — no hidden sync. Configured-tracker writes are explicit.
   Routing and optional-export boundaries live in
   `skills/dev-backlog/references/authority-contract.md`.
 - **Fail-closed tracker** — adapter failure never falls back to local files or
@@ -50,8 +48,8 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 ## Architecture
 
 ```
-GitHub Issues (what: definition, AC, lifecycle)
-      ↕ gh CLI
+Configured tracker (what: definition, AC, lifecycle)
+      ↕ gh | backlog | glab
 .dev-backlog/sprints/ (how: batches, running context, progress)
 ```
 

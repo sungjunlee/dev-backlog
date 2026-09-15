@@ -199,10 +199,13 @@ function createGitlabAdapter({ execFile = execFileSync, listTransport } = {}) {
       return { available: true };
     },
     capabilities() {
-      // Under-declare: glab can assign milestones, but sprint-init's milestone
-      // seed helpers are GitHub-only. Merge-request relationships are not the
-      // named pull-request-relationships capability. Forgejo/Gitea are follow-ups.
-      return ["comments", "closing-semantics"];
+      // Under-declare: glab issue view JSON does not carry notes, so comments
+      // and Agent Brief via notes are not supported until a notes API path
+      // lands; issue body remains authority. glab can assign milestones, but
+      // sprint-init's milestone seed helpers are GitHub-only. Merge-request
+      // relationships are not the named pull-request-relationships capability.
+      // Forgejo/Gitea are follow-ups.
+      return ["closing-semantics"];
     },
     list({ state = "open", limit, repo } = {}) {
       if (listTransport) {
@@ -221,7 +224,7 @@ function createGitlabAdapter({ execFile = execFileSync, listTransport } = {}) {
       const identity = identityFrom(taskIdentity);
       const args = [
         "issue", "view", identity.id,
-        "--comments", "--output", "json",
+        "--output", "json",
         ...repoArgs(repo),
       ];
       return normalizeGitlabTask(parseIssueView(run(args)));

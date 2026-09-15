@@ -8,7 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
-- **`.tracker=gitlab` via glab on frozen ports** — `TRACKER_KEYS` is `["github", "files", "gitlab"]`. The GitLab adapter (`gitlab-tracker.js`) talks only to `glab`, fail-closes when the binary is missing or unauthenticated, and never falls back to GitHub or files. Plan refs are `gitlab#N`. Forgejo/Gitea share forge field shapes and remain follow-up issues. This repository stays `github`. Closes [#415](https://github.com/sungjunlee/dev-backlog/issues/415).
+- **`.tracker=gitlab` via glab on frozen ports** — `TRACKER_KEYS` is `["github", "files", "gitlab"]`. The GitLab adapter (`gitlab-tracker.js`) talks only to `glab`, fail-closes when the binary is missing or unauthenticated, and never falls back to GitHub or files. Plan refs are `gitlab#N`. Capabilities under-declare to `["closing-semantics"]` only: `glab issue view` JSON does not carry notes, so comments / Agent Brief via notes are not claimed yet; issue body remains authority. Forgejo/Gitea share forge field shapes and remain follow-up issues. This repository stays `github`. Closes [#415](https://github.com/sungjunlee/dev-backlog/issues/415).
 
 - **`.tracker=files` via Backlog.md CLI** — `TRACKER_KEYS` is `["github", "files"]`. The files adapter (`files-tracker.js`) talks only to the `backlog` CLI (npm package `backlog.md`), fail-closes when the binary is missing, and never parses `backlog/tasks/*.md`. Plan refs are `BACK-N`. GitHub and files are never co-authority; this repository stays `github`. Closes [#414](https://github.com/sungjunlee/dev-backlog/issues/414).
 

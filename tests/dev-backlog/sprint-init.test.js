@@ -118,10 +118,12 @@ describe("buildIssueLines", () => {
       { ref: "gitlab#12", title: "From ref", labels: [] },
       { tracker: "gitlab", id: "13", title: "From id", labels: ["docs"] },
       { tracker: "gitlab", iid: 14, title: "From iid", labels: [] },
+      { tracker: "gitlab", id: 10007, iid: 7, title: "Prefer iid over REST id" },
     ]), [
       "- [ ] gitlab#12 From ref",
       "- [ ] gitlab#13 From id (~20min)",
       "- [ ] gitlab#14 From iid",
+      "- [ ] gitlab#7 Prefer iid over REST id",
     ]);
   });
 });
@@ -751,7 +753,7 @@ describe("createSprintFile", () => {
     };
     const gitlabAdapter = {
       availability: () => ({ available: true }),
-      capabilities: () => ["comments", "closing-semantics"],
+      capabilities: () => ["closing-semantics"],
       list: forbidden("gitlab list"),
       read: forbidden("gitlab read"),
       create: forbidden("gitlab create"),

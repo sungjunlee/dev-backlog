@@ -103,7 +103,7 @@ function filesIssueId(issue) {
 function planRefForIssue(issue) {
   if (typeof issue.ref === "string" && issue.ref.trim()) return issue.ref.trim();
   if (issue.tracker === "gitlab") {
-    const id = String(issue.id || issue.iid || issue.number || "");
+    const id = String(issue.iid || issue.id || issue.number || "");
     return renderTaskRef({ tracker: "gitlab", id });
   }
   const filesId = filesIssueId(issue);
