@@ -15,8 +15,11 @@ set -uo pipefail
 #   5. Optionally close GitHub milestone (--close-milestone)
 
 # Resolve without `dirname` (restricted PATH / Windows Git Bash).
-SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
-[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+# Normalize backslashes first: `%/*` only strips `/`, so a Windows path
+# would otherwise equal BASH_SOURCE and fall back to `.` (the caller's cwd).
+_src="${BASH_SOURCE[0]//\\//}"
+SCRIPT_DIR="${_src%/*}"
+[ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 

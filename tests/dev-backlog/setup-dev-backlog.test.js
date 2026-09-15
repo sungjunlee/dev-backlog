@@ -6,6 +6,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const { spawnBashSync } = require(path.join(SKILL_SCRIPTS, "bash-runtime.js"));
 const {
   SetupError,
   collectGithubEvidence,
@@ -127,7 +128,7 @@ describe("GitHub-only setup", () => {
 
   it("keeps the init.sh compatibility entrypoint GitHub-only", (t) => {
     const cwd = root(t);
-    const result = spawnSync("bash", [INIT, "demo"], { cwd, encoding: "utf8" });
+    const result = spawnBashSync([INIT, "demo"], { cwd, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
 

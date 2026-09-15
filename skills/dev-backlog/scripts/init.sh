@@ -7,8 +7,11 @@ set -euo pipefail
 #
 PROJECT_NAME="${1:-$(basename "$(pwd)")}"
 # Resolve without `dirname` (restricted PATH / Windows Git Bash).
-SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
-[ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
+# Normalize backslashes first: `%/*` only strips `/`, so a Windows path
+# would otherwise equal BASH_SOURCE and fall back to `.` (the caller's cwd).
+_src="${BASH_SOURCE[0]//\\//}"
+SCRIPT_DIR="${_src%/*}"
+[ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 ARGS=(--project-name "$PROJECT_NAME" --non-interactive)
 
