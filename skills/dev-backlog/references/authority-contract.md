@@ -1,9 +1,11 @@
 # GitHub-native authority and routing contract
 
 GitHub Issues own task specification and lifecycle. A sprint file exists only
-when execution needs continuity beyond one Issue and its PR. Diagnostic export
-files are an explicit one-way snapshot, never runtime authority. Adapter failure
-is fail-closed: no local-file or export fallback.
+when execution needs continuity beyond one Issue and its PR. Exactly one
+configured tracker (`.tracker` is setup-only); runtime never switches adapters.
+Diagnostic export files (`exports/github-issues/` via `--legacy-export`) are an
+explicit one-way snapshot, never runtime authority. Adapter failure is
+fail-closed: no local-file or export fallback.
 
 ## Authority and routing table
 
@@ -73,7 +75,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native core.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Optional leftover operator tree under `backlog/` | The skill does not productize Backlog.md. Human-reviewed Markdown may be imported into a GitHub Issue. `--legacy-export` emits diagnostic snapshots to `exports/github-issues/` (not a compatibility layer, never runtime authority, not under `.dev-backlog/`). Backlog.md tooling is not required |
+| Backlog.md | Optional leftover operator tree under `backlog/` | The skill does not productize Backlog.md. Human-reviewed Markdown may be imported into a GitHub Issue. Backlog.md tooling is not required |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 

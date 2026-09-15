@@ -127,6 +127,7 @@ Done when the next actionable batch or sprint-planning need is named.
 
 These stay explicit because they guard shared or irreversible state:
 
+- Exactly one configured tracker (`.tracker` is setup-only); runtime never switches adapters.
 - Every GitHub mutation is deliberate and explicit; there is no background sync.
 - Configured tracker failure is fail-closed: stop and repair; never fall back to local files or a diagnostic export.
 - `status: completed` is never flipped back; completed sprints are immutable history.
