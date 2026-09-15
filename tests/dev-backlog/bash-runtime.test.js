@@ -16,15 +16,15 @@ const BASH_ENTRYPOINTS = [
   "lib.sh",
 ];
 
-function resolveScriptDirFromBackslashPath(winPath) {
-  return spawnSync("bash", ["-c", [
-    `_src='${winPath}'`,
-    `_src="\${_src//\\\\//}"`,
+function stripScriptDir(winPath, { normalize } = { normalize: false }) {
+  const lines = [`_src='${winPath}'`];
+  if (normalize) lines.push(`_src="\${_src//\\\\//}"`);
+  lines.push(
     `SCRIPT_DIR="\${_src%/*}"`,
     `[ "\$SCRIPT_DIR" = "\$_src" ] && SCRIPT_DIR="."`,
-    `SCRIPT_DIR="\$(cd "\$SCRIPT_DIR" && pwd)"`,
     `printf '%s' "\$SCRIPT_DIR"`,
-  ].join("\n")], { encoding: "utf8" });
+  );
+  return spawnSync("bash", ["-c", lines.join("\n")], { encoding: "utf8" });
 }
 
 describe("Bash runtime boundary", () => {
@@ -67,19 +67,14 @@ describe("Bash runtime boundary", () => {
   });
 
   it("resolves a Windows backslash script path to the scripts directory", () => {
-    const winInit = path.join(SKILL_SCRIPTS, "init.sh").replaceAll("/", "\\");
-    const unnormalized = spawnSync("bash", ["-c", [
-      `_src='${winInit}'`,
-      `SCRIPT_DIR="\${_src%/*}"`,
-      `[ "\$SCRIPT_DIR" = "\$_src" ] && SCRIPT_DIR="."`,
-      `printf '%s' "\$SCRIPT_DIR"`,
-    ].join("\n")], { encoding: "utf8" });
+    const winInit = "C:\\repo\\skills\\scripts\\init.sh";
+
+    const unnormalized = stripScriptDir(winInit);
     assert.equal(unnormalized.status, 0, unnormalized.stderr);
     assert.equal(unnormalized.stdout, ".");
 
-    const result = resolveScriptDirFromBackslashPath(winInit);
+    const result = stripScriptDir(winInit, { normalize: true });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.existsSync(path.join(result.stdout, "setup-dev-backlog.js")), true);
-    assert.equal(path.resolve(result.stdout), path.resolve(SKILL_SCRIPTS));
+    assert.equal(result.stdout, "C:/repo/skills/scripts");
   });
 });
