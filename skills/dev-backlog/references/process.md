@@ -1,20 +1,22 @@
 # Process
 
 Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
-the same core cycle through GitHub Issues. Routing and optional-export
-boundaries live in `authority-contract.md`.
+the same core cycle through the configured tracker (GitHub Issues or the
+Backlog.md CLI). Routing and optional-export boundaries live in
+`authority-contract.md`.
 
 ## Setup
 
-For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive` (or `--tracker files` to pin the Backlog.md CLI). It creates `.dev-backlog/sprints/` and pins the chosen task authority; tracker selection rules live in `file-format.md`.
+For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github|files --non-interactive`. It creates `.dev-backlog/sprints/` and pins the chosen task authority; tracker selection rules live in `file-format.md`.
 
 ## Programmatic Lifecycle Boundary
 
-Scripts and automation create/read/update/close Issues through the adapter
+Scripts and automation create/read/update/close tasks through the adapter
 exported by `scripts/tracker.js` (resolve it from the target backlog directory;
-do not import `github-tracker.js` directly). An agent working interactively
-uses `gh` directly with the patterns in `github-sync.md`; both routes write the
-same live Issue.
+do not import `github-tracker.js` or `files-tracker.js` directly). An agent
+working interactively uses `gh` when `.tracker=github` (`github-sync.md`) or
+the `backlog` CLI when `.tracker=files`; both routes write the same live task
+in the configured tracker. Leftover `tasks/*.md` is never authority.
 
 ```js
 const path = require("node:path");
@@ -29,7 +31,7 @@ const { adapter } = resolveConfiguredTracker(readConfig(backlogDir), { backlogDi
 Call `adapter.list({ state, limit })`, `adapter.read(selector)`,
 `adapter.create(input)`, `adapter.update(selector, changes)`, or
 `adapter.close(selector, options)`. Feed the returned normalized `ref` into the
-sprint Plan. Runtime selectors are `#N`. These exported adapter methods are the stable core lifecycle
+sprint Plan. Runtime selectors are `#N` (github) or `BACK-N` (files). These exported adapter methods are the stable core lifecycle
 API; shell/Node scripts such as `status.sh`, `sync-pull.js`, and
 `sprint-close.sh` are workflow boundaries around it, not substitutes for task
 create/read/update/close.
@@ -45,16 +47,17 @@ It performs exactly one canonical adapter read and returns
 and a stable SHA-256 `source_revision`/`source_digest`. Source precedence, in
 order: an explicit repository-relative `spec_ref` (Issue-body marker
 `<!-- dev-backlog:spec_ref path/to/spec.md -->` or `--spec-ref`), then a posted
-Issue comment whose body starts with `## Agent Brief`, then the live Issue
-body. A failed Issue read or explicit-spec load stops execution fail-closed; the resolver
-never reads task files.
+Issue comment whose body starts with `## Agent Brief`, then the live task
+body. For files tasks, a non-empty CLI `acceptanceCriteria` array is live AC.
+A failed live-task read or explicit-spec load stops execution fail-closed; the resolver
+never reads leftover `tasks/*.md`.
 
 ## Orient — Starting a Session
 
 1. Complete **Setup** only when an admitted sprint is in play or this session is about to admit one (`SKILL.md` Plan rail) and `.dev-backlog/` is missing. Sprint-free Issue → PR does not create `.dev-backlog/` (`authority-contract.md`).
 2. Read `.dev-backlog/sprints/_context.md` when present.
 3. Find the active sprint(s). One track: read Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `status.sh`/`next.sh` render a portfolio; pass `--track <slug>` to work one track.
-4. If no active sprint exists, list open Issues and create a sprint only when complexity admission applies.
+4. If no active sprint exists, list open tasks through the adapter and create a sprint only when complexity admission applies.
 5. Use `status.sh --json` and `next.sh --json` for normalized `tracker`/`id`/`ref` state (`schema_version: 2`: `active_sprints[]` plus the retained single-track fields); GitHub keeps numeric `issue_number`.
 6. If all Plan items are checked, proceed to **Complete** for that track.
 
@@ -62,9 +65,9 @@ never reads task files.
 
 ## Create — New Tasks
 
-1. Create the Issue with acceptance criteria (`gh issue create`, patterns in `github-sync.md`; automation uses `adapter.create`).
-2. Use its `#N` ref in the current sprint Plan when the work is admitted.
-3. Continue directly from the created Issue.
+1. Create the task with acceptance criteria (`gh issue create` when github, patterns in `github-sync.md`; `backlog task create` / `adapter.create` when files).
+2. Use its `#N` (github) or `BACK-N` (files) ref in the current sprint Plan when the work is admitted.
+3. Continue directly from the created task.
 
 ## Plan — Sprint
 
@@ -72,8 +75,8 @@ When starting a new sprint:
 
 1. `sprint-init.js` refuses a track whose scope overlaps an active track (`scopesOverlap` in `lib.js`; with 2+ active tracks an undeclared axis warns and allows). Complete the conflicting track rather than editing `status:` by hand.
 2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`; pass `sprint-init.js --component "slug"` for a declared capability, or mutually exclusive `--scope "glob[,glob]"` when no component axis fits.
-3. List open Issues through the adapter.
-4. GitHub may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible.
+3. List open tasks through the adapter.
+4. GitHub may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible. Files seeds due TBD and an empty Plan (add `BACK-N` refs by hand).
 5. Set a one-sentence Goal, order mutually parallel-safe work into batches, put dependencies in later batches, and record estimates where useful.
 
 ## Work — Execute a Batch
@@ -100,7 +103,7 @@ Per task:
    recorded source revision. If the source changed, review the new effective
    spec before completion.
 2. Commit or merge the implementation and check the Plan item.
-3. Call required `close` to close the GitHub Issue.
+3. Call required `close` (`adapter.close`; files uses `backlog task edit` Done) to close the tracker task.
 4. Use `Fixes #N`, comments, or closing relationships only when GitHub capability semantics are intentionally in scope.
 
 For the whole sprint:
@@ -115,7 +118,7 @@ For the whole sprint:
 
 ## Diagnostic Export — Explicit and One-Way
 
-There is no pull step: re-run `effective-task-spec.js` when Issue content changes. `sync-pull.js --legacy-export` writes non-authoritative snapshots to `exports/github-issues/` for rollback or diagnostics only; it is not a Backlog.md compatibility layer and is not on orient / plan / work / complete. See `file-format.md`.
+There is no pull step: re-run `effective-task-spec.js` when task content changes. `sync-pull.js --legacy-export` writes non-authoritative snapshots to `exports/github-issues/` for rollback or diagnostics only; it is not a Backlog.md compatibility layer and is not on orient / plan / work / complete. See `file-format.md`.
 
 ## Unsupported Optional Capabilities
 
@@ -127,8 +130,7 @@ effects and never switches trackers.
 
 ## Quick Fix — Single Task, No Sprint
 
-Read, update, and close the Issue through the adapter and normal GitHub
-issue/closing behavior.
+Read, update, and close the task through the adapter (github Issue or files CLI).
 Create a sprint only when execution context needs to span work or sessions.
 
 ## Unplanned Work — Mid-Sprint Scope Change
@@ -140,5 +142,5 @@ Create a sprint only when execution context needs to span work or sessions.
 ## Next — What to Work On
 
 1. Read the active sprint and find the first unchecked batch (`next.sh --track <slug>` selects one track when a portfolio is active).
-2. If it is done, list open Issues; create a sprint only when complexity admission applies.
+2. If it is done, list open tasks; create a sprint only when complexity admission applies.
 3. Present the batch with its exact normalized refs and total estimate.

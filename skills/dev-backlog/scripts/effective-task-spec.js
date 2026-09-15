@@ -332,6 +332,32 @@ function acceptanceCriteriaSection(markdown) {
   return lines.slice(start + 1, end).join("\n");
 }
 
+function normalizeCliAcceptanceCriteria(items) {
+  return Object.freeze(items.map((item) => {
+    if (typeof item === "string") {
+      return Object.freeze({ text: item.trim(), checked: false });
+    }
+    if (!item || typeof item !== "object") {
+      return Object.freeze({ text: String(item ?? "").trim(), checked: false });
+    }
+    const text = String(item.text ?? item.description ?? "").trim();
+    const checked = item.checked === true
+      || item.checked === "x"
+      || item.checked === "X"
+      || /^done$/i.test(String(item.status ?? ""));
+    return Object.freeze({ text, checked });
+  }).filter((item) => item.text));
+}
+
+function resolveAcceptanceCriteria(task, effectiveSpec, { tracker, selectedSpecRef } = {}) {
+  const fromFilesCli = (tracker === "files" || task.tracker === "files")
+    && !selectedSpecRef
+    && Array.isArray(task.acceptanceCriteria)
+    && task.acceptanceCriteria.length > 0;
+  if (fromFilesCli) return normalizeCliAcceptanceCriteria(task.acceptanceCriteria);
+  return parseAcceptanceCriteria(effectiveSpec);
+}
+
 function parseAcceptanceCriteria(markdown) {
   const criteria = [];
   const lines = acceptanceCriteriaSection(markdown).split("\n");
@@ -514,7 +540,10 @@ function resolveEffectiveTaskSpec(resolved, taskRef, {
   const digest = digestText(effectiveSpec);
   return Object.freeze({
     effective_spec: effectiveSpec,
-    acceptance_criteria: parseAcceptanceCriteria(effectiveSpec),
+    acceptance_criteria: resolveAcceptanceCriteria(task, effectiveSpec, {
+      tracker: resolved.tracker,
+      selectedSpecRef,
+    }),
     lifecycle: normalizeLifecycle(task),
     source_ref: sourceRef,
     source_revision: `sha256:${digest}`,

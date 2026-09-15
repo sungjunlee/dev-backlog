@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate a sprint file skeleton from a GitHub milestone.
+ * Generate a sprint file skeleton from the configured tracker.
  *
  * Usage: ./scripts/sprint-init.js "auth-system"
  *        ./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
@@ -11,6 +11,10 @@
  *
  * First arg is the topic name. Milestone defaults to topic if not specified.
  * Filename: YYYY-MM-<topic>.md
+ *
+ * GitHub (`.tracker=github`): seeds Plan from a milestone when that capability
+ * is reported. Files (`.tracker=files`): due TBD and an empty Plan (add
+ * BACK-N refs by hand). Never calls GitHub milestone helpers for files.
  *
  * Multi-track (#292): a second active sprint is refused only when its scope
  * overlaps an existing active track (shared scopesOverlap from lib.js);
@@ -82,15 +86,36 @@ function parseArgs(args) {
   return { topic, milestone, dryRun, json, ...trackAxis };
 }
 
+function filesIssueId(issue) {
+  if (!issue || typeof issue !== "object") return null;
+  if (issue.tracker === "files") return String(issue.id);
+  if (
+    issue.number === undefined
+    && typeof issue.id === "string"
+    && /^[1-9]\d*(?:\.[1-9]\d*)?$/.test(issue.id)
+  ) {
+    return issue.id;
+  }
+  return null;
+}
+
+function planRefForIssue(issue) {
+  if (typeof issue.ref === "string" && issue.ref.trim()) return issue.ref.trim();
+  const filesId = filesIssueId(issue);
+  if (filesId) return renderTaskRef({ tracker: "files", id: filesId });
+  return renderTaskRef({ tracker: "github", id: String(issue.number) });
+}
+
 function buildIssueLines(issues) {
   if (!issues.length) return [];
 
   return issues.map((issue) => {
-    const labels = (issue.labels || []).map((l) => l.name);
+    const labels = (issue.labels || [])
+      .map((label) => (typeof label === "string" ? label : label?.name))
+      .filter(Boolean);
     const est = estimateSize(labels);
     const suffix = est ? ` (${est})` : "";
-    const ref = renderTaskRef({ tracker: "github", id: String(issue.number) });
-    return `- [ ] ${ref} ${issue.title}${suffix}`;
+    return `- [ ] ${planRefForIssue(issue)} ${issue.title}${suffix}`;
   });
 }
 
@@ -266,6 +291,44 @@ function resolveComponent({
   return component;
 }
 
+function trackerUsesMilestones(resolved) {
+  if (resolved.tracker === "github") return true;
+  const reported = typeof resolved.adapter.capabilities === "function"
+    ? resolved.adapter.capabilities()
+    : [];
+  return Array.isArray(reported) && reported.includes("milestones");
+}
+
+function resolveSprintIssueSeed({
+  getDue,
+  getIssues,
+  sprintsDir,
+  adapters,
+  execFile,
+}) {
+  if (getDue && getIssues) return { getDue, getIssues };
+
+  const backlogDir = path.dirname(sprintsDir);
+  const resolved = resolveConfiguredTracker(readConfig(backlogDir), {
+    backlogDir,
+    adapters,
+    execFile,
+  });
+
+  if (trackerUsesMilestones(resolved)) {
+    invokeCapability(resolved, "milestones", () => undefined);
+    return {
+      getDue: getDue || getMilestoneDue,
+      getIssues: getIssues || getMilestoneIssues,
+    };
+  }
+
+  return {
+    getDue: getDue || (() => "TBD"),
+    getIssues: getIssues || (() => []),
+  };
+}
+
 function createSprintFile({
   topic,
   milestone,
@@ -281,6 +344,8 @@ function createSprintFile({
   writeFile = fs.writeFileSync,
   getDue,
   getIssues,
+  adapters,
+  execFile,
   // Optional overrides; when omitted, detected from repoRoot's spec/ files.
   hasCharter,
   hasCapabilities,
@@ -289,13 +354,13 @@ function createSprintFile({
     throw new Error("--component and --scope cannot be used together; declare one track axis.");
   }
   const resolvedComponent = resolveComponent({ component, repoRoot, fileExists, readFile });
-  if (!getDue || !getIssues) {
-    const backlogDir = path.dirname(sprintsDir);
-    const resolved = resolveConfiguredTracker(readConfig(backlogDir), { backlogDir });
-    invokeCapability(resolved, "milestones", () => undefined);
-    getDue = getDue || getMilestoneDue;
-    getIssues = getIssues || getMilestoneIssues;
-  }
+  ({ getDue, getIssues } = resolveSprintIssueSeed({
+    getDue,
+    getIssues,
+    sprintsDir,
+    adapters,
+    execFile,
+  }));
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const started = today.toISOString().slice(0, 10);

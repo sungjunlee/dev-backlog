@@ -130,6 +130,25 @@ describe("files required lifecycle adapter", () => {
     assert.deepEqual(validateIdentity(identityOf(tasks[0])), identityOf(tasks[0]));
   });
 
+  it("excludes Done tasks when listing state=open and keeps list-all intact", () => {
+    const listed = [
+      { id: "BACK-1", title: "Open", status: "To Do" },
+      { id: "BACK-2", title: "Doing", status: "In Progress" },
+      { id: "BACK-3", title: "Finished", status: "Done" },
+    ];
+    const { calls, execFile } = recordingExec([listEnvelope(listed), listEnvelope(listed)]);
+    const adapter = createFilesAdapter({ execFile });
+
+    const open = adapter.list({ state: "open" });
+    assert.deepEqual(open.map((task) => task.ref), ["BACK-1", "BACK-2"]);
+    assert.deepEqual(calls[0].args, ["task", "list", "--json"]);
+
+    const all = adapter.list();
+    assert.equal(all.length, 3);
+    assert.equal(all[2].status, "Done");
+    assert.deepEqual(calls[1].args, ["task", "list", "--json"]);
+  });
+
   it("maps closed list state to Done status and preserves decimal ids", () => {
     const listed = [{ id: "BACK-12.1", title: "Child", status: "Done" }];
     const { calls, execFile } = recordingExec([listEnvelope(listed)]);

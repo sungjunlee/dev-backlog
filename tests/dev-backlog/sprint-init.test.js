@@ -100,6 +100,18 @@ describe("buildIssueLines", () => {
   it("returns no Plan lines when there are no issues", () => {
     assert.deepEqual(buildIssueLines([]), []);
   });
+
+  it("renders files refs from tracker identity (#414)", () => {
+    assert.deepEqual(buildIssueLines([
+      { ref: "BACK-12", title: "From ref", labels: [] },
+      { tracker: "files", id: "13", title: "From id", labels: ["docs"] },
+      { id: "14", title: "Bare files id", labels: [] },
+    ]), [
+      "- [ ] BACK-12 From ref",
+      "- [ ] BACK-13 From id (~20min)",
+      "- [ ] BACK-14 Bare files id",
+    ]);
+  });
 });
 
 describe("buildSprintContent", () => {
@@ -666,5 +678,53 @@ describe("createSprintFile", () => {
     assert.match(content, /^component: ""$/m);
     // Checkbox must match the integration contract regex
     assert.match(content, /^- \[ \] #\d+/m);
+  });
+
+  it("seeds a files-tracker sprint without GitHub milestones or gh (#414)", () => {
+    const backlogDir = path.join(tmpDir, ".dev-backlog");
+    const sprintsDir = path.join(backlogDir, "sprints");
+    fs.mkdirSync(backlogDir, { recursive: true });
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "files\n");
+
+    const forbidden = (label) => () => {
+      throw new Error(`${label} must not run`);
+    };
+    const filesAdapter = {
+      availability: () => ({ available: true }),
+      capabilities: () => ["comments"],
+      list: forbidden("files list"),
+      read: forbidden("files read"),
+      create: forbidden("files create"),
+      update: forbidden("files update"),
+      close: forbidden("files close"),
+    };
+    const githubAdapter = {
+      availability: forbidden("github availability"),
+      capabilities: forbidden("github capabilities"),
+      list: forbidden("github list"),
+      read: forbidden("github read"),
+      create: forbidden("github create"),
+      update: forbidden("github update"),
+      close: forbidden("github close"),
+    };
+
+    const result = createSprintFile({
+      topic: "files-sprint",
+      milestone: "files-sprint",
+      dryRun: false,
+      sprintsDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+      adapters: { files: filesAdapter, github: githubAdapter },
+      hasCharter: false,
+      hasCapabilities: false,
+    });
+
+    assert.equal(result.created, true);
+    assert.equal(result.due, "TBD");
+    assert.equal(result.issueCount, 0);
+    assert.equal(result.placeholderIssue, true);
+    assert.match(result.content, /^due: TBD$/m);
+    assert.match(result.content, /^## Plan$/m);
+    assert.doesNotMatch(result.content, /^- \[ \]/m);
   });
 });

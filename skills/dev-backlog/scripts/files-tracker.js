@@ -189,7 +189,11 @@ function createFilesAdapter({
       const status = listStatusFlag(options);
       if (status) args.push("--status", status);
       if (options.limit !== undefined) args.push("--limit", String(options.limit));
-      return parseTaskListEnvelope(run(args)).map((task) => normalizeFilesTask(task, { prefix }));
+      const tasks = parseTaskListEnvelope(run(args)).map((task) => normalizeFilesTask(task, { prefix }));
+      if (options.state === "open" && !status) {
+        return tasks.filter((task) => String(task.status || "").toLowerCase() !== "done");
+      }
+      return tasks;
     },
     read(taskIdentity) {
       const identity = identityFrom(taskIdentity, { prefix });
