@@ -38,16 +38,17 @@ function stubAdapter(overrides = {}) {
 }
 
 describe("TRACKER_KEYS is config-only", () => {
-  it("freezes github as the only selectable key", () => {
-    assert.deepEqual([...TRACKER_KEYS], ["github"]);
+  it("freezes github and files as the selectable keys", () => {
+    assert.deepEqual([...TRACKER_KEYS], ["github", "files"]);
     assert.ok(Object.isFrozen(TRACKER_KEYS));
-    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github"]);
+    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files"]);
     assert.equal(selectTracker(), "github");
     assert.equal(selectTracker({ tracker: "github" }), "github");
-    for (const value of ["files", "gitlab", "local", ""]) {
+    assert.equal(selectTracker({ tracker: "files" }), "files");
+    for (const value of ["gitlab", "local", ""]) {
       assert.throws(
         () => selectTracker({ tracker: value }),
-        (error) => error instanceof TrackerConfigurationError && /expected one of: github/.test(error.message),
+        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files/.test(error.message),
       );
     }
   });
@@ -120,8 +121,10 @@ describe("stub adapter conformance", () => {
   it("validates identities through validateIdentity", () => {
     const identity = { tracker: "github", id: "99", ref: "#99" };
     assert.equal(validateIdentity(identity), identity);
+    const filesIdentity = { tracker: "files", id: "1", ref: "BACK-1" };
+    assert.equal(validateIdentity(filesIdentity), filesIdentity);
     assert.throws(
-      () => validateIdentity({ tracker: "files", id: "1", ref: "files-1" }),
+      () => validateIdentity({ tracker: "gitlab", id: "1", ref: "#1" }),
       TrackerIdentityError,
     );
     assert.throws(
@@ -160,7 +163,7 @@ describe("stub adapter conformance", () => {
       "not authority\n",
     );
     assert.throws(
-      () => selectTracker({ tracker: "files" }),
+      () => selectTracker({ tracker: "gitlab" }),
       TrackerConfigurationError,
     );
   });

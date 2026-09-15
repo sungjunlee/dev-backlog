@@ -7,7 +7,7 @@
 - Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
 - Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` is parsed by the single exact parser; legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
 - Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347; only the legacy-marker filter in `sync-pull`/`triage-collect` remains.)
-- The tracker layer is GitHub-only (`TRACKER_KEYS = ["github"]`, #348); unsupported provider capabilities fail before effects instead of changing tracker authority.
+- The tracker layer is config-only (`TRACKER_KEYS = ["github", "files"]`, #414); unsupported provider capabilities fail before effects instead of changing tracker authority. This repository pins `github`.
 - Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
 - Active sprints partition by track scope (2026-07, epic #289): `component:` equality or explicit `scope:` globs decide overlap through the ONE `scopesOverlap()` in `scripts/lib.js` — never re-implement it. Disjoint tracks coexist as a portfolio; overlap fails loud; single-track behavior is the G4 text-byte-identity compatibility surface (anchored in smoke-test.sh; never snapshot `--json`, which is schema-versioned instead).
 

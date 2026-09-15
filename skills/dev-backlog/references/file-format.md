@@ -65,11 +65,13 @@ task item.
 github
 ```
 
-The only supported value is `github`. When `.tracker` is missing, runtime
-accepts only a leftover top-level `tracker: github` value from `config.yml`;
-with neither, it deterministically defaults to `github`. Any other value fails.
-Availability never changes selection; adapter failure is fail-closed. Setup
-writes `.tracker` atomically and never edits `config.yml`.
+The supported values are `github` and `files`. When `.tracker` is missing, runtime
+accepts only a leftover top-level `tracker: github` or `tracker: files` value
+from `config.yml`; with neither, it deterministically defaults to `github`. Any
+other value fails. Availability never changes selection; adapter failure is
+fail-closed. Setup writes `.tracker` atomically and never edits `config.yml`.
+`files` is a chosen Backlog.md CLI authority (plan refs `BACK-N`), not a
+fallback from GitHub.
 
 ## .dev-backlog/config.yml
 

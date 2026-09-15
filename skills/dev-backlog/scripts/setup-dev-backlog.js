@@ -20,7 +20,7 @@ const {
   migrateLegacyExecutionRoot,
 } = require("./execution-root.js");
 
-const ALLOWED_TRACKERS = Object.freeze(["github"]);
+const ALLOWED_TRACKERS = Object.freeze(["github", "files"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
 
 function requiredDirectories() {
@@ -50,7 +50,7 @@ function usage() {
     "Usage: setup-dev-backlog.js [project-name] [options]",
     "",
     "Options:",
-    "  --tracker github        Pin the GitHub task authority",
+    "  --tracker github|files  Pin the chosen task authority",
     "  --non-interactive       Never prompt (required with --tracker when fresh)",
     "  --project-name NAME     Project name reported for compatibility",
     "  --json                  Print structured output",
@@ -114,7 +114,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 
   if (options.tracker !== undefined && !ALLOWED_TRACKERS.includes(options.tracker)) {
     throw new SetupError(
-      `Invalid --tracker value ${JSON.stringify(options.tracker)}; expected github.`
+      `Invalid --tracker value ${JSON.stringify(options.tracker)}; expected github or files.`
     );
   }
   if (options.projectName !== undefined && options.projectName.length === 0) {
@@ -126,7 +126,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 function assertAllowedTracker(selection, sourcePath) {
   if (!ALLOWED_TRACKERS.includes(selection)) {
     throw new SetupError(
-      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected github.`
+      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected github or files.`
     );
   }
   return selection;
@@ -530,7 +530,7 @@ async function promptForTracker({ recommendation, evidence }) {
   const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     return await terminal.question(
-      `Tracker [github] (default: ${recommendation}): `
+      `Tracker [github|files] (default: ${recommendation}): `
     );
   } finally {
     terminal.close();

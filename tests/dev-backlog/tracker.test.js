@@ -40,17 +40,18 @@ function adapter(overrides = {}) {
   };
 }
 
-describe("GitHub-only authority selection", () => {
-  it("defaults to and explicitly accepts only github", () => {
-    assert.deepEqual([...TRACKER_KEYS], ["github"]);
+describe("Configured tracker selection", () => {
+  it("defaults to github and explicitly accepts files", () => {
+    assert.deepEqual([...TRACKER_KEYS], ["github", "files"]);
     assert.ok(Object.isFrozen(TRACKER_KEYS));
     assert.equal(selectTracker(), "github");
     assert.equal(selectTracker({}), "github");
     assert.equal(selectTracker({ tracker: "github" }), "github");
-    for (const value of ["local", "gitlab", "files", "", 7, null]) {
+    assert.equal(selectTracker({ tracker: "files" }), "files");
+    for (const value of ["local", "gitlab", "", 7, null]) {
       assert.throws(
         () => selectTracker({ tracker: value }),
-        (error) => error instanceof TrackerConfigurationError && /expected one of: github/.test(error.message),
+        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files/.test(error.message),
       );
     }
   });
@@ -64,6 +65,11 @@ describe("GitHub-only authority selection", () => {
     assert.equal(readTrackerSelection(backlogDir), undefined);
     fs.writeFileSync(path.join(backlogDir, ".tracker"), "github\n");
     assert.equal(resolveConfiguredTracker({}, { backlogDir, adapters: { github: adapter() } }).tracker, "github");
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "files\n");
+    assert.equal(
+      resolveConfiguredTracker({}, { backlogDir, adapters: { github: adapter(), files: adapter() } }).tracker,
+      "files",
+    );
     fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
     assert.throws(
       () => resolveConfiguredTracker({}, { backlogDir, adapters: { github: adapter() } }),
@@ -72,17 +78,25 @@ describe("GitHub-only authority selection", () => {
   });
 
   it("never falls back when the GitHub adapter is unavailable", () => {
+    let filesListCalls = 0;
     const github = adapter({
       availability: () => ({ available: false, reason: "gh authentication expired" }),
     });
+    const files = adapter({
+      list: () => {
+        filesListCalls += 1;
+        return [];
+      },
+    });
     assert.throws(
-      () => resolveTracker({}, { adapters: { github } }),
+      () => resolveTracker({}, { adapters: { github, files } }),
       (error) => (
         error instanceof TrackerUnavailableError &&
         error.tracker === "github" &&
         /no fallback was attempted/i.test(error.message)
       ),
     );
+    assert.equal(filesListCalls, 0);
   });
 
   it("normalizes throwing, undefined, malformed, and reasonless availability failures", () => {
@@ -126,9 +140,10 @@ describe("GitHub-only authority selection", () => {
 });
 
 describe("retained adapter portability seam", () => {
-  it("keeps one exact operation shape for production and injected fake-gh adapters", () => {
-    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github"]);
+  it("keeps one exact operation shape for production github and files adapters", () => {
+    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files"]);
     assert.equal(validateAdapter("github", TRACKER_ADAPTERS.github), TRACKER_ADAPTERS.github);
+    assert.equal(validateAdapter("files", TRACKER_ADAPTERS.files), TRACKER_ADAPTERS.files);
     const injected = adapter();
     assert.equal(validateAdapter("github", injected), injected);
     assert.deepEqual([...REQUIRED_ADAPTER_OPERATIONS], [
@@ -154,7 +169,7 @@ describe("retained adapter portability seam", () => {
     );
   });
 
-  it("validates GitHub identities and rejects missing, empty, extra, or invalid fields", () => {
+  it("validates GitHub and files identities and rejects missing, empty, extra, or invalid fields", () => {
     const identity = {
       tracker: "github",
       id: "42",
@@ -162,6 +177,8 @@ describe("retained adapter portability seam", () => {
       url: "https://github.com/acme/widgets/issues/42",
     };
     assert.equal(validateIdentity(identity), identity);
+    const filesIdentity = { tracker: "files", id: "12", ref: "BACK-12" };
+    assert.equal(validateIdentity(filesIdentity), filesIdentity);
     for (const invalid of [
       null,
       {},
@@ -169,6 +186,7 @@ describe("retained adapter portability seam", () => {
       { tracker: "github", ref: "#42" },
       { tracker: "", id: "42", ref: "#42" },
       { tracker: "local", id: "42", ref: "#42" },
+      { tracker: "gitlab", id: "42", ref: "#42" },
       { tracker: "github", id: "", ref: "#42" },
       { tracker: "github", id: "42", ref: "" },
       { tracker: "github", id: "42", ref: "#42", url: "not a url" },

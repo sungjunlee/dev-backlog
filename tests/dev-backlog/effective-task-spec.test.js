@@ -124,7 +124,7 @@ describe("effective task spec selection", () => {
       state: "open",
       status: "In Progress",
       updated_date: "2026-07-31",
-    }, { tracker: "local" });
+    }, { tracker: "files" });
 
     const result = resolveEffectiveTaskSpec(fixture.resolved, "BACK-42", {
       specRef: "spec/tasks/42.md",

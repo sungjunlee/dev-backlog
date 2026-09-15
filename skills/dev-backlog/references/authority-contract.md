@@ -1,11 +1,13 @@
 # GitHub-native authority and routing contract
 
-GitHub Issues own task specification and lifecycle. A sprint file exists only
-when execution needs continuity beyond one Issue and its PR. Exactly one
+GitHub Issues own task specification and lifecycle when `.tracker=github`
+(the default, and this repository's pin). When `.tracker=files`, the Backlog.md
+CLI is the sole task-spec and lifecycle authority. A sprint file exists only
+when execution needs continuity beyond one task and its PR. Exactly one
 configured tracker (`.tracker` is setup-only); runtime never switches adapters.
 Diagnostic export files (`exports/github-issues/` via `--legacy-export`) are an
 explicit one-way snapshot, never runtime authority. Adapter failure is
-fail-closed: no local-file or export fallback.
+fail-closed: no local-file, other-adapter, or export fallback.
 
 ## Authority and routing table
 
@@ -59,14 +61,16 @@ The core product excludes:
 - silent adapter fallback to local files or diagnostic export;
 - automatic writes from search, retrieval, summaries, or memory compilers;
 - required Relay, Matt Pocock skill, GitHub Projects, or Backlog.md runtime
-  dependencies;
-- a second task-spec or lifecycle authority outside GitHub Issues.
+  dependencies when `.tracker=github`;
+- a second task-spec or lifecycle authority in the same repo (GitHub and files
+  are never co-authority).
 
-Do not add tracker providers, bidirectional compatibility machinery,
-task-mirror lifecycle features, or a committed memory/compiler layer without
-new measured adoption evidence and an explicit authority-contract amendment.
+Do not add tracker providers beyond the frozen `TRACKER_KEYS` (`github`,
+`files`), bidirectional compatibility machinery, task-mirror lifecycle
+features, or a committed memory/compiler layer without new measured adoption
+evidence and an explicit authority-contract amendment.
 Measured adoption: 0 of 17 selected a non-default tracker; all 18 then-known
-consumers had a GitHub remote. That evidence froze the GitHub-native core.
+consumers had a GitHub remote. That evidence froze the GitHub-native default.
 
 ## Optional boundaries
 
@@ -75,7 +79,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native core.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Optional leftover operator tree under `backlog/` | The skill does not productize Backlog.md. Human-reviewed Markdown may be imported into a GitHub Issue. Backlog.md tooling is not required |
+| Backlog.md | Chosen task authority when `.tracker=files`; otherwise leftover operator tree under `backlog/` | When `files` is chosen, read/write tasks only through the `backlog` CLI (`--json` where available). Leftover `backlog/tasks/*.md` is never a product parser API. Missing CLI is fail-closed. Never co-authority with GitHub |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 
@@ -89,4 +93,6 @@ installation must be able to:
    this bundle, with `objectives:` and `component:` omitted.
 
 No path may require a cross-repository spec reference, Relay artifact, Projects
-board, task mirror, generated memory, or Backlog.md installation.
+board, task mirror, generated memory, or (when `.tracker=github`) a Backlog.md
+installation. When `.tracker=files`, the Backlog.md CLI is required and GitHub
+is not co-authority.

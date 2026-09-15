@@ -6,7 +6,7 @@ boundaries live in `authority-contract.md`.
 
 ## Setup
 
-For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive`. It creates `.dev-backlog/sprints/` and pins GitHub as the task authority; tracker selection rules live in `file-format.md`.
+For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github --non-interactive` (or `--tracker files` to pin the Backlog.md CLI). It creates `.dev-backlog/sprints/` and pins the chosen task authority; tracker selection rules live in `file-format.md`.
 
 ## Programmatic Lifecycle Boundary
 
