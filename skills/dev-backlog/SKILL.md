@@ -28,8 +28,9 @@ README covers install and human quick start. This file is the agent execution co
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
-The state ownership, compatibility, and optional-integration boundary
+The state ownership, fail-closed tracker, and optional-integration boundary
 are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
+Tracker adapter ports: [`references/adapter-ports.md`](references/adapter-ports.md).
 
 ## Core Contracts
 
@@ -127,6 +128,7 @@ Done when the next actionable batch or sprint-planning need is named.
 These stay explicit because they guard shared or irreversible state:
 
 - Every GitHub mutation is deliberate and explicit; there is no background sync.
+- Configured tracker failure is fail-closed: stop and repair; never fall back to local files or a diagnostic export.
 - `status: completed` is never flipped back; completed sprints are immutable history.
 - Unattended sessions never `amend` `spec/*`.
 
@@ -149,7 +151,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 - `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
 - `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Quick Fix/Unplanned Work/Next workflow.
-- `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional legacy export (`sync-pull.js --legacy-export`, rollback/diagnostics only).
+- `references/adapter-ports.md` — tracker adapter port contract (required ops, fail-closed availability, capability gates).
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional diagnostic export (`sync-pull.js --legacy-export`).
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.

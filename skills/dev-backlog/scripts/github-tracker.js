@@ -1,4 +1,7 @@
-/** GitHub implementation of the required seven-operation tracker lifecycle. */
+/**
+ * GitHub implementation of the required seven-operation tracker lifecycle.
+ * Port contract: references/adapter-ports.md.
+ */
 
 const { execFileSync } = require("child_process");
 

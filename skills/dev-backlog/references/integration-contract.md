@@ -12,7 +12,7 @@ Any actor consuming dev-backlog state should treat these files as the stable rea
 
 - `.dev-backlog/sprints/*.md` with `status: active` are the active execution hubs — one per disjoint-scope track (most repos run a single track): frontmatter identifies lifecycle, routing, and track-scope state; `## Goal`, `## Plan`, `## Running Context`, and `## Progress` identify the current objective, work queue, reusable discoveries, and execution trace.
 - `.dev-backlog/sprints/_context.md` is cross-sprint project memory. Its sections provide durable context for future sessions and analyzers.
-- `backlog/tasks/` and `backlog/completed/` are optional legacy exports with one-way flow from GitHub. They are Backlog.md-shaped paths, not the skill execution root. GitHub Issues are the sole task authority. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log.
+- `exports/github-issues/` is an optional diagnostic snapshot with one-way flow from GitHub. It is not the skill execution root and not a Backlog.md compatibility layer. GitHub Issues are the sole task authority. Actors resolve effective task specs and AC through `effective-task-spec.js`; exported bodies and checkboxes are diagnostic/rollback bytes only. Sprint files remain the execution log. Leftover `backlog/tasks/` or `backlog/completed/` trees, if present, are operator files — never runtime authority.
 - `spec/capabilities.md`, when present, is an optional capability-level learning target addressed by active sprint frontmatter `component:`.
 
 The sections below define the path, heading, checkbox, and annotation grammar. Consumers may read more prose, but they must not require additional headings or rewritten formats to orient from files alone.
@@ -167,12 +167,12 @@ The doctor's own JSON schema stays at `1`; it is independent of the actor read-s
 
 | What | Pattern | Example |
 |------|---------|---------|
-| Legacy task exports | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
+| Diagnostic task exports | `exports/github-issues/{PREFIX}-{N} - {slug}.md` | `exports/github-issues/BACK-42 - oauth-flow.md` |
 | Active sprint | `.dev-backlog/sprints/*.md` with `status: active` | `.dev-backlog/sprints/2026-03-auth-system.md` |
 | Cross-sprint context | `.dev-backlog/sprints/_context.md` | (always this exact name) |
-| Legacy completed exports | `backlog/completed/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/completed/BACK-38 - db-schema.md` |
+| Leftover operator tasks | `backlog/tasks/{PREFIX}-{N[.M]} - {slug}.md` | `backlog/tasks/BACK-42.1 - oauth-flow.md` |
 
-These task paths exist only when an operator requests a legacy export. **PREFIX**
+These task paths exist only when an operator requests a diagnostic export, or as leftover operator files. **PREFIX**
 defaults to `BACK` and is configurable via `.dev-backlog/config.yml` →
 `task_prefix`; it does not select or identify a runtime provider.
 

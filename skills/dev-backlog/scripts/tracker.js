@@ -1,8 +1,14 @@
 /**
- * Configured tracker boundary.
+ * Configured tracker boundary. Port contract: references/adapter-ports.md.
  *
- * Selection is configuration-only. Availability can reject the configured
- * adapter, but it can never choose a different one.
+ * TRACKER_KEYS is config-only selection (this release: ["github"]). Runtime
+ * never switches adapters. Availability can reject the configured adapter, but
+ * it can never choose a different one. Adapter failure is fail-closed: no
+ * local-file or diagnostic-export fallback.
+ *
+ * Required adapter own-keys are exactly REQUIRED_ADAPTER_OPERATIONS, each a
+ * function. Optional capabilities are a CAPABILITY_NAMES subset and may be
+ * invoked only through invokeCapability. Identities pass validateIdentity.
  */
 
 const { createGithubAdapter } = require("./github-tracker.js");
@@ -123,6 +129,7 @@ function renderValue(value) {
   }
 }
 
+/** Config-only. Returns a TRACKER_KEYS member; never probes availability. */
 function selectTracker(config = {}) {
   const hasSelection =
     config !== null &&
@@ -147,6 +154,7 @@ function readTrackerSelection(backlogDir = DEFAULT_BACKLOG_DIR, { fs: fsApi = fs
   }
 }
 
+/** Exact REQUIRED_ADAPTER_OPERATIONS shape: all functions, no extra own-keys. */
 function validateAdapter(tracker, adapter) {
   if (adapter === null || typeof adapter !== "object" || Array.isArray(adapter)) {
     throw new TrackerContractError(`Tracker "${tracker}" adapter must be an object.`);
@@ -178,6 +186,7 @@ function availabilityFailure(tracker, reason, cause) {
   return new TrackerUnavailableError(tracker, reason, cause ? { cause } : undefined);
 }
 
+/** Rejects the configured adapter only. Never selects a different tracker. */
 function probeConfiguredAdapter(tracker, adapter) {
   let report;
   try {
@@ -206,6 +215,10 @@ function probeConfiguredAdapter(tracker, adapter) {
   return Object.freeze({ available: true });
 }
 
+/**
+ * Resolve the configured adapter. Injected `adapters` are for tests; runtime
+ * still uses the configured key only and never falls back to files/export.
+ */
 function resolveTracker(config, { adapters = TRACKER_ADAPTERS } = {}) {
   const tracker = selectTracker(config);
   const adapter = adapters[tracker];
@@ -240,6 +253,7 @@ function resolveConfiguredTracker(config, {
   });
 }
 
+/** Plain object: tracker (TRACKER_KEYS), id, ref, optional absolute http(s) url. */
 function validateIdentity(identity) {
   if (
     identity === null ||
@@ -291,6 +305,7 @@ function isProviderUrl(value) {
   }
 }
 
+/** Array subset of CAPABILITY_NAMES; unknown or duplicate names fail closed. */
 function readCapabilities(tracker, adapter) {
   const reported = adapter.capabilities();
   if (!Array.isArray(reported)) {
@@ -312,6 +327,7 @@ function readCapabilities(tracker, adapter) {
   return Object.freeze([...reported]);
 }
 
+/** Run `operation` only when `capability` is reported. Never switches trackers. */
 function invokeCapability(resolved, capability, operation, ...args) {
   if (
     resolved === null ||

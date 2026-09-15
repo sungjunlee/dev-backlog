@@ -192,8 +192,22 @@ describe("runDoctor", () => {
     const selection = check(report, "tracker_selection");
     assert.equal(selection.status, "warn");
     assert.match(selection.detail.remediation, /Remove the stale top-level tracker:/);
+    assert.match(selection.detail.remediation, /fail-closed/);
     assert.match(selection.detail.remediation, /backlog\/config\.yml/);
     assert.match(selection.detail.remediation, /backlog\/\.tracker/);
+    assert.equal(report.exit_hint, "warn");
+    assert.equal(exitCodeFor(report), 0);
+  });
+
+  it("warns that leftover skill files under backlog/ are not fallback authority", () => {
+    seedCleanRepo(repoRoot);
+    write(path.join(repoRoot, "backlog", "sprints", "leftover.md"), "# leftover\n");
+
+    const report = runDoctor({ repoRoot });
+    const leftover = check(report, "legacy_execution_root");
+    assert.equal(leftover.status, "warn");
+    assert.match(leftover.detail.summary, /Leftover skill files under backlog\//);
+    assert.match(leftover.detail.summary, /not fallback authority/);
     assert.equal(report.exit_hint, "warn");
     assert.equal(exitCodeFor(report), 0);
   });

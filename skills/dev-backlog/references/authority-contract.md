@@ -1,8 +1,9 @@
 # GitHub-native authority and routing contract
 
 GitHub Issues own task specification and lifecycle. A sprint file exists only
-when execution needs continuity beyond one Issue and its PR. Task files remain
-an explicit one-way legacy import/export boundary, never runtime authority.
+when execution needs continuity beyond one Issue and its PR. Diagnostic export
+files are an explicit one-way snapshot, never runtime authority. Adapter failure
+is fail-closed: no local-file or export fallback.
 
 ## Authority and routing table
 
@@ -11,8 +12,8 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | GitHub Issue body and acceptance criteria; a posted `## Agent Brief` comment is the contract when present | Create or amend the Issue (or post the brief as a comment), then read the live Issue and its comments | Legacy `backlog/tasks/` files, sprint Plan text, GitHub Projects |
-| Task lifecycle | GitHub Issue state and native metadata | Update the Issue state, labels, milestone, assignees, and native relationships | Sprint checkboxes, legacy task files, project-board fields |
+| Task specification | GitHub Issue body and acceptance criteria; a posted `## Agent Brief` comment is the contract when present | Create or amend the Issue (or post the brief as a comment), then read the live Issue and its comments | Diagnostic `exports/github-issues/` snapshots, sprint Plan text, GitHub Projects |
+| Task lifecycle | GitHub Issue state and native metadata | Update the Issue state, labels, milestone, assignees, and native relationships | Sprint checkboxes, diagnostic export files, project-board fields |
 | Planning fields | GitHub Issue native metadata | Use labels, milestone, assignees, and Issue relationships; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
@@ -53,6 +54,7 @@ lifecycle.
 The core product excludes:
 
 - dual-write or bidirectional task state;
+- silent adapter fallback to local files or diagnostic export;
 - automatic writes from search, retrieval, summaries, or memory compilers;
 - required Relay, Matt Pocock skill, GitHub Projects, or Backlog.md runtime
   dependencies;
@@ -71,7 +73,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native core.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Optional one-way legacy format compatibility | Human-reviewed Markdown may be imported into a GitHub Issue; `--legacy-export` may emit diagnostic/rollback snapshots; task files are never read as runtime authority and Backlog.md tooling is not required |
+| Backlog.md | Optional leftover operator tree under `backlog/` | The skill does not productize Backlog.md. Human-reviewed Markdown may be imported into a GitHub Issue. `--legacy-export` emits diagnostic snapshots to `exports/github-issues/` (not a compatibility layer, never runtime authority, not under `.dev-backlog/`). Backlog.md tooling is not required |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 

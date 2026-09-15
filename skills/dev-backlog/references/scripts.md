@@ -21,12 +21,12 @@ entry points and are intentionally not listed.
 
 - `scripts/setup-dev-backlog.js [project-name] [--tracker github] [--non-interactive] [--json]` — persist GitHub as the canonical task authority and create only `sprints/`.
 - `scripts/init.sh [project-name]` — bootstrap `.dev-backlog/` with `.tracker` and directories.
-- `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `process.md`.
+- `scripts/tracker.js` — official programmatic core lifecycle boundary: resolve the configured adapter with `{ backlogDir }`, then call `list`, `read`, `create`, `update`, or `close` as documented in `adapter-ports.md` and `process.md`. Adapter failure is fail-closed.
 - `scripts/effective-task-spec.js TASK_REF [--repo OWNER/REPO] [--spec-ref PATH] [--backlog-dir PATH] [--root PATH]` — resolve the configured live task into effective spec, normalized AC/lifecycle, selected source, and stable SHA-256 revision/digest. Source precedence: explicit `spec_ref` (body marker `<!-- dev-backlog:spec_ref PATH -->` or `--spec-ref`), then a posted `## Agent Brief` comment, then the Issue body. Any authority/spec load failure stops without a task-mirror fallback.
 - `scripts/next.sh [--json] [--track slug] [backlog-dir]` — show the next actionable batch; N disjoint active tracks render a portfolio, `--track` selects one.
 - `scripts/status.sh [--json] [--track slug] [backlog-dir]` — summarize sprint-file state plus task state from the configured tracker; portfolio/`--track` semantics match `next.sh`.
 - `scripts/sprint-state.js [--mode status|next] [--track slug | --component slug] [backlog-dir]` — the single sprint-markdown parser behind the `--json` surfaces; emits `schema_version: 2` with `active_sprints[]` plus retained single-track fields.
-- `scripts/sync-pull.js --legacy-export [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — opt-in diagnostic/rollback export of open Issues to `backlog/tasks/`; not a core lifecycle step.
+- `scripts/sync-pull.js --legacy-export [PREFIX] [--update] [--dry-run] [--json] [--limit N]` — opt-in diagnostic/rollback export of open Issues to `exports/github-issues/`; not a core lifecycle step and not a Backlog.md compatibility layer.
 - `scripts/sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"] [--dry-run] [--json]` — create an active sprint skeleton; refuses only a track whose scope overlaps an existing active track (with 2+ active tracks, any undeclared axis warns and allows). `--component` validates and emits one `spec/capabilities.md` slug; `--scope` emits explicit globs when no component axis fits. The flags are mutually exclusive, and spec-backed fields otherwise follow `spec-fallback.md`.
 - `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]` — close an active sprint and print the doctor/reassess signal summary; `--track` picks the track when several are active, otherwise an unambiguous single active needs no flag. Checked legacy mirrors are archived only when present; a mirrorless close is the normal supported path.
 - `scripts/objectives-check.js [--sprints-dir PATH] [--charter PATH] [--json]` — verify sprint Objective IDs.
@@ -38,4 +38,4 @@ entry points and are intentionally not listed.
 
 ## Tracker routing
 
-`.dev-backlog/.tracker` selection rules live in `file-format.md`; routing and optional-export boundaries in `authority-contract.md`.
+`.dev-backlog/.tracker` selection rules live in `file-format.md`; adapter ports in `adapter-ports.md`; routing and optional-export boundaries in `authority-contract.md`.

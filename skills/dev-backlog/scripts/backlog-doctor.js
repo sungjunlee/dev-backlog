@@ -58,6 +58,7 @@ function usage() {
     "",
     "Runs active-sprint, objectives, component, capabilities, sprint-shape,",
     "in-flight trace/staleness, and _context.md bloat checks.",
+    "Configured tracker failure is fail-closed: no local-file or export fallback.",
   ].join("\n");
 }
 
@@ -244,7 +245,7 @@ function checkLeftoverLegacyRoot({ repoRoot, backlogPath }) {
   return verdict("legacy_execution_root", "warn", {
     summary:
       `Leftover skill files under ${LEGACY_EXPORT_DIR}/ (${leftover.join(", ")}); ` +
-      `execution root is ${DEFAULT_BACKLOG_DIR}/. See file-format.md migrate.`,
+      `execution root is ${DEFAULT_BACKLOG_DIR}/. They are not fallback authority. See file-format.md migrate.`,
     leftover,
   });
 }
@@ -261,7 +262,8 @@ function checkStaleTrackerSelection({ repoRoot, backlogPath }) {
   const displayTracker = displayPath(repoRoot, trackerPath);
   const remediation =
     `Remove the stale top-level tracker: key from ${displayConfig}; ` +
-    `change ${displayTracker} when selecting a different tracker.`;
+    `change ${displayTracker} when selecting a different tracker. ` +
+    "Runtime never switches adapters; adapter failure is fail-closed with no local-file fallback.";
   return verdict("tracker_selection", "warn", {
     summary: `Legacy tracker selection remains in ${displayConfig} after ${displayTracker} became authoritative. ${remediation}`,
     config_path: displayConfig,

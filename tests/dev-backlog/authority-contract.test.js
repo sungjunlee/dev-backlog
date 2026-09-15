@@ -60,6 +60,8 @@ it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
   assert.match(markdown, /0 of 17 selected a\s+non-default tracker/);
   assert.match(markdown, /Time is not an admission criterion/);
   assert.match(markdown, /dual-write or bidirectional task state/);
+  assert.match(markdown, /fail-closed/);
+  assert.match(markdown, /silent adapter fallback to local files or diagnostic export/);
   assert.match(markdown, /automatic writes from search, retrieval, summaries, or memory compilers/);
 
   for (const optional of ["Relay", "Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
@@ -86,10 +88,13 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   );
 
   assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
-  assert.match(readme, /Backlog\.md compatibility is a one-way legacy boundary/);
+  assert.match(readme, /Diagnostic Issue snapshots/);
+  assert.match(readme, /never task authority/);
   assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
   assert.match(skill, /^## Sprint Admission$/m);
   assert.match(skill, /effective-task-spec\.js/);
+  assert.match(skill, /fail-closed/);
+  assert.match(skill, /adapter-ports\.md/);
   assert.match(capabilities, /If that read fails, execution stops/);
   assert.match(charter, /one admitted sprint per track/);
   assert.match(sprint, /objectives: \[O10\]/);

@@ -50,10 +50,12 @@ node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
   "#42" --repo OWNER/REPO
 ```
 
-## Legacy Mirror Export
+## Diagnostic Export
 
 Use only when rehearsing rollback or collecting diagnostic bytes. Exported
-files are non-authoritative and must never authorize work or lifecycle changes.
+files land in `exports/github-issues/`, are non-authoritative, are not a
+Backlog.md compatibility layer, and must never authorize work or lifecycle
+changes. Not on orient / plan / work / complete.
 
 ```bash
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sync-pull.js \

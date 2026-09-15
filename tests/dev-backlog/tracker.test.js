@@ -9,6 +9,7 @@ const {
   CAPABILITY_NAMES,
   REQUIRED_ADAPTER_OPERATIONS,
   TRACKER_ADAPTERS,
+  TRACKER_KEYS,
   TrackerConfigurationError,
   TrackerContractError,
   TrackerIdentityError,
@@ -41,10 +42,12 @@ function adapter(overrides = {}) {
 
 describe("GitHub-only authority selection", () => {
   it("defaults to and explicitly accepts only github", () => {
+    assert.deepEqual([...TRACKER_KEYS], ["github"]);
+    assert.ok(Object.isFrozen(TRACKER_KEYS));
     assert.equal(selectTracker(), "github");
     assert.equal(selectTracker({}), "github");
     assert.equal(selectTracker({ tracker: "github" }), "github");
-    for (const value of ["local", "gitlab", "", 7, null]) {
+    for (const value of ["local", "gitlab", "files", "", 7, null]) {
       assert.throws(
         () => selectTracker({ tracker: value }),
         (error) => error instanceof TrackerConfigurationError && /expected one of: github/.test(error.message),
