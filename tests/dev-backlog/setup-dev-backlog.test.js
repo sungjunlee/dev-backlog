@@ -12,6 +12,10 @@ const {
   parseArgs,
   runSetup,
 } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
+const {
+  leftoverSkillFiles,
+  migrateLegacyExecutionRoot,
+} = require(path.join(SKILL_SCRIPTS, "execution-root.js"));
 
 const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
 const INIT = path.join(SKILL_SCRIPTS, "init.sh");
@@ -170,5 +174,31 @@ describe("GitHub-only setup", () => {
     );
     assert.deepEqual(snapshot(cwd), before);
     assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog")), false);
+  });
+
+  it("leaves a lone backlog/config.yml in place and pins .dev-backlog/.tracker", async (t) => {
+    const cwd = root(t);
+    const source = path.join(cwd, "backlog");
+    const raw = "project_name: backlog-md\ndefault_status: To Do\n";
+    fs.mkdirSync(source);
+    fs.writeFileSync(path.join(source, "config.yml"), raw);
+    const result = await runSetup({ cwd, tracker: "github", nonInteractive: true });
+    assert.equal(result.selection, "github");
+    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog/config.yml")), false);
+    assert.equal(fs.readFileSync(path.join(source, "config.yml"), "utf8"), raw);
+    assert.deepEqual(leftoverSkillFiles(cwd), []);
+  });
+
+  it("skips auto-migrate when .dev-backlog/ already exists", (t) => {
+    const cwd = root(t);
+    fs.mkdirSync(path.join(cwd, ".dev-backlog"));
+    fs.mkdirSync(path.join(cwd, "backlog", "sprints"), { recursive: true });
+    fs.writeFileSync(path.join(cwd, "backlog", "sprints", "keep.md"), "# leftover\n");
+    const result = migrateLegacyExecutionRoot(cwd);
+    assert.equal(result.migrated, false);
+    assert.equal(result.reason, "destination-exists");
+    assert.equal(fs.readFileSync(path.join(cwd, "backlog", "sprints", "keep.md"), "utf8"), "# leftover\n");
+    assert.deepEqual(leftoverSkillFiles(cwd), ["sprints"]);
   });
 });

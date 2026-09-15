@@ -19,7 +19,7 @@ same live Issue.
 ```js
 const path = require("node:path");
 const skillDir = "/resolved/dev-backlog-skill";
-const backlogDir = ".dev-backlog"; // or the custom execution-root directory in use
+const backlogDir = ".dev-backlog"; // product default; positional [backlog-dir] is a test/override, not a second product root
 const { readConfig } = require(path.join(skillDir, "scripts/lib.js"));
 const { resolveConfiguredTracker } = require(path.join(skillDir, "scripts/tracker.js"));
 
@@ -51,7 +51,7 @@ never reads task files.
 
 ## Orient — Starting a Session
 
-1. If `.dev-backlog/` does not exist, complete **Setup**.
+1. Complete **Setup** only when an admitted sprint is in play or this session is about to admit one (`SKILL.md` Plan rail) and `.dev-backlog/` is missing. Sprint-free Issue → PR does not create `.dev-backlog/` (`authority-contract.md`).
 2. Read `.dev-backlog/sprints/_context.md` when present.
 3. Find the active sprint(s). One track: read Goal, Plan, Running Context, and latest Progress. Multiple disjoint tracks: `status.sh`/`next.sh` render a portfolio; pass `--track <slug>` to work one track.
 4. If no active sprint exists, list open Issues and create a sprint only when complexity admission applies.
@@ -107,9 +107,10 @@ For the whole sprint:
 
 1. Run `scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]`. With multiple active tracks, `--track <slug>` picks which one to close; without it the close refuses as ambiguous. Pass `--close-milestone` only for a tracker that reports `milestones`; unsupported requests fail before doctor or file mutation.
 2. The command sets `status: completed`, appends final Progress, and prints the
-   doctor/reassess summary. Close does not require or create task directories.
-   When checked legacy GitHub export files happen to exist, it archives only
-   those files.
+   doctor/reassess summary. Close does not touch `backlog/tasks/` (the
+   Backlog.md / `--legacy-export` tree). If leftover mirrors exist under the
+   execution root's `tasks/` (not that Backlog.md tree), close may archive
+   only those. Close does not require or create task directories.
 3. Promote durable Running Context to `_context.md`; retain the sprint file as history.
 
 ## Legacy Export — Explicit and One-Way

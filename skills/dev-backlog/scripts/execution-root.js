@@ -1,9 +1,9 @@
 /**
  * Skill execution root. One directory, not Backlog.md's `backlog/` tree.
  *
- * `sync-pull.js --legacy-export` still writes Backlog.md-shaped files under
- * LEGACY_EXPORT_DIR (`backlog/tasks/`). That export is diagnostic/rollback
- * only and is never skill execution authority.
+ * LEGACY_TASKS_DIR is `backlog/tasks/` — the diagnostic/rollback target of
+ * `sync-pull.js --legacy-export`. LEGACY_EXPORT_DIR is the leftover `backlog/`
+ * tree (not an active skill root). Neither is skill execution authority.
  */
 
 const fs = require("node:fs");
@@ -43,6 +43,24 @@ function listPresentSkillNames(sourceDir, fsApi = fs) {
   return SKILL_OWNED_NAMES.filter((name) => exists(fsApi, path.join(sourceDir, name)));
 }
 
+function hasSkillLayoutMarkers(names) {
+  return names.some((name) => name !== "config.yml");
+}
+
+/**
+ * Skill-owned names that auto-migrate may copy+remove.
+ *
+ * `config.yml` migrates only when another skill marker (`sprints`, `.tracker`,
+ * `triage`, or `triage-config.yml`) is present. A lone `config.yml` is left
+ * under `backlog/` (Backlog.md or ambiguous); setup still creates
+ * `.dev-backlog/.tracker`. Never includes `tasks/`, `docs/`, or `completed/`.
+ */
+function skillOwnedNamesForMigration(sourceDir, fsApi = fs) {
+  const present = listPresentSkillNames(sourceDir, fsApi);
+  if (!hasSkillLayoutMarkers(present)) return [];
+  return present;
+}
+
 function copyOwned(sourcePath, destPath, fsApi) {
   const stat = fsApi.lstatSync(sourcePath);
   if (stat.isDirectory()) {
@@ -69,12 +87,16 @@ function removeOwned(targetPath, fsApi) {
 }
 
 /**
- * One-shot move of leftover skill files from `backlog/` into `.dev-backlog/`.
+ * One-shot copy+remove of leftover skill files from `backlog/` into
+ * `.dev-backlog/`. Not git mv; no backup; not atomic.
  *
  * Runs only when the destination root is absent and at least one skill-owned
- * name exists under `backlog/`. Does not touch `backlog/tasks`, `docs`, or
- * `completed`. Callers must validate tracker selection on the source before
- * invoking this so a refused layout is left untouched.
+ * name exists under `backlog/`. If `.dev-backlog/` already exists, skips
+ * (`destination-exists`) and does not retry — leftovers stay and doctor warns;
+ * they are not a second active root. Does not touch `backlog/tasks`, `docs`,
+ * or `completed`. `config.yml` moves only with a skill layout marker. Callers
+ * must validate tracker selection on the source before invoking this so a
+ * refused layout is left untouched.
  */
 function migrateLegacyExecutionRoot(cwd, { fs: fsApi = fs } = {}) {
   const destRoot = path.join(cwd, DEFAULT_BACKLOG_DIR);
@@ -82,7 +104,7 @@ function migrateLegacyExecutionRoot(cwd, { fs: fsApi = fs } = {}) {
   if (exists(fsApi, destRoot)) {
     return { migrated: false, reason: "destination-exists" };
   }
-  const present = listPresentSkillNames(sourceRoot, fsApi);
+  const present = skillOwnedNamesForMigration(sourceRoot, fsApi);
   if (present.length === 0) {
     return { migrated: false, reason: "no-legacy-skill-files" };
   }
@@ -110,7 +132,7 @@ function migrateLegacyExecutionRoot(cwd, { fs: fsApi = fs } = {}) {
 }
 
 function leftoverSkillFiles(cwd, { fs: fsApi = fs } = {}) {
-  return listPresentSkillNames(path.join(cwd, LEGACY_EXPORT_DIR), fsApi);
+  return skillOwnedNamesForMigration(path.join(cwd, LEGACY_EXPORT_DIR), fsApi);
 }
 
 module.exports = {
