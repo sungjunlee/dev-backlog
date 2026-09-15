@@ -1,21 +1,21 @@
 # Process
 
 Detailed workflow for each phase. `SKILL.md` has the summary; this file routes
-the same core cycle through the configured tracker (GitHub Issues or the
-Backlog.md CLI). Routing and optional-export boundaries live in
+the same core cycle through the configured tracker (GitHub Issues, the
+Backlog.md CLI, or GitLab Issues via `glab`). Routing and optional-export boundaries live in
 `authority-contract.md`.
 
 ## Setup
 
-For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github|files --non-interactive`. It creates `.dev-backlog/sprints/` and pins the chosen task authority; tracker selection rules live in `file-format.md`.
+For a fresh repository, run `scripts/setup-dev-backlog.js --tracker github|files|gitlab --non-interactive`. It creates `.dev-backlog/sprints/` and pins the chosen task authority; tracker selection rules live in `file-format.md`. GitLab requires an authenticated `glab` CLI (`glab auth login`) before runtime use.
 
 ## Programmatic Lifecycle Boundary
 
 Scripts and automation create/read/update/close tasks through the adapter
 exported by `scripts/tracker.js` (resolve it from the target backlog directory;
-do not import `github-tracker.js` or `files-tracker.js` directly). An agent
-working interactively uses `gh` when `.tracker=github` (`github-sync.md`) or
-the `backlog` CLI when `.tracker=files`; both routes write the same live task
+do not import `github-tracker.js`, `files-tracker.js`, or `gitlab-tracker.js` directly). An agent
+working interactively uses `gh` when `.tracker=github` (`github-sync.md`),
+the `backlog` CLI when `.tracker=files`, or `glab` when `.tracker=gitlab`; all routes write the same live task
 in the configured tracker. Leftover `tasks/*.md` is never authority.
 
 ```js
@@ -31,7 +31,7 @@ const { adapter } = resolveConfiguredTracker(readConfig(backlogDir), { backlogDi
 Call `adapter.list({ state, limit })`, `adapter.read(selector)`,
 `adapter.create(input)`, `adapter.update(selector, changes)`, or
 `adapter.close(selector, options)`. Feed the returned normalized `ref` into the
-sprint Plan. Runtime selectors are `#N` (github) or `BACK-N` (files). These exported adapter methods are the stable core lifecycle
+sprint Plan. Runtime selectors are `#N` (github), `BACK-N` (files), or `gitlab#N` (gitlab). These exported adapter methods are the stable core lifecycle
 API; shell/Node scripts such as `status.sh`, `sync-pull.js`, and
 `sprint-close.sh` are workflow boundaries around it, not substitutes for task
 create/read/update/close.
@@ -65,8 +65,8 @@ never reads leftover `tasks/*.md`.
 
 ## Create — New Tasks
 
-1. Create the task with acceptance criteria (`gh issue create` when github, patterns in `github-sync.md`; `backlog task create` / `adapter.create` when files).
-2. Use its `#N` (github) or `BACK-N` (files) ref in the current sprint Plan when the work is admitted.
+1. Create the task with acceptance criteria (`gh issue create` when github, patterns in `github-sync.md`; `backlog task create` / `adapter.create` when files; `glab issue create` when gitlab).
+2. Use its `#N` (github), `BACK-N` (files), or `gitlab#N` (gitlab) ref in the current sprint Plan when the work is admitted.
 3. Continue directly from the created task.
 
 ## Plan — Sprint
@@ -76,7 +76,7 @@ When starting a new sprint:
 1. `sprint-init.js` refuses a track whose scope overlaps an active track (`scopesOverlap` in `lib.js`; with 2+ active tracks an undeclared axis warns and allows). Complete the conflicting track rather than editing `status:` by hand.
 2. Resolve optional `objectives:` and `component:` fields from the spec axis as described in `spec-fallback.md`; pass `sprint-init.js --component "slug"` for a declared capability, or mutually exclusive `--scope "glob[,glob]"` when no component axis fits.
 3. List open tasks through the adapter.
-4. GitHub may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible. Files seeds due TBD and an empty Plan (add `BACK-N` refs by hand).
+4. GitHub may create/assign a milestone and run `sprint-init.js "topic" --milestone "Name"`; its `#N`, estimates, due date, argv, and JSON remain legacy-compatible. Files and GitLab seed due TBD and an empty Plan (add `BACK-N` or `gitlab#N` refs by hand).
 5. Set a one-sentence Goal, order mutually parallel-safe work into batches, put dependencies in later batches, and record estimates where useful.
 
 ## Work — Execute a Batch
@@ -103,7 +103,7 @@ Per task:
    recorded source revision. If the source changed, review the new effective
    spec before completion.
 2. Commit or merge the implementation and check the Plan item.
-3. Call required `close` (`adapter.close`; files uses `backlog task edit` Done) to close the tracker task.
+3. Call required `close` (`adapter.close`; files uses `backlog task edit` Done; gitlab uses `glab issue close`) to close the tracker task.
 4. Use `Fixes #N`, comments, or closing relationships only when GitHub capability semantics are intentionally in scope.
 
 For the whole sprint:
@@ -130,7 +130,7 @@ effects and never switches trackers.
 
 ## Quick Fix — Single Task, No Sprint
 
-Read, update, and close the task through the adapter (github Issue or files CLI).
+Read, update, and close the task through the adapter (github Issue, files CLI, or gitlab `glab`).
 Create a sprint only when execution context needs to span work or sessions.
 
 ## Unplanned Work — Mid-Sprint Scope Change

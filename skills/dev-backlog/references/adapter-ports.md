@@ -1,13 +1,14 @@
 # Tracker adapter ports
 
-Frozen contract for `scripts/tracker.js`. New adapters (`files`, GitLab) must
-satisfy this seam; they are not added here. Selection is configuration-only.
+Frozen contract for `scripts/tracker.js`. Adapters (`github`, `files`,
+`gitlab`) satisfy this seam; Forgejo/Gitea are follow-ups that would reuse the
+same forge field shapes. Selection is configuration-only.
 Runtime never switches adapters. Adapter failure is fail-closed.
 
 ## Selection
 
 `TRACKER_KEYS` is the allowed `.tracker` / setup selection set. This release
-freezes it at `["github", "files"]`.
+freezes it at `["github", "files", "gitlab"]`.
 
 - `selectTracker` / `resolveTracker` read the configured key and load that
   adapter only.
@@ -83,5 +84,8 @@ not on orient / plan / work / complete.
 
 Details of the GitHub adapter live in `github-tracker.js`. The files adapter
 (`files-tracker.js`) talks only to the Backlog.md CLI (`backlog`); it never
-parses `backlog/tasks/*.md`. GitHub and files are never co-authority in one
-repo. Export layout: `file-format.md`. Authority routing: `authority-contract.md`.
+parses `backlog/tasks/*.md`. The GitLab adapter (`gitlab-tracker.js`) talks
+only to `glab`; identities are `gitlab#N`. GitHub, files, and GitLab are never
+co-authority in one repo. Forgejo/Gitea share forge field shapes and are
+follow-up adapters, not implemented here. Export layout: `file-format.md`.
+Authority routing: `authority-contract.md`.

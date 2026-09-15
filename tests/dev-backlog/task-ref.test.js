@@ -25,6 +25,11 @@ describe("parseTaskRef", () => {
       id: "42",
       ref: "BACK-42",
     });
+    assert.deepEqual(parseTaskRef("gitlab#9", OPTIONS), {
+      tracker: "gitlab",
+      id: "9",
+      ref: "gitlab#9",
+    });
   });
 
   it("preserves supported decimal local subtask identities", () => {
@@ -34,6 +39,7 @@ describe("parseTaskRef", () => {
       ref: "BACK-42.10",
     });
     assert.equal(parseTaskRef("#42.10", OPTIONS), null);
+    assert.equal(parseTaskRef("gitlab#42.10", OPTIONS), null);
   });
 
   it("rejects zero, negative, malformed, partial, and foreign-prefix refs", () => {
@@ -49,6 +55,9 @@ describe("parseTaskRef", () => {
       "BACK-1.2.3",
       "BACK-1 trailing",
       "OTHER-1",
+      "gitlab#0",
+      "gitlab#",
+      "gitlab#1 trailing",
       "",
     ]) {
       assert.equal(parseTaskRef(ref, OPTIONS), null, ref);
@@ -60,11 +69,13 @@ describe("renderTaskRef", () => {
   it("renders normalized identities without changing GitHub refs", () => {
     assert.equal(renderTaskRef({ tracker: "github", id: "11" }, OPTIONS), "#11");
     assert.equal(renderTaskRef({ tracker: "files", id: "11.2" }, OPTIONS), "BACK-11.2");
+    assert.equal(renderTaskRef({ tracker: "gitlab", id: "11" }, OPTIONS), "gitlab#11");
   });
 
   it("rejects identities outside the task-ref grammar", () => {
     assert.throws(() => renderTaskRef({ tracker: "github", id: "1.2" }, OPTIONS));
     assert.throws(() => renderTaskRef({ tracker: "files", id: "0" }, OPTIONS));
+    assert.throws(() => renderTaskRef({ tracker: "gitlab", id: "0" }, OPTIONS));
     assert.throws(() => renderTaskRef({ tracker: "other", id: "1" }, OPTIONS));
   });
 });
@@ -110,6 +121,15 @@ describe("containsTaskRef", () => {
     assert.equal(containsTaskRef("- 2026-07-01: prefix-BACK-1 is not exact", task), false);
     assert.equal(containsTaskRef("- 2026-07-01: - BACK-1 started", task), true);
   });
+
+  it("keeps gitlab#1 distinct from gitlab#11 and GitHub #1", () => {
+    const one = parseTaskRef("gitlab#1", OPTIONS);
+    assert.equal(containsTaskRef("- 2026-07-01: gitlab#1 started", one), true);
+    assert.equal(containsTaskRef("- 2026-07-01: gitlab#11 started", one), false);
+    assert.equal(containsTaskRef("- 2026-07-01: completed gitlab#1.", one), true);
+    assert.equal(containsTaskRef("- 2026-07-01: #1 started", one), false);
+    assert.equal(containsTaskRef("- 2026-07-01: review → PR #1", one), false);
+  });
 });
 
 describe("Plan and task-file boundaries", () => {
@@ -120,6 +140,11 @@ describe("Plan and task-file boundaries", () => {
       title: "Child [branch:child]",
     });
     assert.equal(parsePlanCheckbox("- [ ] BACK-1.2x Partial", OPTIONS), null);
+    assert.deepEqual(parsePlanCheckbox("- [ ] gitlab#9 Forge adapter", OPTIONS), {
+      checkboxState: " ",
+      identity: { tracker: "gitlab", id: "9", ref: "gitlab#9" },
+      title: "Forge adapter",
+    });
   });
 
   it("parses exact configured task filenames and keeps tracker aliases explicit", () => {
@@ -131,6 +156,10 @@ describe("Plan and task-file boundaries", () => {
       ...OPTIONS,
       tracker: "files",
     }), { tracker: "files", id: "11.2", ref: "BACK-11.2" });
+    assert.deepEqual(parseTaskFileName("BACK-9 - gitlab.md", {
+      ...OPTIONS,
+      tracker: "gitlab",
+    }), { tracker: "gitlab", id: "9", ref: "gitlab#9" });
     assert.equal(parseTaskFileName("BACK-1x - partial.md", OPTIONS), null);
     assert.equal(parseTaskFileName("OTHER-1 - foreign.md", OPTIONS), null);
   });

@@ -38,17 +38,18 @@ function stubAdapter(overrides = {}) {
 }
 
 describe("TRACKER_KEYS is config-only", () => {
-  it("freezes github and files as the selectable keys", () => {
-    assert.deepEqual([...TRACKER_KEYS], ["github", "files"]);
+  it("freezes github, files, and gitlab as the selectable keys", () => {
+    assert.deepEqual([...TRACKER_KEYS], ["github", "files", "gitlab"]);
     assert.ok(Object.isFrozen(TRACKER_KEYS));
-    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files"]);
+    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files", "gitlab"]);
     assert.equal(selectTracker(), "github");
     assert.equal(selectTracker({ tracker: "github" }), "github");
     assert.equal(selectTracker({ tracker: "files" }), "files");
-    for (const value of ["gitlab", "local", ""]) {
+    assert.equal(selectTracker({ tracker: "gitlab" }), "gitlab");
+    for (const value of ["gitea", "local", ""]) {
       assert.throws(
         () => selectTracker({ tracker: value }),
-        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files/.test(error.message),
+        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files, gitlab/.test(error.message),
       );
     }
   });
@@ -123,8 +124,10 @@ describe("stub adapter conformance", () => {
     assert.equal(validateIdentity(identity), identity);
     const filesIdentity = { tracker: "files", id: "1", ref: "BACK-1" };
     assert.equal(validateIdentity(filesIdentity), filesIdentity);
+    const gitlabIdentity = { tracker: "gitlab", id: "1", ref: "gitlab#1" };
+    assert.equal(validateIdentity(gitlabIdentity), gitlabIdentity);
     assert.throws(
-      () => validateIdentity({ tracker: "gitlab", id: "1", ref: "#1" }),
+      () => validateIdentity({ tracker: "gitea", id: "1", ref: "#1" }),
       TrackerIdentityError,
     );
     assert.throws(
@@ -163,9 +166,39 @@ describe("stub adapter conformance", () => {
       "not authority\n",
     );
     assert.throws(
-      () => selectTracker({ tracker: "gitlab" }),
+      () => selectTracker({ tracker: "gitea" }),
       TrackerConfigurationError,
     );
+  });
+
+  it("never falls back to github or files when gitlab is configured but unavailable", () => {
+    let githubListCalls = 0;
+    let filesListCalls = 0;
+    const gitlab = stubAdapter({
+      availability: () => ({ available: false, reason: "glab authentication expired" }),
+    });
+    const github = stubAdapter({
+      list: () => {
+        githubListCalls += 1;
+        return [];
+      },
+    });
+    const files = stubAdapter({
+      list: () => {
+        filesListCalls += 1;
+        return [];
+      },
+    });
+    assert.throws(
+      () => resolveTracker({ tracker: "gitlab" }, { adapters: { gitlab, github, files } }),
+      (error) => (
+        error instanceof TrackerUnavailableError &&
+        error.tracker === "gitlab" &&
+        /no fallback was attempted/i.test(error.message)
+      ),
+    );
+    assert.equal(githubListCalls, 0);
+    assert.equal(filesListCalls, 0);
   });
 
   it("does not treat a missing registered adapter as a cue to switch", () => {
