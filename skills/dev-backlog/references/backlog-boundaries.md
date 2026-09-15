@@ -17,6 +17,7 @@ Use this as the shared boundary reference for `dev-backlog` and `backlog-triage`
 
 - GitHub Issues remain the source of truth for task definitions and acceptance criteria when `.tracker=github`.
 - When `.tracker=files`, the Backlog.md CLI is the source of truth; Plan refs are `BACK-N`. The skill never parses or writes `backlog/tasks/*.md` as a product API.
+- When `.tracker=gitlab`, GitLab Issues via `glab` are the source of truth; Plan refs are `gitlab#N`.
 - Sprint files own batching, context, progress, and handoff only after work meets a complexity admission trigger; simple Issue → PR work is sprint-free.
 - Task projections are never read as authority; new mirror features are frozen pending staged retirement. Adapter failure is fail-closed.
 - `exports/github-issues/*.md` is an opt-in diagnostic snapshot from `sync-pull.js --legacy-export`. It is not product authority and is not under `.dev-backlog/`.

@@ -14,7 +14,8 @@
  *
  * GitHub (`.tracker=github`): seeds Plan from a milestone when that capability
  * is reported. Files (`.tracker=files`): due TBD and an empty Plan (add
- * BACK-N refs by hand). Never calls GitHub milestone helpers for files.
+ * BACK-N refs by hand). GitLab (`.tracker=gitlab`): due TBD and an empty Plan
+ * (add gitlab#N refs by hand); never calls GitHub milestone helpers.
  *
  * Multi-track (#292): a second active sprint is refused only when its scope
  * overlaps an existing active track (shared scopesOverlap from lib.js);
@@ -101,6 +102,10 @@ function filesIssueId(issue) {
 
 function planRefForIssue(issue) {
   if (typeof issue.ref === "string" && issue.ref.trim()) return issue.ref.trim();
+  if (issue.tracker === "gitlab") {
+    const id = String(issue.iid || issue.id || issue.number || "");
+    return renderTaskRef({ tracker: "gitlab", id });
+  }
   const filesId = filesIssueId(issue);
   if (filesId) return renderTaskRef({ tracker: "files", id: filesId });
   return renderTaskRef({ tracker: "github", id: String(issue.number) });

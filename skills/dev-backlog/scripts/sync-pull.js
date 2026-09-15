@@ -31,7 +31,11 @@ const {
   createGithubAdapter,
   stripNormalizedIdentity,
 } = require("./github-tracker.js");
-const { resolveConfiguredTracker } = require("./tracker.js");
+const {
+  resolveConfiguredTracker,
+  selectTracker,
+  readTrackerSelection,
+} = require("./tracker.js");
 const { DEFAULT_BACKLOG_DIR, LEGACY_TASKS_DIR } = require("./execution-root.js");
 const {
   parseTaskFileName,
@@ -381,12 +385,37 @@ function fetchOpenIssues(limit, execFile = execFileSync) {
     .map(stripNormalizedIdentity);
 }
 
+function legacyExportTrackerError(tracker) {
+  const error = new Error(
+    `sync-pull --legacy-export is a GitHub-shaped diagnostic export; configured tracker is "${tracker}".`
+  );
+  error.tracker = tracker;
+  error.code = "LEGACY_EXPORT_GITHUB_ONLY";
+  error.remediation =
+    "Diagnostic export materializes GitHub issues into exports/github-issues/. " +
+    "It is not a gitlab or files snapshot. Change .tracker only at setup; no fallback was attempted.";
+  return error;
+}
+
+function configuredTrackerForExport({ config = {}, backlogDir } = {}) {
+  const storedSelection = backlogDir
+    ? readTrackerSelection(backlogDir)
+    : undefined;
+  return storedSelection === undefined
+    ? selectTracker(config)
+    : selectTracker({ tracker: storedSelection });
+}
+
 function loadOpenIssues({
   limit,
   execFile = execFileSync,
   config = {},
   backlogDir,
 } = {}) {
+  const tracker = configuredTrackerForExport({ config, backlogDir });
+  if (tracker !== "github") {
+    throw legacyExportTrackerError(tracker);
+  }
   const resolved = resolveConfiguredTracker(config, { execFile, backlogDir });
   return resolved.adapter
     .list({ limit, fields: ISSUE_JSON_FIELDS })

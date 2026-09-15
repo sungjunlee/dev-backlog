@@ -2,7 +2,7 @@
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
 description: Manage GitHub- or Backlog.md-backed sprint execution. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
-compatibility: Requires git, Node.js 18+, and the chosen tracker's CLI (`gh` for github, `backlog` for files). Works on Claude Code and Codex.
+compatibility: Requires git, Node.js 18+, and the chosen tracker's CLI (`gh` for github, `backlog` for files, `glab` for gitlab). Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
@@ -38,6 +38,7 @@ Tracker adapter ports: [`references/adapter-ports.md`](references/adapter-ports.
 ```
 GitHub Issues                    <- canonical task definition and lifecycle (default `.tracker=github`)
 Backlog.md CLI (`backlog`)       <- same role when `.tracker=files` (plan refs BACK-N)
+GitLab Issues (`glab`)           <- same role when `.tracker=gitlab` (plan refs gitlab#N)
 .dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
 .dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
@@ -52,10 +53,11 @@ Backlog.md CLI (`backlog`)       <- same role when `.tracker=files` (plan refs B
 `.dev-backlog/.tracker` is setup-only and names exactly one authority. `github`
 (default) uses GitHub Issues and `#N` plan refs. `files` uses the Backlog.md
 CLI (`backlog`) as a first-class **chosen** authority — same Orient / Plan /
-Work / Complete loop, plan refs `BACK-N`. It is not a degraded fallback.
-Read/write tasks only through that CLI (`--json` where available). If the CLI
-is missing, the adapter is unavailable (fail-closed). Never parse or write
-`backlog/tasks/*.md` as a product API, and never co-authority with GitHub.
+Work / Complete loop, plan refs `BACK-N`. `gitlab` uses GitLab Issues through
+`glab` on the same frozen ports, plan refs `gitlab#N`. None is a degraded
+fallback. If the chosen CLI is missing, the adapter is unavailable
+(fail-closed). Never parse or write `backlog/tasks/*.md` as a product API, and
+never co-authority two trackers.
 
 ## Sprint Admission
 
@@ -78,7 +80,7 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | `component: "slug"` | One capability slug from `spec/capabilities.md`; also the relay-Learnings route and a track-scope axis | Optional; resolves to one `## Capability:` heading. |
 | `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, never inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
-| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` (github) or `BACK-N` (files) ref. |
+| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` (github), `BACK-N` (files), or `gitlab#N` (gitlab) ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
 | `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
 
@@ -107,14 +109,15 @@ Done when you can name the next live Issue and, when a sprint exists, its curren
 
 Goal: a task with acceptance criteria the resolver can read.
 Rail: github → `gh issue create` (`references/github-sync.md`); files →
-adapter/CLI `backlog task create` (plan refs `BACK-N`).
+adapter/CLI `backlog task create` (plan refs `BACK-N`); gitlab → `glab issue create`
+(plan refs `gitlab#N`).
 Done when the new task exists in the configured tracker and, only when the work
 was admitted to a sprint, is added to the active Plan.
 
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js --tracker github|files --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js --tracker github|files|gitlab --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
@@ -123,12 +126,12 @@ Goal: verified work reflected in the configured tracker.
 Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC,
 lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, task body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
 Boundary: if resolution fails, diagnose it, but do not execute the task or change AC/lifecycle until live resolution succeeds.
-Done when verified work is reflected in the configured tracker (github Issues `#N` or files `BACK-N` via CLI) AC/lifecycle and, when admitted, sprint progress.
+Done when verified work is reflected in the configured tracker (github Issues `#N`, files `BACK-N` via CLI, or gitlab `gitlab#N` via `glab`) AC/lifecycle and, when admitted, sprint progress.
 
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close via `adapter.close` (github Issue, or files `backlog task edit` Done). Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the tracker task is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close via `adapter.close` (github Issue, files `backlog task edit` Done, or gitlab `glab issue close`). Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the tracker task is closed with every AC verified; the sprint stays open until its Plan is done.
 Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 

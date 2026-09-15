@@ -303,6 +303,30 @@ describe("legacy export CLI boundary", () => {
     assert.deepEqual(fs.readdirSync(executionDir), [".tracker"]);
   });
 
+  it("fails closed when .tracker is not github without listing provider issues", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-gitlab-export-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const executionDir = path.join(root, ".dev-backlog");
+    fs.mkdirSync(executionDir);
+    fs.writeFileSync(path.join(executionDir, ".tracker"), "gitlab\n");
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(SKILL_SCRIPTS, "sync-pull.js"), "--legacy-export", "--json"],
+      { cwd: root, encoding: "utf8", env: { ...process.env, PATH: "" } },
+    );
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "");
+    const document = JSON.parse(result.stdout);
+    assert.equal(document.error.code, "LEGACY_EXPORT_GITHUB_ONLY");
+    assert.match(document.error.message, /^tracker error:/);
+    assert.match(document.error.message, /GitHub-shaped diagnostic export/);
+    assert.match(document.error.message, /gitlab/);
+    assert.deepEqual(fs.readdirSync(root), [".dev-backlog"]);
+    assert.deepEqual(fs.readdirSync(executionDir), [".tracker"]);
+  });
+
   it("keeps provider failure actionable in human mode", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-provider-human-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -604,6 +628,21 @@ describe("loadOpenIssues", () => {
       encoding: "utf-8",
       maxBuffer: 50 * 1024 * 1024,
     });
+  });
+
+  it("fails closed when the configured tracker is not github", () => {
+    const execFile = () => {
+      throw new Error("must not list through a non-github tracker");
+    };
+    for (const tracker of ["gitlab", "files"]) {
+      assert.throws(
+        () => loadOpenIssues({ execFile, config: { tracker } }),
+        (error) =>
+          error.code === "LEGACY_EXPORT_GITHUB_ONLY"
+          && error.tracker === tracker
+          && /GitHub-shaped diagnostic export/.test(error.message),
+      );
+    }
   });
 });
 

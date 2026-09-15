@@ -18,9 +18,9 @@ const EXPECTED_STATE_CLASSES = [
   "Derived retrieval output",
 ];
 const EXPECTED_SOLE_AUTHORITIES = [
-  "Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); a posted `## Agent Brief` comment is the contract when present",
-  "Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`)",
-  "Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files)",
+  "Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`; GitLab Issue via `glab` when `.tracker=gitlab`); a posted `## Agent Brief` comment is the contract when present",
+  "Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`; GitLab Issue when `.tracker=gitlab`)",
+  "Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files; GitLab labels and assignees when gitlab)",
   "One active sprint file for the admitted track",
   "The bounded `spec/*` contract axis",
   "GitHub repository history",

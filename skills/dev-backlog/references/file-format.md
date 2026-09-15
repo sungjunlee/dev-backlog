@@ -65,13 +65,18 @@ task item.
 github
 ```
 
-The supported values are `github` and `files`. When `.tracker` is missing, runtime
-accepts only a leftover top-level `tracker: github` or `tracker: files` value
-from `config.yml`; with neither, it deterministically defaults to `github`. Any
-other value fails. Availability never changes selection; adapter failure is
-fail-closed. Setup writes `.tracker` atomically and never edits `config.yml`.
-`files` is a chosen Backlog.md CLI authority (plan refs `BACK-N`), not a
-fallback from GitHub.
+The supported values are `github`, `files`, and `gitlab`. When `.tracker` is
+missing, runtime accepts only a leftover top-level `tracker: github`,
+`tracker: files`, or `tracker: gitlab` value from `config.yml`; with neither,
+it deterministically defaults to `github`. Any other value fails. Availability
+never changes selection; adapter failure is fail-closed. Setup writes
+`.tracker` atomically and never edits `config.yml`. `files` is a chosen
+Backlog.md CLI authority (plan refs `BACK-N`), not a fallback from GitHub.
+`gitlab` is a chosen GitLab Issues authority via `glab` (plan refs
+`gitlab#N`). Install [glab](https://gitlab.com/gitlab-org/cli), run
+`glab auth login`, then `setup-dev-backlog.js --tracker gitlab --non-interactive`
+(or write `.dev-backlog/.tracker` containing `gitlab`). Setup never recommends
+`gitlab` over `github` for a GitHub remote.
 
 ## .dev-backlog/config.yml
 
