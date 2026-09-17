@@ -25,6 +25,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [ ] #424 Park the GitLab adapter until a measured consumer exists (~2h)
 - [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (merged)
 - [ ] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h)
+- [~] #431 Plan rail: setup migrates a legacy backlog/ skill layout (rule re-add from the #423 evidence; unplanned, admitted 2026-09-17) (~30min) → PR #436 (open)
 
 ### Batch 4 - Triage experiment (independent; can run alongside Batch 3)
 - [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (merged)
