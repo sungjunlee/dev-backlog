@@ -136,8 +136,8 @@ Backlog.md config or the ownership is ambiguous, leave it under `backlog/`.
 `.dev-backlog/` is absent and at least one skill-owned name still sits under
 `backlog/`. That path is not `git mv`, takes no backup, and is not atomic.
 If `.dev-backlog/` already exists, auto-migrate skips (`destination-exists`)
-and does not retry: leftover skill names stay under `backlog/` and
-`backlog-doctor.js` warns. They are not a second active root.
+and does not retry: leftover skill names stay under `backlog/`. They are not a
+second active root.
 
 A lone `backlog/config.yml` with no `sprints/`, `triage/`, or
 `triage-config.yml` is left in place (Backlog.md or ambiguous). `config.yml`

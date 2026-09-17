@@ -5,11 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const {
-  TRACKER_FLAG_NOTICE,
-  collectGithubEvidence,
-  isGithubRemote,
-} = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
+const { TRACKER_FLAG_NOTICE } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
 
 const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
 
@@ -54,49 +50,16 @@ function writeConfig(root, raw) {
   return configPath;
 }
 
-describe("GitHub evidence safety", () => {
-  it("accepts only strict github.com repository remotes", () => {
-    for (const remote of [
-      "https://github.com/owner/repo.git",
-      "ssh://git@github.com/owner/repo.git",
-      "git@github.com:owner/repo.git",
-      "ssh://git@ssh.github.com:443/owner/repo.git",
-    ]) assert.equal(isGithubRemote(remote), true, remote);
-
-    for (const remote of [
-      "https://github.com.evil.test/owner/repo.git",
-      "https://github.com/owner/repo/issues",
-      "ssh://alice@github.com/owner/repo.git",
-      "git@github.com:owner/../repo.git",
-    ]) assert.equal(isGithubRemote(remote), false, remote);
-  });
-
-  it("sanitizes provider failures and never recommends fallback", () => {
-    const secret = "SECRET-TOKEN";
-    const execFileSync = (command) => {
-      const error = new Error(`${command} failed ${secret}`);
-      if (command === "gh") error.code = "ENOENT";
-      throw error;
-    };
-    const evidence = collectGithubEvidence({ cwd: "/repo", execFileSync });
-    assert.deepEqual(evidence, {
-      recommendation: "github",
-      remote: "missing",
-      cli: "missing",
-      auth: "not-checked",
-    });
-    assert.doesNotMatch(JSON.stringify(evidence), new RegExp(secret));
-  });
-});
-
 describe("GitHub-only setup real process integration", () => {
-  it("creates a fresh execution root with no tracker selection", (t) => {
+  it("creates a fresh execution root and nothing else", (t) => {
     const root = makeRoot(t);
-    const result = runCli(root, ["--non-interactive", "--json", "--project-name", "fresh"]);
+    const result = runCli(root, ["--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
     const parsed = JSON.parse(result.stdout);
-    assert.equal(parsed.projectName, "fresh");
-    assert.deepEqual(parsed.createdDirectories, ["sprints"]);
+    assert.deepEqual(parsed, {
+      action: "setup-dev-backlog",
+      createdDirectories: ["sprints"],
+    });
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/config.yml")), false);
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
@@ -157,6 +120,15 @@ describe("GitHub-only setup real process integration", () => {
     const result = runCli(root, ["--non-interactive"]);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /unsafe config path/);
+    assert.deepEqual(snapshot(root), before);
+  });
+
+  it("rejects an unknown flag without touching the tree", (t) => {
+    const root = makeRoot(t);
+    const before = snapshot(root);
+    const result = runCli(root, ["--probe-provider"]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown argument: --probe-provider/);
     assert.deepEqual(snapshot(root), before);
   });
 });

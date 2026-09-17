@@ -113,7 +113,7 @@ admitted, sprint progress.
 
 Goal: nothing stale left behind.
 Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with `gh issue close`. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until its Plan is done.
-Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
+Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
 ### Next
@@ -146,8 +146,8 @@ Core scripts:
 - `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
 - `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
-- `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
-- `scripts/backlog-doctor.js` — aggregate health checks; JSON includes `reassess_signal`.
+- `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the pre-close doctor summary.
+- `scripts/backlog-doctor.js` — aggregate health checks; `--json` is the machine surface.
 
 ## References
 

@@ -89,8 +89,8 @@ function removeOwned(targetPath, fsApi) {
  *
  * Runs only when the destination root is absent and at least one skill-owned
  * name exists under `backlog/`. If `.dev-backlog/` already exists, skips
- * (`destination-exists`) and does not retry — leftovers stay and doctor warns;
- * they are not a second active root. Does not touch `backlog/tasks`, `docs`,
+ * (`destination-exists`) and does not retry — leftovers stay where they are and
+ * are not a second active root. Does not touch `backlog/tasks`, `docs`,
  * or `completed`. `config.yml` moves only with a skill layout marker. A
  * leftover `.tracker` is parked, not skill-owned: it stays where it is.
  */
@@ -134,10 +134,8 @@ function leftoverSkillFiles(cwd, { fs: fsApi = fs } = {}) {
 module.exports = {
   DEFAULT_BACKLOG_DIR,
   LEGACY_EXPORT_DIR,
-  SKILL_OWNED_NAMES,
   defaultSprintsDir,
   defaultTriageDir,
-  listPresentSkillNames,
   leftoverSkillFiles,
   migrateLegacyExecutionRoot,
 };
