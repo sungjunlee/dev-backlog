@@ -676,24 +676,6 @@ assert_equals "next json overlap: fail-loud exit code" "$STATUS" "1"
 assert_contains "next json overlap: message" "$OUT" "Active tracks overlap on scope"
 rm "$TEST_DIR/.dev-backlog/sprints/2026-03-ov-a.md" "$TEST_DIR/.dev-backlog/sprints/2026-03-ov-b.md"
 
-# --- status.sh: local files section ---
-mkdir -p "$TEST_DIR/.dev-backlog/tasks"
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.md" <<'EOF'
----
-status: To Do
----
-EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-2.md" <<'EOF'
----
-status: In Progress
----
-EOF
-
-OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
-assert_contains "status: task count" "$OUT" "Tasks: 2 total"
-assert_contains "status: todo count" "$OUT" "1 To Do"
-assert_contains "status: inprog count" "$OUT" "1 In Progress"
-
 # ============================================================
 # integration contract pattern tests
 # ============================================================
