@@ -28,7 +28,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [x] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (merged)
 
 ### Batch 5 - Release
-- [~] #447 Cut v0.12.0 with the measured state (~1h) [run:grok-447]
+- [~] #447 Cut v0.12.0 with the measured state (~1h) → PR #455 (open)
 
 ## Running Context
 - Keep test unchanged from the 2026-09 subtraction wave: shared/irreversible-state guard, deterministic check the model cannot cheaply redo, or a consumed wire contract. Only `sprint-state` JSON has a consumer (dev-relay, 19 references); verify a reviewer's "consumed contract" claim by grepping the consumer.
