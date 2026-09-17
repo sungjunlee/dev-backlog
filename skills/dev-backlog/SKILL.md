@@ -37,7 +37,7 @@ Configured tracker               <- canonical task definition and lifecycle
 .dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
 
-- `.dev-backlog/.tracker` names exactly one configured tracker and is set at setup. GitHub Issues is the default and the canonical task authority; an unavailable adapter is fail-closed. Per-adapter CLIs, ref grammars, create commands, and close verbs: [`references/adapter-ports.md`](references/adapter-ports.md).
+- `.dev-backlog/.tracker` names exactly one configured tracker and is set at setup. GitHub Issues is the default; the configured tracker is the sole task authority, and an unavailable adapter is fail-closed. Per-adapter CLIs, ref grammars, create commands, and close verbs: [`references/adapter-ports.md`](references/adapter-ports.md).
 - Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
 - The configured tracker owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file, which remains the permanent execution record once completed.
 - Sprint frontmatter (`objectives:`, `component:`, `scope:`) and how each field degrades when its spec file is absent: `references/file-format.md`.
