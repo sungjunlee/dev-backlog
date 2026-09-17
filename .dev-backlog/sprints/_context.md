@@ -6,7 +6,7 @@
 - Script interfaces should stay stable unless an issue explicitly changes the CLI contract
 - Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
 - Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` is parsed by the single exact parser; legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
-- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347; only the leftover-marker filter in `triage-collect` remains.)
+- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347.)
 - The tracker layer is config-only (`TRACKER_KEYS = ["github", "files", "gitlab"]`, #415); unsupported provider capabilities fail before effects instead of changing tracker authority. This repository pins `github`. Forgejo/Gitea are follow-up forge adapters.
 - Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
 - Active sprints partition by track scope (2026-07, epic #289): `component:` equality or explicit `scope:` globs decide overlap through the ONE `scopesOverlap()` in `scripts/lib.js` — never re-implement it. Disjoint tracks coexist as a portfolio; overlap fails loud; single-track behavior is the G4 text-byte-identity compatibility surface (anchored in the smoke test; never snapshot `--json`, which is schema-versioned instead).
@@ -31,8 +31,8 @@
 ## Known Gotchas
 
 - Live GitHub work re-reads the Issue with `gh issue view --json body,comments` when it changes. There is no local fallback copy of Issue state.
-- Backlog triage snapshot enrichments stay explicit and bounded: `--with-comments` and `--with-closed-issues` are opt-in, while downstream scanners must gracefully gate on optional fields instead of assuming they exist.
-- `triage-relate` relationship edges are advisory context. Even a `merged-pr-link` edge must not become a close recommendation unless `triage-stale` implements a separate conservative obsolete signal.
+- Backlog triage reads issues via `gh`; comment history and merged closing PRs are fetched when a judgment needs them, not as a snapshot-enrichment pass.
+- Relationship edges in the triage report are advisory context. A `merged-pr-link` mention is evidence, not a close by itself — close still needs an Obsolete Candidate plus an accepted apply checkbox.
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.
 - `gh issue create` does not support `--json`; a `create --json ... || create -b "fallback"` chain fails the first call at flag parsing and posts the fallback placeholder as the real issue body (BACK-243 incident, 2026-07-05). Capture the URL from stdout instead.
 - Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `.dev-backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).

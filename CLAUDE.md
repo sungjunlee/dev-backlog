@@ -42,7 +42,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 - **Fail-closed tracker** — adapter failure never falls back to local files;
   `.tracker` is setup-only and runtime never switches adapters.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
-  through validated wire contracts (`--model-actions` JSON, anchor comments);
+  through validated wire contracts (anchor comments);
   scripts own everything checkable
 
 ## Architecture
