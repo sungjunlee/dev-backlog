@@ -25,7 +25,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [ ] #446 Shrink backlog-doctor.js and setup-dev-backlog.js to the surviving checks (~2h)
 
 ### Batch 4 - Triage pipeline decision
-- [~] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) [run:grok-433]
+- [~] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (open)
 
 ### Batch 5 - Release
 - [ ] #447 Cut v0.12.0 with the measured state (~1h)
