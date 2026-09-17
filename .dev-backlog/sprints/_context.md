@@ -24,6 +24,9 @@
 - SKILL.md is goal / rail / Done-when per mode (2026-09 skill-lightening, #396–#399): state a rule once, name the script that enforces it, keep hard constraints only for shared or irreversible state. Re-add prose only when a conformance run shows a repeated mistake (`docs/conformance/`), never for an anticipated risk.
 - Eval prompts live in `tests/evals/`, never in SKILL.md — the 2026-09-12 run showed an in-file Eval Prompts section is a self-contaminating answer key.
 - Cross-family review at batch boundaries (read-only `codex exec -m gpt-6-astra` on the cumulative diff) found three contradictions repetition had hidden; cheaper than per-PR review and worth keeping for prose waves.
+- Keep test for any surface (2026-09 subtraction wave, epic #420): (1) guards shared/irreversible state, (2) deterministic check the model cannot cheaply redo, (3) wire contract another tool consumes. Fails all three → delete, do not rewrite. A reviewer defending a deleted doc as a "consumed contract" must show the consumer reading the doc; dev-relay consumes the sprint-state JSON, never a reference file.
+- A new tracker adapter needs a measured consumer (charter rev 18): its CLI installed and in use on a maintainer machine, or a maintainer repo pinning the key. `files` qualifies; `gitlab` was parked at `a8ddb7d`.
+- Conformance harness recipe: `docs/conformance/2026-09-17-tracker-wave.md` (12 scenarios, prompt builder strips Expected). `codex exec` outside a git repo needs `--skip-git-repo-check`; prompt on stdin with `-`, final answer via `-o`; Astra token counts are on stderr. Fresh-session Fable runs are general-purpose subagents with one Read of the prompt file. A repeated PARTIAL earns either one clause in SKILL.md (#431) or an eval-side Expected relaxation, never both.
 
 ## Known Gotchas
 
@@ -36,4 +39,7 @@
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
 - Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in `smoke-test.sh` depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
 - v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files, and do not delete `sync-pull.js` / `legacy-tracker.js` without a measured consumer (charter freeze 2026-08-17; 2026-08 second-start close).
+- Never chain `gh pr merge` after a grep-filtered test run — capture `$?` from `node --test` and `smoke-test.sh` first. A backtick inside a JS template literal in `backlog-doctor.js` reached main for one commit this way (2026-09-17, #435).
+- In-flight Plan pointer grammar (parsed by `sprint-state.js`): `→ PR #N (state)` at end of line, `[branch:name]`, `[run:id]`. Any other shape reads as unmoored and fails the live smoke assertion.
+- `sprint-init.js --component` is a free track-scope string since #426 (no `spec/capabilities.md` lookup); `objectives:` is never emitted and never checked. Nothing lints `spec/` any more; O4 drift detection is the `backlog-triage` Alignment section.
 - #366 (GitHub resilience) closed 2026-08-22 without a matrix. #367 (fresh-session conformance cadence) runs per release tag and at reassess boundaries; latest run `docs/conformance/2026-09-12-skill-lightening.md`.
