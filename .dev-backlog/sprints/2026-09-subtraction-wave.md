@@ -16,10 +16,10 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 ## Plan
 ### Batch 1 - Reconcile and re-lighten (parallel-safe: #421 touches spec/ and triage/, #422 touches SKILL.md + adapter-ports.md)
 - [~] #421 Reassess under the status-free charter; amend charter to match the #411 tracker wave (human-gated) (~2h) → PR #429 (open)
-- [~] #422 Re-lighten dev-backlog SKILL.md after the #411 tracker wave: tracker branching off the hot path (~2h) → PR #430 (open)
+- [x] #422 Re-lighten dev-backlog SKILL.md after the #411 tracker wave: tracker branching off the hot path (~2h) → PR #430 (merged)
 
 ### Batch 2 - Measure the tracker wave (needs #422)
-- [ ] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h)
+- [~] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h) → PR #432 (open)
 
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
 - [ ] #424 Park the GitLab adapter until a measured consumer exists (~2h)
@@ -45,3 +45,4 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - 2026-09-17: Sprint opened. Epic #420, milestone 23, issues #421–#428 filed; starting point recorded in the epic body (SKILL.md 181 lines / 12 never-only-must, references 1,308, scripts 13,286, tests 11,422).
   
 - 2026-09-17: Batch 1 in flight. #421 report on PR #429 (spec amendments proposed, human gate pending); #422 on PR #430 (Astra review: merge with edits, applied). In-flight pointer grammar is `→ PR #N (state)` at end of line (status.sh `PR_RE`).
+- 2026-09-17: #422 merged (PR #430, SKILL.md 160 lines / never-only-must 4). #423 run done: no behavior loss, scenario 12 gap filed as #431; PR #432 under review.
