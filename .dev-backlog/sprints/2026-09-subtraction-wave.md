@@ -15,7 +15,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 
 ## Plan
 ### Batch 1 - Reconcile and re-lighten (parallel-safe: #421 touches spec/ and triage/, #422 touches SKILL.md + adapter-ports.md)
-- [ ] #421 Reassess under the status-free charter; amend charter to match the #411 tracker wave (human-gated) (~2h)
+- [~] #421 (PR #429, spec gate pending) Reassess under the status-free charter; amend charter to match the #411 tracker wave (human-gated) (~2h)
 - [ ] #422 Re-lighten dev-backlog SKILL.md after the #411 tracker wave: tracker branching off the hot path (~2h)
 
 ### Batch 2 - Measure the tracker wave (needs #422)
