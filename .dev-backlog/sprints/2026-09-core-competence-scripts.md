@@ -25,7 +25,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [ ] #446 Shrink backlog-doctor.js and setup-dev-backlog.js to the surviving checks (~2h)
 
 ### Batch 4 - Triage pipeline decision
-- [~] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (open)
+- [x] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (merged)
 
 ### Batch 5 - Release
 - [ ] #447 Cut v0.12.0 with the measured state (~1h)
@@ -43,3 +43,4 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - 2026-09-17: Batch 1 done (#442 PR #448 charter rev 19; #441 PR #449, scripts 8,234 → 6,243, no hot-path change so no run). Batch 2 runs sequentially (#444 then #443) because both edit SKILL.md/file-format/README/evals.
 - 2026-09-17: Batch 2 done (#444 PR #450 −2,004; #443 PR #451 −1,280). After-run 12/12 both models (`docs/conformance/2026-09-17-core-competence.md`). #445 dispatched to Opus.
 - 2026-09-17: #433 real A/B done on a 15-issue fixture: variant B equivalent to the script pipeline on both models (Astra chose `revisit` over `close` for one merely-inactive issue). Deletion dispatched to Grok in parallel with #445 (disjoint files).
+- 2026-09-17: Batch 4 done: #433 merged (PR #452, −5,384; backlog-triage scripts 3,359 → ~1,000, SKILL.md 116 → 44). After-run 7/7 both models. Waiting on #445 (Opus) for Batch 3.
