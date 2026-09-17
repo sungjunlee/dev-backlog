@@ -84,6 +84,17 @@ describe("checkDocDrift", () => {
     assert.deepEqual(names, ["also-gone.js", "gone.sh"]);
   });
 
+  it("flags extra files under skills/dev-backlog/references/", () => {
+    const root = makeFixtureRepo({ docLine: "ok" });
+    write(path.join(root, "skills", "dev-backlog", "references", "adapter-ports.md"), "ok");
+    write(path.join(root, "skills", "dev-backlog", "references", "authority-contract.md"), "ok");
+    write(path.join(root, "skills", "dev-backlog", "references", "file-format.md"), "ok");
+    write(path.join(root, "skills", "dev-backlog", "references", "spec-fallback.md"), "ok");
+    write(path.join(root, "skills", "dev-backlog", "references", "process.md"), "retired");
+    const names = checkDocDrift(root).dangling.map((d) => d.name);
+    assert.ok(names.includes("process.md"));
+  });
+
   it("inventories top-level script files across skills", () => {
     const root = makeFixtureRepo({ docLine: "ok" });
     write(path.join(root, "skills", "beta", "scripts", "other.sh"), "");
@@ -112,5 +123,19 @@ describe("CLI", () => {
     const parsed = JSON.parse(live.stdout);
     assert.equal(parsed.dangling.length, 0);
     assert.ok(parsed.docs_scanned >= 2);
+  });
+
+  it("scans only the four living dev-backlog reference files", () => {
+    const docs = collectDocFiles(REPO_ROOT).map((d) => path.relative(REPO_ROOT, d));
+    const refs = docs
+      .filter((d) => d.startsWith("skills/dev-backlog/references/"))
+      .map((d) => path.basename(d))
+      .sort();
+    assert.deepEqual(refs, [
+      "adapter-ports.md",
+      "authority-contract.md",
+      "file-format.md",
+      "spec-fallback.md",
+    ]);
   });
 });

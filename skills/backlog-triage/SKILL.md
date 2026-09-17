@@ -110,7 +110,7 @@ Core scripts (full flags in each script's usage string):
 - `references/stale.md` — obsolescence signals, thresholds, and suggested-action grammar.
 - `references/apply.md` — anchor grammar, parse rules, idempotency contract, and apply-log schema.
 - `references/decision-review.md` — prompt-driven Do Now / Shape First / Defer / Drop rubric.
-- `../dev-backlog/references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
+- `../dev-backlog/references/authority-contract.md` — sole-owner routing and file ownership.
 - `../dev-backlog/references/spec-fallback.md` — spec-axis degradation contract (intra-bundle; always resolvable).
 - When installed, craftkit's `spec-charter` skill deepens Alignment: `references/alignment.md` and `references/spec-axis.md`. Enhancements only — never required to run triage.
 - `tests/evals/backlog-triage.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout only).

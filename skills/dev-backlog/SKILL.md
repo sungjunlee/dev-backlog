@@ -123,6 +123,12 @@ Goal: the next actionable batch, or the next live Issue when no sprint is active
 Rail: `next.sh` (`--track <slug>`).
 Done when the next actionable batch or sprint-planning need is named.
 
+### Quick Fix / Unplanned Work
+
+Goal: a discovered fix or extra task is an Issue, not a silent sprint rewrite.
+Rail: sprint-free work is Issue → PR with no sprint edit. Mid-sprint discovery becomes an Issue; admitted work joins the active Plan or a later batch, with a Progress note.
+Done when the Issue exists and, if admitted, is on the Plan.
+
 ## Hard Constraints
 
 These stay explicit because they guard shared or irreversible state:
@@ -134,9 +140,9 @@ These stay explicit because they guard shared or irreversible state:
 
 ## Script Resolution
 
-Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/` directory beside this `SKILL.md`), not from the target project, and run them from the target project root. Invocation pattern: `references/scripts.md`.
+Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/` directory beside this `SKILL.md`), not from the target project, and run them from the target project root. Each script prints its own usage.
 
-Core scripts (full flag inventory in `references/scripts.md`):
+Core scripts:
 
 - `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
 - `scripts/effective-task-spec.js` — resolve live task specification, AC, lifecycle, source, and stable digest from the configured tracker (or one explicit `spec_ref`).
@@ -147,14 +153,8 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 ## References
 
-- `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
-- `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Quick Fix/Unplanned Work/Next workflow.
 - `references/adapter-ports.md` — tracker adapter port contract: per-adapter CLI, plan-ref grammar, create command, and close verb; required ops, fail-closed availability, capability gates.
 - `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional diagnostic export (`sync-pull.js --legacy-export`).
-- `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
-- `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
-- `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.
-- `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).

@@ -11,7 +11,12 @@ const SURFACES = [
   "README.md",
   "CLAUDE.md",
   "spec/system-map.md",
-  "skills/dev-backlog/references/integration-contract.md",
+];
+const LIVING_DEV_BACKLOG_REFERENCES = [
+  "adapter-ports.md",
+  "authority-contract.md",
+  "file-format.md",
+  "spec-fallback.md",
 ];
 
 for (const file of SURFACES) {
@@ -39,12 +44,18 @@ it("keeps the living charter status-free with retired IDs pinned in git", () => 
   );
 });
 
-it("keeps the actor contract GitHub-only while preserving historical ref parsing", () => {
-  const markdown = fs.readFileSync(
-    path.join(ROOT, "skills/dev-backlog/references/integration-contract.md"),
-    "utf8",
-  );
-  assert.doesNotMatch(markdown, /Local Plan items use/);
-  assert.doesNotMatch(markdown, /"tracker": "local",\s*\n\s*"capability"/);
-  assert.doesNotMatch(markdown, /explicitly change backlog\/\.tracker to a tracker/);
+it("keeps skills/dev-backlog/references/ to four living contracts", () => {
+  const dir = path.join(ROOT, "skills/dev-backlog/references");
+  const files = fs.readdirSync(dir).filter((name) => name.endsWith(".md")).sort();
+  assert.deepEqual(files, LIVING_DEV_BACKLOG_REFERENCES);
+});
+
+it("keeps remaining reference contracts free of local-tracker authority language", () => {
+  const dir = path.join(ROOT, "skills/dev-backlog/references");
+  for (const name of LIVING_DEV_BACKLOG_REFERENCES) {
+    const markdown = fs.readFileSync(path.join(dir, name), "utf8");
+    assert.doesNotMatch(markdown, /Local Plan items use/);
+    assert.doesNotMatch(markdown, /"tracker": "local",\s*\n\s*"capability"/);
+    assert.doesNotMatch(markdown, /explicitly change backlog\/\.tracker to a tracker/);
+  }
 });
