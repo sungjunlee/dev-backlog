@@ -178,6 +178,20 @@ describe("createSprintFile", () => {
     assert.doesNotMatch(written, /^- \[ \]/m);
   });
 
+  it("handles special characters in the topic (filename is slugified, title kept)", () => {
+    const result = createSprintFile({
+      topic: "OAuth2 / PKCE (v2)",
+      milestone: "Sprint W15",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    });
+    assert.ok(fs.existsSync(result.sprintFile));
+    assert.match(path.basename(result.sprintFile), /^2026-04-.*\.md$/);
+    assert.doesNotMatch(path.basename(result.sprintFile), /[\/()]/);
+    assert.match(result.content, /OAuth2 \/ PKCE \(v2\)|oauth2/i);
+  });
+
   it("never reads GitHub: no milestone seeding since #445", () => {
     const result = createSprintFile({
       topic: "no-network",

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -uo pipefail
-# Close the active sprint: mark completed, move tasks, remind about context.
+# Close the active sprint: mark completed, remind about context.
 #
 # Usage: bash scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]
 #
@@ -10,9 +10,8 @@ set -uo pipefail
 # Steps:
 #   1. Run backlog-doctor pre-close and compute the text-only reassess signal
 #   2. Set sprint status: completed + add Progress entry
-#   3. Archive leftover local task files when they happen to exist
-#   4. Show Running Context entries (remind to promote to _context.md)
-#   5. Optionally close GitHub milestone (--close-milestone)
+#   3. Show Running Context entries (remind to promote to _context.md)
+#   4. Optionally close GitHub milestone (--close-milestone)
 
 # Resolve without `dirname` (restricted PATH / Windows Git Bash).
 # Normalize backslashes first: `%/*` only strips `/`, so a Windows path
@@ -78,8 +77,6 @@ close_github_milestone() {
 }
 
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
-TASKS_DIR="$BACKLOG_DIR/tasks"
-COMPLETED_DIR="$BACKLOG_DIR/completed"
 
 if [ ! -d "$SPRINTS_DIR" ]; then
   echo "No sprints directory found."
@@ -159,40 +156,7 @@ else
   echo "Set status: completed in $ACTIVE"
 fi
 
-# --- Step 3: Archive leftover local task files when they happen to exist ---
-# Issue numbers of checked Plan items; leftover task files are named
-# `<anything>-<N>.md` or `<anything>-<N> - <slug>.md`.
-DONE_ISSUE_NUMBERS=$(checkbox_lines "$ACTIVE" "x" | sed -E 's/^- \[x\] #([1-9][0-9]*).*$/\1/')
-
-if [ -d "$TASKS_DIR" ] && [ -n "$DONE_ISSUE_NUMBERS" ]; then
-  if ! $DRY_RUN; then
-    mkdir -p "$COMPLETED_DIR"
-  fi
-  echo "$DONE_ISSUE_NUMBERS" | while IFS= read -r issue_number; do
-    # Match the complete storage ref, never a numeric prefix (1 vs 11).
-    TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null \
-      | while IFS= read -r candidate; do
-          basename=$(basename "$candidate")
-          if [[ "$basename" == *"-${issue_number}.md" ]] || [[ "$basename" == *"-${issue_number} - "* ]]; then
-            printf '%s\n' "$candidate"
-            break
-          fi
-        done)
-    if [ -n "$TASK_FILE" ]; then
-      BASENAME=$(basename "$TASK_FILE")
-      if $DRY_RUN; then
-        echo "[dry-run] Would move: $BASENAME → completed/"
-      else
-        mv "$TASK_FILE" "$COMPLETED_DIR/$BASENAME"
-        echo "Moved: $BASENAME → completed/"
-      fi
-    fi
-  done
-else
-  echo "No leftover local task files required for sprint close."
-fi
-
-# --- Step 4: Show Running Context entries ---
+# --- Step 3: Show Running Context entries ---
 CONTEXT=$(extract_section "$ACTIVE" "Running Context")
 if [ -n "$CONTEXT" ]; then
   echo ""
@@ -202,7 +166,7 @@ if [ -n "$CONTEXT" ]; then
   echo "Promote project-level entries to: $SPRINTS_DIR/_context.md"
 fi
 
-# --- Step 5: Optionally close milestone ---
+# --- Step 4: Optionally close milestone ---
 if $CLOSE_MILESTONE; then
   MILESTONE=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -n "$MILESTONE" ]; then

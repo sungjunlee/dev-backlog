@@ -819,7 +819,6 @@ rm "$TEST_DIR/.dev-backlog/sprints/2026-03-other-active.md"
 # --- dry-run test ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --dry-run 2>&1)
 assert_contains "close dry-run: would set completed" "$OUT" "Would set status: completed"
-assert_contains "close dry-run: would move task" "$OUT" "BACK-1"
 assert_contains "close dry-run: shows context entries" "$OUT" "argon2"
 assert_contains "close dry-run: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
 assert_contains "close dry-run: doctor result appears" "$OUT" "[PASS] active_sprint"
@@ -867,7 +866,6 @@ assert_contains "close extra positional: file unchanged" "$(grep '^status:' "$TE
 # --- actual close ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close: set completed" "$OUT" "status: completed"
-assert_contains "close: moved tasks" "$OUT" "BACK-1"
 assert_contains "close: context reminder" "$OUT" "argon2"
 assert_contains "close: doctor result appears" "$OUT" "[PASS] active_sprint"
 assert_contains "close: reassess verdict appears" "$OUT" "Reassess signal:"
@@ -876,9 +874,6 @@ assert_contains "close: reassess verdict appears" "$OUT" "Reassess signal:"
 assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "completed"
 
 # Verify tasks moved
-assert_equals "close: tasks dir has 1 left" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | wc -l | tr -d ' ')" "1"
-assert_equals "close: unrelated stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/")" "BACK-99 - unrelated.md"
-assert_equals "close: completed has 2" "$(ls "$TEST_DIR/.dev-backlog/completed/" | wc -l | tr -d ' ')" "2"
 
 # --- mirrorless GitHub close (#346): no task file or archive directory required ---
 rm -rf "$TEST_DIR/.dev-backlog"
@@ -903,76 +898,10 @@ EOF
 
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close mirrorless: set completed" "$OUT" "status: completed"
-assert_contains "close mirrorless: reports no leftover task files" "$OUT" "No leftover local task files required"
 assert_equals "close mirrorless: does not create tasks directory" \
 	"$(test -d "$TEST_DIR/.dev-backlog/tasks" && echo yes || echo no)" "no"
 assert_equals "close mirrorless: sprint completed" \
 	"$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-mirrorless.md")" "status: completed"
-
-# --- ambiguous issue number test (#1 must not match #11) ---
-rm -rf "$TEST_DIR/.dev-backlog"
-mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
-
-cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-ambig.md" <<'EOF'
----
-status: active
----
-
-## Plan
-- [x] #1 Short task
-
-## Running Context
-
-## Progress
-EOF
-
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - short-task.md" <<'EOF'
----
-id: BACK-1
----
-EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-11 - longer-task.md" <<'EOF'
----
-id: BACK-11
----
-EOF
-
-bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
-assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
-assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
-
-# --- decimal storage names must not collide (#1 must not move -1.20 files) ---
-rm -rf "$TEST_DIR/.dev-backlog"
-mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
-cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-decimal.md" <<'EOF'
----
-status: active
----
-
-## Goal
-Close one issue whose number prefixes a decimal storage name.
-
-## Plan
-- [x] #1 Short task
-
-## Running Context
-
-## Progress
-EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - short-task.md" <<'EOF'
----
-id: BACK-1
----
-EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.20 - longer-subtask.md" <<'EOF'
----
-id: BACK-1.20
----
-EOF
-
-bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
-assert_equals "decimal close: BACK-1 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" | grep -c 'BACK-1 ')" "1"
-assert_equals "decimal close: BACK-1.20 stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
 
 # --- no active sprint ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
