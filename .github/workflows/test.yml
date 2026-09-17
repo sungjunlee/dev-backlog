@@ -20,7 +20,7 @@ jobs:
         run: node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js
 
       - name: Bash smoke tests
-        run: bash skills/dev-backlog/scripts/smoke-test.sh
+        run: bash tests/smoke/smoke-test.sh
 
   windows-test:
     runs-on: windows-latest
@@ -39,4 +39,4 @@ jobs:
 
       - name: Bash smoke tests
         shell: bash
-        run: bash skills/dev-backlog/scripts/smoke-test.sh
+        run: bash tests/smoke/smoke-test.sh

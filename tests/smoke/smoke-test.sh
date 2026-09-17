@@ -3,9 +3,11 @@ set -euo pipefail
 # Smoke tests for bash scripts: lib.sh, next.sh, status.sh.
 # Verifies checkbox parsing, section extraction, and status output.
 #
-# Usage: bash scripts/smoke-test.sh
+# Usage: bash tests/smoke/smoke-test.sh
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$REPO_ROOT/skills/dev-backlog/scripts"
+FAKES_DIR="$REPO_ROOT/tests/fakes"
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -79,7 +81,7 @@ exit /b 1
 EOF
 }
 
-ISOLATED_GH_PRELOAD="$SCRIPT_DIR/isolated-gh-preload.cjs"
+ISOLATED_GH_PRELOAD="$FAKES_DIR/isolated-gh-preload.cjs"
 isolated_node() {
 NODE_OPTIONS="--require=${ISOLATED_GH_PRELOAD}${NODE_OPTIONS:+ ${NODE_OPTIONS}}" node "$@"
 }
@@ -643,9 +645,6 @@ if (j.schema_version !== 2 || j.active_sprint !== null) process.exit(1);
 if (!Array.isArray(j.active_sprints) || j.active_sprints.length !== 2) process.exit(1);
 '
 
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog" 2>&1)
-assert_contains "hook portfolio: line" "$OUT" "[Sprint portfolio] 2 tracks active"
-
 # --track selects one disjoint track (single render, other track excluded)
 OUT=$(bash "$SCRIPT_DIR/next.sh" --track 2026-03-active-a "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "next --track: shows selected track" "$OUT" "2026-03-active-a"
@@ -740,74 +739,6 @@ NODE_WAS_CALLED=0
 [ -e "$NODE_CALLED" ] && NODE_WAS_CALLED=1
 assert_equals "status no-column: skips Node producer" "$NODE_WAS_CALLED" "0"
 assert_not_contains "status no-column: no EPIPE" "$OUT" "EPIPE"
-
-# ============================================================
-# context-hook.sh tests
-# ============================================================
-
-# Restore active sprint for hook tests
-cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-test.md" <<'EOF'
----
-milestone: Test Sprint
-status: active
-started: 2026-03-30
-due: 2026-04-05
----
-
-# Test Sprint
-
-## Goal
-Test context hook.
-
-## Plan
-- [x] #1 Setup DB (~15min)
-- [x] #2 Seed data (~10min)
-- [~] #3 OAuth2 flow (~2hr) → PR #87 (reviewing)
-- [ ] #4 Rate limiting (~30min)
-- [ ] #5 Input validation (~20min)
-
-## Running Context
-
-## Progress
-EOF
-
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
-assert_contains "hook: sprint name" "$OUT" "[Sprint: 2026-03-test]"
-assert_contains "hook: done count" "$OUT" "2/5 done"
-assert_contains "hook: in-flight" "$OUT" "1 in-flight"
-assert_contains "hook: next item" "$OUT" "Next: #4 Rate limiting"
-
-# Hook exits 0
-bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog"
-assert_equals "hook: exit code 0" "$?" "0"
-
-# No active sprint — silent exit 0
-rm "$TEST_DIR/.dev-backlog/sprints/2026-03-test.md"
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
-assert_equals "hook: no sprint = empty" "$OUT" ""
-bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog"
-assert_equals "hook: no sprint exit 0" "$?" "0"
-
-# No sprints dir — silent exit 0
-rm -rf "$TEST_DIR/.dev-backlog/sprints"
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
-assert_equals "hook: no dir = empty" "$OUT" ""
-
-# All done — no next item
-mkdir -p "$TEST_DIR/.dev-backlog/sprints"
-cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-done.md" <<'EOF'
----
-status: active
----
-
-## Plan
-- [x] #1 Task A
-- [x] #2 Task B
-EOF
-
-OUT=$(bash "$SCRIPT_DIR/context-hook.sh" "$TEST_DIR/.dev-backlog")
-assert_contains "hook all-done: count" "$OUT" "2/2 done"
-assert_not_contains "hook all-done: no Next" "$OUT" "Next:"
 
 # ============================================================
 # integration contract pattern tests

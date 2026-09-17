@@ -65,7 +65,7 @@ scripts.
 
 ## FAKE_GH_FAIL test harness
 
-`skills/dev-backlog/scripts/fake-gh-fixture.js` + `fake-gh.js` inject failures:
+`tests/fakes/fake-gh-fixture.js` + `fake-gh.js` inject failures:
 
 | Mode | Behavior |
 | --- | --- |

@@ -5,7 +5,6 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { spawnBashSync } = require(path.join(SKILL_SCRIPTS, "bash-runtime.js"));
 const {
   collectGithubEvidence,
   isGithubRemote,
@@ -13,7 +12,6 @@ const {
 } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
 
 const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
-const INIT = path.join(SKILL_SCRIPTS, "init.sh");
 
 function makeRoot(t, prefix = "setup-integration-") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -282,26 +280,5 @@ describe("GitHub-only setup real process integration", () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /unsafe tracker path/);
     assert.deepEqual(snapshot(root), before);
-  });
-
-  it("keeps init.sh fresh and legacy GitHub behavior through cross-platform Bash", (t) => {
-    const fresh = makeRoot(t, "setup-init-fresh-");
-    const freshRun = spawnBashSync([INIT, "wrapper-demo"], {
-      cwd: fresh,
-      encoding: "utf8",
-    });
-    assert.equal(freshRun.status, 0, freshRun.stderr);
-    assert.equal(fs.readFileSync(path.join(fresh, ".dev-backlog/.tracker"), "utf8"), "github\n");
-
-    const legacy = makeRoot(t, "setup-init-legacy-");
-    const configPath = writeConfig(legacy, "project_name: stable\ntracker: github\n");
-    const raw = fs.readFileSync(configPath, "utf8");
-    const legacyRun = spawnBashSync([INIT, "ignored"], {
-      cwd: legacy,
-      encoding: "utf8",
-    });
-    assert.equal(legacyRun.status, 0, legacyRun.stderr);
-    assert.equal(fs.readFileSync(path.join(legacy, ".dev-backlog/.tracker"), "utf8"), "github\n");
-    assert.equal(fs.readFileSync(configPath, "utf8"), raw);
   });
 });

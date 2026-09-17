@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **Test infrastructure leaves the skill bundle** — `smoke-test.sh`, the `gh`/`backlog` fakes and fixtures, and the isolated-gh preload move to `tests/`; `context-hook.sh` and `init.sh` are deleted (no doc or consumer referenced them). `skills/dev-backlog/scripts/` sheds 1,991 lines with no behavior change; the package-surface lock now rejects test doubles under `skills/`. Closes [#441](https://github.com/sungjunlee/dev-backlog/issues/441).
 - **Charter rev 19: GitHub-only, no export, no reassess counter** — the `files` adapter, the frozen ports, `.tracker` selection, and `BACK-N` refs are parked at tag `v0.11.0` (G1); `sync-pull --legacy-export` / `legacy-tracker.js` are deleted rather than frozen (G2); the doctor's reassess-signal bookkeeping retires; a new Non-Goal names wrapping `gh` as out of scope (keep test). Capabilities `tracker-task-truth` and the system map follow. Human gate 2026-09-17 ("권장대로 진행"). Closes [#442](https://github.com/sungjunlee/dev-backlog/issues/442).
 
 ## [0.11.0] — 2026-09-17

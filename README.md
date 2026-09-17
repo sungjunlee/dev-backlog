@@ -114,7 +114,7 @@ priced in the [authority contract](skills/dev-backlog/references/authority-contr
 
 ```bash
 node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js
-bash skills/dev-backlog/scripts/smoke-test.sh
+bash tests/smoke/smoke-test.sh
 npx --yes skills add . -l
 ```
 

@@ -20,9 +20,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const TEST_FAKES = path.resolve(__dirname, "../fakes");
 const TRIAGE_SCRIPTS = path.resolve(__dirname, "../../skills/backlog-triage/scripts");
 const { resolveBashExecutable, toBashArgs } = require(path.join(SKILL_SCRIPTS, "bash-runtime.js"));
-const { writeGhFixture } = require(path.join(SKILL_SCRIPTS, "fake-gh-fixture.js"));
+const { writeGhFixture } = require(path.join(TEST_FAKES, "fake-gh-fixture.js"));
 const { isIsolatedGithubError } = require(path.join(SKILL_SCRIPTS, "github-milestones.js"));
 
 const SCRIPTS_DIR = SKILL_SCRIPTS;

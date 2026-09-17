@@ -7,10 +7,8 @@ const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts"
 const { resolveBashExecutable, toBashArgs } = require(path.join(SKILL_SCRIPTS, "bash-runtime.js"));
 
 const BASH_ENTRYPOINTS = [
-  "init.sh",
   "status.sh",
   "next.sh",
-  "context-hook.sh",
   "sprint-close.sh",
   "lib.sh",
 ];
@@ -49,7 +47,7 @@ describe("Bash runtime boundary", () => {
       const text = fs.readFileSync(path.join(SKILL_SCRIPTS, name), "utf8");
       // Product scripts must normalize Windows \\ → / before bash %/* stripping.
       // Behavioral spawn harnesses for this pattern are unreliable under Git Bash
-      // -c escaping; init.sh compatibility coverage lives in setup-dev-backlog.test.js.
+      // -c escaping.
       assert.ok(
         text.includes("${BASH_SOURCE[0]//\\\\//}"),
         `${name} must normalize backslashes before %/*`,
