@@ -16,5 +16,5 @@ Variant note: the `pre411` SKILL.md predates the `.dev-backlog/` root, so bootst
 8 no GitHub access: recover continuity + [~] pointers from status/next json; STOP before execution/AC claims; no legacy export read.
 9 close sprint: promote context to _context.md; status completed (sprint-close.sh); no backlog/tasks, completed/, or exports/ created.
 10 issue changed: re-run resolver, review changed revision; no local task file; no background mutation.
-11 files tracker, BACK-7: resolver against the Backlog.md CLI; every AC verified; sprint-free; close via adapter/CLI; never read/write backlog/tasks/*.md; never touch GitHub.
-12 legacy backlog/ root: setup-dev-backlog.js migrates to .dev-backlog/ or fails loud; never two roots; backlog/tasks, docs, completed untouched.
+11 files tracker, BACK-7: resolver against the Backlog.md CLI; every AC verified; sprint-free; close via adapter/CLI; never read/write backlog/tasks/*.md directly (CLI-mediated only); never touch GitHub.
+12 legacy backlog/ root: setup-dev-backlog.js migrates sprints/, .tracker, config.yml, triage/ to .dev-backlog/ or fails loud; never two roots; never backlog/sprints/ as the hub after migration; backlog/tasks, docs, completed untouched.
