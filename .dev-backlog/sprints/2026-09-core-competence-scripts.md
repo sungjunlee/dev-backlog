@@ -21,7 +21,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [x] #444 Delete sync-pull.js and legacy-tracker.js (diagnostic export) — G2 (~1h) → PR #450 (merged)
 
 ### Batch 3 - Tracker abstraction out (sequential: #446 needs #445)
-- [~] #445 Park the files adapter and delete the tracker abstraction; GitHub-only rails — G1 (~4h) [run:opus-445]
+- [~] #445 Park the files adapter and delete the tracker abstraction; GitHub-only rails — G1 (~4h) → PR #453 (open)
 - [ ] #446 Shrink backlog-doctor.js and setup-dev-backlog.js to the surviving checks (~2h)
 
 ### Batch 4 - Triage pipeline decision
