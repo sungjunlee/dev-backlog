@@ -17,7 +17,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [x] #442 Charter rev 19: GitHub-only (files parked), diagnostic export deleted, reassess-signal bookkeeping retired (~1h) → PR #448 (merged)
 
 ### Batch 2 - Delete the gh wrappers (parallel-safe: #443 effective-task-spec + Work rail, #444 sync-pull/legacy)
-- [~] #443 Delete effective-task-spec.js; the Work rail reads the Issue with gh (~2h) [run:opus-443]
+- [~] #443 Delete effective-task-spec.js; the Work rail reads the Issue with gh (~2h) → PR #451 (open)
 - [x] #444 Delete sync-pull.js and legacy-tracker.js (diagnostic export) — G2 (~1h) → PR #450 (merged)
 
 ### Batch 3 - Tracker abstraction out (sequential: #446 needs #445)
