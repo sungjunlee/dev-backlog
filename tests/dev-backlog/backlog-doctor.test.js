@@ -448,8 +448,11 @@ describe("runDoctor", () => {
 
     assert.equal(check(report, "in_flight_trace").status, "warn");
     assert.match(check(report, "in_flight_trace").detail.summary, /unmoored/);
-    // C3: the warn names the repair runbook so "doctor warned — now what?" is answerable.
-    assert.match(check(report, "in_flight_trace").detail.summary, /references\/checkbox-repair\.md/);
+    // C3: the warn itself carries the one-line remediation (no runbook file).
+    assert.match(check(report, "in_flight_trace").detail.summary, /→ PR #N \(state\)/);
+    assert.match(check(report, "in_flight_trace").detail.summary, /\[run:id\]/);
+    assert.match(check(report, "in_flight_trace").detail.summary, /\[branch:name\]/);
+    assert.match(check(report, "in_flight_trace").detail.summary, /revert the item to \[ \]/);
     assert.equal(exitCodeFor(report), 0);
     assert.equal(report.exit_hint, "warn");
   });

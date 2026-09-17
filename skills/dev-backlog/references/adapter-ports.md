@@ -35,8 +35,6 @@ configured CLI is missing or unauthenticated, the adapter is unavailable
 (fail-closed). Never parse or write `backlog/tasks/*.md` as a product API, and
 never make two trackers co-authority in one repo.
 
-`gh` label / milestone / Issue patterns: `github-sync.md`.
-
 ## Required operations
 
 `validateAdapter` requires an object whose own keys are exactly

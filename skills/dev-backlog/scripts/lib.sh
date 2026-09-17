@@ -8,7 +8,6 @@ DEFAULT_BACKLOG_DIR=".dev-backlog"
 # Legacy GitHub checkbox regex aliases — integration contract with dev-relay.
 # Core shell consumers use checkbox_lines/count_checkboxes below, which delegate
 # task-ref grammar to task-ref.js and therefore also accept configured local refs.
-# See: references/integration-contract.md
 RE_CB_ANY='^\- \[.\] #'
 RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'

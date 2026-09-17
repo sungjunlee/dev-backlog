@@ -30,6 +30,17 @@ each returned fact remains the upstream authority named by that result.
 Retrieval output must be disposable and must not be written back automatically
 to Issues, sprints, `_context.md`, or `spec/*`.
 
+## File ownership
+
+| File | Role | Owned by |
+| --- | --- | --- |
+| `.dev-backlog/sprints/_context.md` | Operational facts and gotchas | `dev-backlog` |
+| `.dev-backlog/sprints/*.md` | Admitted-track Plan, Running Context, Progress | `dev-backlog` |
+| `exports/github-issues/*.md` | Opt-in diagnostic/rollback snapshot | operator |
+| `backlog/tasks/*.md` | Leftover operator / Backlog.md tree; never a product parser API | Backlog.md / operator |
+| `.dev-backlog/triage/*.md` | Derived advisory reports | `backlog-triage` |
+| `.dev-backlog/triage/*-apply.log` | JSONL audit logs for accepted issue mutations | `backlog-triage` |
+
 ## Sprint admission
 
 The default path is a sprint-free **Issue → implementation → PR → Issue
