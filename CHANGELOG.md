@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+### Changed
+
+- **Charter rev 19: GitHub-only, no export, no reassess counter** — the `files` adapter, the frozen ports, `.tracker` selection, and `BACK-N` refs are parked at tag `v0.11.0` (G1); `sync-pull --legacy-export` / `legacy-tracker.js` are deleted rather than frozen (G2); the doctor's reassess-signal bookkeeping retires; a new Non-Goal names wrapping `gh` as out of scope (keep test). Capabilities `tracker-task-truth` and the system map follow. Human gate 2026-09-17 ("권장대로 진행"). Closes [#442](https://github.com/sungjunlee/dev-backlog/issues/442).
+
 ## [0.11.0] — 2026-09-17
 
 Headline: **the subtraction release.** First the #411 tracker wave moved the skill execution root to `.dev-backlog/`, froze the adapter ports, and added the `files` adapter; then the subtraction wave (epic #420) re-lightened SKILL.md (181 → 160 lines, never/only/must 13 → 5), deleted six references (10 → 4 files), removed the spec-axis linters, parked the GitLab adapter under charter rev 18's measured-consumer rule, and measured a scripts-less backlog-triage variant (deletion filed as #433). Two conformance reports back it: `docs/conformance/2026-09-17-tracker-wave.md` and `docs/conformance/2026-09-17-triage-scriptless.md`. Rollback points are tag `pre-skill-lightening` (before the 2026-09 skill-lightening wave) and commit `a8ddb7d` (end of the #411 tracker wave, last commit with the GitLab adapter). Breaking for existing consumers: the `.dev-backlog/` root and the diagnostic export path.

@@ -17,34 +17,28 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 
 ## Capability: tracker-task-truth
 
-**Goal:** A repository uses one configured tracker as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
+**Goal:** A repository uses GitHub Issues as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
 
 **In-scope:**
-- Live GitHub Issue list/read/create/update/close lifecycle when `.tracker=github`
-- Selectable `.tracker=files` authority through the Backlog.md CLI (same seven lifecycle ops, `BACK-N` identity)
-- Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships (github)
-- Fail-loud availability and authentication errors; adapter failure is fail-closed
-- The explicit one-way diagnostic export (`sync-pull --legacy-export` → `exports/github-issues/`), as a diagnostic/rollback surface only
+- Live GitHub Issue read/create/update/close lifecycle through `gh`, performed by the session
+- Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships
+- Fail-loud `gh` availability and authentication errors: a failed live read stops execution
 
 **Out-of-scope:**
-- Synchronizing multiple canonical trackers, dual-write, or co-authority (GitHub + files in one repo)
-- New tracker adapters without a measured consumer (charter rule); GitLab, Forgejo, and Gitea remain follow-ups (the GitLab adapter is retrievable at `a8ddb7d`)
-- Task-mirror features, generic tracker parity, or runtime tracker switching
-- Parsing or writing `backlog/tasks/*.md` as a product API (`files` talks to the Backlog.md CLI only)
+- Any tracker other than GitHub Issues, a tracker abstraction, or runtime tracker switching (the `files` adapter and ports are parked at `v0.11.0`, GitLab at `a8ddb7d`; re-admission needs a measured consumer)
+- Task mirrors, diagnostic exports, or any local copy of Issue state
+- Scripts that wrap `gh` for reading Issues, resolving specifications, or seeding Plans
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
-- Task work resolves the effective specification from the live GitHub Issue. If that read fails, execution stops fail-closed; a diagnostic snapshot may be inspected only as rollback evidence and must be human-verified against GitHub before work resumes.
-- Create, plan, work, and complete operations use the configured tracker's stable identity (`#N` or `BACK-N`) and update lifecycle state only through that tracker.
-- Optional features report their availability explicitly; absence of Relay, Projects, Backlog.md, or the spec axis does not block the core Issue → PR path.
-- `sync-pull` refuses without `--legacy-export`; with it, the export writes `exports/github-issues/` one-way and idempotently, and `--update` refreshes frontmatter while preserving human-authored AC bodies (only machine-marker-managed bodies are overwritten).
+- Task work reads the live Issue with `gh issue view --json body,comments`; a comment titled `## Agent Brief` overrides the body and an explicit spec reference overrides both. If that read fails, execution stops fail-closed.
+- Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through `gh`.
+- Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
-- Never treat task files, sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a configured-tracker failure.
-- Never fall back between configured trackers; changing trackers is an explicit `.tracker` rewrite.
-- Never write to human-authored provider content: task bodies without a dev-backlog machine marker, comments, labels, and issue state are untouchable from the export path.
-- A diagnostic export is never required, never authoritative, never read back as execution input, and never a Backlog.md compatibility layer.
+- Never treat sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a GitHub read failure.
+- Never write Issue bodies, comments, labels, or state from a script; every GitHub mutation is a deliberate `gh` call the session makes (or `triage-apply` under its human gate).
 
 ### Learnings
 <!-- LEARN:BEGIN -->
@@ -59,6 +53,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-15 | Freeze tracker adapter ports; diagnostic export moves to `exports/github-issues/`; adapter failure is fail-closed with no local-file fallback (#413) | freeze the seam before files/GitLab adapters; leftover `backlog/tasks/` is not product authority and not a Backlog.md compatibility layer | #412 export still writing `backlog/tasks/` |
 | 2026-09-15 | `.tracker=files` is a first-class chosen authority via the Backlog.md CLI (#414) | same sprint loop, different substrate; CLI-only; fail-closed if the CLI is missing; never co-authority with GitHub; never parse `backlog/tasks/*.md` as a product API | GitHub-only `TRACKER_KEYS` |
 | 2026-09-15 | `.tracker=gitlab` is a first-class forge adapter via `glab` on the frozen ports (#415) | thin CLI translation like github-tracker.js; identities `gitlab#N`; fail-closed; never co-authority; Forgejo/Gitea share forge field shapes and stay follow-ups | `TRACKER_KEYS` without gitlab |
+| 2026-09-17 | GitHub-only again (G1/G2, charter rev 19, epic #440): `files` adapter, ports, `.tracker` selection, and `BACK-N` parked at `v0.11.0`; diagnostic export deleted; task reading is a session `gh` call, not a script (gate 2026-09-17) | no measured consumer for `files` or the export; tracker generality is a charter Non-Goal | 2026-09-15 `files` row; 2026-09-15 ports-freeze row; 2026-08-16/17 export rows |
 | 2026-09-17 | `gitlab` is parked: no measured consumer (no `glab` installed, no repo pins the key); `TRACKER_KEYS` returns to `github`, `files`; the adapter stays retrievable at `a8ddb7d` (#421, #424; gate 2026-09-17) | charter measured-consumer rule | 2026-09-15 gitlab row |
 
 ---
@@ -102,6 +97,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-07-28 | The cannot-prove-disjoint warning fires when 2+ tracks are active and **any** of them is scopeless, not only when two or more are (#337) | one scopeless track next to a declared one is exactly the unprovable state; when more than one track is active, every track must declare an axis | 2026-07-12 pair-rule warning |
 | 2026-07-31 | Admit sprints by execution complexity, not duration; keep simple Issue → PR work sprint-free | requiring a sprint for single-threaded work adds state without resolving a continuity problem | implicit sprint-for-all-work routing |
 | 2026-09-15 | Sprint files, tracker pin, skill config, and triage artifacts live under `.dev-backlog/` (#412) | keep execution continuity off Backlog.md's `backlog/` tree; one root, no dual-write | implicit `backlog/sprints` as the sprint hub |
+| 2026-09-17 | The doctor keeps only shared-state checks (active-track overlap, sprint shape, unmoored `[~]`, in-flight staleness, context bloat); the reassess-signal counter and tracker-selection checks retire (epic #440, #446; gate 2026-09-17) | reassess is a human judgment at sprint close, not a counter | rev-15 reassess cadence bookkeeping |
 | 2026-09-17 | Spec-axis linters removed: `objectives:` and `component:` are unchecked metadata; `component:` is a free track-scope string compared only by `scopesOverlap`; no line budget on this file (#421, #426; gate 2026-09-17) | same upkeep species as the rev-15 status ladder; no consumer read their output | `component:` must resolve to a `## Capability:` heading |
 
 ---

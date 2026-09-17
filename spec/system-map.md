@@ -2,7 +2,7 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority. No required task mirror; an optional one-way diagnostic export exists behind an explicit flag. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
+dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority, read and written by the session through `gh`. No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
 
 ```text
 GitHub Issue (spec + lifecycle + native planning fields)
@@ -14,15 +14,13 @@ GitHub Issue (spec + lifecycle + native planning fields)
 ```
 
 `backlog-triage` is an optional advisory grooming pipeline over the same Issues.
-`spec/*` is an optional human-gated yardstick. Relay, GitHub Projects, and
-the diagnostic `exports/github-issues/` export are optional and non-authoritative.
+`spec/*` is an optional human-gated yardstick. Relay and GitHub Projects are
+optional and non-authoritative.
 Retrieval/memory is not a product surface (#350 no-go).
 
 ## Runtime Boundaries
 
-- GitHub Issues own task specification, native planning metadata, and lifecycle
-  when `.tracker=github`. When `.tracker=files`, the Backlog.md CLI owns that
-  role.
+- GitHub Issues own task specification, native planning metadata, and lifecycle.
   Routing table: [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
 - Sprint files own only admitted complex execution state.
 - `skills/backlog-triage/` owns advisory grooming; GitHub mutation is explicit (`--apply`).
@@ -30,7 +28,7 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 ## Core Flows
 
-1. **Resolve** the live GitHub Issue (`effective-task-spec.js`).
+1. **Read** the live GitHub Issue (`gh issue view --json body,comments`; an `## Agent Brief` comment overrides the body).
 2. **Admit** a sprint only for ordered multi-Issue batches, delegated/parallel
    handoff, cross-Issue/session context, or concurrent-track coordination.
 3. **Execute**: Issue AC and lifecycle stay on GitHub; an admitted sprint carries
@@ -40,17 +38,14 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 ## Storage And External Systems
 
-- GitHub Issues — sole task authority when `.tracker=github` (`gh`; tests use an argv recorder). GitHub Issues remain the canonical default.
+- GitHub Issues — sole task authority (`gh`; tests use an argv recorder).
 - `.dev-backlog/sprints/` — admitted execution state; completed sprints are history.
 - `spec/*` — durable direction when present.
-- `.dev-backlog/.tracker` — `github` or `files` (config-only; this repository pins `github`).
-  Runtime never switches. `files` uses the Backlog.md CLI only; leftover `backlog/tasks/*.md` is not a product API.
-  GitLab/Forgejo/Gitea are follow-up forge adapters (measured consumer required; GitLab retrievable at `a8ddb7d`).
+- No tracker selection: the `files` adapter and `.dev-backlog/.tracker` are parked at `v0.11.0` (GitLab at `a8ddb7d`); a leftover `.tracker` file is ignored.
 
 ## Project-Wide Invariants
 
-- One task authority. Fail-closed on adapter failure. No runtime fallback, co-authority, dual write, or
-  background sync. Tracker unavailability never selects another tracker or any local store.
+- One task authority. A failed `gh` read is fail-closed: no local store, export, or sprint text stands in for it; no dual write or background sync.
 - A failed live Issue read stops execution.
 - A sprint is admitted by execution complexity, never duration alone.
 - Optional surfaces fail before effects; they cannot become authority.
