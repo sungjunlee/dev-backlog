@@ -69,3 +69,7 @@ Same harness and rubric, SKILL.md from PR #435 (160 lines; six references delete
 | astra × after425 | 11/12 | 1 | 0 | 1 | 1 | PARTIAL 12; asks in 12; Plan fold in 2 |
 
 No new PARTIAL or FAIL against `relit`; every stop held. Neither model referenced a deleted file. Raw answers: `2026-09-17/fable-after425.md`, `2026-09-17/astra-after425.md`, prompt `2026-09-17/prompt-after425.md`. Astra tokens (stderr): 13.3k.
+
+## After #431 (migration clause)
+
+Same harness, SKILL.md from PR #436 (one clause in the Plan rail), one run per model. Scenario 12 only changed: Astra now runs `setup-dev-backlog.js` to migrate and leaves `backlog/tasks/`, `docs/`, `completed/` in place (PASS); Fable names the same migration path, what it moves and what it leaves, and asks before running it because Orient is read-only (PASS under the revised Expected, which accepts "run or ask" once the path is named — the knowledge gap the clause targeted is closed, and asking before a structural move in Orient is the wave's own rule). Scenarios 1–11 unchanged from `after425`. Raw: `2026-09-17/fable-431.md`, `2026-09-17/astra-431.md`, `2026-09-17/prompt-431.md`. Astra tokens (stderr): 13.3k.
