@@ -2,8 +2,8 @@
 /**
  * Aggregate deterministic dev-backlog health checks into one CI-ready probe.
  * Each check normalizes to one verdict: active-sprint invariant, sprint shape,
- * in-flight trace/staleness, _context.md bloat. Reassess is a human call at
- * sprint close, not a counter (charter rev 19, #446).
+ * in-flight trace. Reassess is a human call at sprint close, not a counter
+ * (charter rev 19, #446).
  */
 
 const fs = require("fs");
@@ -24,23 +24,19 @@ const {
 const { repoDisplayPath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
-const DEFAULT_STALE_DAYS = 7;
-const CONTEXT_BLOAT_LINE_THRESHOLD = 200;
 const REQUIRED_ACTIVE_SECTIONS = ["Goal", "Plan", "Running Context", "Progress"];
 
 function usage() {
   return [
-    "Usage: backlog-doctor.js [--json] [--stale-days N] [backlog-dir]",
+    "Usage: backlog-doctor.js [--json] [backlog-dir]",
     "",
-    "Runs active-sprint, sprint-shape, in-flight trace/staleness,",
-    "and _context.md bloat checks.",
+    "Runs active-sprint, sprint-shape, and in-flight trace checks.",
   ].join("\n");
 }
 
 function parseArgs(args) {
   const options = {
     backlogDir: DEFAULT_BACKLOG_DIR,
-    staleDays: DEFAULT_STALE_DAYS,
     json: false,
   };
   let backlogDirSet = false;
@@ -50,21 +46,6 @@ function parseArgs(args) {
     if (arg === "--help" || arg === "-h") return { ...options, help: true };
     if (arg === "--json") {
       options.json = true;
-      continue;
-    }
-    if (arg === "--stale-days") {
-      const next = args[i + 1];
-      if (!next) return { ...options, error: `Missing value for --stale-days. ${usage()}` };
-      const parsed = parseStaleDays(next);
-      if (parsed.error) return { ...options, error: parsed.error };
-      options.staleDays = parsed.value;
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--stale-days=")) {
-      const parsed = parseStaleDays(arg.slice("--stale-days=".length));
-      if (parsed.error) return { ...options, error: parsed.error };
-      options.staleDays = parsed.value;
       continue;
     }
     if (arg.startsWith("--")) {
@@ -80,19 +61,10 @@ function parseArgs(args) {
   return options;
 }
 
-function parseStaleDays(raw) {
-  if (!/^\d+$/.test(raw)) {
-    return { error: `Invalid --stale-days value: ${raw}. Expected a non-negative integer.` };
-  }
-  return { value: Number.parseInt(raw, 10) };
-}
-
 function runDoctor({
   repoRoot = process.cwd(),
   backlogDir = DEFAULT_BACKLOG_DIR,
-  staleDays = DEFAULT_STALE_DAYS,
   today = new Date(),
-  contextLineThreshold = CONTEXT_BLOAT_LINE_THRESHOLD,
 } = {}) {
   const root = path.resolve(repoRoot);
   const backlogPath = resolvePath(root, backlogDir);
@@ -115,10 +87,6 @@ function runDoctor({
         tag,
       ),
       in_flight_trace: tagTrack(checkInFlightTrace({ sprintState, activeStatus: active.status }), tag),
-      in_flight_staleness: tagTrack(
-        checkInFlightStaleness({ sprintState, activeStatus: active.status, staleDays }),
-        tag,
-      ),
     };
   });
 
@@ -126,8 +94,6 @@ function runDoctor({
     active,
     ...perTrack.map((run) => run.sprint_shape),
     ...perTrack.map((run) => run.in_flight_trace),
-    ...perTrack.map((run) => run.in_flight_staleness),
-    checkContextBloat({ repoRoot: root, sprintsDir, threshold: contextLineThreshold }),
   ];
 
   return {
@@ -348,71 +314,6 @@ function checkInFlightTrace({ sprintState, activeStatus }) {
   });
 }
 
-function checkInFlightStaleness({ sprintState, activeStatus, staleDays }) {
-  if (sprintState.error) {
-    return verdict("in_flight_staleness", activeStatus === "fail" ? "warn" : "fail", {
-      summary: `Skipped in-flight staleness check: ${sprintState.error.message}`,
-      stale_days: staleDays,
-    });
-  }
-  if (!sprintState.state || !sprintState.state.active_sprint) {
-    return verdict("in_flight_staleness", "pass", {
-      summary: "No active sprint; no in-flight age to check.",
-      stale_days: staleDays,
-    });
-  }
-
-  const stale = sprintState.state.in_flight
-    .filter((item) => item.age_days !== null && item.age_days > staleDays);
-  if (stale.length > 0) {
-    return verdict("in_flight_staleness", "warn", {
-      summary: `${stale.length} in-flight item(s) are older than ${staleDays} day(s).`,
-      stale_days: staleDays,
-      items: stale.map(publicPlanItem),
-    });
-  }
-
-  return verdict("in_flight_staleness", "pass", {
-    summary: `No in-flight items are older than ${staleDays} day(s).`,
-    stale_days: staleDays,
-    in_flight_count: sprintState.state.in_flight.length,
-  });
-}
-
-function checkContextBloat({ repoRoot, sprintsDir, threshold }) {
-  const contextPath = path.join(sprintsDir, "_context.md");
-  if (!fs.existsSync(contextPath)) {
-    return verdict("context_bloat", "pass", {
-      summary: "_context.md is absent; no cross-sprint context bloat detected.",
-      threshold_lines: threshold,
-      line_count: 0,
-    });
-  }
-
-  const content = fs.readFileSync(contextPath, "utf-8");
-  const lineCount = countLines(content);
-  if (lineCount > threshold) {
-    return verdict("context_bloat", "warn", {
-      summary: `_context.md is ${lineCount} lines, above the ${threshold}-line bloat threshold.`,
-      context_path: displayPath(repoRoot, contextPath),
-      threshold_lines: threshold,
-      line_count: lineCount,
-    });
-  }
-
-  return verdict("context_bloat", "pass", {
-    summary: `_context.md is within the ${threshold}-line bloat threshold.`,
-    context_path: displayPath(repoRoot, contextPath),
-    threshold_lines: threshold,
-    line_count: lineCount,
-  });
-}
-
-function countLines(content) {
-  if (content === "") return 0;
-  return content.split(/\r?\n/).length;
-}
-
 // Whitelist (order-stable) of the plan-item fields a verdict may publish.
 const PUBLIC_PLAN_FIELDS = [
   "line", "tracker", "id", "ref", "issue_number",
@@ -477,8 +378,6 @@ if (require.main === module) main();
 module.exports = {
   SCHEMA_VERSION,
   DEFAULT_BACKLOG_DIR,
-  DEFAULT_STALE_DAYS,
-  CONTEXT_BLOAT_LINE_THRESHOLD,
   REQUIRED_ACTIVE_SECTIONS,
   parseArgs,
   runDoctor,

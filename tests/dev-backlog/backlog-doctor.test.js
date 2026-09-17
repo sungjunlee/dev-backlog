@@ -112,19 +112,17 @@ describe("parseArgs", () => {
   it("uses the documented defaults", () => {
     const parsed = parseArgs([]);
     assert.equal(parsed.backlogDir, ".dev-backlog");
-    assert.equal(parsed.staleDays, 7);
     assert.equal(parsed.json, false);
   });
 
-  it("accepts --json, --stale-days, and a backlog directory", () => {
-    const parsed = parseArgs(["--json", "--stale-days", "3", "custom-backlog"]);
+  it("accepts --json and a backlog directory", () => {
+    const parsed = parseArgs(["--json", "custom-backlog"]);
     assert.equal(parsed.json, true);
-    assert.equal(parsed.staleDays, 3);
     assert.equal(parsed.backlogDir, "custom-backlog");
   });
 
-  it("rejects invalid stale-day values", () => {
-    assert.match(parseArgs(["--stale-days", "soon"]).error, /Invalid --stale-days/);
+  it("rejects --stale-days as an unknown argument", () => {
+    assert.match(parseArgs(["--stale-days"]).error, /Unknown argument: --stale-days/);
   });
 });
 
@@ -154,8 +152,6 @@ describe("runDoctor", () => {
       "active_sprint",
       "sprint_shape",
       "in_flight_trace",
-      "in_flight_staleness",
-      "context_bloat",
     ]);
     assert.ok(formatHumanSummary(report).includes("[PASS] active_sprint"));
     // G4: a single active track never grows track tags (text and JSON alike).
@@ -218,7 +214,7 @@ describe("runDoctor", () => {
     assert.match(check(report, "active_sprint").detail.summary, /2 active tracks, scopes disjoint/);
     assert.equal(exitCodeFor(report), 0);
 
-    for (const name of ["sprint_shape", "in_flight_trace", "in_flight_staleness"]) {
+    for (const name of ["sprint_shape", "in_flight_trace"]) {
       const fanned = report.checks.filter((item) => item.name === name);
       assert.equal(fanned.length, 2, `${name} should run once per track`);
       assert.deepEqual(fanned.map((item) => item.track), ["2026-07-auth", "2026-07-billing"]);
@@ -411,43 +407,5 @@ describe("runDoctor", () => {
     assert.match(check(report, "in_flight_trace").detail.summary, /revert the item to \[ \]/);
     assert.equal(exitCodeFor(report), 0);
     assert.equal(report.exit_hint, "warn");
-  });
-
-  it("warns on stale in-flight work beyond --stale-days without failing", () => {
-    seedCleanRepo(
-      repoRoot,
-      sprint({
-        started: "2026-07-01",
-        plan: "- [~] #1 Needs follow-up [branch:doctor-test]",
-      }),
-    );
-
-    const report = runDoctor({
-      repoRoot,
-      staleDays: 3,
-      today: new Date("2026-07-05T00:00:00Z"),
-    });
-
-    assert.equal(check(report, "in_flight_staleness").status, "warn");
-    assert.equal(check(report, "in_flight_staleness").detail.stale_days, 3);
-    assert.deepEqual(
-      check(report, "in_flight_staleness").detail.items.map((item) => item.issue_number),
-      [1],
-    );
-    assert.equal(exitCodeFor(report), 0);
-  });
-
-  it("warns when _context.md exceeds the documented line threshold without failing", () => {
-    seedCleanRepo(repoRoot);
-    write(
-      path.join(repoRoot, ".dev-backlog", "sprints", "_context.md"),
-      Array.from({ length: 201 }, (_, i) => `line ${i + 1}`).join("\n"),
-    );
-
-    const report = runDoctor({ repoRoot });
-
-    assert.equal(check(report, "context_bloat").status, "warn");
-    assert.equal(check(report, "context_bloat").detail.threshold_lines, 200);
-    assert.equal(exitCodeFor(report), 0);
   });
 });
