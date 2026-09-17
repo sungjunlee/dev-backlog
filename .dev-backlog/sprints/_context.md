@@ -30,7 +30,7 @@
 
 ## Known Gotchas
 
-- Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision. There is no local fallback copy of Issue state.
+- Live GitHub work re-reads the Issue with `gh issue view --json body,comments` when it changes. There is no local fallback copy of Issue state.
 - Backlog triage snapshot enrichments stay explicit and bounded: `--with-comments` and `--with-closed-issues` are opt-in, while downstream scanners must gracefully gate on optional fields instead of assuming they exist.
 - `triage-relate` relationship edges are advisory context. Even a `merged-pr-link` edge must not become a close recommendation unless `triage-stale` implements a separate conservative obsolete signal.
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.

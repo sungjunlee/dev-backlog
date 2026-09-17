@@ -90,20 +90,20 @@ statuses: ["To Do", "In Progress", "Done"]
 fields from it. dev-backlog reads `task_prefix`, `default_status`, and
 `statuses`; `project_name` is retained as metadata.
 
-## Effective task specification
+## Task specification
 
-Work and completion resolve task input through `effective-task-spec.js`. It
-selects, in order: an explicit `spec_ref`, a posted Issue comment starting with
-`## Agent Brief`, then the Issue body. To select a repository document
-explicitly, put exactly one marker in the Issue body:
+Work and completion read the live task with `gh issue view N --json
+body,comments`: the newest comment titled `## Agent Brief` overrides the body,
+and a `spec_ref:` line in the body naming a file or URL overrides both. To
+select a document explicitly, put exactly one such line in the Issue body:
 
 ```markdown
-<!-- dev-backlog:spec_ref docs/oauth-rollout.md -->
+spec_ref: docs/oauth-rollout.md
 ```
 
-`spec_ref` is repository-relative. The resolver fails closed when it is
-missing, unreadable, outside the repository, or duplicated with a conflicting
-value; it does not fall back to another document. Optional AC markers:
+A file path is repository-relative; a URL is read as-is. A `spec_ref` that is
+missing, unreadable, or duplicated with a conflicting value fails closed: stop
+and repair, without falling back to another document. Optional AC markers:
 
 ```markdown
 ## Acceptance Criteria

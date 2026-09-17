@@ -18,7 +18,7 @@ const EXPECTED_STATE_CLASSES = [
   "Derived retrieval output",
 ];
 const EXPECTED_SOLE_AUTHORITIES = [
-  "Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); a posted `## Agent Brief` comment is the contract when present",
+  "Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both",
   "Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`)",
   "Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files)",
   "One active sprint file for the admitted track",
@@ -91,7 +91,7 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   assert.match(readme, /Optional surfaces/);
   assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
   assert.match(skill, /^## Sprint Admission$/m);
-  assert.match(skill, /effective-task-spec\.js/);
+  assert.match(skill, /gh issue view N --json body,comments/);
   assert.match(skill, /fail-closed/);
   assert.match(skill, /adapter-ports\.md/);
   assert.match(capabilities, /If that read fails, execution stops/);
