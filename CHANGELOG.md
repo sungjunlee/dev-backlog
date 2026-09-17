@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-09-17
+
+Headline: **the subtraction release.** First the #411 tracker wave moved the skill execution root to `.dev-backlog/`, froze the adapter ports, and added the `files` adapter; then the subtraction wave (epic #420) re-lightened SKILL.md (181 → 160 lines, never/only/must 13 → 5), deleted six references (10 → 4 files), removed the spec-axis linters, parked the GitLab adapter under charter rev 18's measured-consumer rule, and measured a scripts-less backlog-triage variant (deletion filed as #433). Two conformance reports back it: `docs/conformance/2026-09-17-tracker-wave.md` and `docs/conformance/2026-09-17-triage-scriptless.md`. Rollback points are tag `pre-skill-lightening` (before the 2026-09 skill-lightening wave) and commit `a8ddb7d` (end of the #411 tracker wave, last commit with the GitLab adapter). Breaking for existing consumers: the `.dev-backlog/` root and the diagnostic export path.
+
 ### Changed
 
 - **Spec-axis linters removed** — `objectives-check.js`, `component-lint.js`, `capabilities-doctor.js`, and `spec-paths.js` are gone (907 script lines, 1047 test lines); `backlog-doctor.js` drops the three checks; `sprint-init.js` no longer reads `spec/` (`--component` is a free track-scope string compared only by `scopesOverlap`; `objectives:` is optional human-authored metadata); `references/spec-fallback.md` shrinks to triage degradation. `sprint-status.js` (orphaned once its two linter callers went) is deleted too. Decided by charter rev 18 ([#421](https://github.com/sungjunlee/dev-backlog/issues/421)). Closes [#426](https://github.com/sungjunlee/dev-backlog/issues/426).
