@@ -7,7 +7,6 @@ const path = require("node:path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   SetupError,
-  collectGithubEvidence,
   parseArgs,
   runSetup,
 } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
@@ -49,13 +48,15 @@ describe("GitHub-only setup", () => {
     assert.throws(() => parseArgs(["--tracker"]), SetupError);
   });
 
-  it("creates only sprints/ for a fresh repository and writes no .tracker", async (t) => {
+  it("creates only sprints/ for a fresh repository and writes no .tracker or config.yml", async (t) => {
     const cwd = root(t);
     const result = await runSetup({ cwd, nonInteractive: true });
     assert.deepEqual(result.createdDirectories, ["sprints"]);
     assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), ["sprints"]);
     assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog/.tracker")), false);
+    assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog/config.yml")), false);
     assert.ok(!("selection" in result));
+    assert.ok(!("github" in result));
   });
 
   it("ignores a leftover .tracker and never rewrites config.yml", async (t) => {
@@ -71,19 +72,6 @@ describe("GitHub-only setup", () => {
     assert.equal(fs.readFileSync(path.join(backlogDir, "config.yml"), "utf8"), raw);
     assert.equal(fs.readFileSync(path.join(backlogDir, ".tracker"), "utf8"), "files\n");
     assert.equal(fs.existsSync(path.join(backlogDir, "sprints")), true);
-  });
-
-  it("never recommends a runtime fallback when GitHub evidence is unavailable", () => {
-    const evidence = collectGithubEvidence({
-      cwd: "/repo",
-      execFileSync(command) {
-        const error = new Error(`${command} unavailable`);
-        error.code = "ENOENT";
-        throw error;
-      },
-    });
-    assert.equal(evidence.recommendation, "github");
-    assert.equal(evidence.auth, "not-checked");
   });
 
   it("refuses an unsafe backlog root before any effect", async (t) => {

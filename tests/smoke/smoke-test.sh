@@ -114,12 +114,10 @@ if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail"
   process.exit(1);
 }
 '
-assert_json_eval "doctor live: reassess_signal shape" "$OUT" '
+assert_json_eval "doctor live: reassess signal and legacy-root check are gone (#446)" "$OUT" '
 const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
-const s = j.reassess_signal;
-if (!s || typeof s.fired !== "boolean" || typeof s.reason !== "string") process.exit(1);
-if (typeof s.sprints_since_last_report !== "number") process.exit(1);
-if (s.latest_report !== null && typeof s.latest_report !== "string") process.exit(1);
+if ("reassess_signal" in j) process.exit(1);
+if ((j.checks || []).some((check) => check.name === "legacy_execution_root")) process.exit(1);
 '
 
 # ============================================================
@@ -822,7 +820,7 @@ assert_contains "close dry-run: would set completed" "$OUT" "Would set status: c
 assert_contains "close dry-run: shows context entries" "$OUT" "argon2"
 assert_contains "close dry-run: runs doctor" "$OUT" "=== Backlog Doctor (pre-close) ==="
 assert_contains "close dry-run: doctor result appears" "$OUT" "[PASS] active_sprint"
-assert_contains "close dry-run: reassess verdict appears" "$OUT" "Reassess signal:"
+assert_not_contains "close dry-run: no reassess summary (#446)" "$OUT" "Reassess signal:"
 # Verify nothing actually changed
 assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
 assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | wc -l | tr -d ' ')" "3"
@@ -868,7 +866,7 @@ OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close: set completed" "$OUT" "status: completed"
 assert_contains "close: context reminder" "$OUT" "argon2"
 assert_contains "close: doctor result appears" "$OUT" "[PASS] active_sprint"
-assert_contains "close: reassess verdict appears" "$OUT" "Reassess signal:"
+assert_not_contains "close: no reassess summary (#446)" "$OUT" "Reassess signal:"
 
 # Verify sprint file updated
 assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "completed"

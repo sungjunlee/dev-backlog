@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Idempotent dev-backlog setup. GitHub Issues are the only task authority
- * (#445): setup selects nothing, writes no `.dev-backlog/.tracker`, and never
- * reads or writes `.dev-backlog/config.yml`. A leftover `.tracker` is ignored.
+ * Idempotent setup: create `.dev-backlog/sprints/`, migrate a legacy `backlog/`
+ * skill layout, nothing else (#446). GitHub Issues are the only task authority
+ * (#445): no selection step, no `.tracker`, and `config.yml` is never read or
+ * written -- a leftover one keeps its bytes.
  */
 
-const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -19,10 +19,6 @@ const {
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
 const TRACKER_FLAG_NOTICE = "--tracker is ignored since v0.12.0 (GitHub only)";
 
-function requiredDirectories() {
-  return [...MINIMUM_DIRECTORIES];
-}
-
 class SetupError extends Error {
   constructor(message, options = {}) {
     super(message, options);
@@ -33,202 +29,34 @@ class SetupError extends Error {
 
 function usage() {
   return [
-    "Usage: setup-dev-backlog.js [project-name] [options]",
-    "",
-    "Options:",
-    "  --tracker <key>         Ignored since v0.12.0 (GitHub only)",
-    "  --non-interactive       Accepted; setup never prompts",
-    "  --project-name NAME     Project name reported for compatibility",
-    "  --json                  Print structured output",
-    "  --help                  Show this help",
+    "Usage: setup-dev-backlog.js [--non-interactive] [--json] [--tracker <key>]",
+    "Creates .dev-backlog/sprints/ and migrates a legacy backlog/ skill layout.",
+    "--tracker is accepted and ignored (GitHub only since v0.12.0).",
   ].join("\n");
 }
 
-function takeValue(argv, index, flag) {
-  if (index + 1 >= argv.length || argv[index + 1].startsWith("--")) {
-    throw new SetupError(`${flag} requires a value.\n${usage()}`);
-  }
-  return argv[index + 1];
-}
-
 function parseArgs(argv = process.argv.slice(2)) {
-  const options = {
-    tracker: undefined,
-    nonInteractive: false,
-    json: false,
-    projectName: undefined,
-    help: false,
-  };
-  let positionalProjectName;
-
+  const options = { tracker: undefined, nonInteractive: false, json: false, help: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--tracker") {
-      options.tracker = takeValue(argv, index, "--tracker");
-      index += 1;
+      options.tracker = argv[(index += 1)];
+      if (options.tracker === undefined || options.tracker.startsWith("--")) {
+        throw new SetupError(`--tracker requires a value.\n${usage()}`);
+      }
     } else if (arg.startsWith("--tracker=")) {
       options.tracker = arg.slice("--tracker=".length);
-    } else if (arg === "--project-name") {
-      options.projectName = takeValue(argv, index, "--project-name");
-      index += 1;
-    } else if (arg.startsWith("--project-name=")) {
-      options.projectName = arg.slice("--project-name=".length);
     } else if (arg === "--non-interactive") {
       options.nonInteractive = true;
     } else if (arg === "--json") {
       options.json = true;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
-    } else if (arg.startsWith("-")) {
-      throw new SetupError(`Unknown option: ${arg}.\n${usage()}`);
-    } else if (positionalProjectName === undefined) {
-      positionalProjectName = arg;
     } else {
-      throw new SetupError(`Unexpected argument: ${arg}.\n${usage()}`);
+      throw new SetupError(`Unknown argument: ${arg}.\n${usage()}`);
     }
-  }
-
-  if (options.projectName !== undefined && positionalProjectName !== undefined) {
-    throw new SetupError("Project name may be supplied either positionally or with --project-name, not both.");
-  }
-  options.projectName = options.projectName ?? positionalProjectName;
-
-  if (options.projectName !== undefined && options.projectName.length === 0) {
-    throw new SetupError("--project-name requires a non-empty value.");
   }
   return options;
-}
-
-function isGithubRemote(remote) {
-  const value = String(remote || "").trim();
-  if (!value) return false;
-  const component = "[A-Za-z0-9_.-]+";
-  const scp = value.match(/^git@([^:]+):(.+)$/);
-  if (scp && scp[1].toLowerCase() === "github.com") {
-    const parts = scp[2].split("/");
-    const repo = (parts[1] || "").replace(/\.git$/, "");
-    return parts.length === 2 &&
-      new RegExp(`^${component}$`).test(parts[0]) &&
-      new RegExp(`^${component}$`).test(repo) &&
-      ![".", ".."].includes(parts[0]) &&
-      ![".", ".."].includes(repo);
-  }
-  try {
-    const parsed = new URL(value);
-    const host = parsed.hostname.toLowerCase();
-    const standardHttps = parsed.protocol === "https:" && host === "github.com" &&
-      parsed.port === "" && parsed.username === "" && parsed.password === "";
-    const standardSsh = parsed.protocol === "ssh:" && host === "github.com" &&
-      (parsed.port === "" || parsed.port === "22") && parsed.username === "git" && parsed.password === "";
-    const sshOver443 = parsed.protocol === "ssh:" && host === "ssh.github.com" &&
-      parsed.port === "443" && parsed.username === "git" && parsed.password === "";
-    return (
-      (standardHttps || standardSsh || sshOver443) &&
-      parsed.search === "" &&
-      parsed.hash === "" &&
-      new RegExp(`^/${component}/${component}(?:\\.git)?$`).test(parsed.pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function commandFailedBecauseMissing(error) {
-  return error && (error.code === "ENOENT" || error.errno === -2);
-}
-
-function collectGithubEvidence({
-  cwd = process.cwd(),
-  execFileSync = childProcess.execFileSync,
-} = {}) {
-  let remote = "missing";
-  try {
-    const rawRemote = execFileSync(
-      "git",
-      ["config", "--get", "remote.origin.url"],
-      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
-    );
-    remote = isGithubRemote(rawRemote) ? "github" : "non-github";
-  } catch {
-    remote = "missing";
-  }
-
-  let cli = "available";
-  let auth = "authenticated";
-  try {
-    execFileSync(
-      "gh",
-      ["auth", "status", "--hostname", "github.com"],
-      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
-    );
-  } catch (error) {
-    if (commandFailedBecauseMissing(error)) {
-      cli = "missing";
-      auth = "not-checked";
-    } else {
-      cli = "available";
-      auth = "unauthenticated";
-    }
-  }
-
-  const recommendation = "github";
-  return Object.freeze({ recommendation, remote, cli, auth });
-}
-
-function githubAvailabilityFromEvidence(evidence) {
-  const problems = [];
-  const repairs = [];
-  if (evidence.remote !== "github") {
-    problems.push(evidence.remote === "missing" ? "GitHub origin not found" : "origin is not GitHub");
-    repairs.push(
-      evidence.remote === "missing"
-        ? "git remote add origin <github-url>"
-        : "git remote set-url origin <github-url>"
-    );
-  }
-  if (evidence.cli === "missing") {
-    problems.push("gh CLI not found");
-    repairs.push("install GitHub CLI from https://cli.github.com/ and run gh auth login --hostname github.com");
-  } else if (evidence.auth !== "authenticated") {
-    problems.push("gh is not authenticated for github.com");
-    repairs.push("gh auth login --hostname github.com");
-  }
-
-  if (problems.length === 0) {
-    return Object.freeze({ available: true, evidence });
-  }
-  return Object.freeze({
-    available: false,
-    evidence,
-    reason: problems.join("; "),
-    repair: repairs.join("; "),
-    fallbackAttempted: false,
-  });
-}
-
-function checkGithubAvailability(options) {
-  return githubAvailabilityFromEvidence(collectGithubEvidence(options));
-}
-
-function ensureMinimumDirectories(backlogDir, fsApi) {
-  const structure = { backlogCreated: false, created: [] };
-  try {
-    if (!lstatIfPresent(backlogDir, fsApi)) {
-      fsApi.mkdirSync(backlogDir);
-      structure.backlogCreated = true;
-    }
-    for (const name of requiredDirectories()) {
-      const directory = path.join(backlogDir, name);
-      if (!lstatIfPresent(directory, fsApi)) {
-        fsApi.mkdirSync(directory);
-        structure.created.push(name);
-      }
-    }
-    return structure;
-  } catch (error) {
-    rollbackCreatedDirectories(backlogDir, structure, fsApi);
-    throw error;
-  }
 }
 
 function lstatIfPresent(targetPath, fsApi) {
@@ -240,91 +68,57 @@ function lstatIfPresent(targetPath, fsApi) {
   }
 }
 
-function validateRegularFile(targetPath, label, fsApi) {
-  const stat = lstatIfPresent(targetPath, fsApi);
-  if (stat && (stat.isSymbolicLink() || !stat.isFile())) {
-    throw new SetupError(`Refusing unsafe ${label} path: ${targetPath} must be a regular file.`);
-  }
-  return Boolean(stat);
-}
-
-function validateExistingStructure(backlogDir, configPath, fsApi) {
-  const backlogStat = lstatIfPresent(backlogDir, fsApi);
-  if (backlogStat && (backlogStat.isSymbolicLink() || !backlogStat.isDirectory())) {
-    throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
-  }
-  validateRegularFile(configPath, "config", fsApi);
-  for (const name of requiredDirectories()) {
-    const directory = path.join(backlogDir, name);
-    const stat = lstatIfPresent(directory, fsApi);
+// Refuse a symlinked or irregular root, config.yml, or sprints/ before any mkdir.
+function validateExistingStructure(backlogDir, fsApi) {
+  const targets = [
+    [backlogDir, "backlog", "real directory"],
+    [path.join(backlogDir, "config.yml"), "config", "regular file"],
+    ...MINIMUM_DIRECTORIES.map((name) => [path.join(backlogDir, name), "backlog", "real directory"]),
+  ];
+  for (const [target, label, kind] of targets) {
+    const stat = lstatIfPresent(target, fsApi);
     if (!stat) continue;
-    if (stat.isSymbolicLink() || !stat.isDirectory()) {
-      throw new SetupError(`Refusing unsafe backlog path: ${directory} must be a real directory.`);
+    const kindOk = kind === "regular file" ? stat.isFile() : stat.isDirectory();
+    if (stat.isSymbolicLink() || !kindOk) {
+      throw new SetupError(`Refusing unsafe ${label} path: ${target} must be a ${kind}.`);
     }
   }
 }
 
-function rollbackCreatedDirectories(backlogDir, structure, fsApi) {
-  for (const name of [...structure.created].reverse()) {
-    try {
-      fsApi.rmdirSync(path.join(backlogDir, name));
-    } catch {
-      // A concurrent writer made it non-empty or removed it; never delete content.
-    }
+function ensureMinimumDirectories(backlogDir, fsApi) {
+  const created = [];
+  if (!lstatIfPresent(backlogDir, fsApi)) fsApi.mkdirSync(backlogDir);
+  for (const name of MINIMUM_DIRECTORIES) {
+    const directory = path.join(backlogDir, name);
+    if (lstatIfPresent(directory, fsApi)) continue;
+    fsApi.mkdirSync(directory);
+    created.push(name);
   }
-  if (structure.backlogCreated) {
-    try {
-      fsApi.rmdirSync(backlogDir);
-    } catch {
-      // Preserve anything that appeared concurrently.
-    }
-  }
-}
-
-function defaultProjectName(cwd) {
-  return path.basename(path.resolve(cwd)) || "project";
+  return created;
 }
 
 async function runSetup(options = {}, dependencies = {}) {
   const fsApi = dependencies.fs || fs;
   const cwd = path.resolve(options.cwd || process.cwd());
   const backlogDir = path.join(cwd, DEFAULT_BACKLOG_DIR);
-  const destStat = lstatIfPresent(backlogDir, fsApi);
-  if (!destStat) {
-    const leftover = leftoverSkillFiles(cwd, { fs: fsApi });
-    if (leftover.length > 0) {
-      const sourceDir = path.join(cwd, LEGACY_EXPORT_DIR);
-      validateExistingStructure(sourceDir, path.join(sourceDir, "config.yml"), fsApi);
-      migrateLegacyExecutionRoot(cwd, { fs: fsApi });
-    }
-  }
 
-  validateExistingStructure(backlogDir, path.join(backlogDir, "config.yml"), fsApi);
-  const structure = ensureMinimumDirectories(backlogDir, fsApi);
+  if (!lstatIfPresent(backlogDir, fsApi) && leftoverSkillFiles(cwd, { fs: fsApi }).length > 0) {
+    validateExistingStructure(path.join(cwd, LEGACY_EXPORT_DIR), fsApi);
+    migrateLegacyExecutionRoot(cwd, { fs: fsApi });
+  }
+  validateExistingStructure(backlogDir, fsApi);
 
   return Object.freeze({
     action: "setup-dev-backlog",
-    projectName: options.projectName || defaultProjectName(cwd),
-    createdDirectories: structure.created,
-    github: Object.freeze({
-      available: undefined,
-      checked: false,
-      fallbackAttempted: false,
-      repair: "verify with gh auth status --hostname github.com; repair with gh auth login --hostname github.com",
-    }),
+    createdDirectories: ensureMinimumDirectories(backlogDir, fsApi),
   });
 }
 
 function printHumanResult(result, output = process.stdout) {
-  if (result.createdDirectories.length > 0) {
-    output.write(`Created directories: ${result.createdDirectories.join(", ")}\n`);
-  } else {
-    output.write("Backlog directories already complete.\n");
-  }
-  output.write(
-    "GitHub Issues are the task authority; setup does not probe the provider. "
-    + `If gh is unavailable, ${result.github.repair}.\n`
-  );
+  output.write(result.createdDirectories.length > 0
+    ? `Created directories: ${result.createdDirectories.join(", ")}\n`
+    : "Backlog directories already complete.\n");
+  output.write("GitHub Issues are the task authority; verify gh auth status --hostname github.com.\n");
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -333,9 +127,7 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${usage()}\n`);
     return 0;
   }
-  if (options.tracker !== undefined) {
-    process.stderr.write(`${TRACKER_FLAG_NOTICE}\n`);
-  }
+  if (options.tracker !== undefined) process.stderr.write(`${TRACKER_FLAG_NOTICE}\n`);
   const result = await runSetup(options);
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -346,29 +138,13 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-  main().then(
-    (code) => {
-      process.exitCode = code;
-    },
-    (error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`setup-dev-backlog: ${message}\n`);
-      process.exitCode = error && Number.isInteger(error.exitCode) ? error.exitCode : 1;
-    }
-  );
+  main().then((code) => {
+    process.exitCode = code;
+  }, (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`setup-dev-backlog: ${message}\n`);
+    process.exitCode = error && Number.isInteger(error.exitCode) ? error.exitCode : 1;
+  });
 }
 
-module.exports = {
-  MINIMUM_DIRECTORIES,
-  TRACKER_FLAG_NOTICE,
-  SetupError,
-  checkGithubAvailability,
-  collectGithubEvidence,
-  githubAvailabilityFromEvidence,
-  isGithubRemote,
-  main,
-  parseArgs,
-  printHumanResult,
-  requiredDirectories,
-  runSetup,
-};
+module.exports = { MINIMUM_DIRECTORIES, TRACKER_FLAG_NOTICE, SetupError, main, parseArgs, runSetup };

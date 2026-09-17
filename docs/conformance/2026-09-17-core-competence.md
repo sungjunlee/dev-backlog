@@ -39,3 +39,5 @@ SKILL.md from PR #453 (157 lines / never-only-must 5): "GitHub Issues" plainly, 
 | astra × batch3 | 11/11 | 0 | 0 | 0 | 1 | Plan fold offered in 2 (every Astra run); 11 names the migration path, orients read-only |
 
 No new PARTIAL or FAIL against Batch 2; every stop held; no run named a deleted module, a `.tracker` file, or a non-GitHub tracker. Wire contract: dev-relay's `sprint-state` consumer tests 84/84 and its full sweep 712/713 with this branch (the one failure is dev-relay's own wall-clock flake, reproduced on unmodified main). Raw: `2026-09-17-cc/fable-batch3.md`, `astra-batch3.md`, `prompt-batch3.md`. Astra tokens (stderr): 26.0k.
+
+After #446 (doctor and setup shrunk; SKILL.md 157 lines, no reassess mention): one run per model, eleven scenarios — fable 11/11, astra 11/11, same flag profile as Batch 3; no run mentioned a reassess signal, `config.yml`, or a removed setup flag. Raw: `2026-09-17-cc/fable-batch3-post446.md`, `astra-batch3-post446.md`. Astra tokens (stderr): 12.8k.

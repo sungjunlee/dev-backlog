@@ -8,7 +8,7 @@ set -uo pipefail
 # without it the close refuses as ambiguous (a single active needs no flag).
 #
 # Steps:
-#   1. Run backlog-doctor pre-close and compute the text-only reassess signal
+#   1. Run backlog-doctor pre-close (read-only verdicts)
 #   2. Set sprint status: completed + add Progress entry
 #   3. Show Running Context entries (remind to promote to _context.md)
 #   4. Optionally close GitHub milestone (--close-milestone)
@@ -137,12 +137,11 @@ if $CLOSE_MILESTONE && ! $DRY_RUN; then
   fi
 fi
 
-# --- Step 1: Run backlog-doctor and compute the close signal ---
-# The doctor runs before the status flip. Its Node close-summary mode receives
-# the closing sprint path and counts that sprint on today's date, so dry-run
-# output reports the same would-be reassess signal without mutating files.
+# --- Step 1: Run backlog-doctor ---
+# The doctor runs before the status flip and only reads, so a dry-run prints the
+# same verdicts. Whether to reassess the charter is a human call at close (#446).
 TODAY=$(date +%Y-%m-%d)
-DOCTOR_SUMMARY=$(node "$SCRIPT_DIR/backlog-doctor.js" --close-summary --closing-sprint "$ACTIVE" "$BACKLOG_DIR" 2>&1)
+DOCTOR_SUMMARY=$(node "$SCRIPT_DIR/backlog-doctor.js" "$BACKLOG_DIR" 2>&1)
 DOCTOR_STATUS=$?
 
 # --- Step 2: Set status: completed ---
@@ -180,6 +179,7 @@ if $CLOSE_MILESTONE; then
 fi
 
 echo ""
+echo "=== Backlog Doctor (pre-close) ==="
 printf "%s\n" "$DOCTOR_SUMMARY"
 if [ "$DOCTOR_STATUS" -ne 0 ]; then
   echo "Doctor exit code: $DOCTOR_STATUS (close flow continues; see doctor failures above)."

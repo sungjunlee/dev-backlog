@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 /**
  * Aggregate deterministic dev-backlog health checks into one CI-ready probe.
- *
- * Each check normalizes to one verdict; together they cover the active-sprint
- * invariant, sprint shape, in-flight trace/staleness, and _context.md bloat for
- * schedulers and close flows. Spec-axis linting was removed by charter rev 18
- * (#426): `objectives:` and `component:` are unchecked sprint metadata.
+ * Each check normalizes to one verdict: active-sprint invariant, sprint shape,
+ * in-flight trace/staleness, _context.md bloat. Reassess is a human call at
+ * sprint close, not a counter (charter rev 19, #446).
  */
 
 const fs = require("fs");
@@ -23,33 +21,19 @@ const {
   scopesOverlap,
   DEFAULT_BACKLOG_DIR,
 } = require("./lib.js");
-const { leftoverSkillFiles, LEGACY_EXPORT_DIR } = require("./execution-root.js");
 const { repoDisplayPath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_STALE_DAYS = 7;
-const DEFAULT_REASSESS_THRESHOLD = 3;
 const CONTEXT_BLOAT_LINE_THRESHOLD = 200;
 const REQUIRED_ACTIVE_SECTIONS = ["Goal", "Plan", "Running Context", "Progress"];
-const REASSESS_REPORT_RE = /^(\d{4}-\d{2}-\d{2})-reassess\.md$/;
-const SPRINT_CLOSED_RE = /^-\s+(\d{4}-\d{2}-\d{2})(?:\s+[^:]+)?:\s+Sprint closed\b/;
-const SPRINT_FILENAME_MONTH_RE = /^(\d{4}-\d{2})-/;
-const REASSESS_ACCOUNTING_RULE = [
-  "Counts status: completed sprint files by their final 'Sprint closed' Progress date;",
-  "legacy completed sprints without that entry use the filename month as YYYY-MM-01.",
-  "A closing sprint passed by sprint-close counts on today's close date for dry-run/pre-close summaries.",
-  "Sprints closed on the same day as, or before, the latest reassess report's own date are covered by",
-  "that report; only strictly-later close dates count toward the threshold (close times are not",
-  "recorded, so same-day ordering against a report cannot be determined).",
-].join(" ");
 
 function usage() {
   return [
-    "Usage: backlog-doctor.js [--json] [--stale-days N] [--close-summary] [--closing-sprint PATH] [--reassess-threshold N] [backlog-dir]",
+    "Usage: backlog-doctor.js [--json] [--stale-days N] [backlog-dir]",
     "",
     "Runs active-sprint, sprint-shape, in-flight trace/staleness,",
     "and _context.md bloat checks.",
-    "A failed gh read is fail-closed: no local-file or export fallback.",
   ].join("\n");
 }
 
@@ -57,9 +41,6 @@ function parseArgs(args) {
   const options = {
     backlogDir: DEFAULT_BACKLOG_DIR,
     staleDays: DEFAULT_STALE_DAYS,
-    reassessThreshold: DEFAULT_REASSESS_THRESHOLD,
-    closeSummary: false,
-    closingSprintPath: null,
     json: false,
   };
   let backlogDirSet = false;
@@ -69,39 +50,6 @@ function parseArgs(args) {
     if (arg === "--help" || arg === "-h") return { ...options, help: true };
     if (arg === "--json") {
       options.json = true;
-      continue;
-    }
-    if (arg === "--close-summary") {
-      options.closeSummary = true;
-      continue;
-    }
-    if (arg === "--closing-sprint") {
-      const next = args[i + 1];
-      if (!next) return { ...options, error: `Missing value for --closing-sprint. ${usage()}` };
-      options.closingSprintPath = next;
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--closing-sprint=")) {
-      options.closingSprintPath = arg.slice("--closing-sprint=".length);
-      continue;
-    }
-    if (arg === "--reassess-threshold") {
-      const next = args[i + 1];
-      if (!next) return { ...options, error: `Missing value for --reassess-threshold. ${usage()}` };
-      const parsed = parseNonNegativeInteger(next, "--reassess-threshold");
-      if (parsed.error) return { ...options, error: parsed.error };
-      options.reassessThreshold = parsed.value;
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--reassess-threshold=")) {
-      const parsed = parseNonNegativeInteger(
-        arg.slice("--reassess-threshold=".length),
-        "--reassess-threshold",
-      );
-      if (parsed.error) return { ...options, error: parsed.error };
-      options.reassessThreshold = parsed.value;
       continue;
     }
     if (arg === "--stale-days") {
@@ -133,12 +81,8 @@ function parseArgs(args) {
 }
 
 function parseStaleDays(raw) {
-  return parseNonNegativeInteger(raw, "--stale-days");
-}
-
-function parseNonNegativeInteger(raw, flagName) {
   if (!/^\d+$/.test(raw)) {
-    return { error: `Invalid ${flagName} value: ${raw}. Expected a non-negative integer.` };
+    return { error: `Invalid --stale-days value: ${raw}. Expected a non-negative integer.` };
   }
   return { value: Number.parseInt(raw, 10) };
 }
@@ -149,8 +93,6 @@ function runDoctor({
   staleDays = DEFAULT_STALE_DAYS,
   today = new Date(),
   contextLineThreshold = CONTEXT_BLOAT_LINE_THRESHOLD,
-  reassessThreshold = DEFAULT_REASSESS_THRESHOLD,
-  closingSprintPath = null,
 } = {}) {
   const root = path.resolve(repoRoot);
   const backlogPath = resolvePath(root, backlogDir);
@@ -158,10 +100,6 @@ function runDoctor({
 
   const tracks = loadActiveTracks(sprintsDir);
   const active = checkActiveSprint({ repoRoot: root, sprintsDir, tracks });
-  const leftoverLegacyRoot = checkLeftoverLegacyRoot({
-    repoRoot: root,
-    backlogPath,
-  });
 
   // Per-sprint checks fan out per active track (PRD §5.3): 0 or 1 active keeps
   // today's single untagged run; N>1 runs each check once per track and tags
@@ -170,10 +108,10 @@ function runDoctor({
   const perTrack = trackRuns.map((track) => {
     const activePath = track ? track.path : null;
     const tag = tracks.length > 1 ? track : null;
-    const sprintState = loadSprintState({ activePath, backlogPath, today });
+    const sprintState = loadSprintState({ activePath, today });
     return {
       sprint_shape: tagTrack(
-        checkSprintShape({ repoRoot: root, backlogPath, activePath, activeStatus: active.status }),
+        checkSprintShape({ repoRoot: root, activePath, activeStatus: active.status }),
         tag,
       ),
       in_flight_trace: tagTrack(checkInFlightTrace({ sprintState, activeStatus: active.status }), tag),
@@ -186,45 +124,17 @@ function runDoctor({
 
   const checks = [
     active,
-    ...(leftoverLegacyRoot ? [leftoverLegacyRoot] : []),
     ...perTrack.map((run) => run.sprint_shape),
     ...perTrack.map((run) => run.in_flight_trace),
     ...perTrack.map((run) => run.in_flight_staleness),
     checkContextBloat({ repoRoot: root, sprintsDir, threshold: contextLineThreshold }),
   ];
 
-  // Single accounting function for the reassess signal: both the plain
-  // `--json` surface and the `--close-summary` path (via runCloseSummary)
-  // flow through this one call, so there is exactly one place that computes
-  // "fired or quiet" and why.
-  const reassessSignal = buildReassessSignal({
-    repoRoot: root,
-    backlogDir,
-    doctorReport: { checks },
-    closingSprintPath,
-    today,
-    threshold: reassessThreshold,
-  });
-
   return {
     schema_version: SCHEMA_VERSION,
     checks,
     exit_hint: exitHintFor(checks),
-    reassess_signal: reassessSignal,
   };
-}
-
-function checkLeftoverLegacyRoot({ repoRoot, backlogPath }) {
-  const leftover = leftoverSkillFiles(repoRoot);
-  if (leftover.length === 0) return null;
-  const legacyRoot = path.resolve(repoRoot, LEGACY_EXPORT_DIR);
-  if (path.resolve(backlogPath) === legacyRoot) return null;
-  return verdict("legacy_execution_root", "warn", {
-    summary:
-      `Leftover skill files under ${LEGACY_EXPORT_DIR}/ (${leftover.join(", ")}); ` +
-      `execution root is ${DEFAULT_BACKLOG_DIR}/. They are not fallback authority. See file-format.md migrate.`,
-    leftover,
-  });
 }
 
 function resolvePath(repoRoot, maybeRelative) {
@@ -296,9 +206,8 @@ function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(spr
 
     const scopeless = tracks.filter((track) => sprintScopeKey(track.frontmatter).kind === "none");
     if (scopeless.length >= 1) {
-      // informational: a scopeless track cannot be proven disjoint, but cannot
-      // be proven overlapping either; like the between-sprints zero-active
-      // state this stays out of the reassess-signal warn count.
+      // informational: a scopeless track cannot be proven disjoint, but
+      // cannot be proven overlapping either.
       const scopelessFiles = scopeless.map((track) => displayPath(repoRoot, track.path));
       return {
         ...verdict("active_sprint", "warn", {
@@ -321,8 +230,7 @@ function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(spr
   }
 
   if (activeFiles.length === 0 && sprintFiles.length > 0) {
-    // informational: a normal resting state, surfaced as warn for visibility
-    // but excluded from the reassess-signal warn count.
+    // informational: a normal resting state, surfaced as warn for visibility.
     return {
       ...verdict("active_sprint", "warn", {
         summary: `No active sprint found among ${sprintFiles.length} sprint file(s); this is normal between sprints.`,
@@ -354,7 +262,7 @@ function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(spr
 // Parse one track's sprint file directly (not via readSprintState, whose
 // no-selector read is portfolio-global and fails loud on overlapping tracks;
 // the doctor reports overlap itself via the active_sprint verdict).
-function loadSprintState({ activePath, backlogPath, today }) {
+function loadSprintState({ activePath, today }) {
   if (!activePath) return { state: null, error: null };
   try {
     return {
@@ -370,7 +278,7 @@ function loadSprintState({ activePath, backlogPath, today }) {
   }
 }
 
-function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
+function checkSprintShape({ repoRoot, activePath, activeStatus }) {
   if (!activePath) {
     const status = activeStatus === "fail" ? "warn" : "pass";
     return verdict("sprint_shape", status, {
@@ -500,202 +408,19 @@ function checkContextBloat({ repoRoot, sprintsDir, threshold }) {
   });
 }
 
-function runCloseSummary({
-  repoRoot = process.cwd(),
-  backlogDir = DEFAULT_BACKLOG_DIR,
-  staleDays = DEFAULT_STALE_DAYS,
-  today = new Date(),
-  contextLineThreshold = CONTEXT_BLOAT_LINE_THRESHOLD,
-  reassessThreshold = DEFAULT_REASSESS_THRESHOLD,
-  closingSprintPath = null,
-} = {}) {
-  // Thin wrapper: runDoctor already computes reassess_signal via the single
-  // buildReassessSignal accounting function, counting the closing sprint on
-  // today's date when closingSprintPath is supplied.
-  const report = runDoctor({
-    repoRoot,
-    backlogDir,
-    staleDays,
-    today,
-    contextLineThreshold,
-    reassessThreshold,
-    closingSprintPath,
-  });
-  return { doctor_report: report };
-}
-
-function buildReassessSignal({
-  repoRoot = process.cwd(),
-  backlogDir = DEFAULT_BACKLOG_DIR,
-  doctorReport,
-  closingSprintPath = null,
-  today = new Date(),
-  threshold = DEFAULT_REASSESS_THRESHOLD,
-} = {}) {
-  if (!doctorReport) {
-    throw new Error("buildReassessSignal requires a doctorReport");
-  }
-
-  const root = path.resolve(repoRoot);
-  const backlogPath = resolvePath(root, backlogDir);
-  const sprintsDir = path.join(backlogPath, "sprints");
-  const triageDir = path.join(backlogPath, "triage");
-  const latestReassess = findLatestReassessReport({ repoRoot: root, triageDir });
-  const completedRecords = collectCompletedSprintRecords({ repoRoot: root, sprintsDir });
-  const records = maybeAddClosingSprintRecord({
-    repoRoot: root,
-    records: completedRecords,
-    closingSprintPath,
-    today,
-  });
-
-  // Same-day rule: a sprint closed on the same day as (or before) the latest
-  // reassess report's own filename date is treated as covered by that
-  // report. Only strictly-later close dates count toward the threshold --
-  // close timestamps are not recorded (Progress entries are date-only), so
-  // same-day ordering against the report can't be determined; erring quiet
-  // is correct here because doctor warnings still fire independently.
-  const countedRecords = latestReassess
-    ? records.filter((record) => record.accounting_date > latestReassess.date)
-    : records;
-
-  // Informational warns (e.g. the between-sprints zero-active state) stay
-  // visible in doctor output but must not recommend a reassess by themselves.
-  const doctorWarnCount = doctorReport.checks.filter(
-    (check) => check.status === "warn" && !check.informational
-  ).length;
-  const doctorFailCount = doctorReport.checks.filter((check) => check.status === "fail").length;
-  const doctorSignal = doctorWarnCount > 0 || doctorFailCount > 0;
-  const sprintCountSignal = countedRecords.length >= threshold;
-
-  const reason = [
-    doctorSignal
-      ? `doctor emitted ${doctorWarnCount} ${plural("warning", doctorWarnCount)} and ${doctorFailCount} ${plural("failure", doctorFailCount)}`
-      : "doctor clean",
-    sprintCountSignal
-      ? `${countedRecords.length} ${plural("sprint", countedRecords.length)} closed since last reassess (threshold ${threshold})`
-      : `${countedRecords.length}/${threshold} sprint(s) closed since last reassess`,
-  ].join("; ");
-
-  return {
-    fired: doctorSignal || sprintCountSignal,
-    reason,
-    sprints_since_last_report: countedRecords.length,
-    latest_report: latestReassess ? latestReassess.display_path : null,
-    threshold,
-    doctor_warn_count: doctorWarnCount,
-    doctor_fail_count: doctorFailCount,
-    sprint_paths: countedRecords.map((record) => record.display_path),
-    accounting_rule: REASSESS_ACCOUNTING_RULE,
-  };
-}
-
-function findLatestReassessReport({ repoRoot, triageDir }) {
-  if (!fs.existsSync(triageDir)) return null;
-  const matches = fs.readdirSync(triageDir)
-    .map((file) => ({ file, match: file.match(REASSESS_REPORT_RE) }))
-    .filter((entry) => entry.match)
-    .map((entry) => ({
-      date: entry.match[1],
-      path: path.join(triageDir, entry.file),
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const latest = matches[matches.length - 1];
-  if (!latest) return null;
-  return {
-    ...latest,
-    display_path: displayPath(repoRoot, latest.path),
-  };
-}
-
-function collectCompletedSprintRecords({ repoRoot, sprintsDir }) {
-  return listSprintFiles(sprintsDir)
-    .map((filePath) => {
-      const content = fs.readFileSync(filePath, "utf-8");
-      if (!/^status:\s*completed\s*$/m.test(content)) return null;
-      return sprintAccountingRecord({ repoRoot, filePath, content });
-    })
-    .filter(Boolean);
-}
-
-function maybeAddClosingSprintRecord({ repoRoot, records, closingSprintPath, today }) {
-  if (!closingSprintPath) return records;
-  const resolved = resolvePath(repoRoot, closingSprintPath);
-  if (!fs.existsSync(resolved)) return records;
-  if (records.some((record) => record.path === resolved)) return records;
-
-  return [
-    ...records,
-    {
-      path: resolved,
-      display_path: displayPath(repoRoot, resolved),
-      accounting_date: formatLocalDate(today),
-      accounting_source: "closing_sprint",
-    },
-  ];
-}
-
-function sprintAccountingRecord({ repoRoot, filePath, content }) {
-  const progressDate = finalSprintClosedProgressDate(content);
-  const fallbackDate = filenameMonthDate(filePath);
-  const accountingDate = progressDate || fallbackDate;
-  if (!accountingDate) return null;
-
-  return {
-    path: filePath,
-    display_path: displayPath(repoRoot, filePath),
-    accounting_date: accountingDate,
-    accounting_source: progressDate ? "progress" : "filename_month",
-  };
-}
-
-function finalSprintClosedProgressDate(content) {
-  const dates = content.split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(SPRINT_CLOSED_RE);
-      return match ? match[1] : null;
-    })
-    .filter(Boolean);
-  return dates.length > 0 ? dates[dates.length - 1] : null;
-}
-
-function filenameMonthDate(filePath) {
-  const match = path.basename(filePath).match(SPRINT_FILENAME_MONTH_RE);
-  return match ? `${match[1]}-01` : null;
-}
-
-function formatLocalDate(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function plural(noun, count) {
-  return count === 1 ? noun : `${noun}s`;
-}
-
 function countLines(content) {
   if (content === "") return 0;
   return content.split(/\r?\n/).length;
 }
 
+// Whitelist (order-stable) of the plan-item fields a verdict may publish.
+const PUBLIC_PLAN_FIELDS = [
+  "line", "tracker", "id", "ref", "issue_number",
+  "age_days", "age_source", "age_basis_date", "pr", "branch", "run_id",
+];
+
 function publicPlanItem(item) {
-  return {
-    line: item.line,
-    tracker: item.tracker,
-    id: item.id,
-    ref: item.ref,
-    issue_number: item.issue_number,
-    age_days: item.age_days,
-    age_source: item.age_source,
-    age_basis_date: item.age_basis_date,
-    pr: item.pr,
-    branch: item.branch,
-    run_id: item.run_id,
-  };
+  return Object.fromEntries(PUBLIC_PLAN_FIELDS.map((field) => [field, item[field]]));
 }
 
 function verdict(name, status, detail) {
@@ -719,18 +444,7 @@ function formatHumanSummary(report) {
     return `[${labels[check.status]}] ${check.name}${trackTag} - ${check.detail.summary}`;
   });
   lines.push(`Exit hint: ${report.exit_hint}`);
-  lines.push(
-    `Reassess signal: ${report.reassess_signal.fired ? "fired" : "quiet"} - ${report.reassess_signal.reason}`,
-  );
   return lines.join("\n");
-}
-
-function formatCloseSummary(result) {
-  return [
-    "=== Backlog Doctor (pre-close) ===",
-    formatHumanSummary(result.doctor_report),
-    `Accounting rule: ${result.doctor_report.reassess_signal.accounting_rule}`,
-  ].join("\n");
 }
 
 function displayPath(repoRoot, filePath) {
@@ -748,17 +462,6 @@ function main() {
     return;
   }
 
-  if (parsed.closeSummary) {
-    const result = runCloseSummary(parsed);
-    if (parsed.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      console.log(formatCloseSummary(result));
-    }
-    process.exitCode = exitCodeFor(result.doctor_report);
-    return;
-  }
-
   const report = runDoctor(parsed);
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -770,26 +473,18 @@ function main() {
 
 if (require.main === module) main();
 
+
 module.exports = {
   SCHEMA_VERSION,
   DEFAULT_BACKLOG_DIR,
   DEFAULT_STALE_DAYS,
-  DEFAULT_REASSESS_THRESHOLD,
   CONTEXT_BLOAT_LINE_THRESHOLD,
   REQUIRED_ACTIVE_SECTIONS,
-  REASSESS_ACCOUNTING_RULE,
   parseArgs,
   runDoctor,
-  runCloseSummary,
-  buildReassessSignal,
   exitCodeFor,
   formatHumanSummary,
-  formatCloseSummary,
   checkActiveSprint,
   checkSprintShape,
   findUnparseablePlanLines,
-  findLatestReassessReport,
-  collectCompletedSprintRecords,
-  finalSprintClosedProgressDate,
-  filenameMonthDate,
 };
