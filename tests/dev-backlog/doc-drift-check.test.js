@@ -4,7 +4,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const TOOLS = __dirname;
+const TOOLS = path.resolve(__dirname, "../tools");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   parseArgs,

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const TOOLS = __dirname;
+const TOOLS = path.resolve(__dirname, "../tools");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const { resolveBashExecutable, toBashArgs } = require(path.join(TOOLS, "bash-runtime.js"));
 
