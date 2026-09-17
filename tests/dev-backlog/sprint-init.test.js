@@ -9,22 +9,11 @@ const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js
 const {
   parseArgs,
   buildIssueLines,
-  buildSpecFrontmatterBlock,
+  buildComponentFrontmatterLine,
   buildSprintContent,
-  detectSpecPresence,
-  resolveComponent,
   listActiveSprintFiles,
   createSprintFile,
 } = require(path.join(SKILL_SCRIPTS, "sprint-init.js"));
-
-function writeCapabilities(repoRoot, slugs = ["sprint-execution"]) {
-  const specDir = path.join(repoRoot, "spec");
-  fs.mkdirSync(specDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(specDir, "capabilities.md"),
-    slugs.map((slug) => `## Capability: ${slug}\n`).join("\n"),
-  );
-}
 
 describe("parseArgs", () => {
   it("parses topic, milestone, dry-run, and json flags", () => {
@@ -115,27 +104,25 @@ describe("buildIssueLines", () => {
 });
 
 describe("buildSprintContent", () => {
-  it("renders sprint markdown with issues and spec fields when both spec files exist", () => {
+  it("renders sprint markdown with issues and no spec-axis frontmatter", () => {
     const content = buildSprintContent({
       milestone: "Sprint W13",
       started: "2026-04-05",
       due: "2026-04-12",
       topic: "auth-system",
       issues: [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
-      hasCharter: true,
-      hasCapabilities: true,
     });
 
     assert.match(content, /^---\n/);
     assert.match(content, /milestone: Sprint W13/);
     assert.match(content, /started: 2026-04-05/);
     assert.match(content, /due: 2026-04-12/);
-    assert.match(content, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
+    assert.match(content, /due: 2026-04-12\n---/);
     assert.match(content, /# auth-system/);
     assert.match(content, /- \[ \] #42 OAuth2 flow \(~1hr\)/);
   });
 
-  it("omits both spec fields when no spec files exist (B3)", () => {
+  it("omits both spec fields when none were requested (B3, #426)", () => {
     const content = buildSprintContent({
       milestone: "m", started: "2026-04-05", due: "TBD", topic: "cold", issues: [],
     });
@@ -158,41 +145,32 @@ describe("buildSprintContent", () => {
     assert.doesNotMatch(unscoped, /^scope:/m);
   });
 
-  it("emits objectives only when charter present, component only when capabilities present", () => {
-    const charterOnly = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
-      hasCharter: true, hasCapabilities: false,
-    });
-    assert.match(charterOnly, /^objectives: \[\]$/m);
-    assert.doesNotMatch(charterOnly, /^component:/m);
-
-    const capsOnly = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
-      hasCharter: false, hasCapabilities: true,
-    });
-    assert.doesNotMatch(capsOnly, /^objectives:/m);
-    assert.match(capsOnly, /^component: ""$/m);
-  });
-
-  it("emits the resolved component instead of the compatibility placeholder (#331)", () => {
+  it("never emits objectives:, whatever spec/ holds (#426)", () => {
     const content = buildSprintContent({
       milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
-      component: "sprint-execution", hasCapabilities: true,
+      component: "anything-goes",
+    });
+    assert.doesNotMatch(content, /^objectives:/m);
+    assert.match(content, /^component: "anything-goes"$/m);
+  });
+
+  it("emits the requested component verbatim; it is a free string (#331, #426)", () => {
+    const content = buildSprintContent({
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      component: "sprint-execution",
     });
     assert.match(content, /^component: "sprint-execution"$/m);
     assert.doesNotMatch(content, /^component: ""$/m);
   });
 });
 
-describe("buildSpecFrontmatterBlock", () => {
-  it("returns empty string when neither spec file exists", () => {
-    assert.equal(buildSpecFrontmatterBlock({ hasCharter: false, hasCapabilities: false }), "");
+describe("buildComponentFrontmatterLine", () => {
+  it("returns empty string when no component was requested", () => {
+    assert.equal(buildComponentFrontmatterLine(undefined), "");
+    assert.equal(buildComponentFrontmatterLine(""), "");
   });
-  it("returns both keys trailing-newline-terminated when both exist", () => {
-    assert.equal(
-      buildSpecFrontmatterBlock({ hasCharter: true, hasCapabilities: true }),
-      'objectives: []\ncomponent: ""\n',
-    );
+  it("returns one trailing-newline-terminated line when a component was requested", () => {
+    assert.equal(buildComponentFrontmatterLine("sprint-execution"), 'component: "sprint-execution"\n');
   });
 });
 
@@ -216,9 +194,6 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
-      // Explicit overrides keep this deterministic regardless of the test cwd's spec/.
-      hasCharter: true,
-      hasCapabilities: true,
     });
 
     assert.equal(result.action, "sprint-init");
@@ -233,7 +208,7 @@ describe("createSprintFile", () => {
 
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
-    assert.match(written, /due: 2026-04-12\nobjectives: \[\]\ncomponent: ""\n---/);
+    assert.match(written, /due: 2026-04-12\n---/);
   });
 
   it("generates sprint files that pass the doctor shape check with and without issues (#339)", () => {
@@ -265,7 +240,7 @@ describe("createSprintFile", () => {
     }
   });
 
-  it("omits spec fields in the written file when no spec files exist (B3)", () => {
+  it("omits spec fields in the written file when none were requested (B3, #426)", () => {
     const result = createSprintFile({
       topic: "cold-adopter",
       milestone: "M",
@@ -274,8 +249,6 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "TBD",
       getIssues: () => [],
-      hasCharter: false,
-      hasCapabilities: false,
     });
 
     const written = fs.readFileSync(result.sprintFile, "utf-8");
@@ -284,45 +257,28 @@ describe("createSprintFile", () => {
     assert.doesNotMatch(written, /^component:/m);
   });
 
-  it("detectSpecPresence reflects injected spec-file existence", () => {
-    const present = detectSpecPresence({
-      repoRoot: "/repo",
-      fileExists: (p) => p.endsWith(path.join("spec", "charter.md"))
-        || p.endsWith(path.join("spec", "capabilities.md")),
-    });
-    assert.deepEqual(present, { hasCharter: true, hasCapabilities: true });
-
-    const absent = detectSpecPresence({ repoRoot: "/repo", fileExists: () => false });
-    assert.deepEqual(absent, { hasCharter: false, hasCapabilities: false });
-  });
-
-  it("resolves only declared capability slugs and lists known slugs on refusal (#331)", () => {
-    writeCapabilities(tmpDir, ["tracker-task-truth", "sprint-execution"]);
-    assert.equal(resolveComponent({
-      component: "sprint-execution",
-      repoRoot: tmpDir,
-    }), "sprint-execution");
-    assert.throws(() => resolveComponent({
-      component: "unknown",
-      repoRoot: tmpDir,
-    }), /Known components: sprint-execution, tracker-task-truth/);
-  });
-
-  it("refuses --component without spec/capabilities.md before effects (#331)", () => {
+  it("accepts any --component string with no spec/ present and reads nothing there (#426)", () => {
     const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
-    let providerCalled = false;
-    assert.throws(() => createSprintFile({
+    const readPaths = [];
+    const result = createSprintFile({
       topic: "no-axis",
       milestone: "M",
-      component: "sprint-execution",
+      component: "not-a-declared-capability",
       dryRun: false,
       sprintsDir,
-      repoRoot: tmpDir,
-      getDue: () => { providerCalled = true; return "TBD"; },
-      getIssues: () => { providerCalled = true; return []; },
-    }), /spec\/capabilities\.md was not found/);
-    assert.equal(providerCalled, false);
-    assert.equal(fs.existsSync(sprintsDir), false);
+      today: new Date("2026-04-05T09:00:00Z"),
+      fileExists: (candidate) => {
+        readPaths.push(candidate);
+        return fs.existsSync(candidate);
+      },
+      getDue: () => "TBD",
+      getIssues: () => [],
+    });
+
+    assert.equal(result.created, true);
+    assert.equal(result.component, "not-a-declared-capability");
+    assert.match(result.content, /^component: "not-a-declared-capability"$/m);
+    assert.equal(readPaths.some((candidate) => candidate.includes(`${path.sep}spec${path.sep}`)), false);
   });
 
   it("refuses direct component + scope input before effects (#331)", () => {
@@ -415,7 +371,6 @@ describe("createSprintFile", () => {
   });
 
   it("refuses equal components and allows distinct ones without a scopeless warning (#331)", () => {
-    writeCapabilities(tmpDir, ["sprint-execution", "tracker-task-truth"]);
     fs.writeFileSync(
       path.join(tmpDir, "2026-04-current.md"),
       '---\nstatus: active\ncomponent: "tracker-task-truth"\n---\n',
@@ -447,20 +402,19 @@ describe("createSprintFile", () => {
     assert.match(result.content, /^component: "sprint-execution"$/m);
   });
 
-  it("returns component and refusal reason in dry-run JSON mode (#331)", () => {
-    writeCapabilities(tmpDir, ["tracker-task-truth", "sprint-execution"]);
+  it("returns a structured refusal on the dry-run JSON surface when --component is present (#331)", () => {
     const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
     const run = spawnSync(process.execPath, [
-      cli, "probe", "--component", "unknown", "--dry-run", "--json",
+      cli, "probe", "--component", "one-axis", "--scope", "src/**", "--dry-run", "--json",
     ], { cwd: tmpDir, encoding: "utf-8" });
 
     assert.equal(run.status, 1);
     assert.equal(run.stderr, "");
     const result = JSON.parse(run.stdout);
+    assert.equal(result.action, "sprint-init");
     assert.equal(result.dryRun, true);
-    assert.equal(result.component, "unknown");
     assert.equal(result.created, false);
-    assert.match(result.refusalReason, /Known components: sprint-execution, tracker-task-truth/);
+    assert.match(result.refusalReason, /cannot be used together/);
     assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
   });
 
@@ -479,8 +433,6 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [],
-      hasCharter: false,
-      hasCapabilities: false,
     });
 
     assert.equal(result.created, true);
@@ -501,8 +453,6 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [],
-      hasCharter: false,
-      hasCapabilities: false,
     });
 
     assert.equal(result.created, true);
@@ -513,7 +463,6 @@ describe("createSprintFile", () => {
   });
 
   it("warns and creates a component sprint next to a scopeless active track (#337)", () => {
-    writeCapabilities(tmpDir);
     fs.writeFileSync(path.join(tmpDir, "2026-04-current.md"), "---\nstatus: active\n---\n");
 
     const result = createSprintFile({
@@ -665,17 +614,13 @@ describe("createSprintFile", () => {
       today: new Date("2026-04-05T09:00:00Z"),
       getDue: () => "2026-04-12",
       getIssues: () => [{ number: 1, title: "Task", labels: [] }],
-      // Explicit overrides: spec-field emission must not depend on the test
-      // runner's cwd having (or lacking) a spec/ directory (#258).
-      hasCharter: true,
-      hasCapabilities: true,
     });
 
     const content = fs.readFileSync(result.sprintFile, "utf-8");
     // Frontmatter must have status: active on its own line (what find_active_sprint greps for)
     assert.match(content, /^status: active$/m);
-    assert.match(content, /^objectives: \[\]$/m);
-    assert.match(content, /^component: ""$/m);
+    assert.doesNotMatch(content, /^objectives:/m);
+    assert.doesNotMatch(content, /^component:/m);
     // Checkbox must match the integration contract regex
     assert.match(content, /^- \[ \] #\d+/m);
   });
@@ -715,8 +660,6 @@ describe("createSprintFile", () => {
       sprintsDir,
       today: new Date("2026-04-05T09:00:00Z"),
       adapters: { files: filesAdapter, github: githubAdapter },
-      hasCharter: false,
-      hasCapabilities: false,
     });
 
     assert.equal(result.created, true);

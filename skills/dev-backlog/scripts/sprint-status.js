@@ -1,7 +1,6 @@
 "use strict";
 /**
- * Shared frontmatter `status:` reader for the spec-drift checkers
- * (objectives-check.js, component-lint.js).
+ * Shared frontmatter `status:` reader for sprint-file consumers.
  *
  * Handles the YAML scalar shapes that appear in sprint frontmatter:
  *   status: completed

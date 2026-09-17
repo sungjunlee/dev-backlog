@@ -44,17 +44,18 @@ Users can log in and access protected API endpoints.
 - 2026-03-22 AM: Batch 1 done.
 ```
 
-`objectives:` and `component:` are **optional**:
+`objectives:` and `component:` are **optional and unchecked** (charter rev 18):
 
-| Field | Optional? | Omission semantics |
+| Field | Optional? | Semantics |
 | --- | --- | --- |
-| `objectives:` | yes | Omitted entirely when neither `spec/charter.md` nor legacy root `CHARTER.md` exists. A present-but-unknown Objective ID is a hard failure (`objectives-check.js`) — except in `status: completed` sprints, which are immutable history and may reference retired IDs. |
-| `component:` | yes | Omitted entirely when `spec/capabilities.md` does not exist. A present value must resolve to exactly one `## Capability:` slug (`component-lint.js`) — except in `status: completed` sprints, which may reference retired slugs. |
+| `objectives:` | yes | Human-authored charter Objective IDs. Never generated, never resolved against `spec/charter.md`. |
+| `component:` | yes | Free track-scope string, compared only by `scopesOverlap`. By convention a `## Capability:` heading so relay Learnings route, but nothing checks that. |
 
-`sprint-init.js` emits each field only when its backing spec file is present.
-An older sprint that still carries `objectives: []` / `component: ""` stays
-valid. `backlog-doctor.js` warns (soft) only when the **active** sprint omits a
-field while its spec file exists. Full semantics: [`spec-fallback.md`](spec-fallback.md).
+`sprint-init.js` reads no `spec/` file. It emits `component:` only when
+`--component` was given and `scope:` only when `--scope` was given; it never
+emits `objectives:`. An older sprint that still carries `objectives: []` /
+`component: ""` stays valid. Full semantics:
+[`spec-fallback.md`](spec-fallback.md).
 
 Order Plan items into parallel-safe batches. An empty `## Plan` is valid until
 issues are selected; every nonblank, non-heading Plan line must parse as a

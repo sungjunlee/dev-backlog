@@ -6,20 +6,11 @@ This is a **reference, not a spec**. It does not author spec-axis semantics — 
 
 ## Charter resolution (stated once)
 
-`spec/charter.md` is canonical. If it is absent, fall back to the legacy root `CHARTER.md`. If **both** are absent, no charter axis exists — Objective IDs cannot be claimed, and charter-dependent work degrades per the matrix below. This is the only place the `CHARTER.md` fallback rule is stated.
+`spec/charter.md` is canonical. If it is absent, fall back to the legacy root `CHARTER.md`. If **both** are absent, no charter axis exists — Objective IDs cannot be claimed, and triage degrades as below. This is the only place the `CHARTER.md` fallback rule is stated.
 
-## Degradation matrix
+## Sprint frontmatter is not spec-checked
 
-`objectives:` references charter Objective IDs (`O1`…); `component:` is one capability slug from `spec/capabilities.md`.
-
-| charter | capabilities | `objectives:` | `component:` |
-| --- | --- | --- | --- |
-| present | present | Objective IDs the sprint advances | one capability slug |
-| present | absent  | Objective IDs | omit the field (no slug to route to) |
-| absent  | present | omit the field (no IDs to claim) | one capability slug |
-| absent  | absent  | omit the field | omit the field |
-
-"Omit the field" is the target behavior (`sprint-init` from #258 on). An empty `objectives: []` / `component: ""` reads identically — it claims nothing — and stays valid; `objectives-check` and `component-lint` pass either way when the spec file is absent.
+`objectives:` and `component:` are optional sprint metadata and nothing resolves them against `spec/` (charter rev 18, #426). `objectives:` is human-authored and never generated. `component:` is a free track-scope string, compared only by `scopesOverlap`; naming a capability heading is a routing convention for relay Learnings, not a checked contract. Sprints carrying `objectives: []` / `component: ""` stay valid.
 
 ## Triage degradation (never silent)
 

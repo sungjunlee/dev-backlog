@@ -99,13 +99,14 @@ const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 const names = new Set((j.checks || []).map((check) => check.name));
 for (const name of [
   "active_sprint",
-  "objectives_check",
-  "component_lint",
-  "capabilities_doctor",
   "sprint_shape",
   "in_flight_trace",
 ]) {
   if (!names.has(name)) process.exit(1);
+}
+// #426 removed the spec-axis linters; they must not reappear.
+for (const name of ["objectives_check", "component_lint", "capabilities_doctor"]) {
+  if (names.has(name)) process.exit(1);
 }
 if (j.schema_version !== 1 || !Array.isArray(j.checks) || j.exit_hint === "fail") {
   process.exit(1);
@@ -1107,7 +1108,7 @@ assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
 XFAIL=0
 XPASS=0
-GATE_B3="${GATE_B3:-1}"     # #258 landed: enforced — sprint-init omits spec fields when no spec files
+GATE_B3="${GATE_B3:-1}"     # #258 landed: enforced — sprint-init omits spec fields (unconditional since #426)
 GATE_A2A3="${GATE_A2A3:-1}" # #254/#255 landed: enforced regression guard against re-adding ../spec-charter reads
 
 # gated_assert LABEL GATE RESULT("pass"|"fail")
@@ -1160,21 +1161,8 @@ Reach a first closed sprint with no spec files present.
 - 2026-01-01: opened.
 EOF
 
-# GREEN now: charter/capability checks degrade gracefully, never hard-fail.
-OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/objectives-check.js" --json 2>/dev/null)
-assert_json_eval "cold: objectives-check degrades (no charter, no drift)" "$OUT" '
-const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
-if (j.charterFound !== false) process.exit(1);
-if (!Array.isArray(j.drift) || j.drift.length !== 0) process.exit(1);
-'
-OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/component-lint.js" --json 2>/dev/null)
-assert_json_eval "cold: component-lint degrades (no capabilities, no issues)" "$OUT" '
-const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
-if (j.capabilitiesFound !== false) process.exit(1);
-if (!Array.isArray(j.issues) || j.issues.length !== 0) process.exit(1);
-'
-
 # GREEN now: a valid spec-less sprint is fully healthy (fields simply absent).
+# The spec-axis linters that used to be probed here were deleted by #426.
 set +e
 OUT=$(cd "$COLD_DIR" && node "$SCRIPT_DIR/backlog-doctor.js" --json 2>/dev/null)
 STATUS=$?
@@ -1187,8 +1175,8 @@ const bad = (j.checks || []).filter((c) => c.status === "fail");
 if (bad.length !== 0) process.exit(1);
 '
 
-# RED until #258 (B3): sprint-init must OMIT objectives:/component: when there
-# is no spec axis, rather than emitting empty `objectives: []` / `component: ""`.
+# GREEN since #258 (B3), and unconditional since #426: sprint-init never emits
+# `objectives:`, and emits `component:` only when --component is given.
 # Use a fresh spec-less dir with an empty sprints/ so init isn't refused as a
 # second active sprint.
 COLD_INIT_DIR="$TEST_DIR/cold-init"

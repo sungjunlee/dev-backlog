@@ -20,6 +20,10 @@
  * overlaps an existing active track (shared scopesOverlap from lib.js);
  * disjoint tracks are created without refusal; any scopeless track in a
  * multi-track portfolio warns and allows (cannot prove overlap).
+ *
+ * Spec-free (#426): nothing here reads spec/. `--component` is a free
+ * track-scope string compared only by scopesOverlap; `objectives:` is never
+ * emitted (optional human-authored metadata the parser still tolerates).
  */
 
 const fs = require("fs");
@@ -28,14 +32,12 @@ const { renderTaskRef } = require("./task-ref.js");
 const { slugify, estimateSize, readConfig, sprintScopeKey, scopesOverlap } = require("./lib");
 const { defaultSprintsDir } = require("./execution-root.js");
 const { parseFrontmatter } = require("./sprint-state.js");
-const { parseCapabilityNames } = require("./component-lint.js");
 const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
 const {
   invokeCapability,
   resolveConfiguredTracker,
   writeTrackerCliError,
 } = require("./tracker.js");
-const { resolveCharterPath } = require("./spec-paths.js");
 
 const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "glob[,glob]"] [--dry-run] [--json]';
 
@@ -119,17 +121,14 @@ function buildIssueLines(issues) {
   });
 }
 
-// Spec-axis frontmatter is emitted only when the backing spec file exists.
-// A cold adopter with no spec/ gets a clean sprint with no empty ceremony; the
-// omission semantics live in references/spec-fallback.md. Existing sprints that
-// still carry `objectives: []` / `component: ""` remain valid — this is
-// omission-on-generate, not a migration.
-function buildSpecFrontmatterBlock({ hasCharter, hasCapabilities, component }) {
-  const lines = [];
-  if (hasCharter) lines.push("objectives: []");
-  if (component) lines.push(`component: "${component}"`);
-  else if (hasCapabilities) lines.push('component: ""');
-  return lines.length ? `${lines.join("\n")}\n` : "";
+// component: is emitted only when --component was given (#426). It is a free
+// track-scope string, resolved against nothing; naming a capability heading is
+// a routing convention for relay Learnings, not a checked contract.
+// `objectives:` is never generated — it stays optional human-authored metadata
+// that the parser tolerates. Existing sprints carrying `objectives: []` /
+// `component: ""` remain valid; this is omission-on-generate, not a migration.
+function buildComponentFrontmatterLine(component) {
+  return component ? `component: "${component}"\n` : "";
 }
 
 // scope: is emitted only when explicitly requested (--scope, D2) — a track's
@@ -147,11 +146,9 @@ function buildSprintContent({
   issues,
   component,
   scope,
-  hasCharter = false,
-  hasCapabilities = false,
 }) {
   const issueLines = buildIssueLines(issues);
-  const specBlock = buildSpecFrontmatterBlock({ hasCharter, hasCapabilities, component });
+  const componentLine = buildComponentFrontmatterLine(component);
   const scopeLine = buildScopeFrontmatterLine(scope);
 
   return `---
@@ -159,7 +156,7 @@ milestone: ${milestone}
 status: active
 started: ${started}
 due: ${due}
-${scopeLine}${specBlock}---
+${scopeLine}${componentLine}---
 
 # ${topic}
 
@@ -262,35 +259,6 @@ function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "
   return [];
 }
 
-// Detect whether the spec axis backs each field. Charter resolves canonical
-// spec/charter.md or legacy root CHARTER.md; capabilities is spec/capabilities.md.
-function detectSpecPresence({ repoRoot = process.cwd(), fileExists = fs.existsSync } = {}) {
-  const charter = resolveCharterPath({ repoRoot, fileExists });
-  const capabilitiesPath = path.join(repoRoot, "spec", "capabilities.md");
-  return {
-    hasCharter: charter.found,
-    hasCapabilities: fileExists(capabilitiesPath),
-  };
-}
-
-function resolveComponent({
-  component,
-  repoRoot = process.cwd(),
-  fileExists = fs.existsSync,
-  readFile = fs.readFileSync,
-}) {
-  if (!component) return undefined;
-  const capabilitiesPath = path.join(repoRoot, "spec", "capabilities.md");
-  if (!fileExists(capabilitiesPath)) {
-    throw new Error(`Cannot use --component "${component}": spec/capabilities.md was not found, so there is no component axis to validate against.`);
-  }
-  const known = [...parseCapabilityNames(readFile(capabilitiesPath, "utf-8"))].sort();
-  if (!known.includes(component)) {
-    throw new Error(`Unknown component "${component}". Known components: ${known.join(", ") || "(none)"}.`);
-  }
-  return component;
-}
-
 function trackerUsesMilestones(resolved) {
   if (resolved.tracker === "github") return true;
   const reported = typeof resolved.adapter.capabilities === "function"
@@ -337,23 +305,17 @@ function createSprintFile({
   dryRun,
   sprintsDir = defaultSprintsDir(),
   today = new Date(),
-  repoRoot = process.cwd(),
   fileExists = fs.existsSync,
-  readFile = fs.readFileSync,
   mkdir = (dir) => fs.mkdirSync(dir, { recursive: true }),
   writeFile = fs.writeFileSync,
   getDue,
   getIssues,
   adapters,
   execFile,
-  // Optional overrides; when omitted, detected from repoRoot's spec/ files.
-  hasCharter,
-  hasCapabilities,
 }) {
   if (component && Array.isArray(scope) && scope.length) {
     throw new Error("--component and --scope cannot be used together; declare one track axis.");
   }
-  const resolvedComponent = resolveComponent({ component, repoRoot, fileExists, readFile });
   ({ getDue, getIssues } = resolveSprintIssueSeed({
     getDue,
     getIssues,
@@ -376,14 +338,10 @@ function createSprintFile({
     ? []
     : checkTrackDisjointness({
         sprintsDir,
-        component: resolvedComponent,
+        component,
         scope,
         newTrackFile: path.basename(sprintFile),
       });
-
-  const detected = detectSpecPresence({ repoRoot, fileExists });
-  const charterPresent = hasCharter ?? detected.hasCharter;
-  const capabilitiesPresent = hasCapabilities ?? detected.hasCapabilities;
 
   // Fail-loud ordering (#366): getDue/getIssues run BEFORE any filesystem
   // effect so a gh failure leaves no sprint file (or even sprints dir)
@@ -399,10 +357,8 @@ function createSprintFile({
         due,
         topic,
         issues,
-        component: resolvedComponent,
+        component,
         scope,
-        hasCharter: charterPresent,
-        hasCapabilities: capabilitiesPresent,
       });
 
   if (!dryRun && !existingFile) {
@@ -420,7 +376,7 @@ function createSprintFile({
     issues,
     content,
     existingFile,
-    component: resolvedComponent,
+    component,
     warnings,
   });
 }
@@ -505,11 +461,9 @@ if (require.main === module) main();
 module.exports = {
   parseArgs,
   buildIssueLines,
-  buildSpecFrontmatterBlock,
+  buildComponentFrontmatterLine,
   buildScopeFrontmatterLine,
   buildSprintContent,
-  detectSpecPresence,
-  resolveComponent,
   listActiveSprintFiles,
   checkTrackDisjointness,
   createSprintFile,

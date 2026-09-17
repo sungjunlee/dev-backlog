@@ -40,7 +40,7 @@ Configured tracker               <- canonical task definition and lifecycle
 - `.dev-backlog/.tracker` names exactly one configured tracker and is set at setup. GitHub Issues is the default; the configured tracker is the sole task authority, and an unavailable adapter is fail-closed. Per-adapter CLIs, ref grammars, create commands, and close verbs: [`references/adapter-ports.md`](references/adapter-ports.md).
 - Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
 - The configured tracker owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file, which remains the permanent execution record once completed.
-- Sprint frontmatter (`objectives:`, `component:`, `scope:`) and how each field degrades when its spec file is absent: `references/file-format.md`.
+- Sprint frontmatter (`objectives:`, `component:`, `scope:`) and its optional, unchecked fields: `references/file-format.md`.
 
 ## Sprint Admission
 
@@ -59,8 +59,8 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | Section / field | Purpose | Completion check |
 | --- | --- | --- |
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
-| `objectives: [O1]` | Charter Objective IDs advanced by the sprint | Optional; IDs resolve against `spec/charter.md`. |
-| `component: "slug"` | One capability slug from `spec/capabilities.md`; also the relay-Learnings route and a track-scope axis | Optional; resolves to one `## Capability:` heading. |
+| `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
+| `component: "slug"` | Free track-scope string; by convention a capability heading so relay Learnings route; also the relay-Learnings route | Optional; compared by `scopesOverlap` only. |
 | `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, not inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete task ref in the configured tracker's grammar (`references/adapter-ports.md`). |
@@ -155,6 +155,6 @@ Core scripts:
 
 - `references/adapter-ports.md` — tracker adapter port contract: per-adapter CLI, plan-ref grammar, create command, and close verb; required ops, fail-closed availability, capability gates.
 - `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional diagnostic export (`sync-pull.js --legacy-export`).
-- `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
+- `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
