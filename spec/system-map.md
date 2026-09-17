@@ -22,7 +22,7 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 - GitHub Issues own task specification, native planning metadata, and lifecycle
   when `.tracker=github`. When `.tracker=files`, the Backlog.md CLI owns that
-  role. When `.tracker=gitlab`, GitLab Issues via `glab` own that role.
+  role.
   Routing table: [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
 - Sprint files own only admitted complex execution state.
 - `skills/backlog-triage/` owns advisory grooming; GitHub mutation is explicit (`--apply`).
@@ -43,14 +43,14 @@ Retrieval/memory is not a product surface (#350 no-go).
 - GitHub Issues — sole task authority when `.tracker=github` (`gh`; tests use an argv recorder). GitHub Issues remain the canonical default.
 - `.dev-backlog/sprints/` — admitted execution state; completed sprints are history.
 - `spec/*` — durable direction when present.
-- `.dev-backlog/.tracker` — `github`, `files`, or `gitlab` (config-only; this repository pins `github`).
+- `.dev-backlog/.tracker` — `github` or `files` (config-only; this repository pins `github`).
   Runtime never switches. `files` uses the Backlog.md CLI only; leftover `backlog/tasks/*.md` is not a product API.
-  `gitlab` uses `glab` only (plan refs `gitlab#N`). Forgejo/Gitea are follow-up forge adapters.
+  GitLab/Forgejo/Gitea are follow-up forge adapters (measured consumer required; GitLab retrievable at `a8ddb7d`).
 
 ## Project-Wide Invariants
 
 - One task authority. Fail-closed on adapter failure. No runtime fallback, co-authority, dual write, or
-  background sync. GitHub unavailability never selects files, GitLab, or any other store.
+  background sync. Tracker unavailability never selects another tracker or any local store.
 - A failed live Issue read stops execution.
 - A sprint is admitted by execution complexity, never duration alone.
 - Optional surfaces fail before effects; they cannot become authority.
