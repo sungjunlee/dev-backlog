@@ -22,7 +22,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [x] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h) → PR #432 (merged)
 
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
-- [~] #424 Park the GitLab adapter until a measured consumer exists (~2h) [run:grok-424]
+- [~] #424 Park the GitLab adapter until a measured consumer exists (~2h) → PR #437 (open)
 - [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (merged)
 - [~] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h) [run:opus-426]
 - [~] #431 Plan rail: setup migrates a legacy backlog/ skill layout (rule re-add from the #423 evidence; unplanned, admitted 2026-09-17) (~30min) → PR #436 (merged)
