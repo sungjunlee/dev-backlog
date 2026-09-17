@@ -31,7 +31,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (merged)
 
 ### Batch 5 - Release
-- [~] #428 Cut v0.11.0 with the measured state (~1h) [run:grok-428]
+- [~] #428 Cut v0.11.0 with the measured state (~1h) → PR #439 (open)
 
 
 ## Running Context
