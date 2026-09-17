@@ -22,7 +22,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 
 ### Batch 3 - Tracker abstraction out (sequential: #446 needs #445)
 - [x] #445 Park the files adapter and delete the tracker abstraction; GitHub-only rails — G1 (~4h) → PR #453 (merged)
-- [~] #446 Shrink backlog-doctor.js and setup-dev-backlog.js to the surviving checks (~2h) [run:opus-446]
+- [~] #446 Shrink backlog-doctor.js and setup-dev-backlog.js to the surviving checks (~2h) → PR #454 (open)
 
 ### Batch 4 - Triage pipeline decision
 - [x] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (merged)
