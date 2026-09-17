@@ -1,7 +1,6 @@
 # File Format Reference
 
-Sprint files, tracker selection, and config. Optional diagnostic exports are a
-short note at the end — never a runtime format. Adapter ports:
+Sprint files, tracker selection, and config. Adapter ports:
 [adapter-ports.md](adapter-ports.md).
 
 ## Sprint file
@@ -86,8 +85,8 @@ default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 ```
 
-`config.yml` remains the read-only source for diagnostic-export filename
-settings such as `task_prefix`; setup never creates, rewrites, or removes
+`config.yml` remains the read-only source for settings such as
+`task_prefix`; setup never creates, rewrites, or removes
 fields from it. dev-backlog reads `task_prefix`, `default_status`, and
 `statuses`; `project_name` is retained as metadata.
 
@@ -116,22 +115,12 @@ value; it does not fall back to another document. Optional AC markers:
 
 Without the markers, acceptance criteria still work as plain checkboxes.
 
-## Optional diagnostic export
-
-`sync-pull.js --legacy-export` may write `exports/github-issues/` as a
-diagnostic/rollback snapshot. Those files are never read as task truth, are
-not under the skill execution root, and are not a Backlog.md compatibility
-layer. Import is human-reviewed Markdown into a GitHub Issue. Exported
-filenames look like `{PREFIX}-{N} - {Title-Slug}.md`; decimal IDs are
-historical parse-only, not runtime identities. This flag is not on orient,
-plan, work, or complete.
-
 ## Migration from `backlog/` (one-way)
 
 Existing repos that still keep skill files under `backlog/` must move them
 once. The skill execution root is `.dev-backlog/` only. Never delete
 `backlog/tasks/`, `backlog/docs/`, or `backlog/completed/` — those leftover
-operator files are not the diagnostic export and not skill execution.
+operator files are not skill execution.
 
 ### Manual migrate
 
@@ -148,8 +137,7 @@ git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
 ```
 
 3. Leave `backlog/tasks/`, `backlog/docs/`, and `backlog/completed/` in place
-   if they exist — those leftover operator paths are not skill execution and
-   are not `exports/github-issues/`.
+   if they exist — those leftover operator paths are not skill execution.
 4. Verify the destination against the backup before removing any leftover
    skill-owned sources. The move is not atomic: a failed `git mv` can leave
    names on both sides. Do not treat leftover `tasks/`, `docs/`, or

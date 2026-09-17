@@ -22,7 +22,6 @@ const {
   validateAdapter,
   validateIdentity,
 } = require(path.join(SKILL_SCRIPTS, "tracker.js"));
-const { LEGACY_TASKS_DIR } = require(path.join(SKILL_SCRIPTS, "execution-root.js"));
 
 function stubAdapter(overrides = {}) {
   return {
@@ -133,10 +132,9 @@ describe("stub adapter conformance", () => {
     );
   });
 
-  it("never falls back to a files adapter or diagnostic export when the stub is unavailable", (t) => {
+  it("never falls back to a files adapter or local files when the stub is unavailable", (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-stub-nfb-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-    const exportDir = path.join(root, LEGACY_TASKS_DIR);
     const leftoverTasks = path.join(root, "backlog", "tasks");
     fs.mkdirSync(leftoverTasks, { recursive: true });
     fs.writeFileSync(path.join(leftoverTasks, "BACK-1.md"), "not authority\n");
@@ -157,7 +155,6 @@ describe("stub adapter conformance", () => {
       (error) => error instanceof TrackerUnavailableError && error.tracker === "github",
     );
     assert.equal(filesListCalls, 0);
-    assert.equal(fs.existsSync(exportDir), false);
     assert.equal(
       fs.readFileSync(path.join(leftoverTasks, "BACK-1.md"), "utf8"),
       "not authority\n",

@@ -12,7 +12,7 @@ const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline/promises");
-const { readLegacyTracker: readLegacyTrackerFile } = require("./legacy-tracker.js");
+const { parseSimpleYaml } = require("./lib.js");
 const {
   DEFAULT_BACKLOG_DIR,
   LEGACY_EXPORT_DIR,
@@ -143,13 +143,75 @@ function readTrackerFile(trackerPath, fsApi = fs) {
   return assertAllowedTracker(fsApi.readFileSync(trackerPath, "utf8").trim(), trackerPath);
 }
 
-// Legacy `config.yml` selection reading lives in `legacy-tracker.js`: it is a
-// deletable unit that goes away wholesale when legacy support is dropped.
+function stripUncountedSpans(line) {
+  const blanked = line.replace(/"[^"]*"|'[^']*'/g, (match) => " ".repeat(match.length));
+  const comment = blanked.indexOf("#");
+  return comment === -1 ? blanked : blanked.slice(0, comment);
+}
+
+function countTrackerKeys(text) {
+  return (text.match(/(?:^|[\s\[{,]|-\s)tracker\s*:/g) || []).length;
+}
+
+function assertNoUndecodableAuthority(line, refuse) {
+  if (/^\?(\s|$)/.test(line.trim())) {
+    refuse("an explicit mapping key (`?`) can carry tracker authority this reader does not decode");
+  }
+  if (/(["'])(?:[^"'\\]|\\.)*\\(?:[^"'\\]|\\.)*\1\s*:/.test(line)) {
+    refuse("a quoted key contains escape sequences this reader does not decode");
+  }
+}
+
+function assertUnambiguousTrackerAuthority(raw, configPath) {
+  const refuse = (detail) => {
+    throw new SetupError(
+      `Ambiguous tracker authority in ${configPath}: ${detail}. ` +
+        "Leave exactly one top-level `tracker:` key, or remove them all and select a tracker explicitly with --tracker."
+    );
+  };
+
+  let total = 0;
+  let topLevel = 0;
+  let blockScalarIndent = null;
+
+  for (const rawLine of raw.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const indent = rawLine.match(/^[ \t]*/)[0].length;
+    if (blockScalarIndent !== null) {
+      if (!rawLine.trim() || indent > blockScalarIndent) continue;
+      blockScalarIndent = null;
+    }
+    assertNoUndecodableAuthority(rawLine, refuse);
+
+    const line = stripUncountedSpans(rawLine);
+    if (!line.trim()) continue;
+
+    if (/^["']tracker["']\s*:/.test(rawLine)) {
+      refuse("the tracker key is quoted, which obscures authority");
+    }
+
+    const found = countTrackerKeys(line);
+    total += found;
+    if (found > 0 && /^tracker\s*:/.test(line)) topLevel += 1;
+
+    if (/:\s*[|>][+-]?\d*\s*$/.test(line)) blockScalarIndent = indent;
+  }
+
+  if (total > 1) refuse(`${total} tracker declarations were found`);
+  if (total === 1 && topLevel === 0) {
+    refuse("the only tracker declaration is nested rather than a top-level scalar");
+  }
+}
+
 function readLegacyTracker(configPath, fsApi = fs) {
-  return readLegacyTrackerFile(configPath, {
-    fs: fsApi,
-    assertAllowed: assertAllowedTracker,
-    SetupError,
+  const raw = fsApi.readFileSync(configPath, "utf8").replace(/^\uFEFF/, "");
+  assertUnambiguousTrackerAuthority(raw, configPath);
+  const parsed = parseSimpleYaml(raw);
+  if (!Object.prototype.hasOwnProperty.call(parsed, "tracker")) {
+    return Object.freeze({ found: false, selection: undefined });
+  }
+  return Object.freeze({
+    found: true,
+    selection: assertAllowedTracker(parsed.tracker, configPath),
   });
 }
 

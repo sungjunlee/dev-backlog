@@ -7,7 +7,7 @@ GitHub Issues are the canonical task authority. Simple work stays Issue → PR.
 Open a local sprint file only when execution needs shared batching, context,
 progress, or handoff across issues, actors, or sessions.
 
-No new server. No hidden state. No automatic memory writes. No required task mirror.
+No new server. No hidden state. No automatic memory writes. No required local task files.
 This repo is a personal toolkit.
 
 Human quick start is this file. The agent execution contract is
@@ -97,8 +97,7 @@ Users can log in and access protected API endpoints.
 - 2026-03-22: #42 in review.
 ```
 
-Diagnostic Issue snapshots (`exports/github-issues/`) are opt-in via
-`--legacy-export` and are never task authority. Optional surfaces
+Optional surfaces
 (spec axis via [craftkit](https://github.com/sungjunlee/craftkit),
 [dev-relay](https://github.com/sungjunlee/dev-relay), GitHub Projects) are
 priced in the [authority contract](skills/dev-backlog/references/authority-contract.md).

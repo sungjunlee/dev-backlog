@@ -6,7 +6,7 @@
 - Script interfaces should stay stable unless an issue explicitly changes the CLI contract
 - Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
 - Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` is parsed by the single exact parser; legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
-- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347; only the legacy-marker filter in `sync-pull`/`triage-collect` remains.)
+- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347; only the leftover-marker filter in `triage-collect` remains.)
 - The tracker layer is config-only (`TRACKER_KEYS = ["github", "files", "gitlab"]`, #415); unsupported provider capabilities fail before effects instead of changing tracker authority. This repository pins `github`. Forgejo/Gitea are follow-up forge adapters.
 - Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
 - Active sprints partition by track scope (2026-07, epic #289): `component:` equality or explicit `scope:` globs decide overlap through the ONE `scopesOverlap()` in `scripts/lib.js` — never re-implement it. Disjoint tracks coexist as a portfolio; overlap fails loud; single-track behavior is the G4 text-byte-identity compatibility surface (anchored in the smoke test; never snapshot `--json`, which is schema-versioned instead).
@@ -30,7 +30,7 @@
 
 ## Known Gotchas
 
-- Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision. Rollback/diagnostic export is explicit via `sync-pull.js --legacy-export --update`.
+- Live GitHub work re-runs `effective-task-spec.js` and reviews a changed source revision. There is no local fallback copy of Issue state.
 - Backlog triage snapshot enrichments stay explicit and bounded: `--with-comments` and `--with-closed-issues` are opt-in, while downstream scanners must gracefully gate on optional fields instead of assuming they exist.
 - `triage-relate` relationship edges are advisory context. Even a `merged-pr-link` edge must not become a close recommendation unless `triage-stale` implements a separate conservative obsolete signal.
 - Backlog triage reports must protect issues referenced in the active sprint Plan or Running Context from close / close-duplicate proposals.
@@ -38,7 +38,7 @@
 - Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `.dev-backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
 - Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in the smoke test depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
-- v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files, and do not delete `sync-pull.js` / `legacy-tracker.js` without a measured consumer (charter freeze 2026-08-17; 2026-08 second-start close).
+- v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files.
 - Never chain `gh pr merge` after a grep-filtered test run — capture `$?` from `node --test` and the smoke test first. A backtick inside a JS template literal in `backlog-doctor.js` reached main for one commit this way (2026-09-17, #435).
 - In-flight Plan pointer grammar (parsed by `sprint-state.js`): `→ PR #N (state)` at end of line, `[branch:name]`, `[run:id]`. Any other shape reads as unmoored and fails the live smoke assertion.
 - `sprint-init.js --component` is a free track-scope string since #426 (no `spec/capabilities.md` lookup); `objectives:` is never emitted and never checked. Nothing lints `spec/` any more; O4 drift detection is the `backlog-triage` Alignment section.

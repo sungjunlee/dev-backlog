@@ -2,20 +2,16 @@
  * Shared library for dev-backlog Node scripts.
  */
 
-const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const {
   GH_EXEC_DEFAULTS,
   OPEN_ISSUE_JSON_FIELDS,
-  createGithubAdapter,
-  getOpenIssueCount: getGithubOpenIssueCount,
-  stripNormalizedIdentity,
 } = require("./github-tracker.js");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
 
 // Progress-issue publication was removed (#340); this marker survives only to
-// recognize legacy machine-managed issue bodies in sync-pull/triage-collect.
+// recognize leftover machine-managed issue bodies in triage-collect.
 const PROGRESS_MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
 const MARKER_SUFFIX = " -->";
 
@@ -34,13 +30,6 @@ function parseMarkerMonth(body) {
   const valueStart = start + PROGRESS_MARKER_PREFIX.length;
   const end = body.indexOf(MARKER_SUFFIX, valueStart);
   return end === -1 ? null : body.slice(valueStart, end).trim();
-}
-
-function escapeYaml(text) {
-  if (/[:"'#{}\[\]|>&*!%@`]/.test(text) || text !== text.trim()) {
-    return "'" + text.replace(/'/g, "''") + "'";
-  }
-  return text;
 }
 
 const CONFIG_DEFAULTS = {
@@ -235,25 +224,6 @@ function readTriageConfig(backlogDir) {
   );
 }
 
-function getOpenIssueCount({ repo, execFile = execFileSync } = {}) {
-  return getGithubOpenIssueCount({ repo, execFile });
-}
-
-/**
- * Fetch open GitHub issues via `gh issue list`.
- *
- * When `defaultLimit` is provided, the helper uses that limit directly to avoid
- * a separate count fetch. Otherwise, omitted `limit` falls back to a GraphQL
- * count lookup so callers can still fetch "all open issues" without choosing a
- * cap themselves. `execFile` is injectable so tests can stub `gh` without
- * spawning a process.
- */
-function fetchOpenIssues({ repo, limit, defaultLimit, execFile = execFileSync } = {}) {
-  return createGithubAdapter({ execFile })
-    .list({ repo, limit, defaultLimit })
-    .map(stripNormalizedIdentity);
-}
-
 /**
  * Estimate task size from GitHub labels.
  * Size labels (size:S/M/L) override type labels when both present.
@@ -325,7 +295,6 @@ function scopesOverlap(frontmatterA, frontmatterB) {
 
 module.exports = {
   slugify,
-  escapeYaml,
   parseMarkerMonth,
   parseSimpleYaml,
   sprintScopeKey,
@@ -338,6 +307,4 @@ module.exports = {
   DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
   OPEN_ISSUE_JSON_FIELDS,
-  getOpenIssueCount,
-  fetchOpenIssues,
 };

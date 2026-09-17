@@ -5,13 +5,11 @@ const path = require("path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   slugify,
-  escapeYaml,
   scopesOverlap,
   readConfig,
   readTriageConfig,
   parseSimpleYaml,
   estimateSize,
-  fetchOpenIssues,
   CONFIG_DEFAULTS,
   TRIAGE_CONFIG_DEFAULTS,
 } = require(path.join(SKILL_SCRIPTS, "lib.js"));
@@ -50,32 +48,6 @@ describe("slugify", () => {
 
   it("returns empty for empty input", () => {
     assert.equal(slugify(""), "");
-  });
-});
-
-// --- escapeYaml ---
-
-describe("escapeYaml", () => {
-  it("returns plain text unchanged", () => {
-    assert.equal(escapeYaml("simple text"), "simple text");
-  });
-
-  it("quotes text with colons", () => {
-    assert.equal(escapeYaml("key: value"), "'key: value'");
-  });
-
-  it("quotes text with special chars", () => {
-    assert.equal(escapeYaml("hello #world"), "'hello #world'");
-    assert.equal(escapeYaml("a & b"), "'a & b'");
-    assert.equal(escapeYaml("100%"), "'100%'");
-  });
-
-  it("escapes single quotes by doubling", () => {
-    assert.equal(escapeYaml("it's here"), "'it''s here'");
-  });
-
-  it("quotes text with leading/trailing whitespace", () => {
-    assert.equal(escapeYaml(" padded "), "' padded '");
   });
 });
 
@@ -306,116 +278,6 @@ describe("readTriageConfig", () => {
     assert.deepEqual(config.activity_days, { warm: 10, cold: 45 });
     assert.equal(config.stale_days, 75);
     assert.equal(config.closed_issue_days, 30);
-  });
-});
-
-describe("fetchOpenIssues", () => {
-  it("uses the explicit repo and limit when provided", () => {
-    const calls = [];
-    const execFile = (command, args, options) => {
-      calls.push({ command, args, options });
-      return JSON.stringify([{ number: 61, title: "Collect" }]);
-    };
-
-    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", limit: 3, execFile });
-
-    assert.deepEqual(issues, [{ number: 61, title: "Collect" }]);
-    assert.deepEqual(calls, [{
-      command: "gh",
-      args: [
-        "issue",
-        "list",
-        "--state",
-        "open",
-        "--limit",
-        "3",
-        "--repo",
-        "sungjunlee/dev-backlog",
-        "--json",
-        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
-      ],
-      options: {
-        encoding: "utf-8",
-        maxBuffer: 50 * 1024 * 1024,
-      },
-    }]);
-  });
-
-  it("uses defaultLimit without a GraphQL preflight when provided", () => {
-    const calls = [];
-    const execFile = (command, args, options) => {
-      calls.push({ command, args, options });
-      return JSON.stringify([{ number: 1 }, { number: 2 }]);
-    };
-
-    const issues = fetchOpenIssues({
-      repo: "sungjunlee/dev-backlog",
-      defaultLimit: 2147483647,
-      execFile,
-    });
-
-    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
-    assert.deepEqual(calls, [{
-      command: "gh",
-      args: [
-        "issue",
-        "list",
-        "--state",
-        "open",
-        "--limit",
-        "2147483647",
-        "--repo",
-        "sungjunlee/dev-backlog",
-        "--json",
-        "number,title,body,labels,milestone,assignees,createdAt,updatedAt",
-      ],
-      options: {
-        encoding: "utf-8",
-        maxBuffer: 50 * 1024 * 1024,
-      },
-    }]);
-  });
-
-  it("resolves the limit from GraphQL when limit is omitted", () => {
-    const calls = [];
-    const execFile = (command, args, options) => {
-      calls.push({ command, args, options });
-
-      if (args[0] === "api") return "2\n";
-      if (args[0] === "issue") return JSON.stringify([{ number: 1 }, { number: 2 }]);
-      throw new Error(`Unexpected args: ${args.join(" ")}`);
-    };
-
-    const issues = fetchOpenIssues({ repo: "sungjunlee/dev-backlog", execFile });
-
-    assert.deepEqual(issues, [{ number: 1 }, { number: 2 }]);
-    assert.equal(calls.length, 2);
-    assert.deepEqual(calls[0].args, [
-      "api",
-      "graphql",
-      "-F",
-      "owner=sungjunlee",
-      "-F",
-      "name=dev-backlog",
-      "-f",
-      "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { issues(states: OPEN) { totalCount } } }",
-      "--jq",
-      ".data.repository.issues.totalCount",
-    ]);
-  });
-
-  it("returns an empty array without listing issues when the repo has no open issues", () => {
-    const calls = [];
-    const execFile = (command, args, options) => {
-      calls.push({ command, args, options });
-      return "0\n";
-    };
-
-    const issues = fetchOpenIssues({ execFile });
-
-    assert.deepEqual(issues, []);
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].args[0], "api");
   });
 });
 

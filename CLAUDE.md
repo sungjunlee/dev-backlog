@@ -37,10 +37,10 @@ not ship those skills. `spec-charter` owns the charter and the system map.
   provably disjoint scopes (`component:` or `scope:` globs, one shared
   `scopesOverlap` predicate); overlap fails loud
 - **Deliberate mutations only** — no hidden sync. Configured-tracker writes are explicit.
-  Routing and optional-export boundaries live in
+  Routing and optional-integration boundaries live in
   `skills/dev-backlog/references/authority-contract.md`.
-- **Fail-closed tracker** — adapter failure never falls back to local files or
-  diagnostic export; `.tracker` is setup-only and runtime never switches adapters.
+- **Fail-closed tracker** — adapter failure never falls back to local files;
+  `.tracker` is setup-only and runtime never switches adapters.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
   through validated wire contracts (`--model-actions` JSON, anchor comments);
   scripts own everything checkable

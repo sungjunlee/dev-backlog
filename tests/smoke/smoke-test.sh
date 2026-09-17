@@ -948,7 +948,7 @@ EOF
 
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close mirrorless: set completed" "$OUT" "status: completed"
-assert_contains "close mirrorless: reports no mirror requirement" "$OUT" "No legacy task mirrors required"
+assert_contains "close mirrorless: reports no leftover task files" "$OUT" "No leftover local task files required"
 assert_equals "close mirrorless: does not create tasks directory" \
 	"$(test -d "$TEST_DIR/.dev-backlog/tasks" && echo yes || echo no)" "no"
 assert_equals "close mirrorless: sprint completed" \

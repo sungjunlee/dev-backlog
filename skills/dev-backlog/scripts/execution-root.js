@@ -2,11 +2,8 @@
  * Skill execution root. One directory, not Backlog.md's leftover `backlog/`
  * tree.
  *
- * LEGACY_TASKS_DIR is `exports/github-issues/` — the diagnostic/rollback target of
- * `sync-pull.js --legacy-export`. It is not product authority and is not under
- * `.dev-backlog/`. LEGACY_EXPORT_DIR is the leftover `backlog/` tree (not an
- * active skill root; not the diagnostic export). Neither is skill execution
- * authority.
+ * LEGACY_EXPORT_DIR is the leftover `backlog/` tree (not an active skill
+ * root). It is not skill execution authority.
  */
 
 const fs = require("node:fs");
@@ -14,7 +11,6 @@ const path = require("node:path");
 
 const DEFAULT_BACKLOG_DIR = ".dev-backlog";
 const LEGACY_EXPORT_DIR = "backlog";
-const LEGACY_TASKS_DIR = path.join("exports", "github-issues");
 const TRACKER_SELECTION_FILE = ".tracker";
 const SKILL_OWNED_NAMES = Object.freeze([
   "sprints",
@@ -141,7 +137,6 @@ function leftoverSkillFiles(cwd, { fs: fsApi = fs } = {}) {
 module.exports = {
   DEFAULT_BACKLOG_DIR,
   LEGACY_EXPORT_DIR,
-  LEGACY_TASKS_DIR,
   TRACKER_SELECTION_FILE,
   SKILL_OWNED_NAMES,
   defaultSprintsDir,

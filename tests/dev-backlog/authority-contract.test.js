@@ -61,7 +61,7 @@ it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
   assert.match(markdown, /Time is not an admission criterion/);
   assert.match(markdown, /dual-write or bidirectional task state/);
   assert.match(markdown, /fail-closed/);
-  assert.match(markdown, /silent adapter fallback to local files or diagnostic export/);
+  assert.match(markdown, /silent adapter fallback to local files/);
   assert.match(markdown, /automatic writes from search, retrieval, summaries, or memory compilers/);
 
   for (const optional of ["Relay", "Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
@@ -88,8 +88,7 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   );
 
   assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
-  assert.match(readme, /Diagnostic Issue snapshots/);
-  assert.match(readme, /never task authority/);
+  assert.match(readme, /Optional surfaces/);
   assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
   assert.match(skill, /^## Sprint Admission$/m);
   assert.match(skill, /effective-task-spec\.js/);
