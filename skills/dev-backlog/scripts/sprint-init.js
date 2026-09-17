@@ -127,8 +127,16 @@ function buildIssueLines(issues) {
 // `objectives:` is never generated — it stays optional human-authored metadata
 // that the parser tolerates. Existing sprints carrying `objectives: []` /
 // `component: ""` remain valid; this is omission-on-generate, not a migration.
+// component: is a free track-scope string (charter rev 18); it must survive the
+// frontmatter round-trip unchanged, so reject anything that could break the
+// line (whitespace, quotes, newlines) before any file is written.
+const COMPONENT_RE = /^[^\s"]+$/;
 function buildComponentFrontmatterLine(component) {
-  return component ? `component: "${component}"\n` : "";
+  if (!component) return "";
+  if (!COMPONENT_RE.test(component)) {
+    throw new Error(`--component must be a single token without whitespace or quotes; got ${JSON.stringify(component)}`);
+  }
+  return `component: "${component}"\n`;
 }
 
 // scope: is emitted only when explicitly requested (--scope, D2) — a track's

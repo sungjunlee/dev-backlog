@@ -402,6 +402,12 @@ describe("createSprintFile", () => {
     assert.match(result.content, /^component: "sprint-execution"$/m);
   });
 
+  it("rejects a --component value that cannot round-trip through frontmatter", () => {
+    for (const bad of ["a\nb", "has space", 'quo"te']) {
+      assert.throws(() => buildComponentFrontmatterLine(bad), /single token/);
+    }
+  });
+
   it("returns a structured refusal on the dry-run JSON surface when --component is present (#331)", () => {
     const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
     const run = spawnSync(process.execPath, [

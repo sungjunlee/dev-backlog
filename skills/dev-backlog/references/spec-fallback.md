@@ -6,7 +6,7 @@ This is a **reference, not a spec**. It does not author spec-axis semantics — 
 
 ## Charter resolution (stated once)
 
-`spec/charter.md` is canonical. If it is absent, fall back to the legacy root `CHARTER.md`. If **both** are absent, no charter axis exists — Objective IDs cannot be claimed, and triage degrades as below. This is the only place the `CHARTER.md` fallback rule is stated.
+`spec/charter.md` is canonical. If it is absent, fall back to the legacy root `CHARTER.md`. If **both** are absent, no charter axis exists — triage Alignment cannot map issues to Objective IDs and degrades as below (sprint frontmatter is unaffected; see the next section). This is the only place the `CHARTER.md` fallback rule is stated.
 
 ## Sprint frontmatter is not spec-checked
 
