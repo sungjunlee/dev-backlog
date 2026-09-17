@@ -2,8 +2,10 @@
 /**
  * Aggregate deterministic dev-backlog health checks into one CI-ready probe.
  *
- * Existing checker modules own their domains; this wrapper normalizes their
- * verdicts and adds active-sprint shape signals for schedulers and close flows.
+ * Each check normalizes to one verdict; together they cover the active-sprint
+ * invariant, sprint shape, in-flight trace/staleness, and _context.md bloat for
+ * schedulers and close flows. Spec-axis linting was removed by charter rev 18
+ * (#426): `objectives:` and `component:` are unchecked sprint metadata.
  */
 
 const fs = require("fs");
@@ -16,15 +18,6 @@ const {
   parseFrontmatter,
   parseSprintContent,
 } = require("./sprint-state.js");
-const { checkObjectives } = require("./objectives-check.js");
-const {
-  lintComponents,
-  hasErrors: hasComponentErrors,
-} = require("./component-lint.js");
-const {
-  analyzeCapabilities,
-  hasHardFailures: hasCapabilityHardFailures,
-} = require("./capabilities-doctor.js");
 const {
   parseSimpleYaml,
   readConfig,
@@ -33,7 +26,7 @@ const {
   DEFAULT_BACKLOG_DIR,
 } = require("./lib.js");
 const { leftoverSkillFiles, LEGACY_EXPORT_DIR } = require("./execution-root.js");
-const { repoDisplayPath, toPortablePath } = require("./portable-path.js");
+const { repoDisplayPath } = require("./portable-path.js");
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_STALE_DAYS = 7;
@@ -56,8 +49,8 @@ function usage() {
   return [
     "Usage: backlog-doctor.js [--json] [--stale-days N] [--close-summary] [--closing-sprint PATH] [--reassess-threshold N] [backlog-dir]",
     "",
-    "Runs active-sprint, objectives, component, capabilities, sprint-shape,",
-    "in-flight trace/staleness, and _context.md bloat checks.",
+    "Runs active-sprint, sprint-shape, in-flight trace/staleness,",
+    "and _context.md bloat checks.",
     "Configured tracker failure is fail-closed: no local-file or export fallback.",
   ].join("\n");
 }
@@ -164,7 +157,6 @@ function runDoctor({
   const root = path.resolve(repoRoot);
   const backlogPath = resolvePath(root, backlogDir);
   const sprintsDir = path.join(backlogPath, "sprints");
-  const capabilitiesPath = path.join(root, "spec", "capabilities.md");
 
   const tracks = loadActiveTracks(sprintsDir);
   const active = checkActiveSprint({ repoRoot: root, sprintsDir, tracks });
@@ -186,11 +178,6 @@ function runDoctor({
     const tag = tracks.length > 1 ? track : null;
     const sprintState = loadSprintState({ activePath, backlogPath, today });
     return {
-      objectives: tagTrack(checkObjectiveDrift({ repoRoot: root, sprintsDir, activePath }), tag),
-      component_lint: tagTrack(
-        checkComponentRouting({ repoRoot: root, sprintsDir, capabilitiesPath, activePath }),
-        tag,
-      ),
       sprint_shape: tagTrack(
         checkSprintShape({ repoRoot: root, backlogPath, activePath, activeStatus: active.status }),
         tag,
@@ -207,9 +194,6 @@ function runDoctor({
     active,
     ...(staleTrackerSelection ? [staleTrackerSelection] : []),
     ...(leftoverLegacyRoot ? [leftoverLegacyRoot] : []),
-    ...perTrack.map((run) => run.objectives),
-    ...perTrack.map((run) => run.component_lint),
-    checkCapabilities({ repoRoot: root, capabilitiesPath }),
     ...perTrack.map((run) => run.sprint_shape),
     ...perTrack.map((run) => run.in_flight_trace),
     ...perTrack.map((run) => run.in_flight_staleness),
@@ -394,132 +378,6 @@ function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(spr
     sprint_count: sprintFiles.length,
     active_path: activeFiles[0],
   });
-}
-
-function checkObjectiveDrift({ repoRoot, sprintsDir, activePath = null }) {
-  try {
-    const result = checkObjectives({ repoRoot, sprintsDir });
-    if (!result.charterFound) {
-      return verdict("objectives_check", "pass", {
-        summary: "No charter found; objective IDs are not enforced.",
-        charter_found: false,
-        checked_paths: result.checkedPaths.map((file) => displayPath(repoRoot, file)),
-      });
-    }
-    if (result.drift.length > 0) {
-      return verdict("objectives_check", "fail", {
-        summary: `Detected objective drift in ${result.drift.length} sprint file(s).`,
-        charter_found: true,
-        charter_path: displayPath(repoRoot, result.charterPath),
-        drift: result.drift.map((item) => ({
-          ...item,
-          sprintFile: displayPath(repoRoot, item.sprintFile),
-        })),
-      });
-    }
-    // Soft nudge: a charter exists but the ACTIVE sprint dropped the field
-    // entirely (an explicit `objectives: []` does not trip this). Warn only;
-    // omission is valid for spec-less repos and immutable legacy sprints.
-    if (activePath && (result.omittedObjectiveSprints || []).includes(toPortablePath(activePath))) {
-      return verdict("objectives_check", "warn", {
-        summary: "Active sprint omits objectives: while a charter exists; reference an Objective ID or set objectives: [].",
-        charter_found: true,
-        charter_path: displayPath(repoRoot, result.charterPath),
-        active_sprint: displayPath(repoRoot, activePath),
-      });
-    }
-    return verdict("objectives_check", "pass", {
-      summary: `Checked ${result.sprintCount} sprint file(s) against ${result.charterObjectiveIds.length} charter objective(s).`,
-      charter_found: true,
-      charter_path: displayPath(repoRoot, result.charterPath),
-      sprint_count: result.sprintCount,
-    });
-  } catch (error) {
-    return verdict("objectives_check", "fail", {
-      summary: `objectives-check failed: ${error.message}`,
-    });
-  }
-}
-
-function checkComponentRouting({ repoRoot, sprintsDir, capabilitiesPath, activePath = null }) {
-  try {
-    const result = lintComponents({ sprintsDir, capabilitiesPath });
-    if (!result.capabilitiesFound) {
-      return verdict("component_lint", "pass", {
-        summary: "No spec/capabilities.md found; component handles are not enforced.",
-        capabilities_found: false,
-        capabilities_path: displayPath(repoRoot, result.capabilitiesPath),
-      });
-    }
-    if (hasComponentErrors(result)) {
-      return verdict("component_lint", "fail", {
-        summary: `Detected component routing issues in ${result.issues.length} sprint file(s).`,
-        capabilities_found: true,
-        issues: result.issues.map((issue) => ({
-          ...issue,
-          sprintFile: displayPath(repoRoot, issue.sprintFile),
-        })),
-      });
-    }
-    // Soft nudge: capabilities exist but the ACTIVE sprint dropped the field
-    // entirely (an explicit `component: ""` does not trip this).
-    if (activePath && (result.omittedComponentSprints || []).includes(toPortablePath(activePath))) {
-      return verdict("component_lint", "warn", {
-        summary: "Active sprint omits component: while spec/capabilities.md exists; set one capability slug or an explicit empty value.",
-        capabilities_found: true,
-        active_sprint: displayPath(repoRoot, activePath),
-      });
-    }
-    return verdict("component_lint", "pass", {
-      summary: `Checked ${result.checkedSprintCount} sprint file(s); all non-empty component handles resolve.`,
-      capabilities_found: true,
-      declared_capabilities: result.declaredCapabilities.length,
-      routed_sprints: result.routedSprintCount,
-      unrouted_sprints: result.unroutedSprintCount,
-    });
-  } catch (error) {
-    return verdict("component_lint", "fail", {
-      summary: `component-lint failed: ${error.message}`,
-    });
-  }
-}
-
-function checkCapabilities({ repoRoot, capabilitiesPath }) {
-  try {
-    const result = analyzeCapabilities({ capabilitiesPath });
-    if (!result.found) {
-      return verdict("capabilities_doctor", "pass", {
-        summary: "No spec/capabilities.md found; capability hygiene is not enforced.",
-        found: false,
-        capabilities_path: displayPath(repoRoot, result.capabilitiesPath),
-      });
-    }
-    if (hasCapabilityHardFailures(result)) {
-      return verdict("capabilities_doctor", "fail", {
-        summary: `Capability doctor found ${result.hardFailures.length} hard trigger(s).`,
-        found: true,
-        hard_failures: result.hardFailures,
-        warnings: result.warnings,
-      });
-    }
-    if (result.warnings.length > 0) {
-      return verdict("capabilities_doctor", "warn", {
-        summary: `Capability doctor found ${result.warnings.length} warning(s).`,
-        found: true,
-        warnings: result.warnings,
-      });
-    }
-    return verdict("capabilities_doctor", "pass", {
-      summary: `Capability spec is within budget (${result.capabilityCount} capability/capabilities, ${result.lineCount} lines).`,
-      found: true,
-      capability_count: result.capabilityCount,
-      line_count: result.lineCount,
-    });
-  } catch (error) {
-    return verdict("capabilities_doctor", "fail", {
-      summary: `capabilities-doctor failed: ${error.message}`,
-    });
-  }
 }
 
 // Parse one track's sprint file directly (not via readSprintState, whose

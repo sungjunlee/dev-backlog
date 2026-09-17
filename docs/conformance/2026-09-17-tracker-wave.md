@@ -73,3 +73,14 @@ No new PARTIAL or FAIL against `relit`; every stop held. Neither model reference
 ## After #431 (migration clause)
 
 Same harness, SKILL.md from PR #436 (one clause in the Plan rail), one run per model. Scenario 12 only changed: Astra now runs `setup-dev-backlog.js` to migrate and leaves `backlog/tasks/`, `docs/`, `completed/` in place (PASS); Fable names the same migration path, what it moves and what it leaves, and asks before running it because Orient is read-only (PASS under the revised Expected, which accepts "run or ask" once the path is named — the knowledge gap the clause targeted is closed, and asking before a structural move in Orient is the wave's own rule). Scenarios 1–11 unchanged from `after425`. Raw: `2026-09-17/fable-431.md`, `2026-09-17/astra-431.md`, `2026-09-17/prompt-431.md`. Astra tokens (stderr): 13.3k.
+
+## After Batch 3 (#424 GitLab parked, #426 spec-axis linters removed)
+
+Same harness and rubric, SKILL.md from PR #438 (160 lines; `component:` a free scope string, `objectives:` unchecked), one run per model.
+
+| Channel × variant | PASS | PARTIAL | FAIL | ASK | MUT | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| fable × batch3 | 12/12 | 0 | 0 | 0 | 0 | scenario 12 runs setup to migrate and confirms first (PASS under the #431 Expected); scenario 4 asks only if scope is unclear |
+| astra × batch3 | 12/12 | 0 | 0 | 0 | 1 | Plan fold offered in 2 (same as every Astra run); scenario 12 migrates via setup |
+
+No new PARTIAL or FAIL; every stop held; no run named a deleted script, a `gitlab` ref, or a `## Capability:` resolution rule. Raw: `2026-09-17/fable-batch3.md`, `2026-09-17/astra-batch3.md`, `2026-09-17/prompt-batch3.md`. Astra tokens (stderr): 26.1k (reasoning variance; the prompt is unchanged in size).

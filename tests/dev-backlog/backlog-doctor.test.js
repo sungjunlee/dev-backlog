@@ -167,9 +167,6 @@ describe("runDoctor", () => {
     assert.equal(exitCodeFor(report), 0);
     assert.deepEqual(report.checks.map((item) => item.name), [
       "active_sprint",
-      "objectives_check",
-      "component_lint",
-      "capabilities_doctor",
       "sprint_shape",
       "in_flight_trace",
       "in_flight_staleness",
@@ -239,7 +236,7 @@ describe("runDoctor", () => {
     assert.match(check(report, "active_sprint").detail.summary, /2 active tracks, scopes disjoint/);
     assert.equal(exitCodeFor(report), 0);
 
-    for (const name of ["objectives_check", "component_lint", "sprint_shape", "in_flight_trace", "in_flight_staleness"]) {
+    for (const name of ["sprint_shape", "in_flight_trace", "in_flight_staleness"]) {
       const fanned = report.checks.filter((item) => item.name === name);
       assert.equal(fanned.length, 2, `${name} should run once per track`);
       assert.deepEqual(fanned.map((item) => item.track), ["2026-07-auth", "2026-07-billing"]);
@@ -356,63 +353,41 @@ describe("runDoctor", () => {
     assert.equal(exitCodeFor(report), 0);
   });
 
-  it("soft-warns when the active sprint omits objectives while a charter exists (B3)", () => {
-    seedCleanRepo(repoRoot, sprintNoSpecFields({ component: "sprint-execution" }));
+  it("emits no spec-axis verdict even when spec/ is present (#426)", () => {
+    seedCleanRepo(repoRoot);
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
-    assert.equal(check(report, "objectives_check").status, "warn");
-    assert.match(check(report, "objectives_check").detail.summary, /omits objectives/);
-    assert.equal(check(report, "component_lint").status, "pass");
-    assert.equal(exitCodeFor(report), 0); // warn is soft, never blocks
+    for (const name of ["objectives_check", "component_lint", "capabilities_doctor"]) {
+      assert.equal(report.checks.some((item) => item.name === name), false, `${name} is gone`);
+    }
   });
 
-  it("soft-warns when the active sprint omits component while capabilities exist (B3)", () => {
-    seedCleanRepo(repoRoot, sprintNoSpecFields({ objectives: "[O1]" }));
+  it("ignores unknown objective IDs and component handles; they are unchecked metadata (#426)", () => {
+    seedCleanRepo(repoRoot, sprint({ objectives: "[O99]", component: "unknown-component" }));
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
-    assert.equal(check(report, "component_lint").status, "warn");
-    assert.match(check(report, "component_lint").detail.summary, /omits component/);
-    assert.equal(check(report, "objectives_check").status, "pass");
+    assert.equal(report.exit_hint, "pass");
+    assert.equal(exitCodeFor(report), 0);
   });
 
-  it("does not warn on explicit empty spec fields when a spec exists (additive tolerance, B3 AC4)", () => {
+  it("tolerates explicit empty spec fields on a legacy sprint (additive tolerance)", () => {
     seedCleanRepo(repoRoot, sprintNoSpecFields({ objectives: "[]", component: "" }));
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
-    assert.equal(check(report, "objectives_check").status, "pass");
-    assert.equal(check(report, "component_lint").status, "pass");
+    assert.equal(report.exit_hint, "pass");
+    assert.equal(exitCodeFor(report), 0);
   });
 
-  it("passes when spec files are absent and the sprint omits both fields (cold adopter, B3)", () => {
+  it("passes when spec files are absent and the sprint omits both fields (cold adopter)", () => {
     write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-test.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });
 
-    assert.equal(check(report, "objectives_check").status, "pass");
-    assert.equal(check(report, "component_lint").status, "pass");
-  });
-
-  it("fails on unknown objective IDs", () => {
-    seedCleanRepo(repoRoot, sprint({ objectives: "[O99]" }));
-
-    const report = runDoctor({ repoRoot });
-
-    assert.equal(check(report, "objectives_check").status, "fail");
-    assert.match(check(report, "objectives_check").detail.summary, /objective drift/);
-    assert.equal(exitCodeFor(report), 1);
-  });
-
-  it("fails on unknown component handles", () => {
-    seedCleanRepo(repoRoot, sprint({ component: "unknown-component" }));
-
-    const report = runDoctor({ repoRoot });
-
-    assert.equal(check(report, "component_lint").status, "fail");
-    assert.match(check(report, "component_lint").detail.summary, /component routing/);
-    assert.equal(exitCodeFor(report), 1);
+    assert.equal(report.exit_hint, "pass");
+    assert.equal(exitCodeFor(report), 0);
   });
 
   it("fails when the active sprint is missing a required section", () => {
