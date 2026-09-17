@@ -24,14 +24,14 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
 - [~] #424 Park the GitLab adapter until a measured consumer exists (~2h) → PR #437 (merged)
 - [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (merged)
-- [~] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h) → PR #438 (open)
+- [~] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h) → PR #438 (merged)
 - [~] #431 Plan rail: setup migrates a legacy backlog/ skill layout (rule re-add from the #423 evidence; unplanned, admitted 2026-09-17) (~30min) → PR #436 (merged)
 
 ### Batch 4 - Triage experiment (independent; can run alongside Batch 3)
 - [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (merged)
 
 ### Batch 5 - Release
-- [ ] #428 Cut v0.11.0 with the measured state (~1h)
+- [~] #428 Cut v0.11.0 with the measured state (~1h) [run:grok-428]
 
 
 ## Running Context
@@ -51,3 +51,4 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - 2026-09-17: #425 merged (PR #435; references 10 → 4 files, −892 lines). Astra review DO NOT MERGE overridden on evidence (dev-relay consumes sprint-state JSON, not the doc). Post-merge hotfix: a backtick inside the doctor remediation template literal broke `backlog-doctor.js` on main for one commit; caught by re-running smoke, fixed in the next commit. Lesson: never chain `gh pr merge` after a grep-filtered test run — check exit codes explicitly.
 - 2026-09-17: #431 merged (PR #436). Remaining: #421 spec gate (PR #429 open, human decision), then #424 and #426, then #428. Batch 1/2/4 done; Batch 3 has #425 and #431 done.
 - 2026-09-17: Spec gate approved; #421 merged (PR #429, charter rev 18). #424 dispatched to Grok 4.6, #426 to Opus 5, both in own worktrees.
+- 2026-09-17: Batch 3 closed: #424 (PR #437, −1,162), #426 (PR #438, −2,432 incl. orphaned sprint-status.js). After-run on both models 12/12. #428 dispatched to Grok (CHANGELOG release section + release notes); tag and release published from this session.
