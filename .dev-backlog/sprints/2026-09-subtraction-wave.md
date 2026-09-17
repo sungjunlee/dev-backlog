@@ -23,7 +23,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
 - [ ] #424 Park the GitLab adapter until a measured consumer exists (~2h)
-- [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (open)
+- [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (merged)
 - [ ] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h)
 
 ### Batch 4 - Triage experiment (independent; can run alongside Batch 3)
@@ -47,3 +47,4 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - 2026-09-17: Batch 1 in flight. #421 report on PR #429 (spec amendments proposed, human gate pending); #422 on PR #430 (Astra review: merge with edits, applied). In-flight pointer grammar is `→ PR #N (state)` at end of line (status.sh `PR_RE`).
 - 2026-09-17: #422 merged (PR #430, SKILL.md 160 lines / never-only-must 4). #423 run done: no behavior loss, scenario 12 gap filed as #431; PR #432 under review.
 - 2026-09-17: Batch 2 closed (#423 merged, PR #432). Batch 4 #427 measured: variant B plan-level equivalent on both models; deletion filed as #433, PR #434 under Sol review. Batch 3 #425 dispatched to Grok 4.6 (cursor-agent, own worktree); #424/#426 wait on the #421 spec gate.
+- 2026-09-17: #425 merged (PR #435; references 10 → 4 files, −892 lines). Astra review DO NOT MERGE overridden on evidence (dev-relay consumes sprint-state JSON, not the doc). Post-merge hotfix: a backtick inside the doctor remediation template literal broke `backlog-doctor.js` on main for one commit; caught by re-running smoke, fixed in the next commit. Lesson: never chain `gh pr merge` after a grep-filtered test run — check exit codes explicitly.
