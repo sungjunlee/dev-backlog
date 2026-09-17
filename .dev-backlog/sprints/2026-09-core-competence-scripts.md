@@ -28,7 +28,7 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - [x] #433 backlog-triage: fixture-backed real A/B, then delete collect/relate/stale/report; keep triage-apply.js (~3h) → PR #452 (merged)
 
 ### Batch 5 - Release
-- [~] #447 Cut v0.12.0 with the measured state (~1h) → PR #455 (open)
+- [x] #447 Cut v0.12.0 with the measured state (~1h) → PR #455 (merged)
 
 ## Running Context
 - Keep test unchanged from the 2026-09 subtraction wave: shared/irreversible-state guard, deterministic check the model cannot cheaply redo, or a consumed wire contract. Only `sprint-state` JSON has a consumer (dev-relay, 19 references); verify a reviewer's "consumed contract" claim by grepping the consumer.
@@ -46,3 +46,4 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - 2026-09-17: Batch 4 done: #433 merged (PR #452, −5,384; backlog-triage scripts 3,359 → ~1,000, SKILL.md 116 → 44). After-run 7/7 both models. Waiting on #445 (Opus) for Batch 3.
 - 2026-09-17: #445 merged (PR #453, −4,891; GitHub-only, files parked at v0.11.0). Batch 3 after-run 11/11 both models; dev-relay sweep 712/713 (pre-existing flake). #446 dispatched to Opus.
 - 2026-09-17: #446 merged (PR #454; doctor 795 → 490, setup 374 → 150). Batch 3 done. #447 dispatched to Grok; tag/release from this session.
+- 2026-09-17: #447 merged (PR #455); tag v0.12.0 pushed, GitHub release published. Final sizes on main: dev-backlog scripts 2,807 (14 files), backlog-triage 945 (2 files), tests 4,623, SKILL.md 157/5, triage SKILL.md 44, references 3. dev-relay sweep 711/713 (two dispatch-host timing flakes, no sprint-state reference).
