@@ -19,7 +19,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [x] #422 Re-lighten dev-backlog SKILL.md after the #411 tracker wave: tracker branching off the hot path (~2h) → PR #430 (merged)
 
 ### Batch 2 - Measure the tracker wave (needs #422)
-- [~] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h) → PR #432 (open)
+- [x] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h) → PR #432 (merged)
 
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
 - [ ] #424 Park the GitLab adapter until a measured consumer exists (~2h)
