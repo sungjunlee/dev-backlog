@@ -47,12 +47,11 @@ function snapshot(directory) {
 }
 
 describe("GitHub-only setup", () => {
-  it("accepts github, files, and gitlab and rejects retired or unknown authorities", () => {
+  it("accepts github and files and rejects retired or unknown authorities", () => {
     assert.equal(parseArgs(["--tracker", "github"]).tracker, "github");
     assert.equal(parseArgs(["--tracker", "files"]).tracker, "files");
-    assert.equal(parseArgs(["--tracker", "gitlab"]).tracker, "gitlab");
-    assert.throws(() => parseArgs(["--tracker", "local"]), /expected github, files, or gitlab/);
-    assert.throws(() => parseArgs(["--tracker", "gitea"]), /expected github, files, or gitlab/);
+    assert.throws(() => parseArgs(["--tracker", "local"]), /expected github or files/);
+    assert.throws(() => parseArgs(["--tracker", "gitea"]), /expected github or files/);
   });
 
   it("creates only .tracker and sprints for a fresh files repository", async (t) => {
@@ -61,14 +60,6 @@ describe("GitHub-only setup", () => {
     assert.equal(result.selection, "files");
     assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), [".tracker", "sprints"]);
     assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "files\n");
-  });
-
-  it("creates only .tracker and sprints for a fresh gitlab repository", async (t) => {
-    const cwd = root(t, "setup-gitlab-");
-    const result = await runSetup({ cwd, tracker: "gitlab", nonInteractive: true });
-    assert.equal(result.selection, "gitlab");
-    assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), [".tracker", "sprints"]);
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "gitlab\n");
   });
 
   it("creates only .tracker and sprints for a fresh repository", async (t) => {
@@ -104,7 +95,7 @@ describe("GitHub-only setup", () => {
       const before = snapshot(cwd);
     await assert.rejects(
       runSetup({ cwd, nonInteractive: true }),
-      /expected github, files, or gitlab/,
+      /expected github or files/,
     );
       assert.deepEqual(snapshot(cwd), before);
     }
@@ -154,7 +145,7 @@ describe("GitHub-only setup", () => {
       SCRIPT, "--tracker", "local", "--non-interactive",
     ], { cwd: root(t, "setup-cli-local-"), encoding: "utf8" });
     assert.notEqual(cli.status, 0);
-    assert.match(cli.stderr, /expected github, files, or gitlab/);
+    assert.match(cli.stderr, /expected github or files/);
   });
 
   it("migrates leftover skill files from backlog/ into .dev-backlog and leaves export paths", async (t) => {
@@ -189,7 +180,7 @@ describe("GitHub-only setup", () => {
     const before = snapshot(cwd);
     await assert.rejects(
       runSetup({ cwd, nonInteractive: true }),
-      /expected github, files, or gitlab/,
+      /expected github or files/,
     );
     assert.deepEqual(snapshot(cwd), before);
     assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog")), false);

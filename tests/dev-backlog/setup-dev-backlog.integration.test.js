@@ -208,7 +208,7 @@ describe("GitHub-only setup real process integration", () => {
       const before = snapshot(root);
       const result = runCli(root, ["--non-interactive"]);
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /expected github, files, or gitlab/);
+      assert.match(result.stderr, /expected github or files/);
       assert.deepEqual(snapshot(root), before);
     }
 
@@ -217,7 +217,7 @@ describe("GitHub-only setup real process integration", () => {
     const before = snapshot(root);
     const result = runCli(root, ["--non-interactive"]);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /expected github, files, or gitlab/);
+    assert.match(result.stderr, /expected github or files/);
     assert.deepEqual(snapshot(root), before);
   });
 
@@ -227,14 +227,6 @@ describe("GitHub-only setup real process integration", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).selection, "files");
     assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "files\n");
-  });
-
-  it("accepts an explicit gitlab tracker pin", (t) => {
-    const root = makeRoot(t, "setup-gitlab-pin-");
-    const result = runCli(root, ["--tracker", "gitlab", "--non-interactive", "--json"]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).selection, "gitlab");
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "gitlab\n");
   });
 
   it("rolls back fresh directories and temp bytes on atomic publication failures", (t) => {

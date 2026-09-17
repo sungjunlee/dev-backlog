@@ -1,14 +1,13 @@
 # Tracker adapter ports
 
-Frozen contract for `scripts/tracker.js`. Adapters (`github`, `files`,
-`gitlab`) satisfy this seam; Forgejo/Gitea are follow-ups that would reuse the
-same forge field shapes. Selection is configuration-only.
+Frozen contract for `scripts/tracker.js`. Adapters (`github`, `files`)
+satisfy this seam. Selection is configuration-only.
 Runtime never switches adapters. Adapter failure is fail-closed.
 
 ## Selection
 
 `TRACKER_KEYS` is the allowed `.tracker` / setup selection set. This release
-freezes it at `["github", "files", "gitlab"]`.
+freezes it at `["github", "files"]`.
 
 - `selectTracker` / `resolveTracker` read the configured key and load that
   adapter only.
@@ -27,13 +26,19 @@ sprint `## Plan` use the configured key's grammar.
 | --- | --- | --- | --- | --- |
 | `github` (default) | `gh` | `#N` | `gh issue create` | `gh issue close` |
 | `files` | `backlog` (Backlog.md CLI) | `BACK-N` | `backlog task create` | `backlog task edit <id> -s Done` |
-| `gitlab` | `glab` | `gitlab#N` | `glab issue create` | `glab issue close` |
 
-None of the three is a degraded fallback; each is a first-class configured
+Neither is a degraded fallback; each is a first-class configured
 authority running the same Orient / Plan / Work / Complete loop. If the
 configured CLI is missing or unauthenticated, the adapter is unavailable
 (fail-closed). Never parse or write `backlog/tasks/*.md` as a product API, and
 never make two trackers co-authority in one repo.
+
+## Adding an adapter
+
+A new key is admitted only for a measured consumer (charter rule) and must
+satisfy `validateAdapter` on the same seven ops. The parked `gitlab` adapter
+is retrievable at [`a8ddb7d`](https://github.com/sungjunlee/dev-backlog/commit/a8ddb7d)
+for anyone who needs it.
 
 ## Required operations
 
@@ -100,8 +105,5 @@ and stop. Diagnostic export is opt-in (`sync-pull.js --legacy-export`) and is
 not on orient / plan / work / complete.
 
 Adapter implementations: `github-tracker.js`, `files-tracker.js` (Backlog.md
-CLI only), `gitlab-tracker.js` (`glab` only). The GitLab adapter reports
-`closing-semantics` only — comments / Agent Brief via notes are not claimed
-until a notes API path lands; issue body remains authority. Forgejo/Gitea
-share forge field shapes and are follow-up adapters, not implemented here.
-Export layout: `file-format.md`. Authority routing: `authority-contract.md`.
+CLI only). Export layout: `file-format.md`. Authority routing:
+`authority-contract.md`.

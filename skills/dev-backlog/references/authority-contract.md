@@ -2,8 +2,7 @@
 
 GitHub Issues own task specification and lifecycle when `.tracker=github`
 (the default, and this repository's pin). When `.tracker=files`, the Backlog.md
-CLI is the sole task-spec and lifecycle authority. When `.tracker=gitlab`,
-GitLab Issues via `glab` own that role. A sprint file exists only
+CLI is the sole task-spec and lifecycle authority. A sprint file exists only
 when execution needs continuity beyond one task and its PR. Exactly one
 configured tracker (`.tracker` is setup-only); runtime never switches adapters.
 Diagnostic export files (`exports/github-issues/` via `--legacy-export`) are an
@@ -17,9 +16,9 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`; GitLab Issue via `glab` when `.tracker=gitlab`); a posted `## Agent Brief` comment is the contract when present | Create or amend the live task through that tracker (or post the brief as a comment), then read it back; never leftover `tasks/*.md` | Diagnostic `exports/github-issues/` snapshots, sprint Plan text, GitHub Projects |
-| Task lifecycle | Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`; GitLab Issue when `.tracker=gitlab`) | Update the live task state through the configured adapter (`adapter.close` / files `backlog task edit` Done / gitlab `glab issue close`); never both trackers | Sprint checkboxes, diagnostic export files, project-board fields |
-| Planning fields | Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files; GitLab labels and assignees when gitlab) | Use that tracker's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
+| Task specification | Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); a posted `## Agent Brief` comment is the contract when present | Create or amend the live task through that tracker (or post the brief as a comment), then read it back; never leftover `tasks/*.md` | Diagnostic `exports/github-issues/` snapshots, sprint Plan text, GitHub Projects |
+| Task lifecycle | Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`) | Update the live task state through the configured adapter (`adapter.close` / files `backlog task edit` Done); never both trackers | Sprint checkboxes, diagnostic export files, project-board fields |
+| Planning fields | Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files) | Use that tracker's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
 | Historical evidence | GitHub repository history | Read closed Issues/PRs, commits, and committed completed sprint files at their original locations | Copied summaries, search indexes, compiled memory |
@@ -74,12 +73,11 @@ The core product excludes:
 - automatic writes from search, retrieval, summaries, or memory compilers;
 - required Relay, Matt Pocock skill, GitHub Projects, or Backlog.md runtime
   dependencies when `.tracker=github`;
-- a second task-spec or lifecycle authority in the same repo (GitHub, files,
-  and GitLab are never co-authority).
+- a second task-spec or lifecycle authority in the same repo (GitHub and files
+  are never co-authority).
 
 Do not add tracker providers beyond the frozen `TRACKER_KEYS` (`github`,
-`files`, `gitlab`). Forgejo/Gitea share forge field shapes and are follow-up
-issues, not implemented here. Do not add bidirectional compatibility
+`files`). Do not add bidirectional compatibility
 machinery, task-mirror lifecycle features, or a committed memory/compiler
 layer without new measured adoption evidence and an explicit
 authority-contract amendment.
@@ -93,8 +91,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native default.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Chosen task authority when `.tracker=files`; otherwise leftover operator tree under `backlog/` | When `files` is chosen, read/write tasks only through the `backlog` CLI (`--json` where available). Leftover `backlog/tasks/*.md` is never a product parser API. Missing CLI is fail-closed. Never co-authority with GitHub or GitLab |
-| GitLab (`glab`) | Chosen task authority when `.tracker=gitlab` | Read/write issues only through `glab`. Missing or unauthenticated CLI is fail-closed. Never co-authority with GitHub or files. Forgejo/Gitea are follow-up adapters. |
+| Backlog.md | Chosen task authority when `.tracker=files`; otherwise leftover operator tree under `backlog/` | When `files` is chosen, read/write tasks only through the `backlog` CLI (`--json` where available). Leftover `backlog/tasks/*.md` is never a product parser API. Missing CLI is fail-closed. Never co-authority with GitHub |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 

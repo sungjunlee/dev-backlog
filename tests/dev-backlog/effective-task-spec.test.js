@@ -28,7 +28,7 @@ function resolvedTask(task, { tracker = "github", readError } = {}) {
         read(ref, options) {
           reads.push({ ref, options });
           if (readError) throw readError;
-          return { tracker, id: "42", ref: tracker === "github" ? "#42" : tracker === "gitlab" ? "gitlab#42" : "BACK-42", ...task };
+          return { tracker, id: "42", ref: tracker === "github" ? "#42" : "BACK-42", ...task };
         },
       },
     },
@@ -163,39 +163,6 @@ describe("effective task spec selection", () => {
       { text: "Already done", checked: true },
       { text: "Plain string criterion", checked: false },
     ]);
-  });
-
-  it("resolves GitLab issue body AC and gitlab#N identity (#415)", () => {
-    const body = [
-      "## Acceptance criteria",
-      "- [ ] Live GitLab issue.",
-      "- [x] Already checked.",
-    ].join("\n");
-    const url = "https://gitlab.com/acme/widgets/-/issues/42";
-    const fixture = resolvedTask({
-      body,
-      state: "opened",
-      updatedAt: "2026-09-15T08:00:00Z",
-      url,
-    }, { tracker: "gitlab" });
-
-    const result = resolveEffectiveTaskSpec(fixture.resolved, "gitlab#42", {
-      repo: "acme/widgets",
-    });
-
-    assert.deepEqual(fixture.reads, [{
-      ref: "gitlab#42",
-      options: { repo: "acme/widgets" },
-    }]);
-    assert.deepEqual(result.acceptance_criteria, [
-      { text: "Live GitLab issue.", checked: false },
-      { text: "Already checked.", checked: true },
-    ]);
-    assert.deepEqual(result.lifecycle, {
-      state: "open",
-      updated_at: "2026-09-15T08:00:00Z",
-    });
-    assert.equal(result.source_ref, `${url}#issue-body`);
   });
 
   it("does not let a leftover acceptanceCriteria array override GitHub body checkboxes", () => {

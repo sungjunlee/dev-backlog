@@ -1,7 +1,7 @@
 /**
  * Configured tracker boundary. Port contract: references/adapter-ports.md.
  *
- * TRACKER_KEYS is config-only selection (this release: ["github", "files", "gitlab"]).
+ * TRACKER_KEYS is config-only selection (this release: ["github", "files"]).
  * Runtime never switches adapters. Availability can reject the configured
  * adapter, but it can never choose a different one. Adapter failure is
  * fail-closed: no local-file or diagnostic-export fallback.
@@ -13,7 +13,6 @@
 
 const { createGithubAdapter } = require("./github-tracker.js");
 const { createFilesAdapter } = require("./files-tracker.js");
-const { createGitlabAdapter } = require("./gitlab-tracker.js");
 const fs = require("node:fs");
 const path = require("path");
 const { configDisplayPath } = require("./portable-path.js");
@@ -22,7 +21,7 @@ const {
   TRACKER_SELECTION_FILE,
 } = require("./execution-root.js");
 
-const TRACKER_KEYS = Object.freeze(["github", "files", "gitlab"]);
+const TRACKER_KEYS = Object.freeze(["github", "files"]);
 const REQUIRED_ADAPTER_OPERATIONS = Object.freeze([
   "availability",
   "capabilities",
@@ -245,7 +244,6 @@ function resolveConfiguredTracker(config, {
       ? {
           github: createGithubAdapter({ execFile }),
           files: createFilesAdapter({ execFile }),
-          gitlab: createGitlabAdapter({ execFile }),
         }
       : {}),
   };
@@ -360,7 +358,6 @@ function invokeCapability(resolved, capability, operation, ...args) {
 const TRACKER_ADAPTERS = Object.freeze({
   github: createGithubAdapter(),
   files: createFilesAdapter(),
-  gitlab: createGitlabAdapter(),
 });
 
 module.exports = {
@@ -387,5 +384,4 @@ module.exports = {
   invokeCapability,
   createGithubAdapter,
   createFilesAdapter,
-  createGitlabAdapter,
 };

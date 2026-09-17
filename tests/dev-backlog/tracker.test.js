@@ -41,18 +41,17 @@ function adapter(overrides = {}) {
 }
 
 describe("Configured tracker selection", () => {
-  it("defaults to github and explicitly accepts files and gitlab", () => {
-    assert.deepEqual([...TRACKER_KEYS], ["github", "files", "gitlab"]);
+  it("defaults to github and explicitly accepts files", () => {
+    assert.deepEqual([...TRACKER_KEYS], ["github", "files"]);
     assert.ok(Object.isFrozen(TRACKER_KEYS));
     assert.equal(selectTracker(), "github");
     assert.equal(selectTracker({}), "github");
     assert.equal(selectTracker({ tracker: "github" }), "github");
     assert.equal(selectTracker({ tracker: "files" }), "files");
-    assert.equal(selectTracker({ tracker: "gitlab" }), "gitlab");
     for (const value of ["local", "gitea", "", 7, null]) {
       assert.throws(
         () => selectTracker({ tracker: value }),
-        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files, gitlab/.test(error.message),
+        (error) => error instanceof TrackerConfigurationError && /expected one of: github, files/.test(error.message),
       );
     }
   });
@@ -70,14 +69,6 @@ describe("Configured tracker selection", () => {
     assert.equal(
       resolveConfiguredTracker({}, { backlogDir, adapters: { github: adapter(), files: adapter() } }).tracker,
       "files",
-    );
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "gitlab\n");
-    assert.equal(
-      resolveConfiguredTracker({}, {
-        backlogDir,
-        adapters: { github: adapter(), files: adapter(), gitlab: adapter() },
-      }).tracker,
-      "gitlab",
     );
     fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
     assert.throws(
@@ -149,11 +140,10 @@ describe("Configured tracker selection", () => {
 });
 
 describe("retained adapter portability seam", () => {
-  it("keeps one exact operation shape for production github, files, and gitlab adapters", () => {
-    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files", "gitlab"]);
+  it("keeps one exact operation shape for production github and files adapters", () => {
+    assert.deepEqual(Object.keys(TRACKER_ADAPTERS), ["github", "files"]);
     assert.equal(validateAdapter("github", TRACKER_ADAPTERS.github), TRACKER_ADAPTERS.github);
     assert.equal(validateAdapter("files", TRACKER_ADAPTERS.files), TRACKER_ADAPTERS.files);
-    assert.equal(validateAdapter("gitlab", TRACKER_ADAPTERS.gitlab), TRACKER_ADAPTERS.gitlab);
     const injected = adapter();
     assert.equal(validateAdapter("github", injected), injected);
     assert.deepEqual([...REQUIRED_ADAPTER_OPERATIONS], [
@@ -189,8 +179,6 @@ describe("retained adapter portability seam", () => {
     assert.equal(validateIdentity(identity), identity);
     const filesIdentity = { tracker: "files", id: "12", ref: "BACK-12" };
     assert.equal(validateIdentity(filesIdentity), filesIdentity);
-    const gitlabIdentity = { tracker: "gitlab", id: "42", ref: "gitlab#42" };
-    assert.equal(validateIdentity(gitlabIdentity), gitlabIdentity);
     for (const invalid of [
       null,
       {},

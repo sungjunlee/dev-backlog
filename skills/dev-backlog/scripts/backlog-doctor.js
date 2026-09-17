@@ -567,7 +567,7 @@ function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
       required_sections: REQUIRED_ACTIVE_SECTIONS,
       missing_sections: missingSections,
       checkbox_grammar: "^- \\[( |~|x)\\] #\\d+",
-      task_ref_grammar: `#N, gitlab#N, or ${taskPrefix}-N[.M]`,
+      task_ref_grammar: `#N or ${taskPrefix}-N[.M]`,
       unparseable_plan_lines: unparseable,
     });
   }

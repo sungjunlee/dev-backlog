@@ -2,7 +2,7 @@
 /**
  * Canonical task-reference parsing, rendering, and identity helpers.
  *
- * Task refs are complete tokens: GitHub #N, GitLab gitlab#N, or files PREFIX-N,
+ * Task refs are complete tokens: GitHub #N or files PREFIX-N,
  * where files IDs may use Backlog.md decimal subtask notation (N.M).
  * Provider metadata such as `PR #N` is intentionally outside this module.
  */
@@ -12,7 +12,6 @@ const path = require("path");
 
 const DEFAULT_TASK_PREFIX = "BACK";
 const GITHUB_ID_RE = /^[1-9]\d*$/;
-const GITLAB_ID_RE = /^[1-9]\d*$/;
 const FILES_ID_RE = /^[1-9]\d*(?:\.[1-9]\d*)?$/;
 
 function escapeRegExp(value) {
@@ -29,11 +28,6 @@ function taskPrefix(options = {}) {
 
 function parseTaskRef(value, options = {}) {
   if (typeof value !== "string") return null;
-
-  if (value.startsWith("gitlab#")) {
-    const id = value.slice("gitlab#".length);
-    return GITLAB_ID_RE.test(id) ? { tracker: "gitlab", id, ref: value } : null;
-  }
 
   if (value.startsWith("#")) {
     const id = value.slice(1);
@@ -58,8 +52,6 @@ function renderTaskRef(identity, options = {}) {
   let ref;
   if (tracker === "github" && GITHUB_ID_RE.test(id)) {
     ref = `#${id}`;
-  } else if (tracker === "gitlab" && GITLAB_ID_RE.test(id)) {
-    ref = `gitlab#${id}`;
   } else if (tracker === "files" && FILES_ID_RE.test(id)) {
     if (options.taskPrefix === undefined && typeof identity.ref === "string") {
       const suffix = `-${id}`;
@@ -96,7 +88,7 @@ function containsTaskRef(text, identity) {
   if (typeof text !== "string" || !identity) return false;
   const ref = renderTaskRef(identity);
   const escaped = escapeRegExp(ref);
-  const forgeStyle = identity.tracker === "github" || identity.tracker === "gitlab";
+  const forgeStyle = identity.tracker === "github";
   const left = forgeStyle ? "[^A-Za-z0-9_#]" : "[^A-Za-z0-9_-]";
   const right = forgeStyle
     ? "(?![A-Za-z0-9_]|\\.\\d)"
@@ -130,9 +122,8 @@ function githubIssueNumber(identity) {
 
 function taskFileRef(identity, options = {}) {
   if (!identity) throw new Error("task identity is required");
-  if (identity.tracker === "github" || identity.tracker === "gitlab") {
-    const idRe = identity.tracker === "gitlab" ? GITLAB_ID_RE : GITHUB_ID_RE;
-    if (!idRe.test(identity.id)) throw new Error(`invalid ${identity.tracker} task identity`);
+  if (identity.tracker === "github") {
+    if (!GITHUB_ID_RE.test(identity.id)) throw new Error(`invalid ${identity.tracker} task identity`);
     return `${taskPrefix(options)}-${identity.id}`;
   }
   return renderTaskRef(identity, options);
@@ -158,10 +149,6 @@ function parseTaskFileName(fileName, options = {}) {
   if (tracker === "github") {
     if (!GITHUB_ID_RE.test(match[2])) return null;
     return { tracker, id: match[2], ref: `#${match[2]}` };
-  }
-  if (tracker === "gitlab") {
-    if (!GITLAB_ID_RE.test(match[2])) return null;
-    return { tracker, id: match[2], ref: `gitlab#${match[2]}` };
   }
   if (tracker === "files") return { tracker, id: match[2], ref: match[1] };
   return null;
