@@ -10,7 +10,6 @@ const BASH_ENTRYPOINTS = [
   "status.sh",
   "next.sh",
   "sprint-close.sh",
-  "lib.sh",
 ];
 
 describe("Bash runtime boundary", () => {

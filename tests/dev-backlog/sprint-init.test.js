@@ -8,7 +8,6 @@ const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts"
 const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
 const {
   parseArgs,
-  buildIssueLines,
   buildComponentFrontmatterLine,
   buildSprintContent,
   listActiveSprintFiles,
@@ -73,58 +72,27 @@ describe("parseArgs", () => {
   });
 });
 
-describe("buildIssueLines", () => {
-  it("adds estimate suffixes from labels", () => {
-    const lines = buildIssueLines([
-      { number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] },
-      { number: 43, title: "Docs", labels: [{ name: "documentation" }] },
-    ]);
-
-    assert.deepEqual(lines, [
-      "- [ ] #42 OAuth2 flow (~1hr)",
-      "- [ ] #43 Docs (~20min)",
-    ]);
-  });
-
-  it("returns no Plan lines when there are no issues", () => {
-    assert.deepEqual(buildIssueLines([]), []);
-  });
-
-  it("renders files refs from tracker identity (#414)", () => {
-    assert.deepEqual(buildIssueLines([
-      { ref: "BACK-12", title: "From ref", labels: [] },
-      { tracker: "files", id: "13", title: "From id", labels: ["docs"] },
-      { id: "14", title: "Bare files id", labels: [] },
-    ]), [
-      "- [ ] BACK-12 From ref",
-      "- [ ] BACK-13 From id (~20min)",
-      "- [ ] BACK-14 Bare files id",
-    ]);
-  });
-});
-
 describe("buildSprintContent", () => {
-  it("renders sprint markdown with issues and no spec-axis frontmatter", () => {
+  it("renders sprint markdown with an empty Plan and no spec-axis frontmatter", () => {
     const content = buildSprintContent({
       milestone: "Sprint W13",
       started: "2026-04-05",
-      due: "2026-04-12",
+      due: "TBD",
       topic: "auth-system",
-      issues: [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
     });
 
     assert.match(content, /^---\n/);
     assert.match(content, /milestone: Sprint W13/);
     assert.match(content, /started: 2026-04-05/);
-    assert.match(content, /due: 2026-04-12/);
-    assert.match(content, /due: 2026-04-12\n---/);
+    assert.match(content, /due: TBD\n---/);
     assert.match(content, /# auth-system/);
-    assert.match(content, /- \[ \] #42 OAuth2 flow \(~1hr\)/);
+    assert.match(content, /^## Plan$/m);
+    assert.doesNotMatch(content, /^- \[ \]/m);
   });
 
   it("omits both spec fields when none were requested (B3, #426)", () => {
     const content = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "cold", issues: [],
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "cold",
     });
     assert.match(content, /due: TBD\n---/);
     assert.doesNotMatch(content, /^objectives:/m);
@@ -133,21 +101,21 @@ describe("buildSprintContent", () => {
 
   it("emits a scope: line only when explicitly requested (D2, #292)", () => {
     const scoped = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t",
       scope: ["src/auth/**", "src/authz/**"],
     });
     assert.match(scoped, /^scope: \["src\/auth\/\*\*", "src\/authz\/\*\*"\]$/m);
     assert.match(scoped, /due: TBD\nscope: \["src\/auth\/\*\*", "src\/authz\/\*\*"\]\n---/);
 
     const unscoped = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t",
     });
     assert.doesNotMatch(unscoped, /^scope:/m);
   });
 
   it("never emits objectives:, whatever spec/ holds (#426)", () => {
     const content = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t",
       component: "anything-goes",
     });
     assert.doesNotMatch(content, /^objectives:/m);
@@ -156,7 +124,7 @@ describe("buildSprintContent", () => {
 
   it("emits the requested component verbatim; it is a free string (#331, #426)", () => {
     const content = buildSprintContent({
-      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t", issues: [],
+      milestone: "m", started: "2026-04-05", due: "TBD", topic: "t",
       component: "sprint-execution",
     });
     assert.match(content, /^component: "sprint-execution"$/m);
@@ -192,32 +160,40 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [{ number: 42, title: "OAuth2 flow", labels: [{ name: "feature" }] }],
     });
 
     assert.equal(result.action, "sprint-init");
     assert.equal(result.created, true);
     assert.equal(result.existingFile, false);
     assert.equal(result.dryRun, false);
-    assert.equal(result.issueCount, 1);
-    assert.equal(result.placeholderIssue, false);
+    assert.equal(result.issueCount, 0);
+    assert.equal(result.placeholderIssue, true);
     assert.ok(!("component" in result));
     assert.equal(result.sprintFile, path.join(tmpDir, "2026-04-auth-system.md"));
-    assert.match(result.content, /OAuth2 flow/);
 
     const written = fs.readFileSync(result.sprintFile, "utf-8");
     assert.equal(written, result.content);
-    assert.match(written, /due: 2026-04-12\n---/);
+    assert.match(written, /due: TBD\n---/);
+    assert.match(written, /^## Plan$/m);
+    assert.doesNotMatch(written, /^- \[ \]/m);
   });
 
-  it("generates sprint files that pass the doctor shape check with and without issues (#339)", () => {
-    const cases = [
-      { topic: "empty", issues: [] },
-      { topic: "milestone", issues: [{ number: 42, title: "OAuth2 flow", labels: [] }] },
-    ];
+  it("never reads GitHub: no milestone seeding since #445", () => {
+    const result = createSprintFile({
+      topic: "no-network",
+      milestone: "Sprint W16",
+      dryRun: false,
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    });
 
-    for (const { topic, issues } of cases) {
+    assert.equal(result.due, "TBD");
+    assert.equal(result.issueCount, 0);
+    assert.match(result.content, /^milestone: Sprint W16$/m);
+  });
+
+  it("generates sprint files that pass the doctor shape check (#339)", () => {
+    for (const topic of ["empty", "milestone"]) {
       const repoRoot = path.join(tmpDir, topic);
       const backlogPath = path.join(repoRoot, ".dev-backlog");
       const result = createSprintFile({
@@ -226,8 +202,6 @@ describe("createSprintFile", () => {
         dryRun: false,
         repoRoot,
         sprintsDir: path.join(backlogPath, "sprints"),
-        getDue: () => "TBD",
-        getIssues: () => issues,
       });
       const shape = checkSprintShape({
         repoRoot,
@@ -247,8 +221,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
 
     const written = fs.readFileSync(result.sprintFile, "utf-8");
@@ -271,8 +243,6 @@ describe("createSprintFile", () => {
         readPaths.push(candidate);
         return fs.existsSync(candidate);
       },
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
 
     assert.equal(result.created, true);
@@ -291,8 +261,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir,
       repoRoot: tmpDir,
-      getDue: () => "TBD",
-      getIssues: () => [],
     }), /cannot be used together/);
     assert.equal(fs.existsSync(sprintsDir), false);
   });
@@ -323,8 +291,6 @@ describe("createSprintFile", () => {
         dryRun: false,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
-        getDue: () => "2026-04-12",
-        getIssues: () => [],
       });
     }, /Active track overlaps on scope: 2026-04-current\.md/);
   });
@@ -343,8 +309,6 @@ describe("createSprintFile", () => {
         dryRun: true,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
-        getDue: () => "2026-04-12",
-        getIssues: () => [],
       });
     }, /Active track overlaps on scope: 2026-04-current\.md/);
   });
@@ -364,8 +328,6 @@ describe("createSprintFile", () => {
       dryRun: true,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
     assert.deepEqual(disjoint.warnings, []);
   });
@@ -383,8 +345,6 @@ describe("createSprintFile", () => {
       dryRun: true,
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
-      getDue: () => "TBD",
-      getIssues: () => [],
     }), /Active track overlaps on scope: 2026-04-current\.md/);
 
     const result = createSprintFile({
@@ -394,8 +354,6 @@ describe("createSprintFile", () => {
       dryRun: true,
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
     assert.equal(result.component, "sprint-execution");
     assert.deepEqual(result.warnings, []);
@@ -437,8 +395,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [],
     });
 
     assert.equal(result.created, true);
@@ -457,8 +413,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [],
     });
 
     assert.equal(result.created, true);
@@ -479,8 +433,6 @@ describe("createSprintFile", () => {
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [],
     });
 
     assert.equal(result.created, true);
@@ -490,15 +442,13 @@ describe("createSprintFile", () => {
     assert.equal(fs.existsSync(result.sprintFile), true);
   });
 
-  it("returns placeholder metadata on dry-run when milestone has no issues", () => {
+  it("returns placeholder metadata on dry-run for the empty Plan", () => {
     const result = createSprintFile({
       topic: "misc",
       milestone: "Sprint W14",
       dryRun: true,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
 
     assert.equal(result.created, false);
@@ -518,8 +468,6 @@ describe("createSprintFile", () => {
       dryRun: true,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [{ number: 42, title: "OAuth2 flow", labels: [] }],
     });
 
     assert.equal(result.existingFile, true);
@@ -539,8 +487,6 @@ describe("createSprintFile", () => {
         dryRun: false,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
-        getDue: () => "2026-04-12",
-        getIssues: () => [],
       });
     }, /Sprint file already exists/);
   });
@@ -554,8 +500,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: nested,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "TBD",
-      getIssues: () => [],
     });
 
     assert.ok(fs.existsSync(nested));
@@ -564,52 +508,7 @@ describe("createSprintFile", () => {
     assert.match(files[0], /^2026-04-setup\.md$/);
   });
 
-  it("renders multiple issues with varied labels", () => {
-    const issues = [
-      { number: 10, title: "Auth flow", labels: [{ name: "feature" }] },
-      { number: 11, title: "Rate limit", labels: [{ name: "size:S" }] },
-      { number: 12, title: "Fix typo", labels: [{ name: "bug" }, { name: "size:XS" }] },
-      { number: 13, title: "Add docs", labels: [{ name: "documentation" }] },
-      { number: 14, title: "Bare issue", labels: [] },
-    ];
 
-    const result = createSprintFile({
-      topic: "mixed",
-      milestone: "Sprint W15",
-      dryRun: false,
-      sprintsDir: tmpDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => issues,
-    });
-
-    assert.equal(result.issueCount, 5);
-    assert.match(result.content, /#10 Auth flow/);
-    assert.match(result.content, /#14 Bare issue/);
-    // All issues rendered as unchecked checkboxes
-    const checkboxLines = result.content.split("\n").filter((l) => l.startsWith("- [ ] #"));
-    assert.equal(checkboxLines.length, 5);
-  });
-
-  it("handles special characters in topic and issue titles", () => {
-    const result = createSprintFile({
-      topic: "OAuth2 / PKCE (v2)",
-      milestone: "Sprint W15",
-      dryRun: false,
-      sprintsDir: tmpDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "TBD",
-      getIssues: () => [
-        { number: 42, title: "Support café & résumé endpoints", labels: [] },
-      ],
-    });
-
-    assert.ok(fs.existsSync(result.sprintFile));
-    assert.match(result.content, /café & résumé/);
-    // Filename uses slugified topic
-    assert.match(path.basename(result.sprintFile), /^2026-04-.*\.md$/);
-    assert.ok(!path.basename(result.sprintFile).includes("/"));
-  });
 
   it("produces frontmatter compatible with find_active_sprint", () => {
     const result = createSprintFile({
@@ -618,8 +517,6 @@ describe("createSprintFile", () => {
       dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
-      getDue: () => "2026-04-12",
-      getIssues: () => [{ number: 1, title: "Task", labels: [] }],
     });
 
     const content = fs.readFileSync(result.sprintFile, "utf-8");
@@ -627,53 +524,6 @@ describe("createSprintFile", () => {
     assert.match(content, /^status: active$/m);
     assert.doesNotMatch(content, /^objectives:/m);
     assert.doesNotMatch(content, /^component:/m);
-    // Checkbox must match the integration contract regex
-    assert.match(content, /^- \[ \] #\d+/m);
   });
 
-  it("seeds a files-tracker sprint without GitHub milestones or gh (#414)", () => {
-    const backlogDir = path.join(tmpDir, ".dev-backlog");
-    const sprintsDir = path.join(backlogDir, "sprints");
-    fs.mkdirSync(backlogDir, { recursive: true });
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "files\n");
-
-    const forbidden = (label) => () => {
-      throw new Error(`${label} must not run`);
-    };
-    const filesAdapter = {
-      availability: () => ({ available: true }),
-      capabilities: () => ["comments"],
-      list: forbidden("files list"),
-      read: forbidden("files read"),
-      create: forbidden("files create"),
-      update: forbidden("files update"),
-      close: forbidden("files close"),
-    };
-    const githubAdapter = {
-      availability: forbidden("github availability"),
-      capabilities: forbidden("github capabilities"),
-      list: forbidden("github list"),
-      read: forbidden("github read"),
-      create: forbidden("github create"),
-      update: forbidden("github update"),
-      close: forbidden("github close"),
-    };
-
-    const result = createSprintFile({
-      topic: "files-sprint",
-      milestone: "files-sprint",
-      dryRun: false,
-      sprintsDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-      adapters: { files: filesAdapter, github: githubAdapter },
-    });
-
-    assert.equal(result.created, true);
-    assert.equal(result.due, "TBD");
-    assert.equal(result.issueCount, 0);
-    assert.equal(result.placeholderIssue, true);
-    assert.match(result.content, /^due: TBD$/m);
-    assert.match(result.content, /^## Plan$/m);
-    assert.doesNotMatch(result.content, /^- \[ \]/m);
-  });
 });

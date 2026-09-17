@@ -19,8 +19,6 @@ const {
   parseSprintContent,
 } = require("./sprint-state.js");
 const {
-  parseSimpleYaml,
-  readConfig,
   sprintScopeKey,
   scopesOverlap,
   DEFAULT_BACKLOG_DIR,
@@ -51,7 +49,7 @@ function usage() {
     "",
     "Runs active-sprint, sprint-shape, in-flight trace/staleness,",
     "and _context.md bloat checks.",
-    "Configured tracker failure is fail-closed: no local-file or export fallback.",
+    "A failed gh read is fail-closed: no local-file or export fallback.",
   ].join("\n");
 }
 
@@ -160,10 +158,6 @@ function runDoctor({
 
   const tracks = loadActiveTracks(sprintsDir);
   const active = checkActiveSprint({ repoRoot: root, sprintsDir, tracks });
-  const staleTrackerSelection = checkStaleTrackerSelection({
-    repoRoot: root,
-    backlogPath,
-  });
   const leftoverLegacyRoot = checkLeftoverLegacyRoot({
     repoRoot: root,
     backlogPath,
@@ -192,7 +186,6 @@ function runDoctor({
 
   const checks = [
     active,
-    ...(staleTrackerSelection ? [staleTrackerSelection] : []),
     ...(leftoverLegacyRoot ? [leftoverLegacyRoot] : []),
     ...perTrack.map((run) => run.sprint_shape),
     ...perTrack.map((run) => run.in_flight_trace),
@@ -231,28 +224,6 @@ function checkLeftoverLegacyRoot({ repoRoot, backlogPath }) {
       `Leftover skill files under ${LEGACY_EXPORT_DIR}/ (${leftover.join(", ")}); ` +
       `execution root is ${DEFAULT_BACKLOG_DIR}/. They are not fallback authority. See file-format.md migrate.`,
     leftover,
-  });
-}
-
-function checkStaleTrackerSelection({ repoRoot, backlogPath }) {
-  const trackerPath = path.join(backlogPath, ".tracker");
-  const configPath = path.join(backlogPath, "config.yml");
-  if (!fs.existsSync(trackerPath) || !fs.existsSync(configPath)) return null;
-
-  const parsed = parseSimpleYaml(fs.readFileSync(configPath, "utf8"));
-  if (!Object.prototype.hasOwnProperty.call(parsed, "tracker")) return null;
-
-  const displayConfig = displayPath(repoRoot, configPath);
-  const displayTracker = displayPath(repoRoot, trackerPath);
-  const remediation =
-    `Remove the stale top-level tracker: key from ${displayConfig}; ` +
-    `change ${displayTracker} when selecting a different tracker. ` +
-    "Runtime never switches adapters; adapter failure is fail-closed with no local-file fallback.";
-  return verdict("tracker_selection", "warn", {
-    summary: `Legacy tracker selection remains in ${displayConfig} after ${displayTracker} became authoritative. ${remediation}`,
-    config_path: displayConfig,
-    tracker_path: displayTracker,
-    remediation,
   });
 }
 
@@ -391,7 +362,6 @@ function loadSprintState({ activePath, backlogPath, today }) {
         sprintPath: activePath,
         content: fs.readFileSync(activePath, "utf-8"),
         today,
-        taskPrefix: readConfig(backlogPath).task_prefix,
       }),
       error: null,
     };
@@ -412,8 +382,7 @@ function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
   const missingSections = REQUIRED_ACTIVE_SECTIONS.filter(
     (section) => !hasSection(content, section),
   );
-  const taskPrefix = readConfig(backlogPath).task_prefix;
-  const unparseable = findUnparseablePlanLines(content, { taskPrefix });
+  const unparseable = findUnparseablePlanLines(content);
 
   if (missingSections.length > 0 || unparseable.length > 0) {
     const parts = [];
@@ -425,7 +394,7 @@ function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
       required_sections: REQUIRED_ACTIVE_SECTIONS,
       missing_sections: missingSections,
       checkbox_grammar: "^- \\[( |~|x)\\] #\\d+",
-      task_ref_grammar: `#N or ${taskPrefix}-N[.M]`,
+      task_ref_grammar: "#N",
       unparseable_plan_lines: unparseable,
     });
   }
@@ -437,12 +406,12 @@ function checkSprintShape({ repoRoot, backlogPath, activePath, activeStatus }) {
   });
 }
 
-function findUnparseablePlanLines(content, options = {}) {
+function findUnparseablePlanLines(content) {
   return extractSectionLines(content, "Plan")
     .map((line, index) => ({ line, plan_line: index + 1 }))
     .filter(({ line }) => line.trim() !== "")
     .filter(({ line }) => !/^###\s+/.test(line))
-    .filter(({ line }) => parsePlanItem(line, null, options) === null);
+    .filter(({ line }) => parsePlanItem(line) === null);
 }
 
 function checkInFlightTrace({ sprintState, activeStatus }) {
@@ -817,7 +786,6 @@ module.exports = {
   formatHumanSummary,
   formatCloseSummary,
   checkActiveSprint,
-  checkStaleTrackerSelection,
   checkSprintShape,
   findUnparseablePlanLines,
   findLatestReassessReport,

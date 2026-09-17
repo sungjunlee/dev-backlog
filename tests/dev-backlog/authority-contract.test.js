@@ -18,9 +18,9 @@ const EXPECTED_STATE_CLASSES = [
   "Derived retrieval output",
 ];
 const EXPECTED_SOLE_AUTHORITIES = [
-  "Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both",
-  "Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`)",
-  "Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files)",
+  "The GitHub Issue body and acceptance criteria; the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both",
+  "GitHub Issue state and native metadata",
+  "GitHub native metadata (labels, milestone, assignees, and relationships)",
   "One active sprint file for the admitted track",
   "The bounded `spec/*` contract axis",
   "GitHub repository history",
@@ -57,11 +57,12 @@ it("routes every required state class to one non-empty sole-authority cell", () 
 
 it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
   const markdown = contract();
-  assert.match(markdown, /0 of 17 selected a\s+non-default tracker/);
+  assert.match(markdown, /Do not reintroduce a tracker abstraction, adapter ports, or `\.tracker`/);
+  assert.match(markdown, /parked at tag `v0\.11\.0`/);
   assert.match(markdown, /Time is not an admission criterion/);
   assert.match(markdown, /dual-write or bidirectional task state/);
   assert.match(markdown, /fail-closed/);
-  assert.match(markdown, /silent adapter fallback to local files/);
+  assert.match(markdown, /silent fallback to local files when a `gh` read fails/);
   assert.match(markdown, /automatic writes from search, retrieval, summaries, or memory compilers/);
 
   for (const optional of ["Relay", "Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
@@ -93,7 +94,7 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   assert.match(skill, /^## Sprint Admission$/m);
   assert.match(skill, /gh issue view N --json body,comments/);
   assert.match(skill, /fail-closed/);
-  assert.match(skill, /adapter-ports\.md/);
+  assert.match(skill, /GitHub Issues are the only task authority/);
   assert.match(capabilities, /If that read fails, execution stops/);
   assert.match(charter, /one admitted sprint per track/);
   assert.match(sprint, /objectives: \[O10\]/);

@@ -58,12 +58,24 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Optional provider mutations must be authorized before local sprint mutation.
-if $CLOSE_MILESTONE; then
-  if ! node "$SCRIPT_DIR/tracker-capability.js" require milestones "$BACKLOG_DIR"; then
-    exit 1
+# Close a GitHub milestone by title. Fail-loud (#366): a failed lookup or PATCH
+# returns non-zero so sprint-close aborts before marking the sprint completed.
+# Already-closed milestones succeed without a PATCH.
+close_github_milestone() {
+  local name="$1" rows row number state
+  rows=$(MS="$name" gh api --paginate \
+    'repos/{owner}/{repo}/milestones?state=all&per_page=100' \
+    --jq '.[] | select(.title==env.MS) | [.number, .state] | @tsv') || return 1
+  row=$(printf '%s\n' "$rows" | grep -v '^[[:space:]]*$' | head -1)
+  if [ -z "$row" ]; then
+    echo "milestone not found: $name" >&2
+    return 1
   fi
-fi
+  number="${row%%$'\t'*}"
+  state="${row##*$'\t'}"
+  [ "$state" = "closed" ] && return 0
+  gh api -X PATCH "repos/{owner}/{repo}/milestones/$number" -f state=closed >/dev/null || return 1
+}
 
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 TASKS_DIR="$BACKLOG_DIR/tasks"
@@ -122,7 +134,7 @@ if $CLOSE_MILESTONE && ! $DRY_RUN; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
     exit 1
   fi
-  if ! node "$SCRIPT_DIR/tracker-capability.js" close-milestone milestones "$BACKLOG_DIR" "$CLOSE_MILESTONE_NAME"; then
+  if ! close_github_milestone "$CLOSE_MILESTONE_NAME"; then
     echo "Refusing to mark sprint completed: GitHub milestone '$CLOSE_MILESTONE_NAME' could not be closed."
     exit 1
   fi
@@ -147,20 +159,21 @@ else
   echo "Set status: completed in $ACTIVE"
 fi
 
-# --- Step 3: Move completed task files ---
-# Collect exact task-file refs from checked items through the shared parser.
-DONE_FILE_REFS=$(node "$SCRIPT_DIR/task-ref.js" completed-file-refs "$ACTIVE" "$BACKLOG_DIR")
+# --- Step 3: Archive leftover local task files when they happen to exist ---
+# Issue numbers of checked Plan items; leftover task files are named
+# `<anything>-<N>.md` or `<anything>-<N> - <slug>.md`.
+DONE_ISSUE_NUMBERS=$(checkbox_lines "$ACTIVE" "x" | sed -E 's/^- \[x\] #([1-9][0-9]*).*$/\1/')
 
-if [ -d "$TASKS_DIR" ] && [ -n "$DONE_FILE_REFS" ]; then
+if [ -d "$TASKS_DIR" ] && [ -n "$DONE_ISSUE_NUMBERS" ]; then
   if ! $DRY_RUN; then
     mkdir -p "$COMPLETED_DIR"
   fi
-  echo "$DONE_FILE_REFS" | while IFS= read -r file_ref; do
+  echo "$DONE_ISSUE_NUMBERS" | while IFS= read -r issue_number; do
     # Match the complete storage ref, never a numeric prefix (1 vs 11).
     TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null \
       | while IFS= read -r candidate; do
           basename=$(basename "$candidate")
-          if [ "$basename" = "${file_ref}.md" ] || [[ "$basename" == "${file_ref} - "* ]]; then
+          if [[ "$basename" == *"-${issue_number}.md" ]] || [[ "$basename" == *"-${issue_number} - "* ]]; then
             printf '%s\n' "$candidate"
             break
           fi

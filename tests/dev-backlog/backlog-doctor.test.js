@@ -177,7 +177,7 @@ describe("runDoctor", () => {
     assert.ok(report.checks.every((item) => item.track === undefined));
   });
 
-  it("warns with remediation when config.yml keeps a stale tracker key", () => {
+  it("ignores a leftover .tracker file and a stale config.yml tracker key (#445)", () => {
     seedCleanRepo(repoRoot);
     write(path.join(repoRoot, ".dev-backlog", ".tracker"), "local\n");
     write(
@@ -186,13 +186,8 @@ describe("runDoctor", () => {
     );
 
     const report = runDoctor({ repoRoot });
-    const selection = check(report, "tracker_selection");
-    assert.equal(selection.status, "warn");
-    assert.match(selection.detail.remediation, /Remove the stale top-level tracker:/);
-    assert.match(selection.detail.remediation, /fail-closed/);
-    assert.match(selection.detail.remediation, /backlog\/config\.yml/);
-    assert.match(selection.detail.remediation, /backlog\/\.tracker/);
-    assert.equal(report.exit_hint, "warn");
+    assert.equal(report.checks.some((item) => item.name === "tracker_selection"), false);
+    assert.equal(report.exit_hint, "pass");
     assert.equal(exitCodeFor(report), 0);
   });
 
@@ -254,7 +249,6 @@ describe("runDoctor", () => {
   });
 
   it("passes a mirrorless GitHub backlog with no tasks or completed directories (#347)", () => {
-    write(path.join(repoRoot, ".dev-backlog", ".tracker"), "github\n");
     write(path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-one.md"), sprintNoSpecFields());
 
     const report = runDoctor({ repoRoot, today: new Date("2026-07-03T00:00:00Z") });

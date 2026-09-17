@@ -1,11 +1,11 @@
 # GitHub-native authority and routing contract
 
-GitHub Issues own task specification and lifecycle when `.tracker=github`
-(the default, and this repository's pin). When `.tracker=files`, the Backlog.md
-CLI is the sole task-spec and lifecycle authority. A sprint file exists only
-when execution needs continuity beyond one task and its PR. Exactly one
-configured tracker (`.tracker` is setup-only); runtime never switches adapters.
-Adapter failure is fail-closed: no local-file or other-adapter fallback.
+GitHub Issues own task specification and lifecycle. There is no tracker
+abstraction and no adapter layer (charter rev 19); the `files` adapter and
+`.dev-backlog/.tracker` are parked at tag `v0.11.0` and a leftover `.tracker`
+file is ignored. A sprint file exists only when execution needs continuity
+beyond one Issue and its PR. A failed `gh` read is fail-closed: no local-file
+or second-authority fallback.
 
 ## Authority and routing table
 
@@ -14,9 +14,9 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | Configured tracker (GitHub Issue body and acceptance criteria when `.tracker=github`; Backlog.md CLI when `.tracker=files`); the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both | Create or amend the live task through that tracker (or post the brief as a comment), then read it back with `gh issue view N --json body,comments`; never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
-| Task lifecycle | Configured tracker state and native metadata (GitHub Issue when `.tracker=github`; Backlog.md CLI when `.tracker=files`) | Update the live task state through the configured adapter (`adapter.close` / files `backlog task edit` Done); never both trackers | Sprint checkboxes, project-board fields |
-| Planning fields | Configured tracker native metadata (GitHub labels, milestone, assignees, and relationships when github; Backlog.md CLI fields when files) | Use that tracker's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
+| Task specification | The GitHub Issue body and acceptance criteria; the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both | Create or amend the live Issue with `gh` (or post the brief as a comment), then read it back with `gh issue view N --json body,comments`; never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
+| Task lifecycle | GitHub Issue state and native metadata | Update the live Issue state with `gh issue close` / `gh issue edit` | Sprint checkboxes, project-board fields |
+| Planning fields | GitHub native metadata (labels, milestone, assignees, and relationships) | Use GitHub's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
 | Historical evidence | GitHub repository history | Read closed Issues/PRs, commits, and committed completed sprint files at their original locations | Copied summaries, search indexes, compiled memory |
@@ -33,7 +33,7 @@ to Issues, sprints, `_context.md`, or `spec/*`.
 | --- | --- | --- |
 | `.dev-backlog/sprints/_context.md` | Operational facts and gotchas | `dev-backlog` |
 | `.dev-backlog/sprints/*.md` | Admitted-track Plan, Running Context, Progress | `dev-backlog` |
-| `backlog/tasks/*.md` | Leftover operator / Backlog.md tree; never a product parser API | Backlog.md / operator |
+| `backlog/tasks/*.md` | Leftover operator tree; never a product parser API | operator |
 | `.dev-backlog/triage/*.md` | Derived advisory reports | `backlog-triage` |
 | `.dev-backlog/triage/*-apply.log` | JSONL audit logs for accepted issue mutations | `backlog-triage` |
 
@@ -58,7 +58,7 @@ these conditions is true:
 
 A sprint is not justified solely by elapsed time, estimate size, milestone
 membership, or the presence of Relay. When admitted, it owns only execution
-continuity; it does not restate or supersede tracker acceptance criteria or
+continuity; it does not restate or supersede Issue acceptance criteria or
 lifecycle.
 
 ## Explicit exclusions and freezes
@@ -66,20 +66,18 @@ lifecycle.
 The core product excludes:
 
 - dual-write or bidirectional task state;
-- silent adapter fallback to local files;
+- silent fallback to local files when a `gh` read fails;
 - automatic writes from search, retrieval, summaries, or memory compilers;
-- required Relay, Matt Pocock skill, GitHub Projects, or Backlog.md runtime
-  dependencies when `.tracker=github`;
-- a second task-spec or lifecycle authority in the same repo (GitHub and files
-  are never co-authority).
+- required Relay, Matt Pocock skill, or GitHub Projects runtime dependencies;
+- a second task-spec or lifecycle authority in the same repo.
 
-Do not add tracker providers beyond the frozen `TRACKER_KEYS` (`github`,
-`files`). Do not add bidirectional compatibility
-machinery, task-mirror lifecycle features, or a committed memory/compiler
-layer without new measured adoption evidence and an explicit
-authority-contract amendment.
+Do not reintroduce a tracker abstraction, adapter ports, or `.tracker`
+selection: tracker generality is a charter Non-Goal and the `files` adapter is
+parked at tag `v0.11.0`. Do not add bidirectional compatibility machinery,
+task-mirror lifecycle features, or a committed memory/compiler layer without
+new measured adoption evidence and an explicit authority-contract amendment.
 Measured adoption: 0 of 17 selected a non-default tracker; all 18 then-known
-consumers had a GitHub remote. That evidence froze the GitHub-native default.
+consumers had a GitHub remote. That evidence froze the GitHub-native core.
 
 ## Optional boundaries
 
@@ -88,7 +86,7 @@ consumers had a GitHub remote. That evidence froze the GitHub-native default.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Chosen task authority when `.tracker=files`; otherwise leftover operator tree under `backlog/` | When `files` is chosen, read/write tasks only through the `backlog` CLI (`--json` where available). Leftover `backlog/tasks/*.md` is never a product parser API. Missing CLI is fail-closed. Never co-authority with GitHub |
+| Backlog.md | Leftover operator tree under `backlog/` | Leftover `backlog/tasks/*.md` is never a product parser API and never task authority; the `files` adapter is parked at `v0.11.0` |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 
@@ -102,6 +100,4 @@ installation must be able to:
    this bundle, with `objectives:` and `component:` omitted.
 
 No path may require a cross-repository spec reference, Relay artifact, Projects
-board, local task copy, generated memory, or (when `.tracker=github`) a Backlog.md
-installation. When `.tracker=files`, the Backlog.md CLI is required and GitHub
-is not co-authority.
+board, local task copy, generated memory, or a Backlog.md installation.

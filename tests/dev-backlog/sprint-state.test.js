@@ -180,8 +180,7 @@ Expose actor-readable execution state.
     assert.deepEqual(noMatch.active_sprints, []);
   });
 
-  it("uses the configured prefix for mixed GitHub and local Plan identities", () => {
-    writeFile(path.join(backlogDir, "config.yml"), "task_prefix: TASK\n");
+  it("keeps the GitHub wire identity and ignores refs outside the #N grammar", () => {
     writeFile(path.join(backlogDir, "sprints", "mixed.md"), `---
 status: active
 started: 2026-07-01
@@ -189,7 +188,8 @@ started: 2026-07-01
 
 ## Plan
 - [~] #1 Legacy task → PR #11 (reviewing)
-- [ ] TASK-11.2 Local subtask
+- [ ] #2 Next task
+- [ ] TASK-11.2 Not a plan ref since #445
 
 ## Progress
 - 2026-07-02: #11 is a different GitHub task.
@@ -206,11 +206,11 @@ started: 2026-07-01
       tracker, id, ref, issue_number,
     })), [
       { tracker: "github", id: "1", ref: "#1", issue_number: 1 },
-      { tracker: "files", id: "11.2", ref: "TASK-11.2", issue_number: null },
+      { tracker: "github", id: "2", ref: "#2", issue_number: 2 },
     ]);
     assert.equal(state.plan_items[0].pr.number, 11);
     assert.equal(state.in_flight[0].age_basis_date, "2026-07-03");
-    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["TASK-11.2"]);
+    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["#2"]);
   });
 });
 
@@ -303,30 +303,29 @@ status: active
     assert.equal(withoutDate.in_flight[0].age_basis_date, null);
   });
 
-  it("matches local Progress refs exactly across parents and decimal subtasks", () => {
+  it("matches Progress refs exactly, never on a numeric prefix", () => {
     const state = parseSprintContent({
-      sprintPath: ".dev-backlog/sprints/local-age.md",
-      taskPrefix: "BACK",
+      sprintPath: ".dev-backlog/sprints/age.md",
       content: `---
 status: active
 started: 2026-06-30
 ---
 
 ## Plan
-- [~] BACK-1 Parent
-- [~] BACK-1.1 Subtask
+- [~] #1 Parent
+- [~] #11 Sibling
 
 ## Progress
-- 2026-07-01: BACK-11 is unrelated.
-- 2026-07-02: BACK-1.1 started.
-- 2026-07-03: BACK-1 started.
+- 2026-07-01: #111 is unrelated.
+- 2026-07-02: #11 started.
+- 2026-07-03: #1 started.
 `,
       today: new Date("2026-07-04T00:00:00Z"),
     });
 
     assert.deepEqual(state.in_flight.map((item) => [item.ref, item.age_basis_date]), [
-      ["BACK-1", "2026-07-03"],
-      ["BACK-1.1", "2026-07-02"],
+      ["#1", "2026-07-03"],
+      ["#11", "2026-07-02"],
     ]);
   });
 });

@@ -1,6 +1,7 @@
 #!/bin/bash
 set -uo pipefail
-# Project status from sprint file + GitHub + local files.
+# Project status from the sprint file(s) plus leftover local files.
+# Open Issues are a `gh issue list` the session runs itself.
 # Usage: bash scripts/status.sh [--json] [backlog-dir]
 
 # Resolve without `dirname` — restricted PATH (Windows Git Bash) often has a
@@ -105,17 +106,6 @@ if [ -d "$SPRINTS_DIR" ]; then
 	fi
 else
 	echo "(no $BACKLOG_DIR/sprints/ directory)"
-fi
-
-# --- Configured Tracker Tasks ---
-echo ""
-echo "=== Tracker Tasks ==="
-if command -v column >/dev/null 2>&1; then
-	if ! node "$SCRIPT_DIR/tracker-status-list.js" "$BACKLOG_DIR" | column -t -s $'\t'; then
-		exit 1
-	fi
-else
-	echo "(gh not available)"
 fi
 
 # --- Local Files ---

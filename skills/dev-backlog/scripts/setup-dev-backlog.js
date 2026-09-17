@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Idempotent, tracker-aware dev-backlog setup.
- *
- * Tracker authority lives in `.dev-backlog/.tracker`. `.dev-backlog/config.yml`
- * is read only as a legacy selection fallback and is never written by this
- * script.
+ * Idempotent dev-backlog setup. GitHub Issues are the only task authority
+ * (#445): setup selects nothing, writes no `.dev-backlog/.tracker`, and never
+ * reads or writes `.dev-backlog/config.yml`. A leftover `.tracker` is ignored.
  */
 
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-const readline = require("node:readline/promises");
-const { parseSimpleYaml } = require("./lib.js");
 const {
   DEFAULT_BACKLOG_DIR,
   LEGACY_EXPORT_DIR,
@@ -20,28 +16,11 @@ const {
   migrateLegacyExecutionRoot,
 } = require("./execution-root.js");
 
-const ALLOWED_TRACKERS = Object.freeze(["github", "files"]);
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
+const TRACKER_FLAG_NOTICE = "--tracker is ignored since v0.12.0 (GitHub only)";
 
 function requiredDirectories() {
   return [...MINIMUM_DIRECTORIES];
-}
-
-function expectedTrackersPhrase() {
-  const keys = [...ALLOWED_TRACKERS];
-  if (keys.length <= 1) return keys[0] || "";
-  if (keys.length === 2) return `${keys[0]} or ${keys[1]}`;
-  return `${keys.slice(0, -1).join(", ")}, or ${keys[keys.length - 1]}`;
-}
-
-function shellQuote(value) {
-  const text = String(value);
-  if (/^[A-Za-z0-9_./:=@+-]+$/.test(text)) return text;
-  return `'${text.replaceAll("'", `'"'"'`)}'`;
-}
-
-function setupCommand(args = []) {
-  return [shellQuote(process.execPath), shellQuote(__filename), ...args.map(shellQuote)].join(" ");
 }
 
 class SetupError extends Error {
@@ -57,8 +36,8 @@ function usage() {
     "Usage: setup-dev-backlog.js [project-name] [options]",
     "",
     "Options:",
-    "  --tracker github|files  Pin the chosen task authority",
-    "  --non-interactive       Never prompt (required with --tracker when fresh)",
+    "  --tracker <key>         Ignored since v0.12.0 (GitHub only)",
+    "  --non-interactive       Accepted; setup never prompts",
     "  --project-name NAME     Project name reported for compatibility",
     "  --json                  Print structured output",
     "  --help                  Show this help",
@@ -81,18 +60,13 @@ function parseArgs(argv = process.argv.slice(2)) {
     help: false,
   };
   let positionalProjectName;
-  let trackerFlagSeen = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--tracker") {
-      if (trackerFlagSeen) throw new SetupError("--tracker may be supplied only once.");
-      trackerFlagSeen = true;
       options.tracker = takeValue(argv, index, "--tracker");
       index += 1;
     } else if (arg.startsWith("--tracker=")) {
-      if (trackerFlagSeen) throw new SetupError("--tracker may be supplied only once.");
-      trackerFlagSeen = true;
       options.tracker = arg.slice("--tracker=".length);
     } else if (arg === "--project-name") {
       options.projectName = takeValue(argv, index, "--project-name");
@@ -119,100 +93,10 @@ function parseArgs(argv = process.argv.slice(2)) {
   }
   options.projectName = options.projectName ?? positionalProjectName;
 
-  if (options.tracker !== undefined && !ALLOWED_TRACKERS.includes(options.tracker)) {
-    throw new SetupError(
-      `Invalid --tracker value ${JSON.stringify(options.tracker)}; expected ${expectedTrackersPhrase()}.`
-    );
-  }
   if (options.projectName !== undefined && options.projectName.length === 0) {
     throw new SetupError("--project-name requires a non-empty value.");
   }
   return options;
-}
-
-function assertAllowedTracker(selection, sourcePath) {
-  if (!ALLOWED_TRACKERS.includes(selection)) {
-    throw new SetupError(
-      `Invalid tracker selection ${JSON.stringify(selection)} in ${sourcePath}; expected ${expectedTrackersPhrase()}.`
-    );
-  }
-  return selection;
-}
-
-function readTrackerFile(trackerPath, fsApi = fs) {
-  return assertAllowedTracker(fsApi.readFileSync(trackerPath, "utf8").trim(), trackerPath);
-}
-
-function stripUncountedSpans(line) {
-  const blanked = line.replace(/"[^"]*"|'[^']*'/g, (match) => " ".repeat(match.length));
-  const comment = blanked.indexOf("#");
-  return comment === -1 ? blanked : blanked.slice(0, comment);
-}
-
-function countTrackerKeys(text) {
-  return (text.match(/(?:^|[\s\[{,]|-\s)tracker\s*:/g) || []).length;
-}
-
-function assertNoUndecodableAuthority(line, refuse) {
-  if (/^\?(\s|$)/.test(line.trim())) {
-    refuse("an explicit mapping key (`?`) can carry tracker authority this reader does not decode");
-  }
-  if (/(["'])(?:[^"'\\]|\\.)*\\(?:[^"'\\]|\\.)*\1\s*:/.test(line)) {
-    refuse("a quoted key contains escape sequences this reader does not decode");
-  }
-}
-
-function assertUnambiguousTrackerAuthority(raw, configPath) {
-  const refuse = (detail) => {
-    throw new SetupError(
-      `Ambiguous tracker authority in ${configPath}: ${detail}. ` +
-        "Leave exactly one top-level `tracker:` key, or remove them all and select a tracker explicitly with --tracker."
-    );
-  };
-
-  let total = 0;
-  let topLevel = 0;
-  let blockScalarIndent = null;
-
-  for (const rawLine of raw.replace(/^\uFEFF/, "").split(/\r?\n/)) {
-    const indent = rawLine.match(/^[ \t]*/)[0].length;
-    if (blockScalarIndent !== null) {
-      if (!rawLine.trim() || indent > blockScalarIndent) continue;
-      blockScalarIndent = null;
-    }
-    assertNoUndecodableAuthority(rawLine, refuse);
-
-    const line = stripUncountedSpans(rawLine);
-    if (!line.trim()) continue;
-
-    if (/^["']tracker["']\s*:/.test(rawLine)) {
-      refuse("the tracker key is quoted, which obscures authority");
-    }
-
-    const found = countTrackerKeys(line);
-    total += found;
-    if (found > 0 && /^tracker\s*:/.test(line)) topLevel += 1;
-
-    if (/:\s*[|>][+-]?\d*\s*$/.test(line)) blockScalarIndent = indent;
-  }
-
-  if (total > 1) refuse(`${total} tracker declarations were found`);
-  if (total === 1 && topLevel === 0) {
-    refuse("the only tracker declaration is nested rather than a top-level scalar");
-  }
-}
-
-function readLegacyTracker(configPath, fsApi = fs) {
-  const raw = fsApi.readFileSync(configPath, "utf8").replace(/^\uFEFF/, "");
-  assertUnambiguousTrackerAuthority(raw, configPath);
-  const parsed = parseSimpleYaml(raw);
-  if (!Object.prototype.hasOwnProperty.call(parsed, "tracker")) {
-    return Object.freeze({ found: false, selection: undefined });
-  }
-  return Object.freeze({
-    found: true,
-    selection: assertAllowedTracker(parsed.tracker, configPath),
-  });
 }
 
 function isGithubRemote(remote) {
@@ -326,40 +210,6 @@ function checkGithubAvailability(options) {
   return githubAvailabilityFromEvidence(collectGithubEvidence(options));
 }
 
-function tempPathFor(targetPath) {
-  const nonce = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.${nonce}.tmp`);
-}
-
-function atomicPublish(targetPath, content, { fs: fsApi = fs } = {}) {
-  const targetStat = lstatIfPresent(targetPath, fsApi);
-  if (targetStat && (targetStat.isSymbolicLink() || !targetStat.isFile())) {
-    throw new SetupError(`Refusing unsafe tracker path: ${targetPath} must be a regular file.`);
-  }
-  const targetExists = Boolean(targetStat);
-  if (targetExists) {
-    const current = fsApi.readFileSync(targetPath, "utf8");
-    if (current === content) return Object.freeze({ changed: false, created: false });
-  }
-
-  const tempPath = tempPathFor(targetPath);
-  try {
-    fsApi.writeFileSync(tempPath, content, { encoding: "utf8", flag: "wx" });
-    if (targetExists && typeof fsApi.chmodSync === "function") {
-      fsApi.chmodSync(tempPath, fsApi.statSync(targetPath).mode);
-    }
-    fsApi.renameSync(tempPath, targetPath);
-  } catch (error) {
-    try {
-      if (fsApi.existsSync(tempPath)) fsApi.unlinkSync(tempPath);
-    } catch {
-      // Preserve the publication error. A best-effort cleanup was attempted.
-    }
-    throw error;
-  }
-  return Object.freeze({ changed: true, created: !targetExists });
-}
-
 function ensureMinimumDirectories(backlogDir, fsApi) {
   const structure = { backlogCreated: false, created: [] };
   try {
@@ -398,13 +248,12 @@ function validateRegularFile(targetPath, label, fsApi) {
   return Boolean(stat);
 }
 
-function validateExistingStructure(backlogDir, configPath, trackerPath, fsApi) {
+function validateExistingStructure(backlogDir, configPath, fsApi) {
   const backlogStat = lstatIfPresent(backlogDir, fsApi);
   if (backlogStat && (backlogStat.isSymbolicLink() || !backlogStat.isDirectory())) {
     throw new SetupError(`Refusing unsafe backlog path: ${backlogDir} must be a real directory.`);
   }
-  const configExists = validateRegularFile(configPath, "config", fsApi);
-  const trackerExists = validateRegularFile(trackerPath, "tracker", fsApi);
+  validateRegularFile(configPath, "config", fsApi);
   for (const name of requiredDirectories()) {
     const directory = path.join(backlogDir, name);
     const stat = lstatIfPresent(directory, fsApi);
@@ -413,7 +262,6 @@ function validateExistingStructure(backlogDir, configPath, trackerPath, fsApi) {
       throw new SetupError(`Refusing unsafe backlog path: ${directory} must be a real directory.`);
     }
   }
-  return { configExists, trackerExists };
 }
 
 function rollbackCreatedDirectories(backlogDir, structure, fsApi) {
@@ -437,46 +285,6 @@ function defaultProjectName(cwd) {
   return path.basename(path.resolve(cwd)) || "project";
 }
 
-function refusalMessage() {
-  return (
-    "Fresh non-interactive setup requires an explicit tracker. " +
-    `Recommended safe rerun: ${setupCommand(["--tracker", "github", "--non-interactive"])}`
-  );
-}
-
-async function chooseFreshTracker(options, dependencies, cwd) {
-  if (options.tracker !== undefined) {
-    return { selection: options.tracker, selectionSource: "explicit" };
-  }
-  const interactive = !options.nonInteractive && (
-    dependencies.isInteractive !== undefined
-      ? dependencies.isInteractive
-      : Boolean(process.stdin.isTTY && process.stdout.isTTY)
-  );
-  if (!interactive) throw new SetupError(refusalMessage());
-
-  const evidence = collectGithubEvidence({
-    cwd,
-    execFileSync: dependencies.execFileSync || childProcess.execFileSync,
-  });
-  if (typeof dependencies.prompt !== "function") {
-    throw new SetupError("Interactive setup requires a prompt boundary.");
-  }
-  const answer = String(await dependencies.prompt({
-    recommendation: evidence.recommendation,
-    evidence,
-  }) || "").trim().toLowerCase();
-  const selection = answer || evidence.recommendation;
-  assertAllowedTracker(selection, "interactive choice");
-  return {
-    selection,
-    selectionSource: selection === evidence.recommendation
-      ? "recommended"
-      : "interactive-choice",
-    evidence,
-  };
-}
-
 async function runSetup(options = {}, dependencies = {}) {
   const fsApi = dependencies.fs || fs;
   const cwd = path.resolve(options.cwd || process.cwd());
@@ -486,124 +294,37 @@ async function runSetup(options = {}, dependencies = {}) {
     const leftover = leftoverSkillFiles(cwd, { fs: fsApi });
     if (leftover.length > 0) {
       const sourceDir = path.join(cwd, LEGACY_EXPORT_DIR);
-      const sourceConfig = path.join(sourceDir, "config.yml");
-      const sourceTracker = path.join(sourceDir, ".tracker");
-      const sourceState = validateExistingStructure(sourceDir, sourceConfig, sourceTracker, fsApi);
-      if (options.tracker !== undefined) {
-        assertAllowedTracker(options.tracker, "--tracker");
-      }
-      if (sourceState.trackerExists) {
-        readTrackerFile(sourceTracker, fsApi);
-      } else if (sourceState.configExists) {
-        readLegacyTracker(sourceConfig, fsApi);
-      }
+      validateExistingStructure(sourceDir, path.join(sourceDir, "config.yml"), fsApi);
       migrateLegacyExecutionRoot(cwd, { fs: fsApi });
     }
   }
 
-  const configPath = path.join(backlogDir, "config.yml");
-  const trackerPath = path.join(backlogDir, ".tracker");
-  const state = validateExistingStructure(backlogDir, configPath, trackerPath, fsApi);
-
-  if (options.tracker !== undefined) {
-    assertAllowedTracker(options.tracker, "--tracker");
-  }
-
-  let selection;
-  let selectionSource;
-  let recommendationEvidence;
-  if (state.trackerExists) {
-    const current = readTrackerFile(trackerPath, fsApi);
-    selection = options.tracker ?? current;
-    selectionSource = options.tracker === undefined ? "preserved" : "explicit";
-  } else if (state.configExists) {
-    const legacy = readLegacyTracker(configPath, fsApi);
-    selection = options.tracker ?? legacy.selection ?? "github";
-    selectionSource = options.tracker !== undefined
-      ? "explicit"
-      : legacy.found ? "legacy-migration" : "legacy-pin";
-  } else {
-    const fresh = await chooseFreshTracker(options, dependencies, cwd);
-    selection = fresh.selection;
-    selectionSource = fresh.selectionSource;
-    recommendationEvidence = fresh.evidence;
-  }
-
+  validateExistingStructure(backlogDir, path.join(backlogDir, "config.yml"), fsApi);
   const structure = ensureMinimumDirectories(backlogDir, fsApi);
-  let publication;
-  try {
-    publication = atomicPublish(trackerPath, `${selection}\n`, { fs: fsApi });
-  } catch (error) {
-    rollbackCreatedDirectories(backlogDir, structure, fsApi);
-    throw error;
-  }
-
-  let github;
-  if (selection === "github") {
-    if (recommendationEvidence) {
-      github = githubAvailabilityFromEvidence(recommendationEvidence);
-    } else {
-      github = Object.freeze({
-        available: undefined,
-        checked: false,
-        fallbackAttempted: false,
-        repair: "verify with gh auth status --hostname github.com; repair with gh auth login --hostname github.com",
-      });
-    }
-  }
 
   return Object.freeze({
     action: "setup-dev-backlog",
     projectName: options.projectName || defaultProjectName(cwd),
-    selection,
-    selectionSource,
-    trackerPath,
-    trackerChanged: publication.changed,
-    trackerCreated: publication.created,
     createdDirectories: structure.created,
-    evidence: recommendationEvidence,
-    github,
+    github: Object.freeze({
+      available: undefined,
+      checked: false,
+      fallbackAttempted: false,
+      repair: "verify with gh auth status --hostname github.com; repair with gh auth login --hostname github.com",
+    }),
   });
 }
 
-function evidenceSummary(evidence) {
-  return `origin=${evidence.remote}, gh=${evidence.cli}, auth=${evidence.auth}`;
-}
-
 function printHumanResult(result, output = process.stdout) {
-  output.write(`Tracker: ${result.selection} (${result.selectionSource})\n`);
-  output.write(
-    `${result.trackerCreated ? "Created" : result.trackerChanged ? "Updated" : "Preserved"}: ` +
-    `${result.trackerPath}\n`
-  );
   if (result.createdDirectories.length > 0) {
     output.write(`Created directories: ${result.createdDirectories.join(", ")}\n`);
   } else {
     output.write("Backlog directories already complete.\n");
   }
-  if (result.evidence) {
-    output.write(`Recommendation evidence: ${evidenceSummary(result.evidence)}\n`);
-  }
-  if (result.github && result.github.available === false) {
-    output.write(`GitHub tracker remains selected but is unavailable: ${result.github.reason}.\n`);
-    output.write(`Repair: ${result.github.repair}. No local fallback was attempted.\n`);
-  } else if (result.github && result.github.checked === false) {
-    output.write(`GitHub tracker remains selected without provider probing. If unavailable, ${result.github.repair}.\n`);
-  }
-}
-
-async function promptForTracker({ recommendation, evidence }) {
-  process.stdout.write(
-    `Recommended tracker: ${recommendation} (${evidenceSummary(evidence)}).\n`
+  output.write(
+    "GitHub Issues are the task authority; setup does not probe the provider. "
+    + `If gh is unavailable, ${result.github.repair}.\n`
   );
-  const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return await terminal.question(
-      `Tracker [github|files] (default: ${recommendation}): `
-    );
-  } finally {
-    terminal.close();
-  }
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -612,7 +333,10 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${usage()}\n`);
     return 0;
   }
-  const result = await runSetup(options, { prompt: promptForTracker });
+  if (options.tracker !== undefined) {
+    process.stderr.write(`${TRACKER_FLAG_NOTICE}\n`);
+  }
+  const result = await runSetup(options);
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } else {
@@ -635,20 +359,16 @@ if (require.main === module) {
 }
 
 module.exports = {
-  ALLOWED_TRACKERS,
   MINIMUM_DIRECTORIES,
+  TRACKER_FLAG_NOTICE,
   SetupError,
-  atomicPublish,
   checkGithubAvailability,
   collectGithubEvidence,
-  expectedTrackersPhrase,
   githubAvailabilityFromEvidence,
   isGithubRemote,
   main,
   parseArgs,
   printHumanResult,
-  readLegacyTracker,
-  readTrackerFile,
   requiredDirectories,
   runSetup,
 };

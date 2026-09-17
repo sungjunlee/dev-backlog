@@ -4,11 +4,50 @@
 
 const fs = require("fs");
 const path = require("path");
-const {
-  GH_EXEC_DEFAULTS,
-  OPEN_ISSUE_JSON_FIELDS,
-} = require("./github-tracker.js");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
+
+const GH_EXEC_DEFAULTS = Object.freeze({
+  encoding: "utf-8",
+  maxBuffer: 50 * 1024 * 1024,
+});
+// Plan refs are complete GitHub Issue refs and nothing else: `#N`, N >= 1.
+const ISSUE_REF_RE = /^#([1-9]\d*)$/;
+const PLAN_CHECKBOX_RE = /^- \[( |~|x)\] (\S+)(?:\s+(.*))?$/;
+
+/** `#N` -> task identity, or null. The one plan-ref parser. */
+function parseIssueRef(text) {
+  const match = typeof text === "string" ? text.match(ISSUE_REF_RE) : null;
+  if (!match) return null;
+  const id = match[1];
+  return { tracker: "github", id, ref: `#${id}`, issue_number: Number(id) };
+}
+
+/** One Plan line -> `{ checkboxState, identity, title }`, or null. */
+function parsePlanCheckbox(line) {
+  const match = typeof line === "string" ? line.match(PLAN_CHECKBOX_RE) : null;
+  if (!match) return null;
+  const identity = parseIssueRef(match[2]);
+  if (!identity) return null;
+  return { checkboxState: match[1], identity, title: (match[3] || "").trim() };
+}
+
+/**
+ * Exact `#N` mention in free text. `#11` never matches `#1`, `#42.1` is not
+ * `#42`, and provider metadata (`PR #42`) is not a task ref.
+ */
+function containsIssueRef(text, identity) {
+  if (typeof text !== "string" || !identity || !identity.ref) return false;
+  const matcher = new RegExp(
+    `(^|[^A-Za-z0-9_#])(${identity.ref})(?![A-Za-z0-9_]|\\.\\d)`,
+    "g"
+  );
+  for (const match of text.matchAll(matcher)) {
+    const refStart = match.index + match[1].length;
+    if (/PR\s$/.test(text.slice(Math.max(0, refStart - 3), refStart))) continue;
+    return true;
+  }
+  return false;
+}
 
 // Progress-issue publication was removed (#340); this marker survives only to
 // recognize leftover machine-managed issue bodies in triage-collect.
@@ -31,13 +70,6 @@ function parseMarkerMonth(body) {
   const end = body.indexOf(MARKER_SUFFIX, valueStart);
   return end === -1 ? null : body.slice(valueStart, end).trim();
 }
-
-const CONFIG_DEFAULTS = {
-  tracker: "github",
-  task_prefix: "BACK",
-  default_status: "To Do",
-  statuses: ["To Do", "In Progress", "Done"],
-};
 
 const TRIAGE_CONFIG_DEFAULTS = {
   theme_keywords: {},
@@ -205,45 +237,11 @@ function readYamlConfig(configPath, defaults) {
   }
 }
 
-/**
- * Read `.dev-backlog/config.yml` with simple YAML key: value parsing.
- * Returns merged config (file values override defaults).
- * Gracefully falls back to defaults on missing/malformed file.
- */
-function readConfig(backlogDir) {
-  return readYamlConfig(
-    path.join(backlogDir || DEFAULT_BACKLOG_DIR, "config.yml"),
-    CONFIG_DEFAULTS
-  );
-}
-
 function readTriageConfig(backlogDir) {
   return readYamlConfig(
     path.join(backlogDir || DEFAULT_BACKLOG_DIR, "triage-config.yml"),
     TRIAGE_CONFIG_DEFAULTS
   );
-}
-
-/**
- * Estimate task size from GitHub labels.
- * Size labels (size:S/M/L) override type labels when both present.
- */
-function estimateSize(labels) {
-  // Size labels take priority (most specific)
-  for (const l of labels) {
-    if (l === "size:S") return "~15min";
-    if (l === "size:M") return "~1hr";
-    if (l === "size:L") return "~2hr";
-  }
-  // Type labels
-  for (const l of labels) {
-    if (l === "bug" || l === "type:bug") return "~30min";
-    if (l === "chore" || l === "type:chore") return "~15min";
-    if (l === "feature" || l === "type:feature") return "~1hr";
-    if (l === "refactor" || l === "type:refactor") return "~1hr";
-    if (l === "docs" || l === "documentation" || l === "type:docs") return "~20min";
-  }
-  return "";
 }
 
 /**
@@ -299,12 +297,12 @@ module.exports = {
   parseSimpleYaml,
   sprintScopeKey,
   scopesOverlap,
-  readConfig,
   readTriageConfig,
-  estimateSize,
-  CONFIG_DEFAULTS,
+  ISSUE_REF_RE,
+  parseIssueRef,
+  parsePlanCheckbox,
+  containsIssueRef,
   TRIAGE_CONFIG_DEFAULTS,
   DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
-  OPEN_ISSUE_JSON_FIELDS,
 };

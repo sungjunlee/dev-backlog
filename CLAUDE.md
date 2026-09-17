@@ -1,6 +1,6 @@
 # dev-backlog
 
-Configured tracker as task truth + local sprint files for execution continuity,
+GitHub Issues as task truth + local sprint files for execution continuity,
 for Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
 `backlog-triage` (advisory open-issue grooming).
 
@@ -29,18 +29,18 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
-- **Configured tracker = sole task authority** — GitHub Issues (`gh`) OR files (Backlog.md CLI) per `.tracker` are the live authority; never co-authority. Task definition, AC, and lifecycle are read live from the tracker (`gh issue view N --json body,comments`; an `## Agent Brief` comment overrides the body, a `spec_ref:` line overrides both); no task-file directory required
+- **GitHub Issues = sole task authority** — there is no tracker abstraction and no adapter layer; the `files` adapter and `.dev-backlog/.tracker` are parked at tag `v0.11.0` and a leftover `.tracker` is ignored. Task definition, AC, and lifecycle are read live with `gh issue view N --json body,comments` (an `## Agent Brief` comment overrides the body, a `spec_ref:` line overrides both); no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
 - **Multi-track sprints** — concurrent `status: active` tracks must declare
   provably disjoint scopes (`component:` or `scope:` globs, one shared
   `scopesOverlap` predicate); overlap fails loud
-- **Deliberate mutations only** — no hidden sync. Configured-tracker writes are explicit.
+- **Deliberate mutations only** — no hidden sync. GitHub writes are explicit.
   Routing and optional-integration boundaries live in
   `skills/dev-backlog/references/authority-contract.md`.
-- **Fail-closed tracker** — adapter failure never falls back to local files;
-  `.tracker` is setup-only and runtime never switches adapters.
+- **Fail-closed GitHub read** — a failed `gh` read stops execution; it never
+  falls back to sprint text or a local copy.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
   through validated wire contracts (anchor comments);
   scripts own everything checkable
@@ -48,8 +48,8 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 ## Architecture
 
 ```
-Configured tracker (what: definition, AC, lifecycle)
-      ↕ gh | backlog
+GitHub Issues (what: definition, AC, lifecycle)
+      ↕ gh
 .dev-backlog/sprints/ (how: batches, running context, progress)
 ```
 

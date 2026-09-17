@@ -296,25 +296,22 @@ assert_equals "count: done" "$CB_DONE" "2"
 assert_equals "count: in-flight" "$CB_IN_FLIGHT" "1"
 assert_equals "count: todo" "$CB_TODO" "2"
 
-# Configured local refs use the same shell parser, including decimal subtasks.
+# Refs outside the `#N` grammar are ignored (GitHub-only since #445).
 mkdir -p "$TEST_DIR/local-backlog/sprints"
-printf 'local\n' >"$TEST_DIR/local-backlog/.tracker"
-cat >"$TEST_DIR/local-backlog/config.yml" <<'EOF'
-task_prefix: BACK
-EOF
 cat >"$TEST_DIR/local-backlog/sprints/active.md" <<'EOF'
 ---
 status: active
 ---
 
 ## Goal
-Exercise local refs.
+Exercise the #N grammar.
 
 ## Plan
-- [x] BACK-1 Done
-- [~] BACK-11 In flight [branch:local-11]
-- [ ] BACK-11.2 Next subtask
-- [ ] BACK-0 Invalid and ignored
+- [x] #1 Done
+- [~] #11 In flight [branch:issue-11]
+- [ ] #112 Next task
+- [ ] #0 Invalid and ignored
+- [ ] BACK-11.2 Parked grammar, ignored
 
 ## Running Context
 
@@ -322,18 +319,20 @@ Exercise local refs.
 EOF
 
 count_checkboxes "$TEST_DIR/local-backlog/sprints/active.md"
-assert_equals "count local: total" "$CB_TOTAL" "3"
-assert_equals "count local: done" "$CB_DONE" "1"
-assert_equals "count local: in-flight" "$CB_IN_FLIGHT" "1"
-assert_equals "count local: todo" "$CB_TODO" "1"
+assert_equals "count grammar: total" "$CB_TOTAL" "3"
+assert_equals "count grammar: done" "$CB_DONE" "1"
+assert_equals "count grammar: in-flight" "$CB_IN_FLIGHT" "1"
+assert_equals "count grammar: todo" "$CB_TODO" "1"
 
 OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/local-backlog")
-assert_contains "next local: displays in-flight ref" "$OUT" "BACK-11 In flight"
-assert_contains "next local: displays decimal todo ref" "$OUT" "BACK-11.2 Next subtask"
+assert_contains "next grammar: displays in-flight ref" "$OUT" "#11 In flight"
+assert_contains "next grammar: displays todo ref" "$OUT" "#112 Next task"
+assert_not_contains "next grammar: ignores parked prefix refs" "$OUT" "BACK-11.2"
 
 OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/local-backlog")
-assert_contains "status local: counts all valid refs" "$OUT" "1/3 tasks (33%)"
-assert_contains "status local: displays decimal next ref" "$OUT" "BACK-11.2 Next subtask"
+assert_contains "status grammar: counts all valid refs" "$OUT" "1/3 tasks (33%)"
+assert_contains "status grammar: displays next ref" "$OUT" "#112 Next task"
+assert_not_contains "status grammar: no Tracker Tasks section" "$OUT" "=== Tracker Tasks ==="
 
 # Empty file
 cat >"$TEST_DIR/empty.md" <<'EOF'
@@ -697,49 +696,6 @@ assert_contains "status: task count" "$OUT" "Tasks: 2 total"
 assert_contains "status: todo count" "$OUT" "1 To Do"
 assert_contains "status: inprog count" "$OUT" "1 In Progress"
 
-# A missing formatter must be detected before starting the Node producer. This
-# keeps the compatibility fallback and prevents a closed pipe from surfacing as
-# an unhandled EPIPE in tracker-status-list.js.
-NO_COLUMN_BIN="$TEST_DIR/no-column-bin"
-NO_COLUMN_BACKLOG="$TEST_DIR/no-column-backlog"
-NODE_CALLED="$TEST_DIR/no-column-node-called"
-mkdir -p "$NO_COLUMN_BIN" "$NO_COLUMN_BACKLOG"
-# Git Bash on Windows often creates a dirname/git symlink that executes but
-# prints nothing (SCRIPT_DIR emptied). Prefer a working copy when the link is
-# unusable. PATH must still exclude `column` and keep the fake node.
-install_no_column_bin() {
-	local src="$1" dest="$2"
-	shift 2
-	local out=""
-	ln -s "$src" "$dest" 2>/dev/null || true
-	out="$("$dest" "$@" 2>/dev/null)" || out=""
-	if [ -z "$out" ]; then
-		rm -f "$dest"
-		cp "$src" "$dest"
-		chmod +x "$dest"
-	fi
-}
-install_no_column_bin "$(command -v dirname)" "$NO_COLUMN_BIN/dirname" /
-install_no_column_bin "$(command -v git)" "$NO_COLUMN_BIN/git" --version
-cat >"$NO_COLUMN_BIN/node" <<'EOF'
-#!/bin/bash
-: > "$NODE_CALLED"
-exit 99
-EOF
-chmod +x "$NO_COLUMN_BIN/node"
-
-set +e
-OUT=$(NODE_CALLED="$NODE_CALLED" PATH="$NO_COLUMN_BIN" RELAY_HOME="$TEST_DIR/no-relay" \
-	/bin/bash "$SCRIPT_DIR/status.sh" "$NO_COLUMN_BACKLOG" 2>&1)
-STATUS=$?
-set -e
-assert_equals "status no-column: exit code" "$STATUS" "0"
-assert_contains "status no-column: compatibility fallback" "$OUT" "(gh not available)"
-NODE_WAS_CALLED=0
-[ -e "$NODE_CALLED" ] && NODE_WAS_CALLED=1
-assert_equals "status no-column: skips Node producer" "$NODE_WAS_CALLED" "0"
-assert_not_contains "status no-column: no EPIPE" "$OUT" "EPIPE"
-
 # ============================================================
 # integration contract pattern tests
 # ============================================================
@@ -927,7 +883,6 @@ assert_equals "close: completed has 2" "$(ls "$TEST_DIR/.dev-backlog/completed/"
 # --- mirrorless GitHub close (#346): no task file or archive directory required ---
 rm -rf "$TEST_DIR/.dev-backlog"
 mkdir -p "$TEST_DIR/.dev-backlog/sprints"
-printf 'github\n' >"$TEST_DIR/.dev-backlog/.tracker"
 cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-mirrorless.md" <<'EOF'
 ---
 status: active
@@ -986,31 +941,27 @@ bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
 assert_equals "ambig: BACK-1 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" 2>/dev/null | grep -c 'BACK-1 ')" "1"
 assert_equals "ambig: BACK-11 NOT moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" 2>/dev/null | grep -c 'BACK-11')" "1"
 
-# --- local decimal closeout (BACK-1.2 must not match BACK-1.20) ---
+# --- decimal storage names must not collide (#1 must not move -1.20 files) ---
 rm -rf "$TEST_DIR/.dev-backlog"
 mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
-printf 'local\n' >"$TEST_DIR/.dev-backlog/.tracker"
-cat >"$TEST_DIR/.dev-backlog/config.yml" <<'EOF'
-task_prefix: BACK
-EOF
-cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-local.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-decimal.md" <<'EOF'
 ---
 status: active
 ---
 
 ## Goal
-Close one local subtask.
+Close one issue whose number prefixes a decimal storage name.
 
 ## Plan
-- [x] BACK-1.2 Short subtask
+- [x] #1 Short task
 
 ## Running Context
 
 ## Progress
 EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.2 - short-subtask.md" <<'EOF'
+cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - short-task.md" <<'EOF'
 ---
-id: BACK-1.2
+id: BACK-1
 ---
 EOF
 cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1.20 - longer-subtask.md" <<'EOF'
@@ -1020,8 +971,8 @@ id: BACK-1.20
 EOF
 
 bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" >/dev/null 2>&1
-assert_equals "local close: BACK-1.2 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" | grep -c 'BACK-1.2 ')" "1"
-assert_equals "local close: BACK-1.20 stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
+assert_equals "decimal close: BACK-1 moved" "$(ls "$TEST_DIR/.dev-backlog/completed/" | grep -c 'BACK-1 ')" "1"
+assert_equals "decimal close: BACK-1.20 stayed" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | grep -c 'BACK-1.20 ')" "1"
 
 # --- no active sprint ---
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
