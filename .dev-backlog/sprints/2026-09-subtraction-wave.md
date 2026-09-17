@@ -31,7 +31,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (merged)
 
 ### Batch 5 - Release
-- [~] #428 Cut v0.11.0 with the measured state (~1h) → PR #439 (open)
+- [~] #428 Cut v0.11.0 with the measured state (~1h) → PR #439 (merged)
 
 
 ## Running Context
@@ -52,3 +52,4 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - 2026-09-17: #431 merged (PR #436). Remaining: #421 spec gate (PR #429 open, human decision), then #424 and #426, then #428. Batch 1/2/4 done; Batch 3 has #425 and #431 done.
 - 2026-09-17: Spec gate approved; #421 merged (PR #429, charter rev 18). #424 dispatched to Grok 4.6, #426 to Opus 5, both in own worktrees.
 - 2026-09-17: Batch 3 closed: #424 (PR #437, −1,162), #426 (PR #438, −2,432 incl. orphaned sprint-status.js). After-run on both models 12/12. #428 dispatched to Grok (CHANGELOG release section + release notes); tag and release published from this session.
+- 2026-09-17: #428 merged (PR #439); tag v0.11.0 pushed, GitHub release published. Epic #420 acceptance measured on main: SKILL.md 160 lines / never-only-must 5 / one "configured tracker" phrasing; references 4 files (430 lines); TRACKER_KEYS github+files; charter rev 18; before/after runs for every deletion batch with no new PARTIAL/FAIL; one rule re-added (#431) on repeated evidence.
