@@ -36,4 +36,4 @@
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
 - Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in `smoke-test.sh` depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
 - v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files, and do not delete `sync-pull.js` / `legacy-tracker.js` without a measured consumer (charter freeze 2026-08-17; 2026-08 second-start close).
-- #366 (GitHub resilience) and #367 (Eval-Prompts cadence) stay parked until organic pain appears.
+- #366 (GitHub resilience) closed 2026-08-22 without a matrix. #367 (fresh-session conformance cadence) runs per release tag and at reassess boundaries; latest run `docs/conformance/2026-09-12-skill-lightening.md`.

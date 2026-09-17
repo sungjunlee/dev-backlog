@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **Reassess under the status-free charter** — `.dev-backlog/triage/2026-09-17-reassess.md` is the first reassess since rev 15: no status ladder, one contradictions list, one human-gated amendment proposal (charter rev 18, capabilities, system map) covering the tracker measured-consumer rule and the spec-axis linter removal. `_context.md` drops the stale "#366/#367 parked" gotcha. Closes [#421](https://github.com/sungjunlee/dev-backlog/issues/421).
 - **Plan rail says setup migrates a legacy `backlog/` skill layout** — one clause, re-added on the 2026-09-17 conformance evidence (scenario 12 PARTIAL on both models, both post-#411 variants): fresh sessions did not know `setup-dev-backlog.js` migrates and stopped to ask. Closes [#431](https://github.com/sungjunlee/dev-backlog/issues/431).
 - **Six dev-backlog references deleted** — `integration-contract.md`, `github-sync.md`, `process.md`, `scripts.md`, `backlog-boundaries.md`, and `checkbox-repair.md` are gone (892 lines); Quick Fix / Unplanned Work fold into SKILL.md, the ownership table into `authority-contract.md`, and the unmoored-`[~]` remediation into the doctor warn message. `references/` is four files. Closes [#425](https://github.com/sungjunlee/dev-backlog/issues/425).
 
