@@ -21,3 +21,5 @@ Revised 2026-09-17 (#431): scenario 12 Expected accepts "run setup or ask before
 Revised 2026-09-17 (#443): scenarios 6, 7, 10, and 11 drop the deleted resolver script; the Work rail is a `gh issue view --json body,comments` read, with an `## Agent Brief` comment over the body and `spec_ref:` over both.
 
 Revised 2026-09-17 (#433): `backlog-triage.md` scenario 2 is the scripts-less report (no collect/relate/stale/report helpers); the other six scenarios are unchanged.
+
+Revised 2026-09-18 (#445): `dev-backlog.md` scenario 11 (`.tracker=files` sprint-free work) is removed with the `files` adapter — dev-backlog is GitHub-only since v0.12.0. The legacy-layout scenario (now the last one) drops its `backlog/.tracker` fixture; nothing else is renumbered.

@@ -6,11 +6,11 @@ const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts"
 const {
   slugify,
   scopesOverlap,
-  readConfig,
   readTriageConfig,
   parseSimpleYaml,
-  estimateSize,
-  CONFIG_DEFAULTS,
+  parseIssueRef,
+  parsePlanCheckbox,
+  containsIssueRef,
   TRIAGE_CONFIG_DEFAULTS,
 } = require(path.join(SKILL_SCRIPTS, "lib.js"));
 
@@ -51,86 +51,78 @@ describe("slugify", () => {
   });
 });
 
-// --- estimateSize ---
+// --- #N plan-ref grammar (GitHub-only since #445) ---
 
-describe("estimateSize", () => {
-  it("returns ~30min for bug labels", () => {
-    assert.equal(estimateSize(["bug"]), "~30min");
-    assert.equal(estimateSize(["type:bug"]), "~30min");
+describe("parseIssueRef", () => {
+  it("parses a complete GitHub issue ref", () => {
+    assert.deepEqual(parseIssueRef("#1"), {
+      tracker: "github", id: "1", ref: "#1", issue_number: 1,
+    });
+    assert.deepEqual(parseIssueRef("#42"), {
+      tracker: "github", id: "42", ref: "#42", issue_number: 42,
+    });
   });
 
-  it("returns ~15min for chore labels", () => {
-    assert.equal(estimateSize(["chore"]), "~15min");
-    assert.equal(estimateSize(["type:chore"]), "~15min");
-  });
-
-  it("returns ~1hr for feature labels", () => {
-    assert.equal(estimateSize(["feature"]), "~1hr");
-    assert.equal(estimateSize(["type:feature"]), "~1hr");
-  });
-
-  it("returns ~1hr for refactor labels", () => {
-    assert.equal(estimateSize(["refactor"]), "~1hr");
-    assert.equal(estimateSize(["type:refactor"]), "~1hr");
-  });
-
-  it("returns ~20min for docs labels", () => {
-    assert.equal(estimateSize(["docs"]), "~20min");
-    assert.equal(estimateSize(["documentation"]), "~20min");
-    assert.equal(estimateSize(["type:docs"]), "~20min");
-  });
-
-  it("returns correct size for size:S/M/L", () => {
-    assert.equal(estimateSize(["size:S"]), "~15min");
-    assert.equal(estimateSize(["size:M"]), "~1hr");
-    assert.equal(estimateSize(["size:L"]), "~2hr");
-  });
-
-  it("size labels override type labels", () => {
-    assert.equal(estimateSize(["bug", "size:L"]), "~2hr");
-    assert.equal(estimateSize(["size:S", "type:feature"]), "~15min");
-  });
-
-  it("returns empty for unrecognized labels", () => {
-    assert.equal(estimateSize(["priority:high"]), "");
-    assert.equal(estimateSize([]), "");
+  it("rejects everything that is not a complete #N ref", () => {
+    for (const value of [
+      "#0", "#01", "#42.10", "#", "#abc", "#42abc", " #42", "#42 ",
+      "BACK-1", "BACK-1.2", "1", "", null, undefined, 42,
+    ]) {
+      assert.equal(parseIssueRef(value), null, JSON.stringify(value));
+    }
   });
 });
 
-// --- readConfig ---
-
-describe("readConfig", () => {
-  const tmpDir = path.join(__dirname, "__tmp_config_test__");
-
-  beforeEach(() => {
-    fs.mkdirSync(tmpDir, { recursive: true });
+describe("parsePlanCheckbox", () => {
+  it("parses each marker with its ref and title", () => {
+    assert.deepEqual(parsePlanCheckbox("- [~] #12 Child [branch:child]"), {
+      checkboxState: "~",
+      identity: { tracker: "github", id: "12", ref: "#12", issue_number: 12 },
+      title: "Child [branch:child]",
+    });
+    assert.equal(parsePlanCheckbox("- [x] #7").title, "");
+    assert.equal(parsePlanCheckbox("- [ ] #7").checkboxState, " ");
   });
 
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+  it("returns null for non-checkbox lines and refs outside the grammar", () => {
+    for (const line of [
+      "- [ ] BACK-1.2 Partial",
+      "- [ ] #0 Invalid",
+      "- [?] #1 Bad marker",
+      "### Batch 1",
+      "",
+    ]) {
+      assert.equal(parsePlanCheckbox(line), null, line);
+    }
+  });
+});
+
+describe("containsIssueRef", () => {
+  it("matches only an exact ref and never a prefix", () => {
+    const one = parseIssueRef("#1");
+    assert.equal(containsIssueRef("- 2026-07-01: #1 started", one), true);
+    assert.equal(containsIssueRef("- 2026-07-01: #11 started", one), false);
+    assert.equal(containsIssueRef("- 2026-07-01: note#1 started", one), false);
+    assert.equal(containsIssueRef("- 2026-07-01: review -> PR #1", one), false);
   });
 
-  it("returns defaults when config file is missing", () => {
-    const config = readConfig(path.join(tmpDir, "nonexistent"));
-    assert.equal(config.tracker, "github");
-    assert.equal(config.task_prefix, CONFIG_DEFAULTS.task_prefix);
-    assert.equal(config.default_status, CONFIG_DEFAULTS.default_status);
+  it("allows trailing punctuation but not identifier or decimal suffixes", () => {
+    const task = parseIssueRef("#42");
+    assert.equal(containsIssueRef("- 2026-07-01: completed #42.", task), true);
+    assert.equal(containsIssueRef("- 2026-07-01: completed (#42),", task), true);
+    assert.equal(containsIssueRef("- 2026-07-01: #42abc is not exact", task), false);
+    assert.equal(containsIssueRef("- 2026-07-01: #42_suffix is not exact", task), false);
+    assert.equal(containsIssueRef("- 2026-07-01: #42.1 is not an issue ref", task), false);
   });
+});
 
-  it("reads an explicit tracker while preserving the github compatibility default", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), "tracker: local\n");
-    assert.equal(readConfig(tmpDir).tracker, "local");
+// --- parseSimpleYaml ---
 
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
-    const compatibilityConfig = readConfig(tmpDir);
-    assert.equal(compatibilityConfig.tracker, "github");
-    assert.equal(compatibilityConfig.task_prefix, "PROJ");
-  });
-
+describe("parseSimpleYaml", () => {
   it("strips only quote-aware YAML separation comments", () => {
     assert.deepEqual(
       parseSimpleYaml([
-        "tracker: local # keep",
+        "status: active # keep",
         "plain: value#suffix",
         "single: 'it''s # inside' # outside",
         'double: "say \\"#\\" here" # outside',
@@ -139,7 +131,7 @@ describe("readConfig", () => {
         "",
       ].join("\n")),
       {
-        tracker: "local",
+        status: "active",
         plain: "value#suffix",
         single: "it's # inside",
         double: 'say \\"#\\" here',
@@ -149,91 +141,50 @@ describe("readConfig", () => {
     );
   });
 
-  it("reads quoted and unquoted tracker values with separated comments", () => {
-    for (const [line, expected] of [
-      ["tracker: local # keep\n", "local"],
-      ["tracker: 'local'\t# keep\n", "local"],
-      ['tracker: "github"  # keep\n', "github"],
-      ["tracker: local#suffix\n", "local#suffix"],
-    ]) {
-      fs.writeFileSync(path.join(tmpDir, "config.yml"), line);
-      assert.equal(readConfig(tmpDir).tracker, expected);
-    }
-  });
-
-  it("does not parse block scalar physical content as config keys", () => {
+  it("does not parse block scalar physical content as keys", () => {
     const parsed = parseSimpleYaml([
-      "tracker: local",
+      "status: active",
       "literal: |",
-      "  tracker: github",
-      "  task_prefix: HIDDEN",
+      "  status: hidden",
+      "  component: HIDDEN",
       "folded: &copy !text >-2 # keep",
-      "  tracker: github",
-      "  task_prefix: ALSO-HIDDEN",
-      "task_prefix: REAL",
+      "  status: hidden",
+      "  component: ALSO-HIDDEN",
+      "component: REAL",
       "",
     ].join("\n"));
-    assert.equal(parsed.tracker, "local");
-    assert.equal(parsed.task_prefix, "REAL");
+    assert.equal(parsed.status, "active");
+    assert.equal(parsed.component, "REAL");
   });
 
-  it("does not parse multiline quoted scalar content as config keys", () => {
+  it("does not parse multiline quoted scalar content as keys", () => {
     const parsed = parseSimpleYaml([
-      "tracker: local",
+      "status: active",
       "single: 'first line",
-      "  tracker: github",
+      "  status: hidden",
       "  it''s still quoted",
       "  last line'",
       'double: "first \\"still quoted',
-      "  tracker: github",
+      "  status: hidden",
       '  last line"',
-      "task_prefix: REAL",
+      "component: REAL",
       "",
     ].join("\n"));
-    assert.equal(parsed.tracker, "local");
-    assert.equal(parsed.task_prefix, "REAL");
+    assert.equal(parsed.status, "active");
+    assert.equal(parsed.component, "REAL");
   });
 
-  it("reads task_prefix from valid config", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'task_prefix: "PROJ"\n');
-    const config = readConfig(tmpDir);
-    assert.equal(config.task_prefix, "PROJ");
-  });
-
-  it("strips surrounding quotes", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), "task_prefix: 'MY-PREFIX'\n");
-    const config = readConfig(tmpDir);
-    assert.equal(config.task_prefix, "MY-PREFIX");
-  });
-
-  it("merges file values with defaults", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), 'project_name: "test"\n');
-    const config = readConfig(tmpDir);
-    assert.equal(config.project_name, "test");
-    assert.equal(config.task_prefix, "BACK"); // default preserved
-  });
-
-  it("handles malformed YAML gracefully", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), "not valid yaml: [\n");
-    const config = readConfig(tmpDir);
-    // Should still parse what it can or fall back to defaults
-    assert.equal(config.task_prefix, "BACK");
-  });
-
-  it("handles empty file", () => {
-    fs.writeFileSync(path.join(tmpDir, "config.yml"), "");
-    const config = readConfig(tmpDir);
-    assert.equal(config.task_prefix, "BACK");
-  });
-
-  it("preserves array defaults for list values", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "config.yml"),
-      'statuses: ["To Do", "In Progress", "Done"]\ntask_prefix: "PROJ"\n'
+  it("parses inline arrays and strips surrounding quotes", () => {
+    const parsed = parseSimpleYaml(
+      'scope: ["src/auth/**", "src/authz/**"]\ncomponent: \'MY-COMPONENT\'\n'
     );
-    const config = readConfig(tmpDir);
-    assert.ok(Array.isArray(config.statuses), "statuses should remain an array");
-    assert.equal(config.task_prefix, "PROJ");
+    assert.deepEqual(parsed.scope, ["src/auth/**", "src/authz/**"]);
+    assert.equal(parsed.component, "MY-COMPONENT");
+  });
+
+  it("handles malformed and empty input gracefully", () => {
+    assert.deepEqual(parseSimpleYaml("not valid yaml: [\n"), {});
+    assert.deepEqual(parseSimpleYaml(""), {});
   });
 });
 

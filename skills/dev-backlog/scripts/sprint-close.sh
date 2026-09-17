@@ -1,6 +1,6 @@
 #!/bin/bash
 set -uo pipefail
-# Close the active sprint: mark completed, move tasks, remind about context.
+# Close the active sprint: mark completed, remind about context.
 #
 # Usage: bash scripts/sprint-close.sh [backlog-dir] [--track slug] [--dry-run] [--close-milestone]
 #
@@ -10,9 +10,8 @@ set -uo pipefail
 # Steps:
 #   1. Run backlog-doctor pre-close and compute the text-only reassess signal
 #   2. Set sprint status: completed + add Progress entry
-#   3. Archive leftover local task files when they happen to exist
-#   4. Show Running Context entries (remind to promote to _context.md)
-#   5. Optionally close GitHub milestone (--close-milestone)
+#   3. Show Running Context entries (remind to promote to _context.md)
+#   4. Optionally close GitHub milestone (--close-milestone)
 
 # Resolve without `dirname` (restricted PATH / Windows Git Bash).
 # Normalize backslashes first: `%/*` only strips `/`, so a Windows path
@@ -58,16 +57,26 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Optional provider mutations must be authorized before local sprint mutation.
-if $CLOSE_MILESTONE; then
-  if ! node "$SCRIPT_DIR/tracker-capability.js" require milestones "$BACKLOG_DIR"; then
-    exit 1
+# Close a GitHub milestone by title. Fail-loud (#366): a failed lookup or PATCH
+# returns non-zero so sprint-close aborts before marking the sprint completed.
+# Already-closed milestones succeed without a PATCH.
+close_github_milestone() {
+  local name="$1" rows row number state
+  rows=$(MS="$name" gh api --paginate \
+    'repos/{owner}/{repo}/milestones?state=all&per_page=100' \
+    --jq '.[] | select(.title==env.MS) | [.number, .state] | @tsv') || return 1
+  row=$(printf '%s\n' "$rows" | grep -v '^[[:space:]]*$' | head -1)
+  if [ -z "$row" ]; then
+    echo "milestone not found: $name" >&2
+    return 1
   fi
-fi
+  number="${row%%$'\t'*}"
+  state="${row##*$'\t'}"
+  [ "$state" = "closed" ] && return 0
+  gh api -X PATCH "repos/{owner}/{repo}/milestones/$number" -f state=closed >/dev/null || return 1
+}
 
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
-TASKS_DIR="$BACKLOG_DIR/tasks"
-COMPLETED_DIR="$BACKLOG_DIR/completed"
 
 if [ ! -d "$SPRINTS_DIR" ]; then
   echo "No sprints directory found."
@@ -122,7 +131,7 @@ if $CLOSE_MILESTONE && ! $DRY_RUN; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
     exit 1
   fi
-  if ! node "$SCRIPT_DIR/tracker-capability.js" close-milestone milestones "$BACKLOG_DIR" "$CLOSE_MILESTONE_NAME"; then
+  if ! close_github_milestone "$CLOSE_MILESTONE_NAME"; then
     echo "Refusing to mark sprint completed: GitHub milestone '$CLOSE_MILESTONE_NAME' could not be closed."
     exit 1
   fi
@@ -147,39 +156,7 @@ else
   echo "Set status: completed in $ACTIVE"
 fi
 
-# --- Step 3: Move completed task files ---
-# Collect exact task-file refs from checked items through the shared parser.
-DONE_FILE_REFS=$(node "$SCRIPT_DIR/task-ref.js" completed-file-refs "$ACTIVE" "$BACKLOG_DIR")
-
-if [ -d "$TASKS_DIR" ] && [ -n "$DONE_FILE_REFS" ]; then
-  if ! $DRY_RUN; then
-    mkdir -p "$COMPLETED_DIR"
-  fi
-  echo "$DONE_FILE_REFS" | while IFS= read -r file_ref; do
-    # Match the complete storage ref, never a numeric prefix (1 vs 11).
-    TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null \
-      | while IFS= read -r candidate; do
-          basename=$(basename "$candidate")
-          if [ "$basename" = "${file_ref}.md" ] || [[ "$basename" == "${file_ref} - "* ]]; then
-            printf '%s\n' "$candidate"
-            break
-          fi
-        done)
-    if [ -n "$TASK_FILE" ]; then
-      BASENAME=$(basename "$TASK_FILE")
-      if $DRY_RUN; then
-        echo "[dry-run] Would move: $BASENAME → completed/"
-      else
-        mv "$TASK_FILE" "$COMPLETED_DIR/$BASENAME"
-        echo "Moved: $BASENAME → completed/"
-      fi
-    fi
-  done
-else
-  echo "No leftover local task files required for sprint close."
-fi
-
-# --- Step 4: Show Running Context entries ---
+# --- Step 3: Show Running Context entries ---
 CONTEXT=$(extract_section "$ACTIVE" "Running Context")
 if [ -n "$CONTEXT" ]; then
   echo ""
@@ -189,7 +166,7 @@ if [ -n "$CONTEXT" ]; then
   echo "Promote project-level entries to: $SPRINTS_DIR/_context.md"
 fi
 
-# --- Step 5: Optionally close milestone ---
+# --- Step 4: Optionally close milestone ---
 if $CLOSE_MILESTONE; then
   MILESTONE=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -n "$MILESTONE" ]; then

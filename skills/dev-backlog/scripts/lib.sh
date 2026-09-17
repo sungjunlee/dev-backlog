@@ -5,30 +5,21 @@
 # Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
 DEFAULT_BACKLOG_DIR=".dev-backlog"
 
-# Legacy GitHub checkbox regex aliases — integration contract with dev-relay.
-# Core shell consumers use checkbox_lines/count_checkboxes below, which delegate
-# task-ref grammar to task-ref.js and therefore also accept configured local refs.
+# GitHub checkbox regex aliases — integration contract with dev-relay.
 RE_CB_ANY='^\- \[.\] #'
 RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
 
-# Resolve without `dirname`; normalize Windows backslashes before `%/*`.
-_src="${BASH_SOURCE[0]//\\//}"
-TASK_REF_SCRIPT_DIR="${_src%/*}"
-[ "$TASK_REF_SCRIPT_DIR" = "$_src" ] && TASK_REF_SCRIPT_DIR="."
-TASK_REF_SCRIPT_DIR="$(cd "$TASK_REF_SCRIPT_DIR" && pwd)"
+# Plan refs are complete GitHub Issue refs: `#N`, N >= 1, no decimals.
+# Keep in sync with ISSUE_REF_RE / PLAN_CHECKBOX_RE in lib.js.
+RE_ISSUE_REF='#[1-9][0-9]*([[:space:]]|$)'
 
 # Print valid Plan checkbox lines, optionally limited to one marker (space/~ /x).
 # Usage: checkbox_lines "$FILE" [marker]
 checkbox_lines() {
-  local file="$1" marker="${2-}" backlog_dir
-  backlog_dir=$(dirname "$(dirname "$file")")
-  if [ "$#" -gt 1 ]; then
-    node "$TASK_REF_SCRIPT_DIR/task-ref.js" plan-lines "$file" "$backlog_dir" "$marker"
-  else
-    node "$TASK_REF_SCRIPT_DIR/task-ref.js" plan-lines "$file" "$backlog_dir"
-  fi
+  local file="$1" marker="${2- |~|x}"
+  grep -E "^- \[(${marker})\] ${RE_ISSUE_REF}" "$file" 2>/dev/null || true
 }
 
 # List active sprint files (status: active in frontmatter).
@@ -85,15 +76,15 @@ resolve_track() {
   return 1
 }
 
-# Count checkbox states in a sprint file through the shared task-ref parser.
+# Count checkbox states in a sprint file through the shared ref grammar.
 # Sets: CB_TOTAL, CB_DONE, CB_IN_FLIGHT, CB_TODO
 # Usage: count_checkboxes "$FILE"
 count_checkboxes() {
   local file="$1"
-  local backlog_dir counts
-  backlog_dir=$(dirname "$(dirname "$file")")
-  counts=$(node "$TASK_REF_SCRIPT_DIR/task-ref.js" counts "$file" "$backlog_dir")
-  read -r CB_TOTAL CB_DONE CB_IN_FLIGHT CB_TODO <<< "$counts"
+  CB_DONE=$(checkbox_lines "$file" "x" | grep -c . || true)
+  CB_IN_FLIGHT=$(checkbox_lines "$file" "~" | grep -c . || true)
+  CB_TODO=$(checkbox_lines "$file" " " | grep -c . || true)
+  CB_TOTAL=$((CB_DONE + CB_IN_FLIGHT + CB_TODO))
 }
 
 # Return the first unchecked todo item (stripped of "- [ ] " prefix).

@@ -4,11 +4,10 @@
 
 - GitHub Issues are the source of truth; `.dev-backlog/` is the execution layer
 - Script interfaces should stay stable unless an issue explicitly changes the CLI contract
-- Exactly one persisted tracker owns canonical task truth. Runtime selection is configuration-only and fail-closed; an absent key is the documented GitHub compatibility default, never an auth/CLI fallback.
-- Core task identity is `{ tracker, id, ref, url? }`. GitHub `#N` is parsed by the single exact parser; legacy GitHub `issue_number`, filenames, Markdown, and JSON remain compatibility aliases.
-- Direct GitHub task lifecycle transport belongs to the GitHub adapter. Milestones, PR relationships, comments, and closing semantics remain explicit capabilities or narrowly named provider transports. (Mirrors and progress issues were removed by #340/#347.)
-- The tracker layer is config-only (`TRACKER_KEYS = ["github", "files", "gitlab"]`, #415); unsupported provider capabilities fail before effects instead of changing tracker authority. This repository pins `github`. Forgejo/Gitea are follow-up forge adapters.
-- Setup recommendations never override a persisted tracker selection, and setup re-runs preserve user-authored configuration and task bytes.
+- GitHub-only since v0.12.0 (#445): the `files` adapter, the frozen adapter ports, and `.dev-backlog/.tracker` are parked at tag `v0.11.0`. No tracker abstraction, no adapter layer, no selection step; a leftover `.tracker` is ignored, never deleted. Re-admitting any of it needs a measured consumer, not an installed CLI.
+- Plan refs are `#N` and nothing else. The one parser is `parseIssueRef` / `parsePlanCheckbox` in `scripts/lib.js`; `lib.sh` mirrors it as `RE_ISSUE_REF` for the shell rails. The wire identity dev-relay reads stays `{ tracker: "github", id, ref, issue_number }`.
+- Milestones, PR relationships, comments, and closing semantics are plain `gh` calls the session (or one small bash guard in `sprint-close.sh`) makes. (Mirrors and progress issues were removed by #340/#347.)
+- Setup re-runs preserve user-authored configuration and task bytes; `config.yml` is neither read nor written by this skill.
 - Active sprints partition by track scope (2026-07, epic #289): `component:` equality or explicit `scope:` globs decide overlap through the ONE `scopesOverlap()` in `scripts/lib.js` — never re-implement it. Disjoint tracks coexist as a portfolio; overlap fails loud; single-track behavior is the G4 text-byte-identity compatibility surface (anchored in the smoke test; never snapshot `--json`, which is schema-versioned instead).
 
 ## Conventions
@@ -25,7 +24,7 @@
 - Eval prompts live in `tests/evals/`, never in SKILL.md — the 2026-09-12 run showed an in-file Eval Prompts section is a self-contaminating answer key.
 - Cross-family review at batch boundaries (read-only `codex exec -m gpt-6-astra` on the cumulative diff) found three contradictions repetition had hidden; cheaper than per-PR review and worth keeping for prose waves.
 - Keep test for any surface (2026-09 subtraction wave, epic #420): (1) guards shared/irreversible state, (2) deterministic check the model cannot cheaply redo, (3) wire contract another tool consumes. Fails all three → delete, do not rewrite. A reviewer defending a deleted doc as a "consumed contract" must show the consumer reading the doc; dev-relay consumes the sprint-state JSON, never a reference file.
-- A new tracker adapter needs a measured consumer (charter rev 18): its CLI installed and in use on a maintainer machine, or a maintainer repo pinning the key. `files` qualifies; `gitlab` was parked at `a8ddb7d`.
+- Tracker generality is a charter Non-Goal (rev 19): do not re-add an adapter, a port contract, or a selection file. `gitlab` was parked at `a8ddb7d`; `files` and the ports at `v0.11.0`.
 - Conformance harness recipe: `docs/conformance/2026-09-17-tracker-wave.md` (12 scenarios, prompt builder strips Expected). `codex exec` outside a git repo needs `--skip-git-repo-check`; prompt on stdin with `-`, final answer via `-o`; Astra token counts are on stderr. Fresh-session Fable runs are general-purpose subagents with one Read of the prompt file. A repeated PARTIAL earns either one clause in SKILL.md (#431) or an eval-side Expected relaxation, never both.
 
 ## Known Gotchas
@@ -37,7 +36,7 @@
 - `gh issue create` does not support `--json`; a `create --json ... || create -b "fallback"` chain fails the first call at flag parsing and posts the fallback placeholder as the real issue body (BACK-243 incident, 2026-07-05). Capture the URL from stdout instead.
 - Reassess signal counting is date-granular: sprints closed on the same day as (or after) the latest `.dev-backlog/triage/YYYY-MM-DD-reassess.md` all count, so several small same-day closes can re-trigger the recommendation right after a reassess (observed 2026-07-04). Judgment call at close time; tune the threshold/rule if it keeps nagging (PRD listed thresholds as dogfood-tunable).
 - `references/spec-fallback.md` is consumption-side only, ~1 page hard cap: it says how dev-backlog/backlog-triage BEHAVE when the spec axis is thin/absent, never authors spec semantics (that lives in craftkit). Guard against it drifting into a second spec-axis authority — that was the 2026-06/07 silent-fork failure mode (#253)
-- Smoke flake (not a regression): the live-repo `status: shows sprint name` assertion in the smoke test depends on `gh issue list` and can fail intermittently on network; re-run before assuming a change broke it. The offline cold-adopter section is deterministic (2026-07)
+- The smoke test is fully offline since #445: `status.sh` no longer lists Issues and `sprint-init.js` no longer reads milestones, so a smoke failure is a real regression, not a network flake.
 - v1.0.0 is reserved and is not a cleanup cut: do not delete completed sprint files.
 - Never chain `gh pr merge` after a grep-filtered test run — capture `$?` from `node --test` and the smoke test first. A backtick inside a JS template literal in `backlog-doctor.js` reached main for one commit this way (2026-09-17, #435).
 - In-flight Plan pointer grammar (parsed by `sprint-state.js`): `→ PR #N (state)` at end of line, `[branch:name]`, `[run:id]`. Any other shape reads as unmoored and fails the live smoke assertion.

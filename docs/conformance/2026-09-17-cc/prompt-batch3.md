@@ -1,3 +1,28 @@
+You are a fresh coding-agent session (no prior conversation, no memory). The skill file below is loaded as your operating contract. This is a SIMULATION: do not run commands, do not read or modify any files. Answer from the skill text and ordinary judgment. Answer in English.
+
+For EACH scenario below, answer in at most 5 lines:
+- ACTIONS: what you do, in order, naming the scripts or commands you would use
+- MUTATIONS: what you would change in the tracker and in local files (or "none")
+- STOP/ASK: whether you would stop or ask the user before acting, and why (or "no")
+
+Number your answers 1-11 to match the scenarios. Answer all 11. Keep the whole answer under 1100 words.
+
+## Scenarios
+
+1. "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan."
+2. "Plan a sprint whose scope overlaps a track that is already `status: active`."
+3. "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan."
+4. "Repo with no spec axis: open GitHub issues but no `.dev-backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. The user names three issues that must land in order. Reach a first active sprint."
+5. "Repo with no spec axis: one self-contained GitHub issue, no `.dev-backlog/`, and no Relay."
+6. "Work issue #42 with no local task files and three live Issue AC checkboxes."
+7. "Fresh online session with no local task files."
+8. "Fresh session with only repo files available, no conversation history, and no GitHub access."
+9. "Close a sprint with Running Context that applies to future work and no local task files."
+10. "GitHub Issue changed during work."
+11. "Consumer repo still on the legacy layout: `backlog/sprints/` with an active sprint and `backlog/config.yml` exist; `.dev-backlog/` does not. Orient."
+
+## Skill file (SKILL.md)
+
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
@@ -155,3 +180,4 @@ Core scripts:
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
+

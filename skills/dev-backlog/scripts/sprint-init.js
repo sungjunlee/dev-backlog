@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate a sprint file skeleton from the configured tracker.
+ * Generate an empty sprint file skeleton.
  *
  * Usage: ./scripts/sprint-init.js "auth-system"
  *        ./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
@@ -9,12 +9,12 @@
  *        ./scripts/sprint-init.js "auth-system" --dry-run
  *        ./scripts/sprint-init.js "auth-system" --json
  *
- * First arg is the topic name. Milestone defaults to topic if not specified.
+ * First arg is the topic name. Milestone defaults to topic if not specified
+ * and is written to frontmatter verbatim; nothing is read from GitHub.
  * Filename: YYYY-MM-<topic>.md
  *
- * GitHub (`.tracker=github`): seeds Plan from a milestone when that capability
- * is reported. Files (`.tracker=files`): due TBD and an empty Plan (add
- * BACK-N refs by hand); never calls GitHub milestone helpers.
+ * The Plan is written empty (#445): listing Issues is a `gh issue list` the
+ * session runs itself, and the model writes the batches.
  *
  * Multi-track (#292): a second active sprint is refused only when its scope
  * overlaps an existing active track (shared scopesOverlap from lib.js);
@@ -28,16 +28,9 @@
 
 const fs = require("fs");
 const path = require("path");
-const { renderTaskRef } = require("./task-ref.js");
-const { slugify, estimateSize, readConfig, sprintScopeKey, scopesOverlap } = require("./lib");
+const { slugify, sprintScopeKey, scopesOverlap } = require("./lib");
 const { defaultSprintsDir } = require("./execution-root.js");
 const { parseFrontmatter } = require("./sprint-state.js");
-const { getMilestoneDue, getMilestoneIssues } = require("./github-milestones.js");
-const {
-  invokeCapability,
-  resolveConfiguredTracker,
-  writeTrackerCliError,
-} = require("./tracker.js");
 
 const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "glob[,glob]"] [--dry-run] [--json]';
 
@@ -88,39 +81,6 @@ function parseArgs(args) {
   return { topic, milestone, dryRun, json, ...trackAxis };
 }
 
-function filesIssueId(issue) {
-  if (!issue || typeof issue !== "object") return null;
-  if (issue.tracker === "files") return String(issue.id);
-  if (
-    issue.number === undefined
-    && typeof issue.id === "string"
-    && /^[1-9]\d*(?:\.[1-9]\d*)?$/.test(issue.id)
-  ) {
-    return issue.id;
-  }
-  return null;
-}
-
-function planRefForIssue(issue) {
-  if (typeof issue.ref === "string" && issue.ref.trim()) return issue.ref.trim();
-  const filesId = filesIssueId(issue);
-  if (filesId) return renderTaskRef({ tracker: "files", id: filesId });
-  return renderTaskRef({ tracker: "github", id: String(issue.number) });
-}
-
-function buildIssueLines(issues) {
-  if (!issues.length) return [];
-
-  return issues.map((issue) => {
-    const labels = (issue.labels || [])
-      .map((label) => (typeof label === "string" ? label : label?.name))
-      .filter(Boolean);
-    const est = estimateSize(labels);
-    const suffix = est ? ` (${est})` : "";
-    return `- [ ] ${planRefForIssue(issue)} ${issue.title}${suffix}`;
-  });
-}
-
 // component: is emitted only when --component was given (#426). It is a free
 // track-scope string, resolved against nothing; naming a capability heading is
 // a routing convention for relay Learnings, not a checked contract.
@@ -151,11 +111,9 @@ function buildSprintContent({
   started,
   due,
   topic,
-  issues,
   component,
   scope,
 }) {
-  const issueLines = buildIssueLines(issues);
   const componentLine = buildComponentFrontmatterLine(component);
   const scopeLine = buildScopeFrontmatterLine(scope);
 
@@ -172,7 +130,7 @@ ${scopeLine}${componentLine}---
 [One sentence: what's true when this sprint is done]
 
 ## Plan
-${issueLines.join("\n")}
+
 
 ## Running Context
 [Decisions and discoveries that carry across tasks in this sprint]
@@ -201,7 +159,6 @@ function createSprintResult({
   sprintFile,
   started,
   due,
-  issues,
   content,
   existingFile,
   component,
@@ -215,8 +172,8 @@ function createSprintResult({
     sprintFile,
     started,
     due,
-    issueCount: issues.length,
-    placeholderIssue: Boolean(content) && issues.length === 0,
+    issueCount: 0,
+    placeholderIssue: Boolean(content),
     existingFile,
     created: !dryRun && !existingFile,
     ...(component ? { component } : {}),
@@ -267,44 +224,6 @@ function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "
   return [];
 }
 
-function trackerUsesMilestones(resolved) {
-  if (resolved.tracker === "github") return true;
-  const reported = typeof resolved.adapter.capabilities === "function"
-    ? resolved.adapter.capabilities()
-    : [];
-  return Array.isArray(reported) && reported.includes("milestones");
-}
-
-function resolveSprintIssueSeed({
-  getDue,
-  getIssues,
-  sprintsDir,
-  adapters,
-  execFile,
-}) {
-  if (getDue && getIssues) return { getDue, getIssues };
-
-  const backlogDir = path.dirname(sprintsDir);
-  const resolved = resolveConfiguredTracker(readConfig(backlogDir), {
-    backlogDir,
-    adapters,
-    execFile,
-  });
-
-  if (trackerUsesMilestones(resolved)) {
-    invokeCapability(resolved, "milestones", () => undefined);
-    return {
-      getDue: getDue || getMilestoneDue,
-      getIssues: getIssues || getMilestoneIssues,
-    };
-  }
-
-  return {
-    getDue: getDue || (() => "TBD"),
-    getIssues: getIssues || (() => []),
-  };
-}
-
 function createSprintFile({
   topic,
   milestone,
@@ -316,21 +235,10 @@ function createSprintFile({
   fileExists = fs.existsSync,
   mkdir = (dir) => fs.mkdirSync(dir, { recursive: true }),
   writeFile = fs.writeFileSync,
-  getDue,
-  getIssues,
-  adapters,
-  execFile,
 }) {
   if (component && Array.isArray(scope) && scope.length) {
     throw new Error("--component and --scope cannot be used together; declare one track axis.");
   }
-  ({ getDue, getIssues } = resolveSprintIssueSeed({
-    getDue,
-    getIssues,
-    sprintsDir,
-    adapters,
-    execFile,
-  }));
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const started = today.toISOString().slice(0, 10);
@@ -351,12 +259,9 @@ function createSprintFile({
         newTrackFile: path.basename(sprintFile),
       });
 
-  // Fail-loud ordering (#366): getDue/getIssues run BEFORE any filesystem
-  // effect so a gh failure leaves no sprint file (or even sprints dir)
-  // behind. Previously getMilestoneDue/getMilestoneIssues swallowed errors
-  // as TBD/[], silently writing an empty sprint on a broken provider.
-  const due = existingFile ? "TBD" : getDue(milestone);
-  const issues = existingFile ? [] : getIssues(milestone);
+  // `due:` is human-owned metadata (#445): nothing is read from GitHub here,
+  // so sprint-init never touches the network and never fails on provider state.
+  const due = "TBD";
   const content = existingFile
     ? null
     : buildSprintContent({
@@ -364,7 +269,6 @@ function createSprintFile({
         started,
         due,
         topic,
-        issues,
         component,
         scope,
       });
@@ -381,7 +285,6 @@ function createSprintFile({
     sprintFile,
     started,
     due,
-    issues,
     content,
     existingFile,
     component,
@@ -410,8 +313,7 @@ function printResult(result) {
   }
 
   if (result.placeholderIssue) {
-    console.log(`No open issues found for milestone: ${result.milestone}`);
-    console.log("Create the milestone and assign issues first, or add issues manually.");
+    console.log("The Plan is empty: add `- [ ] #N Title` items for the work this track carries.");
   }
 
   if (result.dryRun) {
@@ -447,14 +349,6 @@ function main() {
 
     printResult(result);
   } catch (error) {
-    // Provider-capability failures keep the shared typed error contract from tracker.js
-    // ({error: ...}, four scripts, SKILL.md:52) and are deliberately NOT wrapped in the
-    // component-aware refusal below. Wrapping them would serialize the same tracker
-    // failure two ways depending on whether --component was passed. Issue #331 carries
-    // the amended criterion.
-    if (writeTrackerCliError(error, { json: parsed.json })) {
-      process.exit(1);
-    }
     if (parsed.json && parsed.component) {
       console.log(JSON.stringify(refusalResult(parsed, error), null, 2));
       process.exit(1);
@@ -468,7 +362,6 @@ if (require.main === module) main();
 
 module.exports = {
   parseArgs,
-  buildIssueLines,
   buildComponentFrontmatterLine,
   buildScopeFrontmatterLine,
   buildSprintContent,

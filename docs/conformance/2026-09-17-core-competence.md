@@ -28,3 +28,14 @@ Both Claude Fable 5.1 and GPT-6 Astra produced the eight sections in order, neve
 Decision: delete `triage-collect.js`, `triage-relate.js`, `triage-stale.js`, `triage-report.js`, and `triage-github.js`; keep `triage-apply.js`. Artifacts: `DECISION.md`, `report-A-scripts.md`, `report-B-fable.md`, `report-B-astra.md`.
 
 After-run (plan level, seven `tests/evals/backlog-triage.md` scenarios, new 44-line SKILL.md, one run per model): fable 7/7, astra 7/7. Both name the `--limit` pagination rule, `closedByPullRequestsReferences`, the code-fence/URL/self-mention exclusion, `stale_days`, active-sprint protection (`revisit` not `close`), and the unchanged `triage-apply.js` semantics (skip unchecked, dedupe once, dry-run default, `already-applied`). No PARTIAL/FAIL. Raw: `2026-09-17-cc/433/plan-run-*.md`. Astra tokens (stderr): 24.4k.
+
+## Batch 3 (#445 tracker abstraction deleted, GitHub-only)
+
+SKILL.md from PR #453 (157 lines / never-only-must 5): "GitHub Issues" plainly, `#N` refs only, no `.tracker`. Scenario 11 (the `files` adapter) retired with the adapter, so the set is eleven; the legacy-layout scenario is now 11.
+
+| Channel × variant | PASS | PARTIAL | FAIL | ASK | MUT | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| fable × batch3 | 11/11 | 0 | 0 | 0 | 0 | 8 fail-closed on a failed `gh` read; 11 names the setup migration and asks before moving files |
+| astra × batch3 | 11/11 | 0 | 0 | 0 | 1 | Plan fold offered in 2 (every Astra run); 11 names the migration path, orients read-only |
+
+No new PARTIAL or FAIL against Batch 2; every stop held; no run named a deleted module, a `.tracker` file, or a non-GitHub tracker. Wire contract: dev-relay's `sprint-state` consumer tests 84/84 and its full sweep 712/713 with this branch (the one failure is dev-relay's own wall-clock flake, reproduced on unmodified main). Raw: `2026-09-17-cc/fable-batch3.md`, `astra-batch3.md`, `prompt-batch3.md`. Astra tokens (stderr): 26.0k.

@@ -42,58 +42,35 @@ function snapshot(directory) {
 }
 
 describe("GitHub-only setup", () => {
-  it("accepts github and files and rejects retired or unknown authorities", () => {
-    assert.equal(parseArgs(["--tracker", "github"]).tracker, "github");
-    assert.equal(parseArgs(["--tracker", "files"]).tracker, "files");
-    assert.throws(() => parseArgs(["--tracker", "local"]), /expected github or files/);
-    assert.throws(() => parseArgs(["--tracker", "gitea"]), /expected github or files/);
+  it("accepts any --tracker value and never pins one (#445)", () => {
+    for (const value of ["github", "files", "local", "gitea"]) {
+      assert.equal(parseArgs(["--tracker", value]).tracker, value);
+    }
+    assert.throws(() => parseArgs(["--tracker"]), SetupError);
   });
 
-  it("creates only .tracker and sprints for a fresh files repository", async (t) => {
-    const cwd = root(t, "setup-files-");
-    const result = await runSetup({ cwd, tracker: "files", nonInteractive: true });
-    assert.equal(result.selection, "files");
-    assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), [".tracker", "sprints"]);
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "files\n");
-  });
-
-  it("creates only .tracker and sprints for a fresh repository", async (t) => {
+  it("creates only sprints/ for a fresh repository and writes no .tracker", async (t) => {
     const cwd = root(t);
-    const result = await runSetup({ cwd, tracker: "github", nonInteractive: true });
-    assert.equal(result.selection, "github");
-    assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), [".tracker", "sprints"]);
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    const result = await runSetup({ cwd, nonInteractive: true });
+    assert.deepEqual(result.createdDirectories, ["sprints"]);
+    assert.deepEqual(fs.readdirSync(path.join(cwd, ".dev-backlog")).sort(), ["sprints"]);
+    assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog/.tracker")), false);
+    assert.ok(!("selection" in result));
   });
 
-  it("preserves a legacy github config byte-for-byte while pinning .tracker", async (t) => {
+  it("ignores a leftover .tracker and never rewrites config.yml", async (t) => {
     const cwd = root(t);
     const backlogDir = path.join(cwd, ".dev-backlog");
     fs.mkdirSync(backlogDir);
-    const raw = "project_name: legacy\r\ntracker: github\r\n# keep\r\n";
+    const raw = "project_name: legacy\r\ntracker: files\r\n# keep\r\n";
     fs.writeFileSync(path.join(backlogDir, "config.yml"), raw);
-    const result = await runSetup({ cwd, nonInteractive: true });
-    assert.equal(result.selectionSource, "legacy-migration");
-    assert.equal(fs.readFileSync(path.join(backlogDir, "config.yml"), "utf8"), raw);
-    assert.equal(fs.readFileSync(path.join(backlogDir, ".tracker"), "utf8"), "github\n");
-  });
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "files\n");
 
-  it("refuses retired local selections before effects", async (t) => {
-    for (const source of ["config", "selection"]) {
-      const cwd = root(t, `setup-retired-${source}-`);
-      const backlogDir = path.join(cwd, ".dev-backlog");
-      fs.mkdirSync(backlogDir);
-      if (source === "config") {
-        fs.writeFileSync(path.join(backlogDir, "config.yml"), "tracker: local\n");
-      } else {
-        fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
-      }
-      const before = snapshot(cwd);
-    await assert.rejects(
-      runSetup({ cwd, nonInteractive: true }),
-      /expected github or files/,
-    );
-      assert.deepEqual(snapshot(cwd), before);
-    }
+    await runSetup({ cwd, nonInteractive: true });
+
+    assert.equal(fs.readFileSync(path.join(backlogDir, "config.yml"), "utf8"), raw);
+    assert.equal(fs.readFileSync(path.join(backlogDir, ".tracker"), "utf8"), "files\n");
+    assert.equal(fs.existsSync(path.join(backlogDir, "sprints")), true);
   });
 
   it("never recommends a runtime fallback when GitHub evidence is unavailable", () => {
@@ -109,12 +86,11 @@ describe("GitHub-only setup", () => {
     assert.equal(evidence.auth, "not-checked");
   });
 
-  it("rejects unsafe .tracker publication paths", async (t) => {
+  it("refuses an unsafe backlog root before any effect", async (t) => {
     const cwd = root(t);
     const outside = root(t, "setup-outside-");
-    fs.mkdirSync(path.join(cwd, ".dev-backlog"));
     try {
-      fs.symlinkSync(path.join(outside, "selection"), path.join(cwd, ".dev-backlog/.tracker"));
+      fs.symlinkSync(outside, path.join(cwd, ".dev-backlog"));
     } catch (error) {
       if (process.platform === "win32" && error.code === "EPERM") {
         t.skip("Windows symlink privilege unavailable");
@@ -123,62 +99,44 @@ describe("GitHub-only setup", () => {
       throw error;
     }
     const before = snapshot(cwd);
-    await assert.rejects(
-      runSetup({ cwd, tracker: "github", nonInteractive: true }),
-      SetupError,
-    );
+    await assert.rejects(runSetup({ cwd, nonInteractive: true }), SetupError);
     assert.deepEqual(snapshot(cwd), before);
   });
 
-  it("migrates leftover skill files from backlog/ into .dev-backlog and leaves export paths", async (t) => {
+  it("migrates leftover skill files from backlog/ and leaves export paths", async (t) => {
     const cwd = root(t);
     const source = path.join(cwd, "backlog");
     fs.mkdirSync(path.join(source, "sprints"), { recursive: true });
     fs.mkdirSync(path.join(source, "tasks"));
-    fs.writeFileSync(path.join(source, ".tracker"), "github\n");
-    fs.writeFileSync(path.join(source, "config.yml"), "project_name: leftover\ntracker: github\n");
+    fs.writeFileSync(path.join(source, "config.yml"), "project_name: leftover\n");
     fs.writeFileSync(path.join(source, "sprints", "keep.md"), "# keep\n");
-    fs.writeFileSync(path.join(source, "tasks", "BACK-1.md"), "export\n");
+    fs.writeFileSync(path.join(source, "tasks", "one.md"), "export\n");
 
-    const result = await runSetup({ cwd, nonInteractive: true });
-    assert.equal(result.selection, "github");
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    await runSetup({ cwd, nonInteractive: true });
+
     assert.equal(
       fs.readFileSync(path.join(cwd, ".dev-backlog/config.yml"), "utf8"),
-      "project_name: leftover\ntracker: github\n",
+      "project_name: leftover\n",
     );
     assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/sprints/keep.md"), "utf8"), "# keep\n");
     assert.equal(fs.existsSync(path.join(source, "sprints")), false);
-    assert.equal(fs.existsSync(path.join(source, ".tracker")), false);
     assert.equal(fs.existsSync(path.join(source, "config.yml")), false);
-    assert.equal(fs.readFileSync(path.join(source, "tasks", "BACK-1.md"), "utf8"), "export\n");
+    assert.equal(fs.readFileSync(path.join(source, "tasks", "one.md"), "utf8"), "export\n");
   });
 
-  it("refuses leftover local tracker under backlog/ before migrating", async (t) => {
-    const cwd = root(t);
-    const source = path.join(cwd, "backlog");
-    fs.mkdirSync(source);
-    fs.writeFileSync(path.join(source, ".tracker"), "local\n");
-    const before = snapshot(cwd);
-    await assert.rejects(
-      runSetup({ cwd, nonInteractive: true }),
-      /expected github or files/,
-    );
-    assert.deepEqual(snapshot(cwd), before);
-    assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog")), false);
-  });
-
-  it("leaves a lone backlog/config.yml in place and pins .dev-backlog/.tracker", async (t) => {
+  it("leaves a lone backlog/config.yml and a parked backlog/.tracker in place", async (t) => {
     const cwd = root(t);
     const source = path.join(cwd, "backlog");
     const raw = "project_name: backlog-md\ndefault_status: To Do\n";
     fs.mkdirSync(source);
     fs.writeFileSync(path.join(source, "config.yml"), raw);
-    const result = await runSetup({ cwd, tracker: "github", nonInteractive: true });
-    assert.equal(result.selection, "github");
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    fs.writeFileSync(path.join(source, ".tracker"), "files\n");
+
+    await runSetup({ cwd, nonInteractive: true });
+
     assert.equal(fs.existsSync(path.join(cwd, ".dev-backlog/config.yml")), false);
     assert.equal(fs.readFileSync(path.join(source, "config.yml"), "utf8"), raw);
+    assert.equal(fs.readFileSync(path.join(source, ".tracker"), "utf8"), "files\n");
     assert.deepEqual(leftoverSkillFiles(cwd), []);
   });
 

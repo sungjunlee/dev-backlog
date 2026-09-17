@@ -8,12 +8,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const { parseSimpleYaml, readConfig, scopesOverlap, DEFAULT_BACKLOG_DIR } = require("./lib.js");
 const {
-  containsTaskRef,
-  githubIssueNumber,
+  parseSimpleYaml,
+  scopesOverlap,
+  containsIssueRef,
   parsePlanCheckbox,
-} = require("./task-ref.js");
+  DEFAULT_BACKLOG_DIR,
+} = require("./lib.js");
 
 // v2 (multi-track): adds `active_sprints[]`; `active_sprint` + the top-level
 // single-sprint fields are retained (sole element when exactly one is active,
@@ -213,7 +214,7 @@ function parseProgressEntries(progressLines) {
     });
 }
 
-function parsePlanItems(planLines, options = {}) {
+function parsePlanItems(planLines) {
   const items = [];
   let batchHeading = null;
 
@@ -223,15 +224,15 @@ function parsePlanItems(planLines, options = {}) {
       continue;
     }
 
-    const item = parsePlanItem(line, batchHeading, options);
+    const item = parsePlanItem(line, batchHeading);
     if (item) items.push(item);
   }
 
   return items;
 }
 
-function parsePlanItem(line, batchHeading = null, options = {}) {
-  const checkbox = parsePlanCheckbox(line, options);
+function parsePlanItem(line, batchHeading = null) {
+  const checkbox = parsePlanCheckbox(line);
   if (!checkbox) return null;
 
   const checkboxState = checkbox.checkboxState;
@@ -261,7 +262,7 @@ function parsePlanItem(line, batchHeading = null, options = {}) {
     tracker: identity.tracker,
     id: identity.id,
     ref: identity.ref,
-    issue_number: githubIssueNumber(identity),
+    issue_number: identity.issue_number,
     title,
     batch_heading: batchHeading,
     pr,
@@ -316,7 +317,7 @@ function computeAge(identityOrIssueNumber, progressEntries, startedDate, today) 
     ? { tracker: "github", id: String(identityOrIssueNumber), ref: `#${identityOrIssueNumber}` }
     : identityOrIssueNumber;
   const progressDates = progressEntries
-    .filter((entry) => entry.date && containsTaskRef(entry.line, identity))
+    .filter((entry) => entry.date && containsIssueRef(entry.line, identity))
     .map((entry) => entry.date)
     .sort();
 
@@ -349,11 +350,10 @@ function parseSprintContent({
   sprintPath,
   content,
   today = new Date(),
-  taskPrefix = "BACK",
 }) {
   const frontmatter = parseFrontmatter(content);
   const goal = extractSectionLines(content, "Goal").join("\n").trim();
-  const planItems = parsePlanItems(extractSectionLines(content, "Plan"), { taskPrefix });
+  const planItems = parsePlanItems(extractSectionLines(content, "Plan"));
   const progressEntries = parseProgressEntries(extractSectionLines(content, "Progress"));
   const nextBatch = findNextBatch(planItems);
   const inFlight = planItems
@@ -429,13 +429,11 @@ function readSprintState({
 
   if (activeFiles.length === 0) return emptyState();
 
-  const taskPrefix = readConfig(backlogDir).task_prefix;
   const perSprints = activeFiles
     .map((sprintPath) => parseSprintContent({
       sprintPath,
       content: readFileSync(sprintPath, "utf-8"),
       today,
-      taskPrefix,
     }))
     .sort(comparePerSprint);
 

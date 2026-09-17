@@ -11,10 +11,8 @@ const path = require("node:path");
 
 const DEFAULT_BACKLOG_DIR = ".dev-backlog";
 const LEGACY_EXPORT_DIR = "backlog";
-const TRACKER_SELECTION_FILE = ".tracker";
 const SKILL_OWNED_NAMES = Object.freeze([
   "sprints",
-  TRACKER_SELECTION_FILE,
   "config.yml",
   "triage",
   "triage-config.yml",
@@ -49,10 +47,10 @@ function hasSkillLayoutMarkers(names) {
 /**
  * Skill-owned names that auto-migrate may copy+remove.
  *
- * `config.yml` migrates only when another skill marker (`sprints`, `.tracker`,
- * `triage`, or `triage-config.yml`) is present. A lone `config.yml` is left
- * under `backlog/` (Backlog.md or ambiguous); setup still creates
- * `.dev-backlog/.tracker`. Never includes `tasks/`, `docs/`, or `completed/`.
+ * `config.yml` migrates only when another skill marker (`sprints`, `triage`,
+ * or `triage-config.yml`) is present. A lone `config.yml` is left under
+ * `backlog/` (Backlog.md or ambiguous). Never includes `tasks/`, `docs/`,
+ * `completed/`, or a parked `.tracker`.
  */
 function skillOwnedNamesForMigration(sourceDir, fsApi = fs) {
   const present = listPresentSkillNames(sourceDir, fsApi);
@@ -93,9 +91,8 @@ function removeOwned(targetPath, fsApi) {
  * name exists under `backlog/`. If `.dev-backlog/` already exists, skips
  * (`destination-exists`) and does not retry — leftovers stay and doctor warns;
  * they are not a second active root. Does not touch `backlog/tasks`, `docs`,
- * or `completed`. `config.yml` moves only with a skill layout marker. Callers
- * must validate tracker selection on the source before invoking this so a
- * refused layout is left untouched.
+ * or `completed`. `config.yml` moves only with a skill layout marker. A
+ * leftover `.tracker` is parked, not skill-owned: it stays where it is.
  */
 function migrateLegacyExecutionRoot(cwd, { fs: fsApi = fs } = {}) {
   const destRoot = path.join(cwd, DEFAULT_BACKLOG_DIR);
@@ -137,7 +134,6 @@ function leftoverSkillFiles(cwd, { fs: fsApi = fs } = {}) {
 module.exports = {
   DEFAULT_BACKLOG_DIR,
   LEGACY_EXPORT_DIR,
-  TRACKER_SELECTION_FILE,
   SKILL_OWNED_NAMES,
   defaultSprintsDir,
   defaultTriageDir,

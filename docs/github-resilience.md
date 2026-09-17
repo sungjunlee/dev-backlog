@@ -8,41 +8,37 @@ access and re-runs the command.
 
 ## gh call inventory
 
-Counted from `runGithubCycle` argv assertions (`tracker-cycle.acceptance.test.js`)
-plus the code paths in `github-tracker.js`, `github-milestones.js`,
-`sprint-init.js`, `sprint-close.sh`, and `backlog-triage/scripts/triage-{collect,apply}.js`.
+Since #433 (triage pipeline deleted) and #445 (tracker abstraction deleted),
+the only **scripted** `gh` calls left are `sprint-close.sh --close-milestone`
+and `triage-apply --apply`. Every other GitHub read or write — issue view,
+list, create, edit, close — is a `gh` call the session makes itself and owns
+the failure of; charter rev 19 Non-Goal "Wrapping `gh`".
 
 ### Read class (allowed to keep working during a partial outage)
 
 | Call | Where | Purpose | gh calls per command run |
 | --- | --- | --- | --- |
-| `gh issue list … --json …` | github-tracker.js `list` | plan/status/next reads | 1 per list |
-| `gh issue view <n> --json …` | github-tracker.js `read`; triage-apply label pre-read | single issue read | 1 per read |
-| `gh api repos/{owner}/{repo}/milestones --jq .due_on` | github-milestones.js `getMilestoneDue` | milestone due-date lookup (sprint-init) | sprint-init total: **2** (due lookup + open-issue list) |
-| `gh api --paginate repos/{owner}/{repo}/milestones?state=all&per_page=100 --jq '[.number, .state] | @tsv'` | github-milestones.js `closeMilestone` | milestone state lookup (sprint-close) | close-milestone: **1+ pages** for lookup, plus **1 PATCH** or **0** when already closed |
-| `gh api graphql … totalCount` | github-tracker.js `getOpenIssueCount` | default list limit | 1 when the default limit is used |
-| `gh api graphql` paginated queries | triage-collect.js | snapshot collection (open/closed issues) | ≥1 page each for open/closed |
-| `gh api repos/…/issues/<n>/comments` | triage-collect.js `fetchIssueComments` | optional comment hydration | 0–1 per issue |
+| `gh api --paginate repos/{owner}/{repo}/milestones?state=all&per_page=100 --jq '[.number, .state] | @tsv'` | sprint-close.sh `close_github_milestone` | milestone state lookup | close-milestone: **1+ pages** for lookup, plus **1 PATCH** or **0** when already closed |
+| `gh issue view <n> --json …` | triage-apply label pre-read | single issue read | 0–1 per action |
 
 Per-command totals (healthy run, counted from source):
 
 | Command | gh calls |
 | --- | --- |
-| `sprint-init` | 2 (milestone due lookup + open-issue list) |
+| `sprint-init` | 0 — nothing is read from GitHub (#445) |
+| `status.sh` / `next.sh` | 0 — sprint files only (#445) |
+| `sprint-close` (no flag) | 0 |
 | `sprint-close --close-milestone` | 1+ paginated lookup pages, plus 1 PATCH — or 0 PATCH if already closed |
-| tracker create / update / close | 1 mutation each |
-| status list (`tracker-status-list.js`) | 1 (open-issue list) |
 | `triage-apply --apply` | 1 mutation per action (+1 optional view for label pre-reads) |
 
 ### Mutation class (fail loud, exactly once)
 
 | Call | Where | Purpose |
 | --- | --- | --- |
-| `gh issue create --title --body` | github-tracker.js `create` | task creation |
-| `gh issue edit <n> …` | github-tracker.js `update`; triage-apply `set-*` verbs | title/body/labels/milestone edits |
-| `gh issue close <n>` | github-tracker.js `close`; triage-apply `close-issue` | closing semantics |
-| `gh issue comment <n> --body` | comments capability consumers | progress comments |
-| `gh api -X PATCH repos/{owner}/{repo}/milestones/<n> -f state=closed` | sprint-close → `tracker-capability.js close-milestone` → github-milestones.js `closeMilestone` | milestone close (skipped when already closed) |
+| `gh issue edit <n> …` | triage-apply `set-*` verbs | labels/milestone edits |
+| `gh issue close <n>` | triage-apply `close-issue` | closing semantics |
+| `gh issue comment <n> --body` | triage-apply close/revisit comments | audit comments |
+| `gh api -X PATCH repos/{owner}/{repo}/milestones/<n> -f state=closed` | sprint-close.sh `close_github_milestone` | milestone close (skipped when already closed) |
 
 Every mutation is issued **once**. A non-zero exit propagates as an exception
 (`execFileSync`) or shell failure; there is no retry loop anywhere in these
@@ -50,18 +46,16 @@ scripts.
 
 ## Fail-loud guarantees
 
-1. **Tracker create/update/close** exit non-zero on rate-limit/auth-expired,
-   surface the gh stderr, make exactly one failing call, and leave GitHub state
+1. **triage-apply mutations** exit non-zero on rate-limit/auth-expired, surface
+   the gh stderr, make exactly one failing call, and leave GitHub state
    unchanged. Proven by `github-resilience.acceptance.test.js`.
 2. **Partial outage**: read calls succeed; mutations fail once with
    "GitHub unavailable" and no state write.
-3. **Sprint init** runs `getMilestoneDue`/`getMilestoneIssues` before any file
-   is written. Previously those helpers swallowed gh errors as `TBD`/`[]`,
-   which silently produced an empty sprint file on a broken provider. They now
-   propagate the error; a failed init leaves no sprint file behind.
+3. **Sprint init** makes no gh call at all since #445, so a broken provider can
+   no longer produce an empty or half-seeded sprint file.
 4. **Sprint close --close-milestone** closes the GitHub milestone *before* any
-   local mutation. If the PATCH fails, the local sprint stays `status: active`
-   — never completed-with-open-milestone.
+   local mutation. If the lookup or the PATCH fails, the local sprint stays
+   `status: active` — never completed-with-open-milestone.
 
 ## FAKE_GH_FAIL test harness
 

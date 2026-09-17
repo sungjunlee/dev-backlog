@@ -1,14 +1,13 @@
 # File Format Reference
 
-Sprint files, tracker selection, and config. Adapter ports:
-[adapter-ports.md](adapter-ports.md).
+Sprint files and `.dev-backlog/` layout.
 
 ## Sprint file
 
 Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Required
 headings: `## Goal`, `## Plan`, `## Running Context`, `## Progress`. Plan item
-grammar: `- [ ] #N …` (or the configured tracker ref); `[~]` in-flight and `[x]`
-done may append `→ PR #N (state)` (end of line), `[branch:name]`, and/or `[run:…]` (end of line). Section semantics live in
+grammar: `- [ ] #N …` — a complete GitHub Issue ref and nothing else; `[~]`
+in-flight and `[x]` done may append `→ PR #N (state)` (end of line), `[branch:name]`, and/or `[run:…]` (end of line). Section semantics live in
 [SKILL.md](../SKILL.md).
 
 ```markdown
@@ -60,35 +59,19 @@ Order Plan items into parallel-safe batches. An empty `## Plan` is valid until
 issues are selected; every nonblank, non-heading Plan line must parse as a
 task item.
 
-## Tracker selection
+## No tracker selection
 
-`.dev-backlog/.tracker` contains exactly one newline-terminated selection:
-
-```text
-github
-```
-
-The supported values are `github` and `files`. When `.tracker` is
-missing, runtime accepts only a leftover top-level `tracker: github` or
-`tracker: files` value from `config.yml`; with neither,
-it deterministically defaults to `github`. Any other value fails. Availability
-never changes selection; adapter failure is fail-closed. Setup writes
-`.tracker` atomically and never edits `config.yml`. `files` is a chosen
-Backlog.md CLI authority (plan refs `BACK-N`), not a fallback from GitHub.
+GitHub Issues are the only task authority (charter rev 19). Nothing is
+selected: setup writes no `.dev-backlog/.tracker`, runtime reads none, and a
+leftover `.tracker` file is ignored rather than deleted. The `files` adapter
+and the frozen adapter ports are retrievable at tag `v0.11.0`.
 
 ## .dev-backlog/config.yml
 
-```yaml
-project_name: "my-project"
-task_prefix: "BACK"
-default_status: "To Do"
-statuses: ["To Do", "In Progress", "Done"]
-```
-
-`config.yml` remains the read-only source for settings such as
-`task_prefix`; setup never creates, rewrites, or removes
-fields from it. dev-backlog reads `task_prefix`, `default_status`, and
-`statuses`; `project_name` is retained as metadata.
+`config.yml` is not read by this skill. Setup never creates, rewrites, or
+removes fields from it; an existing file (Backlog.md's, or a leftover of an
+earlier release) is preserved byte-for-byte. `backlog-triage` reads its own
+`.dev-backlog/triage-config.yml`.
 
 ## Task specification
 
@@ -130,7 +113,6 @@ operator files are not skill execution.
 ```bash
 mkdir -p .dev-backlog
 git mv backlog/sprints .dev-backlog/sprints           # if present
-git mv backlog/.tracker .dev-backlog/.tracker         # if present
 git mv backlog/config.yml .dev-backlog/config.yml     # skill config only; see below
 git mv backlog/triage .dev-backlog/triage             # if present
 git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
@@ -145,23 +127,21 @@ git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
 5. Remove an empty leftover `backlog/` only when nothing else needs it
    (typically when `tasks/`, `docs/`, and `completed/` are also absent).
 
-`config.yml`: move it only when it is this skill's `tracker:` / `task_prefix`
-file. If it is a Backlog.md config or the ownership is ambiguous, leave it
-under `backlog/` and create `.dev-backlog/.tracker` via setup.
+`config.yml`: move it only when it is this skill's leftover file. If it is a
+Backlog.md config or the ownership is ambiguous, leave it under `backlog/`.
 
 ### Setup auto-migrate
 
 `setup-dev-backlog.js` copies then removes those same skill-owned names when
 `.dev-backlog/` is absent and at least one skill-owned name still sits under
 `backlog/`. That path is not `git mv`, takes no backup, and is not atomic.
-It validates the leftover tracker pin first, so a refused layout is left
-untouched. If `.dev-backlog/` already exists, auto-migrate skips
-(`destination-exists`) and does not retry: leftover skill names stay under
-`backlog/` and `backlog-doctor.js` warns. They are not a second active root.
+If `.dev-backlog/` already exists, auto-migrate skips (`destination-exists`)
+and does not retry: leftover skill names stay under `backlog/` and
+`backlog-doctor.js` warns. They are not a second active root.
 
-A lone `backlog/config.yml` with no `sprints/`, `.tracker`, `triage/`, or
-`triage-config.yml` is left in place (Backlog.md or ambiguous); setup still
-creates `.dev-backlog/.tracker`. `config.yml` is migrated only when one of
-those skill markers is present.
+A lone `backlog/config.yml` with no `sprints/`, `triage/`, or
+`triage-config.yml` is left in place (Backlog.md or ambiguous). `config.yml`
+is migrated only when one of those skill markers is present; a leftover
+`backlog/.tracker` is parked and stays where it is.
 
 This is one-way: do not copy execution files back into `backlog/`.

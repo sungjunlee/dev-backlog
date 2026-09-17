@@ -6,9 +6,9 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
+  TRACKER_FLAG_NOTICE,
   collectGithubEvidence,
   isGithubRemote,
-  readLegacyTracker,
 } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
 
 const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
@@ -54,50 +54,6 @@ function writeConfig(root, raw) {
   return configPath;
 }
 
-function faultPreload(t, source) {
-  const root = makeRoot(t, "setup-preload-");
-  const preload = path.join(root, "fault.cjs");
-  fs.writeFileSync(preload, source);
-  return preload;
-}
-
-describe("legacy tracker read safety", () => {
-  it("reads BOM-prefixed github and ignores block, comment, and quoted-value decoys", (t) => {
-    const root = makeRoot(t);
-    const accepted = [
-      `${String.fromCharCode(0xfeff)}tracker: github\r\nproject_name: legacy\r\n`,
-      "note: |\n  tracker: local\ntracker: github\n",
-      "# tracker: local\ntracker: github\n",
-      'note: "see tracker: local"\ntracker: "github"\n',
-    ];
-    for (const raw of accepted) {
-      const configPath = writeConfig(root, raw);
-      assert.deepEqual(readLegacyTracker(configPath), {
-        found: true,
-        selection: "github",
-      });
-    }
-  });
-
-  it("fails closed on ambiguous or authority-obscuring YAML keys", (t) => {
-    const root = makeRoot(t);
-    const refused = [
-      "tracker: github\ntracker: local\n",
-      '"tracker": github\n',
-      "provider:\n  tracker: github\n",
-      "- tracker: github\n",
-      "? tracker\n: github\n",
-    ];
-    for (const raw of refused) {
-      const configPath = writeConfig(root, raw);
-      assert.throws(
-        () => readLegacyTracker(configPath),
-        /Ambiguous tracker authority|Unsupported tracker authority shape/
-      );
-    }
-  });
-});
-
 describe("GitHub evidence safety", () => {
   it("accepts only strict github.com repository remotes", () => {
     for (const remote of [
@@ -134,39 +90,27 @@ describe("GitHub evidence safety", () => {
 });
 
 describe("GitHub-only setup real process integration", () => {
-  it("creates a fresh GitHub selection without config.yml", (t) => {
+  it("creates a fresh execution root with no tracker selection", (t) => {
     const root = makeRoot(t);
-    const result = runCli(root, [
-      "--tracker", "github", "--non-interactive", "--json", "--project-name", "fresh",
-    ]);
+    const result = runCli(root, ["--non-interactive", "--json", "--project-name", "fresh"]);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).selection, "github");
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.projectName, "fresh");
+    assert.deepEqual(parsed.createdDirectories, ["sprints"]);
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/config.yml")), false);
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
-    assert.equal(fs.existsSync(path.join(root, "backlog/tasks")), false);
   });
 
-  it("pins legacy github while preserving exact complex config bytes", (t) => {
+  it("accepts --tracker, ignores it, and says so on stderr (#445)", (t) => {
     const root = makeRoot(t);
-    const raw = [
-      `${String.fromCharCode(0xfeff)}project_name: legacy`,
-      'note: "tracker: local"',
-      "body: |",
-      "  tracker: local",
-      "tracker: github # preserved",
-      "tail: preserved",
-      "",
-    ].join("\r\n");
-    const configPath = writeConfig(root, raw);
-    const result = runCli(root, ["--non-interactive", "--json"]);
+    const result = runCli(root, ["--tracker", "files", "--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).selectionSource, "legacy-migration");
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
-    assert.equal(fs.readFileSync(configPath, "utf8"), raw);
+    assert.equal(result.stderr.trim(), TRACKER_FLAG_NOTICE);
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
   });
 
-  it("gives .tracker precedence and leaves complex config bytes untouched", (t) => {
+  it("leaves complex config bytes untouched and never reads a tracker key", (t) => {
     const root = makeRoot(t);
     const raw = [
       '"note:with:colons": &copy !text |-2',
@@ -174,21 +118,20 @@ describe("GitHub-only setup real process integration", () => {
       "single: 'first line",
       "  tracker: local",
       "  last line'",
-      "tracker: local # stale and ignored",
+      "tracker: local # parked and ignored",
       "tail: preserved",
     ].join("\r\n");
     const configPath = writeConfig(root, raw);
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "local\n");
     const result = runCli(root, ["--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).selection, "github");
     assert.equal(fs.readFileSync(configPath, "utf8"), raw);
+    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "local\n");
   });
 
   it("repairs partial structure and reruns byte-idempotently", (t) => {
     const root = makeRoot(t);
     fs.mkdirSync(path.join(root, ".dev-backlog"));
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
     const first = runCli(root, ["--non-interactive"]);
     assert.equal(first.status, 0, first.stderr);
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
@@ -198,76 +141,11 @@ describe("GitHub-only setup real process integration", () => {
     assert.deepEqual(snapshot(path.join(root, ".dev-backlog")), repaired);
   });
 
-  it("rejects invalid and retired local selections before effects", (t) => {
-    for (const selection of ["gitea", "local"]) {
-      const root = makeRoot(t, `setup-invalid-${selection}-`);
-      fs.mkdirSync(path.join(root, ".dev-backlog"));
-      fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), `${selection}\n`);
-      const before = snapshot(root);
-      const result = runCli(root, ["--non-interactive"]);
-      assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /expected github or files/);
-      assert.deepEqual(snapshot(root), before);
-    }
-
-    const root = makeRoot(t, "setup-invalid-config-local-");
-    writeConfig(root, "tracker: local\n");
-    const before = snapshot(root);
-    const result = runCli(root, ["--non-interactive"]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /expected github or files/);
-    assert.deepEqual(snapshot(root), before);
-  });
-
-  it("accepts an explicit files tracker pin", (t) => {
-    const root = makeRoot(t, "setup-files-pin-");
-    const result = runCli(root, ["--tracker", "files", "--non-interactive", "--json"]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).selection, "files");
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "files\n");
-  });
-
-  it("rolls back fresh directories and temp bytes on atomic publication failures", (t) => {
-    for (const failure of ["write", "rename"]) {
-      const root = makeRoot(t, `setup-failure-${failure}-`);
-      const source = failure === "write"
-        ? [
-            'const fs = require("node:fs");',
-            'const original = fs.writeFileSync;',
-            'fs.writeFileSync = function (target, content, options) {',
-            '  if (String(target).includes(".tracker.") && String(target).endsWith(".tmp")) {',
-            '    original.call(this, target, "partial", options);',
-            '    throw new Error("injected write failure");',
-            '  }',
-            '  return original.call(this, target, content, options);',
-            '};',
-          ].join("\n")
-        : [
-            'const fs = require("node:fs");',
-            'const original = fs.renameSync;',
-            'fs.renameSync = function (from, to) {',
-            '  if (String(to).replace(/\\\\/g, "/").endsWith("/.dev-backlog/.tracker")) {',
-            '    throw new Error("injected rename failure");',
-            '  }',
-            '  return original.call(this, from, to);',
-            '};',
-          ].join("\n");
-      const preload = faultPreload(t, source);
-      const result = runCli(root, ["--tracker", "github", "--non-interactive"], {
-        ...process.env,
-        NODE_OPTIONS: `--require=${preload}`,
-      });
-      assert.notEqual(result.status, 0, failure);
-      assert.match(result.stderr, new RegExp(`injected ${failure} failure`));
-      assert.equal(fs.existsSync(path.join(root, ".dev-backlog")), false);
-    }
-  });
-
-  it("rejects a dangling .tracker symlink before mutation", (t) => {
+  it("rejects an unsafe config path before mutation", (t) => {
     const root = makeRoot(t);
     fs.mkdirSync(path.join(root, ".dev-backlog"));
     try {
-      fs.symlinkSync(path.join(root, "missing"), path.join(root, ".dev-backlog/.tracker"));
+      fs.symlinkSync(path.join(root, "missing"), path.join(root, ".dev-backlog/config.yml"));
     } catch (error) {
       if (process.platform === "win32" && error.code === "EPERM") {
         t.skip("Windows symlink privilege is unavailable");
@@ -276,9 +154,9 @@ describe("GitHub-only setup real process integration", () => {
       throw error;
     }
     const before = snapshot(root);
-    const result = runCli(root, ["--tracker", "github", "--non-interactive"]);
+    const result = runCli(root, ["--non-interactive"]);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /unsafe tracker path/);
+    assert.match(result.stderr, /unsafe config path/);
     assert.deepEqual(snapshot(root), before);
   });
 });
