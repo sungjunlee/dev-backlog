@@ -91,7 +91,7 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   assert.match(readme, /Optional surfaces/);
   assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
   assert.match(skill, /^## Sprint Admission$/m);
-  assert.match(skill, /effective-task-spec\.js/);
+  assert.match(skill, /gh issue view N --json body,comments/);
   assert.match(skill, /fail-closed/);
   assert.match(skill, /adapter-ports\.md/);
   assert.match(capabilities, /If that read fails, execution stops/);

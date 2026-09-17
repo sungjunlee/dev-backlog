@@ -79,9 +79,7 @@ if (args[0] === "issue" && args[1] === "list") {
   process.exit(0);
 }
 
-if (exact(["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"]) ||
-    exact(["issue", "view", "42", "--json", "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url"]) ||
-    exact(["issue", "view", "42", "--json", "number,title,body,state,labels,milestone,assignees,createdAt,updatedAt,url,comments"])) {
+if (exact(["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"])) {
   const issue = state.issues.find((candidate) => String(candidate.number) === args[2]);
   if (!issue) process.exit(4);
   out(issue); process.exit(0);

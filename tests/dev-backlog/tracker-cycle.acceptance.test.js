@@ -18,7 +18,6 @@ const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
 const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
 const STATUS_PATH = path.join(SCRIPTS_DIR, "status.sh");
 const NEXT_PATH = path.join(SCRIPTS_DIR, "next.sh");
-const EFFECTIVE_TASK_SPEC_PATH = path.join(SCRIPTS_DIR, "effective-task-spec.js");
 
 function makeRoot(t, prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -210,14 +209,10 @@ function runMirrorlessGithubCycle(fixture) {
   assert.equal(next.next_batch.items[0].ref, "#42");
   assertNoTaskDirectories();
 
-  const effective = parseJsonResult(run(process.execPath, [
-    EFFECTIVE_TASK_SPEC_PATH, "#42", "--backlog-dir", fixture.backlogDir,
-    "--root", fixture.root,
-  ], fixture), "github effective task read");
-  assert.equal(effective.source_ref, "https://github.test/acme/widgets/issues/42#issue-body");
-  assert.equal(effective.lifecycle.state, "open");
-  assert.equal(effective.acceptance_criteria.length, 1);
-  assert.equal(effective.acceptance_criteria[0].text, "Preserve live AC");
+  const live = runWorker(fixture, "read", { selector: "#42" });
+  assert.equal(live.url, "https://github.test/acme/widgets/issues/42");
+  assert.equal(live.state, "open");
+  assert.match(live.body, /^- \[ \] Preserve live AC$/m);
   assertNoTaskDirectories();
 
   runWorker(fixture, "update", {
@@ -243,7 +238,7 @@ describe("GitHub tracker core cycle acceptance", () => {
 });
 
 describe("mirrorless GitHub core acceptance", () => {
-  it("runs create → Plan → orient/effective read → update → complete with no task directories", (t) => {
+  it("runs create → Plan → orient/live read → update → complete with no task directories", (t) => {
     runMirrorlessGithubCycle(prepareMirrorlessGithub(t));
   });
 

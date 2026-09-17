@@ -42,13 +42,14 @@ Work from the live Issue. No sprint, no pull step, and no task-file directory re
 /dev-backlog work 42
 ```
 
-Resolve intent and AC from the live Issue when you need the machine-readable
-spec:
+Read intent and AC from the live Issue:
 
 ```bash
-node /path/to/dev-backlog/skills/dev-backlog/scripts/effective-task-spec.js \
-  "#42" --repo OWNER/REPO
+gh issue view 42 --json body,comments
 ```
+
+A comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in
+the body naming a file or URL overrides both.
 
 Sibling skill [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the
 open-issue pile. It is not part of the default loop.

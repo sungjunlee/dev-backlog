@@ -89,7 +89,7 @@ Done when you can name the next live Issue and, when a sprint exists, its curren
 
 ### Create
 
-Goal: a task with acceptance criteria the resolver can read.
+Goal: a task with acceptance criteria a fresh session can read.
 Rail: the configured tracker's create command (`references/adapter-ports.md`).
 Done when the new task exists in the configured tracker and, when the work was
 admitted to a sprint, is added to the active Plan.
@@ -103,16 +103,16 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 ### Work
 
 Goal: verified work reflected in the configured tracker.
-Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC,
-lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, task body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
-Boundary: if resolution fails, diagnose it, but do not execute the task or change AC/lifecycle until live resolution succeeds.
+Rail: `gh issue view N --json body,comments` is the specification; the newest
+comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in the body naming a file or URL overrides both. Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Boundary: if the `gh` read fails, diagnose it; do not execute the task or change AC/lifecycle until a live read succeeds.
 Done when verified work is reflected in the configured tracker's AC/lifecycle
 and, when admitted, sprint progress.
 
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close via the adapter's `close`. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the tracker task is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per task: re-read the live task and verify every AC against the current specification, then merge or commit and close via the adapter's `close`. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the tracker task is closed with every AC verified; the sprint stays open until its Plan is done.
 Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -144,7 +144,6 @@ Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/`
 Core scripts:
 
 - `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
-- `scripts/effective-task-spec.js` — resolve live task specification, AC, lifecycle, source, and stable digest from the configured tracker (or one explicit `spec_ref`).
 - `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
