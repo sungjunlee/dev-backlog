@@ -13,3 +13,5 @@ consumed by the #367 conformance cadence rather than read on every session.
 - `backlog-triage.md` — prompts for the `backlog-triage` skill.
 
 Revised 2026-09-13 (#407): `dev-backlog.md` scenarios 3 and 7 Expected relaxed as over-specified per the 2026-09-12 conformance run.
+
+Revised 2026-09-17 (#423): `dev-backlog.md` gains scenarios 11 (`.tracker=files` sprint-free work) and 12 (legacy `backlog/` layout); scenario 4 names three ordered issues.
