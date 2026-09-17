@@ -1,6 +1,6 @@
 ---
 milestone: 2026-09 core-competence scripts
-status: active
+status: completed
 started: 2026-09-17
 due: TBD
 scope: ["skills/**", "spec/**", "tests/**", "docs/**", ".github/**", "README.md", "CLAUDE.md"]
@@ -47,3 +47,4 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 - 2026-09-17: #445 merged (PR #453, −4,891; GitHub-only, files parked at v0.11.0). Batch 3 after-run 11/11 both models; dev-relay sweep 712/713 (pre-existing flake). #446 dispatched to Opus.
 - 2026-09-17: #446 merged (PR #454; doctor 795 → 490, setup 374 → 150). Batch 3 done. #447 dispatched to Grok; tag/release from this session.
 - 2026-09-17: #447 merged (PR #455); tag v0.12.0 pushed, GitHub release published. Final sizes on main: dev-backlog scripts 2,807 (14 files), backlog-triage 945 (2 files), tests 4,623, SKILL.md 157/5, triage SKILL.md 44, references 3. dev-relay sweep 711/713 (two dispatch-host timing flakes, no sprint-state reference).
+- 2026-09-18: Sprint closed. 8/8 tasks completed.
