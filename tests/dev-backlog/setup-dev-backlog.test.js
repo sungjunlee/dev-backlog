@@ -3,10 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { spawnBashSync } = require(path.join(SKILL_SCRIPTS, "bash-runtime.js"));
 const {
   SetupError,
   collectGithubEvidence,
@@ -17,9 +15,6 @@ const {
   leftoverSkillFiles,
   migrateLegacyExecutionRoot,
 } = require(path.join(SKILL_SCRIPTS, "execution-root.js"));
-
-const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
-const INIT = path.join(SKILL_SCRIPTS, "init.sh");
 
 function root(t, prefix = "setup-github-only-") {
   const value = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -133,19 +128,6 @@ describe("GitHub-only setup", () => {
       SetupError,
     );
     assert.deepEqual(snapshot(cwd), before);
-  });
-
-  it("keeps the init.sh compatibility entrypoint GitHub-only", (t) => {
-    const cwd = root(t);
-    const result = spawnBashSync([INIT, "demo"], { cwd, encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.readFileSync(path.join(cwd, ".dev-backlog/.tracker"), "utf8"), "github\n");
-
-    const cli = spawnSync(process.execPath, [
-      SCRIPT, "--tracker", "local", "--non-interactive",
-    ], { cwd: root(t, "setup-cli-local-"), encoding: "utf8" });
-    assert.notEqual(cli.status, 0);
-    assert.match(cli.stderr, /expected github or files/);
   });
 
   it("migrates leftover skill files from backlog/ into .dev-backlog and leaves export paths", async (t) => {

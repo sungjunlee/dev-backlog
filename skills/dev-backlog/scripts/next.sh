@@ -39,7 +39,7 @@ fi
 SPRINTS_DIR="$BACKLOG_DIR/sprints"
 
 if [ ! -d "$SPRINTS_DIR" ]; then
-  echo "No $SPRINTS_DIR directory. Run init.sh first."
+  echo "No $SPRINTS_DIR directory. Run setup-dev-backlog.js first."
   exit 1
 fi
 

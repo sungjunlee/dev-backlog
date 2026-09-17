@@ -19,7 +19,8 @@ const {
   filesIdentity,
   normalizeFilesTask,
 } = require(path.join(SKILL_SCRIPTS, "files-tracker.js"));
-const { writeBacklogFixture } = require(path.join(SKILL_SCRIPTS, "fake-backlog-fixture.js"));
+const TEST_FAKES = path.resolve(__dirname, "../fakes");
+const { writeBacklogFixture } = require(path.join(TEST_FAKES, "fake-backlog-fixture.js"));
 
 function recordingExec(responses) {
   const calls = [];
