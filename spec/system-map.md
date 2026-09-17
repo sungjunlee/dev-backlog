@@ -2,7 +2,7 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority, read and written by the session through `gh`. No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
+dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority, read and written by the session through `gh` (the only scripted writer is `triage-apply`, under its human gate). No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
 
 ```text
 GitHub Issue (spec + lifecycle + native planning fields)
@@ -33,7 +33,7 @@ Retrieval/memory is not a product surface (#350 no-go).
    handoff, cross-Issue/session context, or concurrent-track coordination.
 3. **Execute**: Issue AC and lifecycle stay on GitHub; an admitted sprint carries
    Plan, Running Context, and Progress.
-4. **Complete**: merge the PR, close the Issue, close any admitted sprint.
+4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when its whole Plan is done.
 5. **Groom** (optional): triage is advisory until `--apply`.
 
 ## Storage And External Systems
@@ -48,7 +48,7 @@ Retrieval/memory is not a product surface (#350 no-go).
 - One task authority. A failed `gh` read is fail-closed: no local store, export, or sprint text stands in for it; no dual write or background sync.
 - A failed live Issue read stops execution.
 - A sprint is admitted by execution complexity, never duration alone.
-- Optional surfaces fail before effects; they cannot become authority.
+- An unavailable optional surface (Relay, Projects, the spec axis) is reported and skipped before any effect; it never blocks the Issue → PR path and never becomes authority.
 - Automation is report-only toward `spec/*`.
 
 ## Where To Go Next

@@ -26,19 +26,19 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 
 **Out-of-scope:**
 - Any tracker other than GitHub Issues, a tracker abstraction, or runtime tracker switching (the `files` adapter and ports are parked at `v0.11.0`, GitLab at `a8ddb7d`; re-admission needs a measured consumer)
-- Task mirrors, diagnostic exports, or any local copy of Issue state
+- Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage snapshots are advisory input to a report, never authority)
 - Scripts that wrap `gh` for reading Issues, resolving specifications, or seeding Plans
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
-- Task work reads the live Issue with `gh issue view --json body,comments`; a comment titled `## Agent Brief` overrides the body and an explicit spec reference overrides both. If that read fails, execution stops fail-closed.
+- Task work reads the live Issue with `gh issue view --json body,comments`; the newest comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in the body naming a file or URL overrides both. If that read fails, execution stops fail-closed.
 - Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through `gh`.
 - Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
 - Never treat sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a GitHub read failure.
-- Never write Issue bodies, comments, labels, or state from a script; every GitHub mutation is a deliberate `gh` call the session makes (or `triage-apply` under its human gate).
+- Never write Issue bodies, comments, labels, or state from a script; every GitHub mutation is a deliberate `gh` call the session makes. The one scripted exception is `triage-apply`, which mutates only anchors a human checked.
 
 ### Learnings
 <!-- LEARN:BEGIN -->
@@ -77,7 +77,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, milestone membership, and Relay presence alone never trigger one.
 - No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
 - Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
-- One successful `sprint-close.sh` invocation flips the sprint to `status: completed` and appends final Progress. No task directories are required; checked legacy mirrors are archived only when present.
+- One successful `sprint-close.sh` invocation flips the sprint to `status: completed` and appends final Progress; it runs only when every Plan item is `[x]` or explicitly struck in Progress.
 
 ### Hard Constraints
 - Never mutate a sprint's `status: completed` back to `active`; completed sprints are immutable history.
