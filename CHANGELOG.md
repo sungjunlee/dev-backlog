@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **Plan rail says setup migrates a legacy `backlog/` skill layout** — one clause, re-added on the 2026-09-17 conformance evidence (scenario 12 PARTIAL on both models, both post-#411 variants): fresh sessions did not know `setup-dev-backlog.js` migrates and stopped to ask. Closes [#431](https://github.com/sungjunlee/dev-backlog/issues/431).
 - **Six dev-backlog references deleted** — `integration-contract.md`, `github-sync.md`, `process.md`, `scripts.md`, `backlog-boundaries.md`, and `checkbox-repair.md` are gone (892 lines); Quick Fix / Unplanned Work fold into SKILL.md, the ownership table into `authority-contract.md`, and the unmoored-`[~]` remediation into the doctor warn message. `references/` is four files. Closes [#425](https://github.com/sungjunlee/dev-backlog/issues/425).
 
 - **backlog-triage scripts-less experiment** — a 33-line variant B SKILL.md (`gh` reads, fixed report shape, anchors, `triage-apply.js` kept) reaches the same graded outcome as the current SKILL.md + scripts on all seven `tests/evals/backlog-triage.md` scenarios on Claude Fable 5.1 and GPT-6 Astra at plan level (edge direction ungraded; label-based stale signal lost) (`docs/conformance/2026-09-17-triage-scriptless.md`); deletion of collect/relate/stale/report filed as #433, gated on a fixture-backed real-execution A/B. Closes [#427](https://github.com/sungjunlee/dev-backlog/issues/427); closes the last #367 item.
