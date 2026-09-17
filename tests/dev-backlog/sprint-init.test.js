@@ -112,20 +112,6 @@ describe("buildIssueLines", () => {
       "- [ ] BACK-14 Bare files id",
     ]);
   });
-
-  it("renders gitlab#N refs from tracker identity (#415)", () => {
-    assert.deepEqual(buildIssueLines([
-      { ref: "gitlab#12", title: "From ref", labels: [] },
-      { tracker: "gitlab", id: "13", title: "From id", labels: ["docs"] },
-      { tracker: "gitlab", iid: 14, title: "From iid", labels: [] },
-      { tracker: "gitlab", id: 10007, iid: 7, title: "Prefer iid over REST id" },
-    ]), [
-      "- [ ] gitlab#12 From ref",
-      "- [ ] gitlab#13 From id (~20min)",
-      "- [ ] gitlab#14 From iid",
-      "- [ ] gitlab#7 Prefer iid over REST id",
-    ]);
-  });
 });
 
 describe("buildSprintContent", () => {
@@ -729,54 +715,6 @@ describe("createSprintFile", () => {
       sprintsDir,
       today: new Date("2026-04-05T09:00:00Z"),
       adapters: { files: filesAdapter, github: githubAdapter },
-      hasCharter: false,
-      hasCapabilities: false,
-    });
-
-    assert.equal(result.created, true);
-    assert.equal(result.due, "TBD");
-    assert.equal(result.issueCount, 0);
-    assert.equal(result.placeholderIssue, true);
-    assert.match(result.content, /^due: TBD$/m);
-    assert.match(result.content, /^## Plan$/m);
-    assert.doesNotMatch(result.content, /^- \[ \]/m);
-  });
-
-  it("seeds a gitlab-tracker sprint without GitHub milestones or gh (#415)", () => {
-    const backlogDir = path.join(tmpDir, ".dev-backlog");
-    const sprintsDir = path.join(backlogDir, "sprints");
-    fs.mkdirSync(backlogDir, { recursive: true });
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "gitlab\n");
-
-    const forbidden = (label) => () => {
-      throw new Error(`${label} must not run`);
-    };
-    const gitlabAdapter = {
-      availability: () => ({ available: true }),
-      capabilities: () => ["closing-semantics"],
-      list: forbidden("gitlab list"),
-      read: forbidden("gitlab read"),
-      create: forbidden("gitlab create"),
-      update: forbidden("gitlab update"),
-      close: forbidden("gitlab close"),
-    };
-    const githubAdapter = {
-      availability: forbidden("github availability"),
-      capabilities: forbidden("github capabilities"),
-      list: forbidden("github list"),
-      read: forbidden("github read"),
-      create: forbidden("github create"),
-      update: forbidden("github update"),
-      close: forbidden("github close"),
-    };
-
-    const result = createSprintFile({
-      topic: "gitlab-sprint",
-      milestone: "gitlab-sprint",
-      dryRun: false,
-      sprintsDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-      adapters: { gitlab: gitlabAdapter, github: githubAdapter, files: githubAdapter },
       hasCharter: false,
       hasCapabilities: false,
     });

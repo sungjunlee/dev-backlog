@@ -304,11 +304,11 @@ describe("legacy export CLI boundary", () => {
   });
 
   it("fails closed when .tracker is not github without listing provider issues", (t) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-gitlab-export-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "sync-pull-files-export-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
     const executionDir = path.join(root, ".dev-backlog");
     fs.mkdirSync(executionDir);
-    fs.writeFileSync(path.join(executionDir, ".tracker"), "gitlab\n");
+    fs.writeFileSync(path.join(executionDir, ".tracker"), "files\n");
 
     const result = spawnSync(
       process.execPath,
@@ -322,7 +322,7 @@ describe("legacy export CLI boundary", () => {
     assert.equal(document.error.code, "LEGACY_EXPORT_GITHUB_ONLY");
     assert.match(document.error.message, /^tracker error:/);
     assert.match(document.error.message, /GitHub-shaped diagnostic export/);
-    assert.match(document.error.message, /gitlab/);
+    assert.match(document.error.message, /files/);
     assert.deepEqual(fs.readdirSync(root), [".dev-backlog"]);
     assert.deepEqual(fs.readdirSync(executionDir), [".tracker"]);
   });
@@ -634,7 +634,7 @@ describe("loadOpenIssues", () => {
     const execFile = () => {
       throw new Error("must not list through a non-github tracker");
     };
-    for (const tracker of ["gitlab", "files"]) {
+    for (const tracker of ["files"]) {
       assert.throws(
         () => loadOpenIssues({ execFile, config: { tracker } }),
         (error) =>

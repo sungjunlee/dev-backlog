@@ -29,7 +29,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
-- **Configured tracker = sole task authority** — GitHub Issues (`gh`) OR files (Backlog.md CLI) OR GitLab (`glab`) per `.tracker` are the live authority; never co-authority. Task definition, AC, and lifecycle resolve from the live tracker (`effective-task-spec.js`); no task-file directory required
+- **Configured tracker = sole task authority** — GitHub Issues (`gh`) OR files (Backlog.md CLI) per `.tracker` are the live authority; never co-authority. Task definition, AC, and lifecycle resolve from the live tracker (`effective-task-spec.js`); no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
@@ -49,7 +49,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ```
 Configured tracker (what: definition, AC, lifecycle)
-      ↕ gh | backlog | glab
+      ↕ gh | backlog
 .dev-backlog/sprints/ (how: batches, running context, progress)
 ```
 

@@ -393,7 +393,7 @@ function legacyExportTrackerError(tracker) {
   error.code = "LEGACY_EXPORT_GITHUB_ONLY";
   error.remediation =
     "Diagnostic export materializes GitHub issues into exports/github-issues/. " +
-    "It is not a gitlab or files snapshot. Change .tracker only at setup; no fallback was attempted.";
+    "It is not a files snapshot. Change .tracker only at setup; no fallback was attempted.";
   return error;
 }
 
