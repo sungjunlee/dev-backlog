@@ -48,7 +48,7 @@ Read intent and AC from the live Issue:
 gh issue view 42 --json body,comments
 ```
 
-A comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in
+The newest comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in
 the body naming a file or URL overrides both.
 
 Sibling skill [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the
