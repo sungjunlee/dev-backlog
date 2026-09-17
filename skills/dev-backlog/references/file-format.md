@@ -9,7 +9,7 @@ short note at the end — never a runtime format. Adapter ports:
 Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Required
 headings: `## Goal`, `## Plan`, `## Running Context`, `## Progress`. Plan item
 grammar: `- [ ] #N …` (or the configured tracker ref); `[~]` in-flight and `[x]`
-done may append `→ PR #N (state)` and/or `[run:…]`. Section semantics live in
+done may append `→ PR #N (state)` (end of line), `[branch:name]`, and/or `[run:…]` (end of line). Section semantics live in
 [SKILL.md](../SKILL.md).
 
 ```markdown

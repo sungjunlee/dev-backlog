@@ -58,3 +58,14 @@ Unchanged: per release tag and at reassess boundaries. This run also satisfies t
 ## Raw artifacts
 
 `2026-09-17/` holds the three prompts, the rubric, and each channel's answers (`fable-*.md`, `astra-*.md`). The 2026-09-12 raw directory is pruned in this commit per the retention rule; its dated report stays.
+
+## After #425 (references deletion)
+
+Same harness and rubric, SKILL.md from PR #435 (160 lines; six references deleted, Quick Fix / Unplanned Work folded in), the revised scenario 4 text (three ordered issues), one run per model.
+
+| Channel × variant | PASS | PARTIAL | FAIL | ASK | MUT | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| fable × after425 | 11/12 | 1 | 0 | 1 | 0 | PARTIAL 12; asks in 12 only (scenario 4 no longer asks with the issues named) |
+| astra × after425 | 11/12 | 1 | 0 | 1 | 1 | PARTIAL 12; asks in 12; Plan fold in 2 |
+
+No new PARTIAL or FAIL against `relit`; every stop held. Neither model referenced a deleted file. Raw answers: `2026-09-17/fable-after425.md`, `2026-09-17/astra-after425.md`, prompt `2026-09-17/prompt-after425.md`. Astra tokens (stderr): 13.3k.
