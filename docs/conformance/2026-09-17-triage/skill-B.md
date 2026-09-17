@@ -27,7 +27,7 @@ Done when the report exists with every section present, every proposal anchored,
 ## Apply
 
 Goal: only accepted actions reach GitHub.
-Rail: after a human flips `[ ]` → `[x]` next to an anchor, `triage-apply.js <report.md>` prints the plan (dry-run); `triage-apply.js <report.md> --apply --yes` executes accepted actions, dedupes by `(verb, issue, args)`, skips unknown verbs, logs `already-applied` on re-runs, and writes an audit log beside the report.
+Rail: after a human flips `[ ]` → `[x]` next to an anchor, `node <installed skill dir>/scripts/triage-apply.js <report.md>` prints the plan (dry-run); the same with `--apply --yes` executes accepted actions, dedupes by `(verb, issueNumber, normalizedArgs)`, skips unknown verbs, logs `already-applied` on re-runs, and writes an audit log beside the report.
 Done when every accepted action is applied or logged `already-applied` and nothing unaccepted was touched.
 
 Scripts resolve from the installed `backlog-triage` skill directory; run from the target project root. Sprint files, milestones, and Issue AC belong to `dev-backlog`.
