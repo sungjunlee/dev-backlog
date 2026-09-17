@@ -8,12 +8,12 @@ Fixture: 15 open issues (`fixture-issues.json`) covering inactive-no-milestone, 
 
 | Criterion | A (scripts) | B fable | B astra |
 | --- | --- | --- | --- |
-| Eight sections in order | yes | yes | yes |
+| Sections in order | six (Alignment and Decision Review are prompt-driven in A too) | eight | eight |
 | Close set from deterministic signals | 604, 606, 607, 608 | 604, 606, 607, 608 (+ close-duplicate 613, a judgment A cannot make) | 606, 607, 608; 604 detected as stale but proposed as `revisit` (judgment call the skill allows) |
 | Protected 603 / 612 never closed | yes | yes | yes (both proposed as `revisit`, protection stated) |
 | Code-fence mention (609→601), URL fragment (602→PR 77), self-mention (614) ignored | yes | yes, listed as "Excluded evidence" | yes, listed as "Excluded" |
 | Edge direction (601 blocks 602; 602 depends-on 601; merged PR 88 → 608; comment 610→608) | yes | yes | yes |
-| Anchors parse in `triage-apply.js --json` (unknown verbs) | 4 / 0 | 32 / 0 (16 after dedupe) | 26 / 0 (13 after dedupe) |
+| Anchors parse in `triage-apply.js --json` (occurrences / distinct after dedupe / unknown verbs) | 8 / 4 / 0 | 32 / 16 / 0 | 26 / 13 / 0 |
 | Alignment / Decision Review present | not produced by A (prompt-driven in both variants) | yes | yes |
 
-Decision: **delete** `triage-collect.js`, `triage-relate.js`, `triage-stale.js`, `triage-report.js`, `triage-github.js` and their references; keep `triage-apply.js` (+ anchor helper). The one difference (Astra's `revisit` for a merely inactive issue) is a more conservative verb, not a missed signal, and the human gate decides either way.
+Decision: **delete** `triage-collect.js`, `triage-relate.js`, `triage-stale.js`, `triage-report.js`, `triage-github.js` and their references; keep `triage-apply.js` (+ anchor helper). Judgment differences, both allowed by the skill and both decided by the human gate: Astra proposed `revisit` instead of `close` for the merely inactive #604; Fable added a `close-duplicate` for #613 that A cannot produce. Every deterministic signal A emits was detected by both B runs. Limits: `compare.py` checks issue-number presence in the Relationships section and anchor validity, not edge direction (verified by reading the two B reports, quoted in the table); this A/B used supplied `gh` output, so live collection and pagination were not exercised — SKILL.md names `--limit` and `closedByPullRequestsReferences` for that.

@@ -12,7 +12,9 @@ def edges(t):
     return sec
 verbs_ok=all(v in ("close","revisit","close-duplicate","set-priority","assign-milestone") for v,_,_ in aB)
 # apply dry-run parse of B
-r=subprocess.run(["node","/Users/sjlee/workspace/active/harness-stack/dev-backlog/skills/backlog-triage/scripts/triage-apply.js",sys.argv[2],"--json"],capture_output=True,text=True)
+import os
+apply=os.environ.get("TRIAGE_APPLY", os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","..","..","..","skills","backlog-triage","scripts","triage-apply.js"))
+r=subprocess.run(["node",apply,sys.argv[2],"--json"],capture_output=True,text=True)
 print(f"== {label}")
 print("sections in order:",order_ok, "| missing:",[s for s,p in zip(sections,posB) if p<0])
 print("B closes:",sorted(closesB),"| A closes:",sorted(closesA))

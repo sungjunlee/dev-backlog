@@ -110,7 +110,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - `backlog-triage` report written by the session from `gh` reads (fixed eight-section shape, anchors) and the `triage-apply` human-gated pipeline
 - Charter-aware Alignment Check (Issue → Objective mapping)
 - Spec-aware Decision Review (`Do Now`, `Shape First`, `Defer`, `Drop / Close`)
-- Triage snapshots (v2 collector) and the advisory triage report artifact
+- The advisory triage report artifact under `.dev-backlog/triage/`
 
 **Out-of-scope:**
 - Deleting Issues (no path provided)
