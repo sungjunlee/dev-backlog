@@ -18,6 +18,25 @@ freezes it at `["github", "files", "gitlab"]`.
 - Changing trackers is an explicit `.tracker` rewrite at setup, not a runtime
   decision.
 
+## Per-adapter surface
+
+The concrete surface behind `SKILL.md`'s "configured tracker". Plan refs in a
+sprint `## Plan` use the configured key's grammar.
+
+| Key | CLI | Plan ref | Create | Close |
+| --- | --- | --- | --- | --- |
+| `github` (default) | `gh` | `#N` | `gh issue create` | `gh issue close` |
+| `files` | `backlog` (Backlog.md CLI) | `BACK-N` | `backlog task create` | `backlog task edit <id> -s Done` |
+| `gitlab` | `glab` | `gitlab#N` | `glab issue create` | `glab issue close` |
+
+None of the three is a degraded fallback; each is a first-class configured
+authority running the same Orient / Plan / Work / Complete loop. If the
+configured CLI is missing or unauthenticated, the adapter is unavailable
+(fail-closed). Never parse or write `backlog/tasks/*.md` as a product API, and
+never make two trackers co-authority in one repo.
+
+`gh` label / milestone / Issue patterns: `github-sync.md`.
+
 ## Required operations
 
 `validateAdapter` requires an object whose own keys are exactly
@@ -82,12 +101,9 @@ There is no silent fallback to another adapter, `backlog/tasks/`,
 and stop. Diagnostic export is opt-in (`sync-pull.js --legacy-export`) and is
 not on orient / plan / work / complete.
 
-Details of the GitHub adapter live in `github-tracker.js`. The files adapter
-(`files-tracker.js`) talks only to the Backlog.md CLI (`backlog`); it never
-parses `backlog/tasks/*.md`. The GitLab adapter (`gitlab-tracker.js`) talks
-only to `glab`; identities are `gitlab#N`. It reports `closing-semantics` only
-— comments / Agent Brief via notes are not claimed until a notes API path
-lands; issue body remains authority. GitHub, files, and GitLab are never
-co-authority in one repo. Forgejo/Gitea share forge field shapes and are
-follow-up adapters, not implemented here. Export layout: `file-format.md`.
-Authority routing: `authority-contract.md`.
+Adapter implementations: `github-tracker.js`, `files-tracker.js` (Backlog.md
+CLI only), `gitlab-tracker.js` (`glab` only). The GitLab adapter reports
+`closing-semantics` only — comments / Agent Brief via notes are not claimed
+until a notes API path lands; issue body remains authority. Forgejo/Gitea
+share forge field shapes and are follow-up adapters, not implemented here.
+Export layout: `file-format.md`. Authority routing: `authority-contract.md`.
