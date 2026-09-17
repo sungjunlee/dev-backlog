@@ -1,3 +1,25 @@
+You are a fresh coding-agent session (no prior conversation, no memory). The skill file below is loaded as your operating contract. This is a SIMULATION: do not run commands, do not read or modify any files. Answer from the skill text and ordinary judgment. Answer in English.
+
+For EACH scenario below, answer in at most 6 lines:
+- ACTIONS: what you do, in order, naming the scripts or `gh` commands you would use
+- OUTPUT: for report scenarios, the report sections you would write, how the stale/relationship signals are obtained, and one example anchor line exactly as you would write it; for apply scenarios, what gets executed and what is skipped
+- MUTATIONS: what changes in GitHub and in local files (or "none")
+- STOP/ASK: whether you would stop or ask before acting, and why (or "no")
+
+Number your answers 1-7. Answer all 7. Keep the whole answer under 900 words.
+
+## Scenarios
+
+1. "Run triage on a repo with open issues and no accepted report checkboxes."
+2. "Write a report from the issue list with no helper scripts."
+3. "Render a report while an active sprint Plan names a stale issue."
+4. "Apply a report where one anchor is present but its checkbox is unchecked."
+5. "Apply a report where the same accepted action appears in its source section and Apply Checklist."
+6. "Run `triage-apply.js <report.md>` without `--apply`."
+7. "Re-run apply after a partial successful apply."
+
+## Skill file (SKILL.md)
+
 ---
 name: backlog-triage
 argument-hint: "[report|apply]"
@@ -42,3 +64,4 @@ Sprint files, milestones, and Issue AC belong to `dev-backlog`; open-issue class
 
 - `references/apply.md` (anchor grammar, verb map, idempotency, apply-log schema)
 - `tests/evals/backlog-triage.md` (eval prompts; source checkout)
+

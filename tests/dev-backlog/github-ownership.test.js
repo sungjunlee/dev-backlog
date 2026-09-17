@@ -16,7 +16,7 @@ const ALLOWED_DIRECT_GH = new Set([
   // Setup owns only provider recommendation/repair diagnostics (`gh auth status`),
   // never task lifecycle operations.
   "skills/dev-backlog/scripts/setup-dev-backlog.js",
-  "skills/backlog-triage/scripts/triage-github.js",
+  "skills/backlog-triage/scripts/triage-apply.js",
 ]);
 
 function productionJavascriptFiles(directory) {
@@ -46,8 +46,6 @@ describe("direct gh production ownership", () => {
       "skills/dev-backlog/scripts/sprint-init.js",
       "skills/dev-backlog/scripts/status.sh",
       "skills/dev-backlog/scripts/sprint-close.sh",
-      "skills/backlog-triage/scripts/triage-collect.js",
-      "skills/backlog-triage/scripts/triage-apply.js",
     ];
     const directPattern = /execFile(?:Sync)?\(\s*["']gh["']|^[ \t]*(?:MS="\$MILESTONE" )?gh (?:api|issue|pr)\b|^[ \t]*["']gh["'][ \t]*,/m;
     for (const relative of migrated) {

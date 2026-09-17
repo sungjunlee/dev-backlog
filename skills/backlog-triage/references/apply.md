@@ -1,6 +1,6 @@
 # Apply Semantics
 
-**Purpose.** Authoritative reference for the anchor-comment apply contract used by the backlog-triage report renderer in #64 and the apply step in #65.
+**Purpose.** Authoritative reference for the anchor-comment apply contract used by the session-written backlog-triage report and the apply step in #65.
 
 The report is a two-surface document:
 
@@ -15,7 +15,7 @@ The single regex contract for parsing a triage anchor is:
 <!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->
 ```
 
-`skills/backlog-triage/scripts/triage-report.js` exports `parseAnchor(line)` so downstream code can import the shared parser instead of re-implementing this regex.
+`skills/backlog-triage/scripts/anchor.js` exports `parseAnchor(line)` so downstream code can import the shared parser instead of re-implementing this regex. `triage-apply.js` consumes that helper.
 
 ### Slot Semantics
 
@@ -33,7 +33,7 @@ The target issue is `#42`. The later `#87` lives in the args payload and must no
 
 ## Supported MVP Verbs
 
-The renderer in #64 emits these verbs:
+The session-written report emits these verbs:
 
 - `close`
 - `revisit`
@@ -103,14 +103,12 @@ That is valid. These are separate proposals and therefore separate anchor+checkb
 
 The invalid case is duplicating the exact same action for the same issue without new meaning, for example two separate `close` anchors for `#42` that differ only by wording.
 
-## Renderer / Apply Contract
+## Report / Apply Contract
 
-The report renderer in #64 is responsible for:
+The session-written report is responsible for:
 
 - Emitting syntactically valid anchor comments
-- Keeping anchors stable across re-runs for the same inputs
 - Pairing every anchor with a checkbox
-- Preserving the existing report on overwrite by moving it to `.bak`
 
 The apply step in #65 is responsible for:
 
@@ -121,7 +119,7 @@ The apply step in #65 is responsible for:
 
 ## Report Boundaries
 
-The renderer emits anchor+checkbox pairs in four sections:
+The report emits anchor+checkbox pairs in four sections:
 
 - `## Obsolete Candidates` — source section with evidence sub-bullet
 - `## Priority Proposals` — source section with rationale

@@ -14,7 +14,6 @@ const {
 } = require(path.join(SKILL_SCRIPTS, "github-milestones.js"));
 const { listStatusRows } = require(path.join(SKILL_SCRIPTS, "tracker-status-list.js"));
 const { createSprintFile } = require(path.join(SKILL_SCRIPTS, "sprint-init.js"));
-const { collectSnapshot } = require(path.join(TRIAGE_SCRIPTS, "triage-collect.js"));
 const { execute: applyTriage } = require(path.join(TRIAGE_SCRIPTS, "triage-apply.js"));
 
 function makeExec(responses) {
@@ -80,7 +79,7 @@ describe("GitHub optional capability transports", () => {
 });
 
 describe("retired tracker public mutation boundaries", () => {
-  it("rejects local config before sprint-init or triage provider/filesystem effects", async () => {
+  it("rejects local config before sprint-init or triage provider/filesystem effects", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "retired-tracker-mutations-"));
     const backlogDir = path.join(root, ".dev-backlog");
     fs.mkdirSync(backlogDir);
@@ -96,15 +95,6 @@ describe("retired tracker public mutation boundaries", () => {
       milestone: "blocked",
       sprintsDir: path.join(backlogDir, "sprints"),
     }), /expected one of: github/);
-
-    await assert.rejects(
-      collectSnapshot({
-        repo: "acme/widgets",
-        trackerConfig: { tracker: "local" },
-        execFile: provider,
-      }),
-      /expected one of: github/
-    );
 
     const report = path.join(root, "report.md");
     fs.writeFileSync(report, [

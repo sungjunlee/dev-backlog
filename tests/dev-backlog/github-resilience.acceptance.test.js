@@ -230,20 +230,6 @@ describe("isolated-environment classifier", () => {
     assert.deepEqual(calls[0], ["issue", "comment", "42", "-b", "stale cleanup"]);
     assert.equal(JSON.stringify(fixture.state()), stateBefore, "GitHub state must be unchanged");
   });
-
-  it("triage-collect --repo fails loud under rate-limit and creates no snapshot cache", (t) => {
-    const fixture = prepareFixture(t, { failMode: "rate-limit" });
-    fs.mkdirSync(path.join(fixture.backlogDir), { recursive: true });
-
-    const result = run(process.execPath, [
-      path.join(TRIAGE_SCRIPTS, "triage-collect.js"),
-      "--repo", "acme/widgets",
-    ], fixture);
-    assert.notEqual(result.status, 0, `expected failure, got stdout:\n${result.stdout}`);
-    assert.match(result.stderr, /API rate limit exceeded/);
-    assert.equal(fs.existsSync(path.join(fixture.backlogDir, "triage", ".cache")), false,
-      "no snapshot cache file created");
-  });
 });
 
 describe("fail-loud GitHub resilience: partial-outage", () => {
