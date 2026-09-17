@@ -27,7 +27,7 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - [ ] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h)
 
 ### Batch 4 - Triage experiment (independent; can run alongside Batch 3)
-- [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (open)
+- [~] #427 backlog-triage scripts-less experiment: run the seven evals on both models, then decide deletion (~3h) → PR #434 (merged)
 
 ### Batch 5 - Release
 - [ ] #428 Cut v0.11.0 with the measured state (~1h)
