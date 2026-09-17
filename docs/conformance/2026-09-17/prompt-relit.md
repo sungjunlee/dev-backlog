@@ -1,41 +1,41 @@
-You are a fresh coding-agent session (no prior conversation, no memory). The skill file below is loaded as your operating contract. This is a SIMULATION: do not run commands, do not read or modify any files. Answer from the skill text and ordinary judgment.
+You are a fresh coding-agent session (no prior conversation, no memory). The skill file below is loaded as your operating contract. This is a SIMULATION: do not run commands, do not read or modify any files. Answer from the skill text and ordinary judgment. Answer in English.
 
 For EACH scenario below, answer in at most 5 lines:
 - ACTIONS: what you do, in order, naming the scripts or commands you would use
-- MUTATIONS: what you would change in GitHub and in local files (or "none")
+- MUTATIONS: what you would change in the tracker and in local files (or "none")
 - STOP/ASK: whether you would stop or ask the user before acting, and why (or "no")
 
-Number your answers 1-10 to match the scenarios. Answer all ten. Keep the whole answer under 900 words.
+Number your answers 1-12 to match the scenarios. Answer all 12. Keep the whole answer under 1100 words.
 
 ## Scenarios
 
 1. "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan."
 2. "Plan a sprint whose scope overlaps a track that is already `status: active`."
 3. "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan."
-4. "Repo with no spec axis: open GitHub issues but no `backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint."
-5. "Repo with no spec axis: one self-contained GitHub issue, no `backlog/`, and no Relay."
+4. "Repo with no spec axis: open GitHub issues but no `.dev-backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. Reach a first active sprint."
+5. "Repo with no spec axis: one self-contained GitHub issue, no `.dev-backlog/`, and no Relay."
 6. "Work issue #42 with no local task files and three live Issue AC checkboxes."
 7. "Fresh online session with no local task files."
 8. "Fresh session with only repo files available, no conversation history, and no GitHub access."
 9. "Close a sprint with Running Context that applies to future work and no local task files."
 10. "GitHub Issue changed during work."
+11. "Repo with `.dev-backlog/.tracker` = `files` (Backlog.md CLI installed), one self-contained task `BACK-7` with two AC checkboxes, and no active sprint. Work it."
+12. "Consumer repo still on the legacy layout: `backlog/sprints/` with an active sprint, `backlog/.tracker` = `github`, and `backlog/config.yml` exist; `.dev-backlog/` does not. Orient."
 
 ## Skill file (SKILL.md)
 
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
-description: Manage GitHub-backed sprint execution. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
-compatibility: Requires git, Node.js 18+, and gh CLI. Works on Claude Code and Codex.
+description: Manage sprint execution on the configured tracker (GitHub Issues by default). Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires git, Node.js 18+, and the configured tracker's CLI (see `references/adapter-ports.md`). Works on Claude Code and Codex.
 metadata:
   related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
 ---
 
 # Dev Backlog
 
-Real job: keep GitHub Issues as task-definition and lifecycle truth while using
-`backlog/sprints/` only when complex execution needs a shared continuity,
-progress, or handoff record.
+Real job: keep the configured tracker as task-definition and lifecycle truth while using `.dev-backlog/sprints/` when complex execution needs a shared continuity, progress, or handoff record.
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, deterministic rails, and stop conditions.
 
@@ -50,25 +50,22 @@ README covers install and human quick start. This file is the agent execution co
 | "next", "다음 작업" | `next` |
 | "complete", "close sprint" | `complete` |
 
-If `backlog/` does not exist, run `scripts/setup-dev-backlog.js --tracker
-github --non-interactive`; see `references/file-format.md`.
-
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
-The state ownership, compatibility, and optional-integration boundary
+The state ownership, fail-closed tracker, and optional-integration boundary
 are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
 
 ## Core Contracts
 
 ```
-GitHub Issues               <- canonical task definition and lifecycle
-backlog/sprints/            <- optional complex-execution hub (one active file per track)
-backlog/sprints/_context.md <- cross-sprint project context
+Configured tracker               <- canonical task definition and lifecycle
+.dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
+.dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
 
-- Start every session by reading `backlog/sprints/_context.md` and the active sprint file when present.
-- GitHub Issues own task truth; decisions, progress, and cross-task context stay in an admitted sprint file.
-- Completed sprints stay as the permanent execution record.
+- `.dev-backlog/.tracker` names exactly one configured tracker and is set at setup. GitHub Issues is the default and the canonical task authority; an unavailable adapter is fail-closed. Per-adapter CLIs, ref grammars, create commands, and close verbs: [`references/adapter-ports.md`](references/adapter-ports.md).
+- Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
+- The configured tracker owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file, which remains the permanent execution record once completed.
 - Sprint frontmatter (`objectives:`, `component:`, `scope:`) and how each field degrades when its spec file is absent: `references/file-format.md`.
 
 ## Sprint Admission
@@ -78,21 +75,21 @@ Create a sprint only when execution complexity requires continuity beyond one
 Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
 cross-Issue/session context, or concurrent track coordination. Duration,
 estimate, milestone membership, and Relay presence alone do not trigger a
-sprint. Once admitted, the sprint owns execution continuity only; the Issue
-continues to own task specification and lifecycle.
+sprint. Once admitted, the sprint owns execution continuity; task
+specification and lifecycle stay with the configured tracker.
 
 ## Sprint File Contract
 
-Each active sprint file (one per track) in `backlog/sprints/YYYY-MM-<topic>.md` carries:
+Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>.md` carries:
 
 | Section / field | Purpose | Completion check |
 | --- | --- | --- |
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
 | `objectives: [O1]` | Charter Objective IDs advanced by the sprint | Optional; IDs resolve against `spec/charter.md`. |
 | `component: "slug"` | One capability slug from `spec/capabilities.md`; also the relay-Learnings route and a track-scope axis | Optional; resolves to one `## Capability:` heading. |
-| `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, never inferred. |
+| `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, not inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
-| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
+| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete task ref in the configured tracker's grammar (`references/adapter-ports.md`). |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
 | `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
 
@@ -119,27 +116,30 @@ Done when you can name the next live Issue and, when a sprint exists, its curren
 
 ### Create
 
-Goal: a GitHub Issue with acceptance criteria the resolver can read.
-Rail: `gh issue create` patterns in `references/github-sync.md`.
-Done when the new task exists in GitHub and, only when the work was admitted to a sprint, is added to the active Plan.
+Goal: a task with acceptance criteria the resolver can read.
+Rail: the configured tracker's create command (`references/adapter-ports.md`).
+Done when the new task exists in the configured tracker and, when the work was
+admitted to a sprint, is added to the active Plan.
 
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js --tracker <key> --non-interactive` creates it first (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
 
-Goal: verified work reflected in GitHub.
-Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC, lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, Issue body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Goal: verified work reflected in the configured tracker.
+Rail: `effective-task-spec.js TASK_REF` returns the effective specification, AC,
+lifecycle, `source_ref`, and digest; the resolver decides source precedence (explicit `spec_ref`, posted `## Agent Brief` comment, task body). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
 Boundary: if resolution fails, diagnose it, but do not execute the task or change AC/lifecycle until live resolution succeeds.
-Done when verified work is reflected in GitHub Issue AC/lifecycle and, when admitted, sprint progress.
+Done when verified work is reflected in the configured tracker's AC/lifecycle
+and, when admitted, sprint progress.
 
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close the Issue (Plan item `[x]` and Progress too when a sprint is admitted). Done for the task when the Issue is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per task: re-resolve and verify every AC against the current effective specification, then merge or commit and close via the adapter's `close`. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the tracker task is closed with every AC verified; the sprint stays open until its Plan is done.
 Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints any reassess recommendation; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -153,7 +153,8 @@ Done when the next actionable batch or sprint-planning need is named.
 
 These stay explicit because they guard shared or irreversible state:
 
-- Every GitHub mutation is deliberate and explicit; there is no background sync.
+- `.tracker` names one configured tracker at setup; runtime never switches adapters, and adapter failure is fail-closed — stop and repair (`references/adapter-ports.md`).
+- Every tracker mutation is deliberate and explicit; there is no background sync.
 - `status: completed` is never flipped back; completed sprints are immutable history.
 - Unattended sessions never `amend` `spec/*`.
 
@@ -163,10 +164,8 @@ Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/`
 
 Core scripts (full flag inventory in `references/scripts.md`):
 
-- `scripts/setup-dev-backlog.js` — bootstrap `backlog/`.
-- `scripts/effective-task-spec.js` — resolve live task specification, AC,
-  lifecycle, source, and stable digest from the live Issue (or one explicit
-  `spec_ref`).
+- `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
+- `scripts/effective-task-spec.js` — resolve live task specification, AC, lifecycle, source, and stable digest from the configured tracker (or one explicit `spec_ref`).
 - `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
 - `scripts/next.sh` / `scripts/status.sh` — next actionable batch and tracker-neutral sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the doctor/reassess summary.
@@ -176,11 +175,13 @@ Core scripts (full flag inventory in `references/scripts.md`):
 
 - `references/scripts.md` — full script/flag inventory beyond the core-path scripts above.
 - `references/process.md` — detailed Orient/Create/Plan/Work/Complete/Quick Fix/Unplanned Work/Next workflow.
-- `references/file-format.md` — sprint file shape, `backlog/` config, and the optional legacy export (`sync-pull.js --legacy-export`, rollback/diagnostics only).
+- `references/adapter-ports.md` — tracker adapter port contract: per-adapter CLI, plan-ref grammar, create command, and close verb; required ops, fail-closed availability, capability gates.
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional diagnostic export (`sync-pull.js --legacy-export`).
 - `references/github-sync.md` — `gh` CLI patterns for labels, milestones, and Issues.
 - `references/integration-contract.md` — dev-relay interop paths, sections, and regex contracts.
 - `references/checkbox-repair.md` — runbook for repairing an unmoored `[~]` after a doctor warn.
 - `references/backlog-boundaries.md` — backlog-side file boundaries and ownership.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): `objectives:`/`component:` semantics and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
-- `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout only).
+- `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
+
