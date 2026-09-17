@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+### Changed
+
+- **status.sh trailing sections deleted** — the Local Files block (counted `tasks/*.md` mirrors by a Backlog.md `status:` field, a format parked at `v0.11.0`), the Relay Runs block (re-derived another tool's run-directory slug and grepped its manifests), and the Past sprints line are gone (54 lines with their smoke fixture); each was one command away and nothing consumed them. Output now ends after the Active Sprint block; `--json` and `--track` are unchanged. Closes [#459](https://github.com/sungjunlee/dev-backlog/issues/459).
+
 ## [0.12.0] — 2026-09-17
 
 Headline: **the core-competence release.** Epic #440 returns the skill to GitHub-only (charter rev 19): the `files` adapter, tracker ports, `.tracker` selection, and the diagnostic export are parked at tag `v0.11.0`. Scripts shrank to the four surfaces that beat `gh` plus file reads — the sprint-file contract, fail-loud shared-state guards (track overlap, unmoored `[~]`, `status: completed`), the `sprint-state` JSON dev-relay consumes, and the `triage-apply` human gate — measured as dev-backlog scripts 8,234 → 2,807 lines, backlog-triage scripts 3,359 → 945, tests 9,738 → 4,623, with SKILL.md at 157 lines / never-only-must 5, backlog-triage SKILL.md 116 → 44, and references 4 → 3. The Work rail is a `gh issue view` read; the backlog-triage report is written by the session (deletion decided by a fixture-backed real A/B). Conformance is `docs/conformance/2026-09-17-core-competence.md` (every batch before/after on Claude Fable 5.1 and GPT-6 Astra, no new PARTIAL/FAIL). BREAKING: `.tracker=files` repos must stay on v0.11.0; `effective-task-spec.js`, `sync-pull.js`, milestone seeding in `sprint-init.js`, the Tracker Tasks listing in `status.sh`, the doctor's `reassess_signal`, `setup-dev-backlog.js --project-name`/`--dry-run`/GitHub probe, and the leftover task-file archive step in `sprint-close.sh` are gone. Rollback point: tag `v0.11.0`.
