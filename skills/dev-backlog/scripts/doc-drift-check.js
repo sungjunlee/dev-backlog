@@ -16,9 +16,6 @@
  *     proper nouns (`Node.js`) are ignored.
  *   - Filename-level only by design; flags and exported symbols are out of
  *     scope for v1 (#367).
- *   - `skills/dev-backlog/references/` is the four living contracts
- *     (`adapter-ports.md`, `authority-contract.md`, `file-format.md`,
- *     `spec-fallback.md`); extra `.md` files are drift (#425).
  *
  * Exit codes:
  *   0  every mentioned script resolves
@@ -54,13 +51,6 @@ function listSkillDirs(root) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(skillsDir, entry.name));
 }
-
-const LIVING_DEV_BACKLOG_REFERENCES = new Set([
-  "adapter-ports.md",
-  "authority-contract.md",
-  "file-format.md",
-  "spec-fallback.md",
-]);
 
 function collectDocFiles(root) {
   const docs = [];
@@ -105,19 +95,6 @@ function extractMentions(content) {
   return mentions;
 }
 
-function extraDevBacklogReferences(root) {
-  const refsDir = path.join(root, "skills", "dev-backlog", "references");
-  if (!fs.existsSync(refsDir)) return [];
-  return fs
-    .readdirSync(refsDir)
-    .filter((name) => name.endsWith(".md") && !LIVING_DEV_BACKLOG_REFERENCES.has(name))
-    .map((name) => ({
-      doc: path.join("skills/dev-backlog/references", name),
-      name,
-      line: 1,
-    }));
-}
-
 function checkDocDrift(root) {
   const inventory = collectScriptInventory(root);
   const docs = collectDocFiles(root);
@@ -130,7 +107,6 @@ function checkDocDrift(root) {
       }
     }
   }
-  dangling.push(...extraDevBacklogReferences(root));
   return { docs_scanned: docs.length, inventory_size: inventory.size, dangling };
 }
 
@@ -171,8 +147,6 @@ module.exports = {
   collectDocFiles,
   collectScriptInventory,
   extractMentions,
-  extraDevBacklogReferences,
   checkDocDrift,
   formatReport,
-  LIVING_DEV_BACKLOG_REFERENCES,
 };
