@@ -43,7 +43,6 @@ describe("direct gh production ownership", () => {
   it("removes direct task lifecycle ownership from every migrated generic caller", () => {
     const migrated = [
       "skills/dev-backlog/scripts/lib.js",
-      "skills/dev-backlog/scripts/sync-pull.js",
       "skills/dev-backlog/scripts/sprint-init.js",
       "skills/dev-backlog/scripts/status.sh",
       "skills/dev-backlog/scripts/sprint-close.sh",

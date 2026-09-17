@@ -26,8 +26,7 @@ README covers install and human quick start. This file is the agent execution co
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
-The state ownership, fail-closed tracker, and optional-integration boundary
-are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
+The state ownership, fail-closed tracker, and optional-integration boundary are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
 
 ## Core Contracts
 
@@ -154,7 +153,7 @@ Core scripts:
 ## References
 
 - `references/adapter-ports.md` — tracker adapter port contract: per-adapter CLI, plan-ref grammar, create command, and close verb; required ops, fail-closed availability, capability gates.
-- `references/file-format.md` — sprint file shape, `.dev-backlog/` config, and the optional diagnostic export (`sync-pull.js --legacy-export`).
+- `references/file-format.md` — sprint file shape and `.dev-backlog/` config.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).

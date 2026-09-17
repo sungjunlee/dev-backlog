@@ -29,4 +29,4 @@ Spec absence never creates work. A self-contained GitHub Issue follows the
 sprint-free Issue → PR path. If execution complexity requires a sprint, a cold
 adopter can still create, resume, and close it with `objectives:` and
 `component:` omitted. Neither path may require craftkit, Relay, GitHub
-Projects, task mirrors, generated memory, or Backlog.md.
+Projects, local task copies, generated memory, or Backlog.md.

@@ -16,7 +16,7 @@ plus the code paths in `github-tracker.js`, `github-milestones.js`,
 
 | Call | Where | Purpose | gh calls per command run |
 | --- | --- | --- | --- |
-| `gh issue list … --json …` | github-tracker.js `list` | plan/status/next/sync-pull reads | 1 per list |
+| `gh issue list … --json …` | github-tracker.js `list` | plan/status/next reads | 1 per list |
 | `gh issue view <n> --json …` | github-tracker.js `read`; triage-apply label pre-read | single issue read | 1 per read |
 | `gh api repos/{owner}/{repo}/milestones --jq .due_on` | github-milestones.js `getMilestoneDue` | milestone due-date lookup (sprint-init) | sprint-init total: **2** (due lookup + open-issue list) |
 | `gh api --paginate repos/{owner}/{repo}/milestones?state=all&per_page=100 --jq '[.number, .state] | @tsv'` | github-milestones.js `closeMilestone` | milestone state lookup (sprint-close) | close-milestone: **1+ pages** for lookup, plus **1 PATCH** or **0** when already closed |

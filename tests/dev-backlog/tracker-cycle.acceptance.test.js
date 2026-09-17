@@ -12,10 +12,8 @@ const { writeGhFixture } = require(path.join(TEST_FAKES, "fake-gh-fixture.js"));
 const SCRIPTS_DIR = SKILL_SCRIPTS;
 const {
   DEFAULT_BACKLOG_DIR,
-  LEGACY_TASKS_DIR,
 } = require(path.join(SCRIPTS_DIR, "execution-root.js"));
 const TRACKER_PATH = path.join(SCRIPTS_DIR, "tracker.js");
-const SYNC_PATH = path.join(SCRIPTS_DIR, "sync-pull.js");
 const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
 const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
 const STATUS_PATH = path.join(SCRIPTS_DIR, "status.sh");
@@ -134,19 +132,6 @@ function runGithubCycle(fixture) {
     tracker: "github", id: "42", ref: "#42", url: "https://github.test/acme/widgets/issues/42",
   });
 
-  const pulled = parseJsonResult(
-    run(process.execPath, [SYNC_PATH, "--legacy-export", "--limit", "1", "--json"], fixture),
-    "github sync-pull"
-  );
-  assert.equal(pulled.createdFiles[0], "BACK-42 - cycle-task.md");
-  const taskPath = path.join(fixture.root, LEGACY_TASKS_DIR, pulled.createdFiles[0]);
-  const today = new Date().toISOString().slice(0, 10);
-  assert.equal(fs.readFileSync(taskPath, "utf8"), [
-    "---", "id: BACK-42", "title: Cycle task", "status: To Do", "labels: []",
-    "priority: high", "milestone: Cycle Milestone", `created_date: '${today}'`, "---",
-    "## Description", "Human GitHub body", "", "## Acceptance Criteria", "- [ ] Preserve me", "",
-  ].join("\n"));
-
   const init = parseJsonResult(run(process.execPath, [
     SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone", "--json",
   ], fixture), "github sprint-init");
@@ -161,17 +146,10 @@ function runGithubCycle(fixture) {
   assert.equal(next.next_batch.items[0].ref, "#42");
   assert.equal(runWorker(fixture, "read", { selector: "#42" }).title, "Cycle task");
 
-  const originalBody = fs.readFileSync(taskPath, "utf8").slice(fs.readFileSync(taskPath, "utf8").indexOf("\n## Description"));
   runWorker(fixture, "update", { selector: "#42", changes: { title: "Cycle task renamed" } });
-  parseJsonResult(run(process.execPath, [
-    SYNC_PATH, "--legacy-export", "--limit", "1", "--update", "--json",
-  ], fixture), "github update mirror");
-  const updatedMirror = fs.readFileSync(taskPath, "utf8");
-  assert.match(updatedMirror, /^title: Cycle task renamed$/m);
-  assert.equal(updatedMirror.slice(updatedMirror.indexOf("\n## Description")), originalBody);
+  assert.equal(runWorker(fixture, "read", { selector: "#42" }).title, "Cycle task renamed");
 
   finishSprint(fixture, sprintPath, { closeMilestone: true });
-  assert.equal(fs.readFileSync(taskPath, "utf8"), updatedMirror);
   assert.equal(fs.existsSync(path.join(fixture.backlogDir, "tasks")), false);
   assert.equal(fs.existsSync(path.join(fixture.backlogDir, "completed")), false);
   runWorker(fixture, "close", { selector: "#42" });
@@ -187,12 +165,11 @@ function runGithubCycle(fixture) {
   const calls = fixture.providerCalls();
   assert.deepEqual(calls, [
     ["issue", "create", "--title", "Cycle task", "--body", body],
-    ["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"],
     ["api", "repos/{owner}/{repo}/milestones", "--jq", '.[] | select(.title==env.MS) | .due_on'],
     ["issue", "list", "--milestone", "Cycle Milestone", "--state", "open", "--json", "number,title,labels"],
     ["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"],
     ["issue", "edit", "42", "--title", "Cycle task renamed"],
-    ["issue", "list", "--state", "open", "--limit", "1", "--json", "number,title,body,labels,milestone,assignees"],
+    ["issue", "view", "42", "--json", "number,title,body,labels,milestone,assignees,createdAt,updatedAt"],
     ["api", "--paginate", "repos/{owner}/{repo}/milestones?state=all&per_page=100", "--jq", '.[] | select(.title==env.MS) | [.number, .state] | @tsv'],
     ["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"],
     ["issue", "close", "42"],

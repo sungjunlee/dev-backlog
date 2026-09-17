@@ -13,7 +13,7 @@ freezes it at `["github", "files"]`.
   adapter only.
 - Availability may reject the configured adapter (`TrackerUnavailableError`).
   It never chooses a different tracker, never consults a second registered
-  adapter, and never falls back to local files or `sync-pull --legacy-export`.
+  adapter, and never falls back to local files.
 - Changing trackers is an explicit `.tracker` rewrite at setup, not a runtime
   decision.
 
@@ -100,10 +100,9 @@ Missing, empty, extra, inherited, or invalid fields raise
 ## Fail-closed
 
 There is no silent fallback to another adapter, `backlog/tasks/`,
-`exports/github-issues/`, or any local file. Diagnose the configured tracker
-and stop. Diagnostic export is opt-in (`sync-pull.js --legacy-export`) and is
-not on orient / plan / work / complete.
+or any local file. Diagnose the configured tracker
+and stop.
 
 Adapter implementations: `github-tracker.js`, `files-tracker.js` (Backlog.md
-CLI only). Export layout: `file-format.md`. Authority routing:
+CLI only). Layout: `file-format.md`. Authority routing:
 `authority-contract.md`.
