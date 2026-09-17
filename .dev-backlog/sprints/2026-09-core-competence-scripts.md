@@ -13,8 +13,8 @@ dev-backlog and backlog-triage scripts shrink to the four surfaces that beat `gh
 
 ## Plan
 ### Batch 1 - Test infra out, spec rev 19 (parallel-safe: #441 scripts/tests/CI, #442 spec/)
-- [ ] #441 Move test infrastructure out of the skill bundle; delete context-hook.sh and init.sh (~1h)
-- [ ] #442 Charter rev 19: GitHub-only (files parked), diagnostic export deleted, reassess-signal bookkeeping retired (~1h)
+- [~] #441 Move test infrastructure out of the skill bundle; delete context-hook.sh and init.sh (~1h) [run:grok-441]
+- [~] #442 Charter rev 19: GitHub-only (files parked), diagnostic export deleted, reassess-signal bookkeeping retired (~1h) → PR #448 (open)
 
 ### Batch 2 - Delete the gh wrappers (parallel-safe: #443 effective-task-spec + Work rail, #444 sync-pull/legacy)
 - [ ] #443 Delete effective-task-spec.js; the Work rail reads the Issue with gh (~2h)
