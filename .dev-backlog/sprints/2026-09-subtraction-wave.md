@@ -15,16 +15,16 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 
 ## Plan
 ### Batch 1 - Reconcile and re-lighten (parallel-safe: #421 touches spec/ and triage/, #422 touches SKILL.md + adapter-ports.md)
-- [~] #421 Reassess under the status-free charter; amend charter to match the #411 tracker wave (human-gated) (~2h) → PR #429 (open)
+- [~] #421 Reassess under the status-free charter; amend charter to match the #411 tracker wave (human-gated) (~2h) → PR #429 (merged)
 - [x] #422 Re-lighten dev-backlog SKILL.md after the #411 tracker wave: tracker branching off the hot path (~2h) → PR #430 (merged)
 
 ### Batch 2 - Measure the tracker wave (needs #422)
 - [x] #423 Conformance run for the #411 tracker wave and the re-lightened SKILL.md (Fable 5.1 + GPT-6 Astra) (~3h) → PR #432 (merged)
 
 ### Batch 3 - Delete (parallel-safe: #424 scripts/tests for gitlab, #425 references; #424 and #426 wait for the #421 amendment)
-- [ ] #424 Park the GitLab adapter until a measured consumer exists (~2h)
+- [~] #424 Park the GitLab adapter until a measured consumer exists (~2h) [run:grok-424]
 - [~] #425 Delete low-ROE dev-backlog references (integration-contract, github-sync, process, scripts, boundaries, checkbox-repair) (~3h) → PR #435 (merged)
-- [ ] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h)
+- [~] #426 Remove spec-axis linters (objectives-check, component-lint, capabilities-doctor); component: is a free scope string (~3h) [run:opus-426]
 - [~] #431 Plan rail: setup migrates a legacy backlog/ skill layout (rule re-add from the #423 evidence; unplanned, admitted 2026-09-17) (~30min) → PR #436 (merged)
 
 ### Batch 4 - Triage experiment (independent; can run alongside Batch 3)
@@ -50,3 +50,4 @@ dev-backlog spec, code, and hot path agree after the #411 tracker wave, and ever
 - 2026-09-17: Batch 2 closed (#423 merged, PR #432). Batch 4 #427 measured: variant B plan-level equivalent on both models; deletion filed as #433, PR #434 under Sol review. Batch 3 #425 dispatched to Grok 4.6 (cursor-agent, own worktree); #424/#426 wait on the #421 spec gate.
 - 2026-09-17: #425 merged (PR #435; references 10 → 4 files, −892 lines). Astra review DO NOT MERGE overridden on evidence (dev-relay consumes sprint-state JSON, not the doc). Post-merge hotfix: a backtick inside the doctor remediation template literal broke `backlog-doctor.js` on main for one commit; caught by re-running smoke, fixed in the next commit. Lesson: never chain `gh pr merge` after a grep-filtered test run — check exit codes explicitly.
 - 2026-09-17: #431 merged (PR #436). Remaining: #421 spec gate (PR #429 open, human decision), then #424 and #426, then #428. Batch 1/2/4 done; Batch 3 has #425 and #431 done.
+- 2026-09-17: Spec gate approved; #421 merged (PR #429, charter rev 18). #424 dispatched to Grok 4.6, #426 to Opus 5, both in own worktrees.
