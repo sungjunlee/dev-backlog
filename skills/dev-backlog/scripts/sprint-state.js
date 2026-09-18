@@ -469,8 +469,9 @@ function readSprintState({
 }
 
 // ---------------------------------------------------------------------------
-// Text rendering. Line-for-line the output next.sh / status.sh printed in bash
-// before #468; the shell scripts now exec `--format text` instead of parsing.
+// Text rendering. The shape next.sh / status.sh printed in bash before #468,
+// on JSON semantics (Plan-only counts, started-ordered portfolio, fail-loud
+// overlap, trimmed trailing blanks). The shell scripts exec `--format text`.
 // ---------------------------------------------------------------------------
 
 const NO_SPRINT_HINT = "List open tasks in the task authority.";
