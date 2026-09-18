@@ -27,7 +27,7 @@ CLI / [`glab`](https://gitlab.com/gitlab-org/cli) when you opt out of GitHub
 with one line:
 
 ```bash
-printf 'backlog\n' > .dev-backlog/.tracker   # or: gitlab
+mkdir -p .dev-backlog && printf 'backlog\n' > .dev-backlog/.tracker   # or: gitlab
 ```
 
 To inspect scripts from a clone:

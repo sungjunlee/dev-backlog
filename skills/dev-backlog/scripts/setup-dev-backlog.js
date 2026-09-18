@@ -18,7 +18,7 @@ const {
 const { readTaskAuthority } = require("./lib.js");
 
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
-const TRACKER_FLAG_NOTICE = "--tracker is ignored since v0.12.0 (GitHub only)";
+const TRACKER_FLAG_NOTICE = "--tracker is ignored since v0.12.0; the task authority is the .dev-backlog/.tracker line";
 
 class SetupError extends Error {
   constructor(message, options = {}) {
@@ -32,7 +32,7 @@ function usage() {
   return [
     "Usage: setup-dev-backlog.js [--non-interactive] [--json] [--tracker <key>]",
     "Creates .dev-backlog/sprints/ and migrates a legacy backlog/ skill layout.",
-    "--tracker is accepted and ignored (GitHub only since v0.12.0).",
+    "--tracker is accepted and ignored; write .dev-backlog/.tracker by hand to choose the authority.",
   ].join("\n");
 }
 

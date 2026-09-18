@@ -129,13 +129,14 @@ fi
 # defaults to github — an unreadable or irregular one is a hard stop.
 if $CLOSE_MILESTONE; then
   TRACKER="$BACKLOG_DIR/.tracker"
-  if [ ! -e "$TRACKER" ]; then
+  if [ ! -e "$TRACKER" ] && [ ! -L "$TRACKER" ]; then
     AUTHORITY=github
   elif [ ! -f "$TRACKER" ] || ! AUTHORITY=$(head -n1 "$TRACKER"); then
     echo "Refusing --close-milestone: cannot read task authority from $TRACKER."
     exit 1
   else
-    AUTHORITY=$(printf '%s' "$AUTHORITY" | tr -d '\357\273\277' | sed 's/\r$//;s/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
+    BOM=$(printf '\357\273\277'); AUTHORITY="${AUTHORITY#"$BOM"}"
+    AUTHORITY=$(printf '%s' "$AUTHORITY" | sed 's/\r$//;s/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
   fi
   if [ "$AUTHORITY" != "github" ]; then
     echo "Refusing --close-milestone: task authority is '$AUTHORITY' (.dev-backlog/.tracker); milestones are GitHub-only."

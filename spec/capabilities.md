@@ -25,13 +25,13 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - Fail-loud CLI availability and authentication errors: a failed live read stops execution
 
 **Out-of-scope:**
-- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs), and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one line of prose and no code, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
+- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs) plus its entry in the scripts' allow-list, and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one line of prose and no code, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
 - Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage snapshots are advisory input to a report, never authority)
 - Scripts that wrap the authority CLI for reading tasks, resolving specifications, or seeding Plans; scripts never invoke `gh`, `backlog`, or `glab` for task state (`triage-apply` and `--close-milestone` are the GitHub-only exceptions)
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
-- Task work reads the live task with the declared authority's Read verb (`gh issue view --json body,comments` by default); on GitHub the newest comment titled `## Agent Brief` overrides the body, and in every authority a `spec_ref:` line in the body naming a file or URL overrides the body. If that read fails, execution stops fail-closed; the authority is never inferred from which CLI is installed.
+- Task work reads the live task with the declared authority's Read verb (`gh issue view --json body,comments` by default); on GitHub the newest comment titled `## Agent Brief` overrides the body, and in every authority a `spec_ref:` line in the body naming a file or URL overrides the body (on GitHub, the Agent Brief as well). If that read fails, execution stops fail-closed; the authority is never inferred from which CLI is installed.
 - Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through the declared authority's CLI.
 - Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
 

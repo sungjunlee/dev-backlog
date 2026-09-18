@@ -64,9 +64,12 @@ task item.
 One line naming the task authority: `github` (the default when the file is
 absent), `backlog` (the Backlog.md CLI; `files` is accepted as the legacy
 spelling), or `gitlab`. Setup never writes it; a maintainer creates it by hand
-to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). Only the
-session and `sprint-state.js` (for the JSON `tracker` field) read it; any other
-value fails loud. No adapter code: the `files` adapter and the frozen ports
+to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). Readers: the
+session, `sprint-state.js` (JSON `tracker` field), `setup-dev-backlog.js`
+(result line), and `sprint-close.sh --close-milestone` (GitHub-only guard).
+Only the first line counts, trimmed and case-insensitive; an empty, unknown,
+unreadable, or directory `.tracker` fails loud — only an absent file means
+`github`. No adapter code: the `files` adapter and the frozen ports
 stay at tag `v0.11.0`.
 
 ## .dev-backlog/config.yml
