@@ -214,9 +214,84 @@ started: 2026-07-01
     assert.equal(state.in_flight[0].age_basis_date, "2026-07-03");
     assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["#2"]);
   });
+
+  // --- .dev-backlog/.tracker task authority (#476) ---
+
+  it("sets plan_items[].tracker and in_flight[].tracker from a declared .tracker file", () => {
+    writeFile(path.join(backlogDir, "sprints", "authority.md"), `---
+status: active
+started: 2026-07-01
+---
+
+## Plan
+- [~] #1 In flight
+- [ ] #2 Todo
+
+## Progress
+`);
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "backlog\n");
+
+    const state = readSprintState({
+      backlogDir,
+      today: new Date("2026-07-02T00:00:00Z"),
+    });
+
+    assert.deepEqual(state.plan_items.map((item) => item.tracker), ["backlog", "backlog"]);
+    assert.deepEqual(state.in_flight.map((item) => item.tracker), ["backlog"]);
+    assert.equal(state.next_batch.items[0].tracker, "backlog");
+  });
+
+  it("keeps tracker as github when .tracker is absent", () => {
+    writeFile(path.join(backlogDir, "sprints", "default.md"), `---
+status: active
+---
+
+## Plan
+- [ ] #1 Todo
+
+## Progress
+`);
+
+    const state = readSprintState({ backlogDir });
+    assert.deepEqual(state.plan_items.map((item) => item.tracker), ["github"]);
+  });
+
+  it("fails loud (stderr + exit 1) on an unknown .tracker value via the CLI", () => {
+    const { spawnSync } = require("child_process");
+    const BIN = path.resolve(__dirname, "../../skills/dev-backlog/scripts/sprint-state.js");
+    fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
+
+    const res = spawnSync(process.execPath, [BIN, backlogDir], { encoding: "utf8" });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /Unknown task authority "local"/);
+  });
 });
 
 describe("parseSprintContent", () => {
+  it("defaults tracker to github and honors an explicit authority override (#476)", () => {
+    const content = `---
+status: active
+---
+
+## Plan
+- [~] #1 In flight
+
+## Progress
+`;
+    const defaulted = parseSprintContent({ sprintPath: ".dev-backlog/sprints/a.md", content });
+    assert.equal(defaulted.plan_items[0].tracker, "github");
+    assert.equal(defaulted.in_flight[0].tracker, "github");
+
+    const overridden = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/a.md",
+      content,
+      authority: "gitlab",
+    });
+    assert.equal(overridden.plan_items[0].tracker, "gitlab");
+    assert.equal(overridden.in_flight[0].tracker, "gitlab");
+  });
+
   it("marks unmoored in-flight items without trace pointers", () => {
     const state = parseSprintContent({
       sprintPath: ".dev-backlog/sprints/unmoored.md",

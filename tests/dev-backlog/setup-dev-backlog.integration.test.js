@@ -73,6 +73,21 @@ describe("GitHub-only setup real process integration", () => {
     assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
   });
 
+  it("names the declared task authority on the human result line (#476)", (t) => {
+    const root = makeRoot(t);
+    const withoutTracker = runCli(root, ["--non-interactive"]);
+    assert.equal(withoutTracker.status, 0, withoutTracker.stderr);
+    assert.match(
+      withoutTracker.stdout,
+      /Task authority: github \(default; \.dev-backlog\/\.tracker not present\)/
+    );
+
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "backlog\n");
+    const withTracker = runCli(root, ["--non-interactive"]);
+    assert.equal(withTracker.status, 0, withTracker.stderr);
+    assert.match(withTracker.stdout, /Task authority: backlog \(\.dev-backlog\/\.tracker\)/);
+  });
+
   it("leaves complex config bytes untouched and never reads a tracker key", (t) => {
     const root = makeRoot(t);
     const raw = [
@@ -85,11 +100,23 @@ describe("GitHub-only setup real process integration", () => {
       "tail: preserved",
     ].join("\r\n");
     const configPath = writeConfig(root, raw);
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "local\n");
+    // A valid declared authority (#476); the embedded "tracker: local" strings
+    // above are config.yml content, never parsed as YAML keys either way.
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
     const result = runCli(root, ["--non-interactive", "--json"]);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.readFileSync(configPath, "utf8"), raw);
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "local\n");
+    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
+  });
+
+  it("fails loud on an unknown declared .tracker value (#476)", (t) => {
+    const root = makeRoot(t);
+    fs.mkdirSync(path.join(root, ".dev-backlog"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "local\n");
+    const result = runCli(root, ["--non-interactive", "--json"]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown task authority "local"/);
+    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), false);
   });
 
   it("repairs partial structure and reruns byte-idempotently", (t) => {

@@ -1,5 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
@@ -9,6 +11,7 @@ const {
   parseIssueRef,
   parsePlanCheckbox,
   containsIssueRef,
+  readTaskAuthority,
 } = require(path.join(SKILL_SCRIPTS, "lib.js"));
 
 // --- slugify ---
@@ -201,5 +204,65 @@ describe("scopesOverlap", () => {
     assert.equal(scopesOverlap({ component: "auth" }, { scope: ["src/auth/**"] }), false);
     assert.equal(scopesOverlap({}, {}), false);
     assert.equal(scopesOverlap({ component: "auth" }, {}), false);
+  });
+});
+
+// --- readTaskAuthority (#476) ---
+
+describe("readTaskAuthority", () => {
+  function root(t) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "task-authority-"));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    return dir;
+  }
+  function write(dir, content) {
+    fs.writeFileSync(path.join(dir, ".tracker"), content);
+  }
+
+  it("defaults to github when .tracker is absent", (t) => {
+    assert.equal(readTaskAuthority(root(t)), "github");
+  });
+
+  it("reads a declared github value", (t) => {
+    const dir = root(t);
+    write(dir, "github\n");
+    assert.equal(readTaskAuthority(dir), "github");
+  });
+
+  it("maps backlog and the legacy files spelling to backlog", (t) => {
+    const backlogDir = root(t);
+    write(backlogDir, "backlog\n");
+    assert.equal(readTaskAuthority(backlogDir), "backlog");
+
+    const filesDir = root(t);
+    write(filesDir, "files\n");
+    assert.equal(readTaskAuthority(filesDir), "backlog");
+  });
+
+  it("reads gitlab case-insensitively", (t) => {
+    const dir = root(t);
+    write(dir, "GITLAB\n");
+    assert.equal(readTaskAuthority(dir), "gitlab");
+  });
+
+  it("trims a trailing newline and surrounding whitespace on the first line", (t) => {
+    const dir = root(t);
+    write(dir, "  backlog  \n");
+    assert.equal(readTaskAuthority(dir), "backlog");
+  });
+
+  it("reads only the first line, ignoring anything after it", (t) => {
+    const dir = root(t);
+    write(dir, "github\nbacklog\n");
+    assert.equal(readTaskAuthority(dir), "github");
+  });
+
+  it("throws on an unknown value, naming the value and the file", (t) => {
+    const dir = root(t);
+    write(dir, "local\n");
+    assert.throws(
+      () => readTaskAuthority(dir),
+      /Unknown task authority "local" in .*\.tracker; expected github, backlog, or gitlab\./
+    );
   });
 });

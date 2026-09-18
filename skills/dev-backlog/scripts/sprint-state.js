@@ -13,7 +13,7 @@ const {
   parseSimpleYaml,
   scopesOverlap,
   containsIssueRef,
-  parsePlanCheckbox,
+  parsePlanCheckbox, readTaskAuthority,
   DEFAULT_BACKLOG_DIR,
 } = require("./lib.js");
 
@@ -356,11 +356,12 @@ function computeAge(identityOrIssueNumber, progressEntries, startedDate, today) 
 function parseSprintContent({
   sprintPath,
   content,
-  today = new Date(),
+  today = new Date(), authority = "github",
 }) {
   const frontmatter = parseFrontmatter(content);
   const goal = extractSectionLines(content, "Goal").join("\n").trim();
   const planItems = parsePlanItems(extractSectionLines(content, "Plan"));
+  for (const item of planItems) item.tracker = authority; // #476: declared authority wins
   const progressEntries = parseProgressEntries(extractSectionLines(content, "Progress"));
   const nextBatch = findNextBatch(planItems);
   const inFlight = planItems
@@ -428,6 +429,7 @@ function readSprintState({
   readFileSync = fs.readFileSync,
 } = {}) {
   const sprintsDir = path.join(backlogDir, "sprints");
+  const authority = readTaskAuthority(backlogDir); // #476: read once per run
   const activeFiles = findActiveSprintFiles(sprintsDir, {
     existsSync,
     readdirSync,
@@ -441,6 +443,7 @@ function readSprintState({
       sprintPath,
       content: readFileSync(sprintPath, "utf-8"),
       today,
+      authority,
     }))
     .sort(comparePerSprint);
 

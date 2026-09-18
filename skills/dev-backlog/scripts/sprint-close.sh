@@ -126,6 +126,8 @@ fi
 # There is no automatic retry and no fallback authority: fix GitHub access
 # (rate limit / auth / outage) and re-run the close.
 if $CLOSE_MILESTONE && ! $DRY_RUN; then
+  [ -f "$BACKLOG_DIR/.tracker" ] && AUTHORITY=$(tr -d '\r' < "$BACKLOG_DIR/.tracker" | head -n1 | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//') || AUTHORITY=github
+  [ "$AUTHORITY" = "github" ] || { echo "Refusing --close-milestone: task authority is '$AUTHORITY' (.dev-backlog/.tracker); milestones are GitHub-only."; exit 1; }
   CLOSE_MILESTONE_NAME=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -z "$CLOSE_MILESTONE_NAME" ]; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."

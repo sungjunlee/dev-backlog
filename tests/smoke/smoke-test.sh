@@ -887,6 +887,33 @@ assert_equals "close mirrorless: sprint completed" \
 OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" 2>&1)
 assert_contains "close: no active sprint" "$OUT" "No active sprint"
 
+# --- refuses --close-milestone under a non-GitHub task authority (#476) ---
+rm -rf "$TEST_DIR/.dev-backlog"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints"
+cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-authority.md" <<'EOF'
+---
+milestone: Authority Sprint
+status: active
+---
+
+## Plan
+- [x] #1 Done task
+
+## Progress
+EOF
+echo "backlog" >"$TEST_DIR/.dev-backlog/.tracker"
+
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --close-milestone 2>&1)
+STATUS=$?
+set -e
+assert_equals "close --close-milestone non-github authority: exit code" "$STATUS" "1"
+assert_contains "close --close-milestone non-github authority: refusal message" "$OUT" \
+	"Refusing --close-milestone: task authority is 'backlog' (.dev-backlog/.tracker); milestones are GitHub-only."
+assert_contains "close --close-milestone non-github authority: sprint file untouched" \
+	"$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-authority.md")" "active"
+rm -f "$TEST_DIR/.dev-backlog/.tracker"
+
 # ============================================================
 # cold-adopter portability (adoption-hardening V1, PRD 2026-07)
 # ============================================================

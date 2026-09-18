@@ -1,6 +1,23 @@
 /** Shared library for dev-backlog Node scripts. */
 
+const fs = require("node:fs");
+const path = require("node:path");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
+const TASK_AUTHORITIES = { github: "github", backlog: "backlog", files: "backlog", gitlab: "gitlab" };
+/** `<backlogDir>/.tracker`, one line; absent -> "github". Unknown values fail loud (#476). */
+function readTaskAuthority(backlogDir) {
+  const trackerPath = path.join(backlogDir, ".tracker");
+  let line = "github";
+  try {
+    line = fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (!(line in TASK_AUTHORITIES)) {
+    throw new Error(`Unknown task authority "${line}" in ${trackerPath}; expected github, backlog, or gitlab.`);
+  }
+  return TASK_AUTHORITIES[line];
+}
 
 const GH_EXEC_DEFAULTS = Object.freeze({
   encoding: "utf-8",
@@ -234,6 +251,7 @@ module.exports = {
   parseIssueRef,
   parsePlanCheckbox,
   containsIssueRef,
+  readTaskAuthority,
   DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
 };
