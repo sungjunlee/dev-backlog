@@ -16,8 +16,8 @@ The two keep-test candidates left open at v0.13.0 are gone — one implementatio
 
 ### Batch 1 — parallel (disjoint files)
 
-- [ ] #468 next.sh / status.sh render text from sprint-state.js; delete bash sprint parsing (est: 2h)
-- [ ] #469 smoke-test.sh: delete GATE_* / gated_assert scaffolding (est: 30m)
+- [~] #468 next.sh / status.sh render text from sprint-state.js; delete bash sprint parsing [branch:468-next-status-text-from-sprint-state]
+- [x] #469 smoke-test.sh: delete GATE_* / gated_assert scaffolding → PR #471 (merged)
 
 ### Batch 2 — release
 
@@ -31,4 +31,5 @@ The two keep-test candidates left open at v0.13.0 are gone — one implementatio
 ## Progress
 
 - 2026-09-18: sprint opened; epic #467, issues #468–#470, milestone 26.
+- 2026-09-18: #469 merged (PR #471, Sol MERGE); #468 in flight.
   
