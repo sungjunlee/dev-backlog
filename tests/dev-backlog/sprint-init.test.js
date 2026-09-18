@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
 const {
@@ -342,6 +343,45 @@ describe("createSprintFile", () => {
     }
   });
 
+  it("rejects the retired --dry-run / --json flags and a missing --milestone value (#457)", () => {
+    assert.match(parseArgs(["auth", "--dry-run"]).error, /Unknown argument: --dry-run/);
+    assert.match(parseArgs(["auth", "--json"]).error, /Unknown argument: --json/);
+    assert.match(parseArgs(["auth", "--milestone"]).error, /Missing value for --milestone/);
+    assert.match(parseArgs(["auth", "--milestone", "--scope", "src/**"]).error, /Missing value for --milestone/);
+  });
+
+  it("exits 1 and creates nothing when --component and --scope are both given (#331)", () => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const run = spawnSync(process.execPath, [
+      cli, "probe", "--component", "one-axis", "--scope", "src/**",
+    ], { cwd: tmpDir, encoding: "utf-8" });
+
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /cannot be used together/);
+    assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
+  });
+
+  it("exits 1 and creates nothing on a retired flag (#457)", () => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const run = spawnSync(process.execPath, [cli, "probe", "--dry-run"], { cwd: tmpDir, encoding: "utf-8" });
+
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /Unknown argument: --dry-run/);
+    assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
+  });
+
+  it("writes a skeleton with an empty Plan and no placeholder prose", () => {
+    const result = createSprintFile({
+      topic: "misc",
+      milestone: "Sprint W14",
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    });
+
+    assert.doesNotMatch(result.content, /Order into parallel-safe batches|add issues here/);
+    assert.match(fs.readFileSync(result.sprintFile, "utf-8"), /## Plan\n\n/);
+  });
+
   it("creates a disjoint-scope second active track without refusal (#292)", () => {
     fs.writeFileSync(
       path.join(tmpDir, "2026-04-current.md"),
@@ -399,7 +439,7 @@ describe("createSprintFile", () => {
     assert.equal(fs.existsSync(result.sprintFile), true);
   });
 
-  it("throws when target sprint file already exists", () => {
+  it("throws when the target sprint file already exists and leaves it untouched", () => {
     fs.writeFileSync(path.join(tmpDir, "2026-04-auth-system.md"), "existing content");
 
     assert.throws(() => {
@@ -410,6 +450,7 @@ describe("createSprintFile", () => {
         today: new Date("2026-04-05T09:00:00Z"),
       });
     }, /Sprint file already exists/);
+    assert.equal(fs.readFileSync(path.join(tmpDir, "2026-04-auth-system.md"), "utf-8"), "existing content");
   });
 
   it("creates sprintsDir when it does not exist", () => {

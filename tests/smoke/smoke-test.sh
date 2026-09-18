@@ -1141,7 +1141,7 @@ STATUS=$?
 set -e
 assert_equals "multi-track #292: disjoint second-track init exit code" "$STATUS" "0"
 assert_not_contains "multi-track #292: disjoint init creates with no warnings" "$OUT" "Warning:"
-assert_contains "multi-track #292: disjoint init writes scope frontmatter" "$(cat "$MT_LIFE_DIR/.dev-backlog/sprints/"*billing*.md)" 'scope: ["src/billing/**"]'
+assert_equals "multi-track #292: disjoint init writes scope frontmatter" "$(grep '^scope:' "$MT_LIFE_DIR/.dev-backlog/sprints/"*billing*.md)" 'scope: ["src/billing/**"]'
 
 set +e
 OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" 2>&1)

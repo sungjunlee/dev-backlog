@@ -46,13 +46,26 @@ function parseArgs(args) {
   const topic = args[0];
   if (topic.startsWith("--")) return { error: USAGE };
 
-  let milestone = topic;
-  const msIdx = args.indexOf("--milestone");
-  if (msIdx !== -1 && args[msIdx + 1]) milestone = args[msIdx + 1];
+  const KNOWN_FLAGS = ["--milestone", "--component", "--scope"];
+  for (let i = 1; i < args.length; i += 1) {
+    if (args[i].startsWith("--") && !KNOWN_FLAGS.includes(args[i])) {
+      return { error: `Unknown argument: ${args[i]}. ${USAGE}` };
+    }
+    if (KNOWN_FLAGS.includes(args[i])) i += 1;
+  }
 
   // Explicit only (D2): the track axis is never inferred from touched paths.
   const trackAxis = parseTrackAxis(args);
   if (trackAxis.error) return trackAxis;
+
+  let milestone = topic;
+  const msIdx = args.indexOf("--milestone");
+  if (msIdx !== -1) {
+    if (!args[msIdx + 1] || args[msIdx + 1].startsWith("--")) {
+      return { error: `Missing value for --milestone. ${USAGE}` };
+    }
+    milestone = args[msIdx + 1];
+  }
   return { topic, milestone, ...trackAxis };
 }
 
