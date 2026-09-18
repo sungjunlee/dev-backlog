@@ -9,6 +9,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 ### Changed
 
 - **Task authority is one `.dev-backlog/.tracker` line** (absent = `github`; `backlog` for the Backlog.md CLI, `files` as its legacy spelling; `gitlab`) and SKILL.md carries a three-verb table (read / create / close) in place of the four `gh` rails. Charter rev 20 (epic #472); references, README, CLAUDE.md, and the prose tests follow. No adapter code; the parked `files` adapter stays parked (#475).
+- Scripts read an optional `.dev-backlog/.tracker` declared task authority (default `github`; `backlog`/legacy `files`; `gitlab`; unknown value fails loud) into `sprint-state.js`'s `tracker` field, `sprint-close.sh --close-milestone`'s GitHub-only refusal, and `setup-dev-backlog.js`'s human result line; `readTaskAuthority` is exported from `lib.js`. Setup never writes `.tracker`. Closes [#476](https://github.com/sungjunlee/dev-backlog/issues/476).
 
 ## [0.14.0] — 2026-09-18
 

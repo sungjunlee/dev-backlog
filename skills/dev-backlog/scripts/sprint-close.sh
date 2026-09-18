@@ -125,6 +125,23 @@ fi
 # local sprint must remain active — never completed-with-open-milestone.
 # There is no automatic retry and no fallback authority: fix GitHub access
 # (rate limit / auth / outage) and re-run the close.
+# The task authority guard runs even under --dry-run; only an absent .tracker
+# defaults to github — an unreadable or irregular one is a hard stop.
+if $CLOSE_MILESTONE; then
+  TRACKER="$BACKLOG_DIR/.tracker"
+  if [ ! -e "$TRACKER" ]; then
+    AUTHORITY=github
+  elif [ ! -f "$TRACKER" ] || ! AUTHORITY=$(head -n1 "$TRACKER"); then
+    echo "Refusing --close-milestone: cannot read task authority from $TRACKER."
+    exit 1
+  else
+    AUTHORITY=$(printf '%s' "$AUTHORITY" | tr -d '\357\273\277' | sed 's/\r$//;s/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
+  fi
+  if [ "$AUTHORITY" != "github" ]; then
+    echo "Refusing --close-milestone: task authority is '$AUTHORITY' (.dev-backlog/.tracker); milestones are GitHub-only."
+    exit 1
+  fi
+fi
 if $CLOSE_MILESTONE && ! $DRY_RUN; then
   CLOSE_MILESTONE_NAME=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -z "$CLOSE_MILESTONE_NAME" ]; then

@@ -2,9 +2,9 @@
 
 /**
  * Idempotent setup: create `.dev-backlog/sprints/`, migrate a legacy `backlog/`
- * skill layout, nothing else (#446). GitHub Issues are the only task authority
- * (#445): no selection step, no `.tracker`, and `config.yml` is never read or
- * written -- a leftover one keeps its bytes.
+ * skill layout, nothing else (#446). GitHub Issues are the task authority by
+ * default, or an optional `.dev-backlog/.tracker` value (read-only; #476).
+ * `config.yml` is never read or written -- a leftover one keeps its bytes.
  */
 
 const fs = require("node:fs");
@@ -15,6 +15,7 @@ const {
   leftoverSkillFiles,
   migrateLegacyExecutionRoot,
 } = require("./execution-root.js");
+const { readTaskAuthority } = require("./lib.js");
 
 const MINIMUM_DIRECTORIES = Object.freeze(["sprints"]);
 const TRACKER_FLAG_NOTICE = "--tracker is ignored since v0.12.0 (GitHub only)";
@@ -107,6 +108,7 @@ async function runSetup(options = {}, dependencies = {}) {
     migrateLegacyExecutionRoot(cwd, { fs: fsApi });
   }
   validateExistingStructure(backlogDir, fsApi);
+  readTaskAuthority(backlogDir);
 
   return Object.freeze({
     action: "setup-dev-backlog",
@@ -114,11 +116,14 @@ async function runSetup(options = {}, dependencies = {}) {
   });
 }
 
-function printHumanResult(result, output = process.stdout) {
+function printHumanResult(result, backlogDir, output = process.stdout) {
   output.write(result.createdDirectories.length > 0
     ? `Created directories: ${result.createdDirectories.join(", ")}\n`
     : "Backlog directories already complete.\n");
-  output.write("GitHub Issues are the task authority; verify gh auth status --hostname github.com.\n");
+  const source = fs.existsSync(path.join(backlogDir, ".tracker"))
+    ? "(.dev-backlog/.tracker)"
+    : "(default; .dev-backlog/.tracker not present)";
+  output.write(`Task authority: ${readTaskAuthority(backlogDir)} ${source}\n`);
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -132,7 +137,7 @@ async function main(argv = process.argv.slice(2)) {
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } else {
-    printHumanResult(result);
+    printHumanResult(result, path.join(process.cwd(), DEFAULT_BACKLOG_DIR));
   }
   return 0;
 }
