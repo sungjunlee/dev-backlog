@@ -25,7 +25,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - Fail-loud CLI availability and authentication errors: a failed live read stops execution
 
 **Out-of-scope:**
-- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs), and a row needs a measured consumer (GitLab is unmeasured as of 2026-09-18); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
+- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs), and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one line of prose and no code, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
 - Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage snapshots are advisory input to a report, never authority)
 - Scripts that wrap the authority CLI for reading tasks, resolving specifications, or seeding Plans; scripts never invoke `gh`, `backlog`, or `glab` for task state (`triage-apply` and `--close-milestone` are the GitHub-only exceptions)
 - GitHub Projects fields as task specification or lifecycle state

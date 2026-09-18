@@ -21,8 +21,9 @@ const LIVING_DEV_BACKLOG_REFERENCES = [
 for (const file of SURFACES) {
   it(`${file} states the one declared task authority with GitHub as the default`, () => {
     const markdown = fs.readFileSync(path.join(ROOT, file), "utf8");
-    assert.match(markdown, /task authority/i);
-    assert.match(markdown, /GitHub Issues?[^\n]*(?:by default|default)|default[^\n]*GitHub Issues?/i);
+    assert.match(markdown, /task authority[^\n]*(?:canonical|sole|standalone|only task authority)|(?:canonical|sole|standalone)[^\n]*task authority/i);
+    assert.match(markdown, /GitHub Issues?[^\n]*by default|by default[^\n]*GitHub Issues?/i);
+    assert.doesNotMatch(markdown, /GitHub Issues are not the default/i);
     assert.doesNotMatch(markdown, /local-tracker\.json\s*\(canonical/i);
     assert.doesNotMatch(markdown, /local-tracker\.js\s*->/i);
   });

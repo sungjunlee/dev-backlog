@@ -47,8 +47,8 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 | `.tracker` | Read the specification | Create | Close |
 | --- | --- | --- | --- |
 | `github` (default) | `gh issue view N --json body,comments`; the newest comment titled `## Agent Brief` overrides the body | `gh issue create` | `gh issue close N` |
-| `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` |
-| `gitlab` (`glab`, self-hosted included; documented, not yet measured) | `glab issue view N` | `glab issue create` | `glab issue close N` |
+| `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
+| `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
 
 A `spec_ref:` line in the body naming a file or URL overrides the body in every authority. `backlog-triage` and `sprint-close.sh --close-milestone` are GitHub-only.
 

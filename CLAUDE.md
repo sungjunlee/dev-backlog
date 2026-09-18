@@ -1,6 +1,6 @@
 # dev-backlog
 
-One task authority (GitHub Issues by default) as task truth + local sprint files for execution continuity,
+One sole task authority (GitHub Issues by default) as task truth + local sprint files for execution continuity,
 for Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
 `backlog-triage` (advisory open-issue grooming).
 
@@ -49,7 +49,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ```
 Task authority, GitHub Issues by default (what: definition, AC, lifecycle)
-      ↕ gh
+      ↕ the authority's CLI (`gh` by default)
 .dev-backlog/sprints/ (how: batches, running context, progress)
 ```
 
