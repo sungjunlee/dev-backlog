@@ -15,13 +15,11 @@ const {
 } = require(path.join(SKILL_SCRIPTS, "sprint-init.js"));
 
 describe("parseArgs", () => {
-  it("parses topic, milestone, dry-run, and json flags", () => {
-    const parsed = parseArgs(["auth-system", "--milestone", "Sprint W13", "--dry-run", "--json"]);
+  it("parses topic and milestone", () => {
+    const parsed = parseArgs(["auth-system", "--milestone", "Sprint W13"]);
     assert.deepEqual(parsed, {
       topic: "auth-system",
       milestone: "Sprint W13",
-      dryRun: true,
-      json: true,
     });
   });
 
@@ -29,12 +27,10 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["auth-system"]);
     assert.equal(parsed.topic, "auth-system");
     assert.equal(parsed.milestone, "auth-system");
-    assert.equal(parsed.dryRun, false);
-    assert.equal(parsed.json, false);
   });
 
   it("returns usage error when topic is missing", () => {
-    const parsed = parseArgs(["--json"]);
+    const parsed = parseArgs([]);
     assert.match(parsed.error, /Usage: sprint-init\.js/);
   });
 
@@ -54,7 +50,7 @@ describe("parseArgs", () => {
 
   it("rejects --scope without a value (#292)", () => {
     assert.match(parseArgs(["auth", "--scope"]).error, /Missing value for --scope/);
-    assert.match(parseArgs(["auth", "--scope", "--json"]).error, /Missing value for --scope/);
+    assert.match(parseArgs(["auth", "--scope", "--milestone"]).error, /Missing value for --scope/);
   });
 
   it("parses --component as an explicit track axis (#331)", () => {
@@ -157,7 +153,6 @@ describe("createSprintFile", () => {
     const result = createSprintFile({
       topic: "auth-system",
       milestone: "Sprint W13",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -165,9 +160,6 @@ describe("createSprintFile", () => {
     assert.equal(result.action, "sprint-init");
     assert.equal(result.created, true);
     assert.equal(result.existingFile, false);
-    assert.equal(result.dryRun, false);
-    assert.equal(result.issueCount, 0);
-    assert.equal(result.placeholderIssue, true);
     assert.ok(!("component" in result));
     assert.equal(result.sprintFile, path.join(tmpDir, "2026-04-auth-system.md"));
 
@@ -182,7 +174,6 @@ describe("createSprintFile", () => {
     const result = createSprintFile({
       topic: "OAuth2 / PKCE (v2)",
       milestone: "Sprint W15",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -196,13 +187,11 @@ describe("createSprintFile", () => {
     const result = createSprintFile({
       topic: "no-network",
       milestone: "Sprint W16",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
 
     assert.equal(result.due, "TBD");
-    assert.equal(result.issueCount, 0);
     assert.match(result.content, /^milestone: Sprint W16$/m);
   });
 
@@ -213,7 +202,6 @@ describe("createSprintFile", () => {
       const result = createSprintFile({
         topic,
         milestone: topic,
-        dryRun: false,
         repoRoot,
         sprintsDir: path.join(backlogPath, "sprints"),
       });
@@ -232,7 +220,6 @@ describe("createSprintFile", () => {
     const result = createSprintFile({
       topic: "cold-adopter",
       milestone: "M",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -250,7 +237,6 @@ describe("createSprintFile", () => {
       topic: "no-axis",
       milestone: "M",
       component: "not-a-declared-capability",
-      dryRun: false,
       sprintsDir,
       today: new Date("2026-04-05T09:00:00Z"),
       fileExists: (candidate) => {
@@ -272,7 +258,6 @@ describe("createSprintFile", () => {
       milestone: "M",
       component: "sprint-execution",
       scope: ["src/**"],
-      dryRun: false,
       sprintsDir,
       repoRoot: tmpDir,
     }), /cannot be used together/);
@@ -302,25 +287,6 @@ describe("createSprintFile", () => {
         topic: "next-sprint",
         milestone: "Sprint W14",
         scope: ["src/auth/api/**"],
-        dryRun: false,
-        sprintsDir: tmpDir,
-        today: new Date("2026-04-05T09:00:00Z"),
-      });
-    }, /Active track overlaps on scope: 2026-04-current\.md/);
-  });
-
-  it("also refuses dry-run creation on scope overlap (#292)", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "2026-04-current.md"),
-      '---\nstatus: active\nscope: ["src/auth/**"]\n---\n',
-    );
-
-    assert.throws(() => {
-      createSprintFile({
-        topic: "next-sprint",
-        milestone: "Sprint W14",
-        scope: ["src/auth/**"],
-        dryRun: true,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
       });
@@ -339,7 +305,6 @@ describe("createSprintFile", () => {
       topic: "billing",
       milestone: "Sprint W14",
       scope: ["src/billing/**"],
-      dryRun: true,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -356,7 +321,6 @@ describe("createSprintFile", () => {
       topic: "duplicate",
       milestone: "M",
       component: "tracker-task-truth",
-      dryRun: true,
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
     }), /Active track overlaps on scope: 2026-04-current\.md/);
@@ -365,7 +329,6 @@ describe("createSprintFile", () => {
       topic: "disjoint",
       milestone: "M",
       component: "sprint-execution",
-      dryRun: true,
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
     });
@@ -380,20 +343,43 @@ describe("createSprintFile", () => {
     }
   });
 
-  it("returns a structured refusal on the dry-run JSON surface when --component is present (#331)", () => {
+  it("rejects the retired --dry-run / --json flags and a missing --milestone value (#457)", () => {
+    assert.match(parseArgs(["auth", "--dry-run"]).error, /Unknown argument: --dry-run/);
+    assert.match(parseArgs(["auth", "--json"]).error, /Unknown argument: --json/);
+    assert.match(parseArgs(["auth", "--milestone"]).error, /Missing value for --milestone/);
+    assert.match(parseArgs(["auth", "--milestone", "--scope", "src/**"]).error, /Missing value for --milestone/);
+  });
+
+  it("exits 1 and creates nothing when --component and --scope are both given (#331)", () => {
     const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
     const run = spawnSync(process.execPath, [
-      cli, "probe", "--component", "one-axis", "--scope", "src/**", "--dry-run", "--json",
+      cli, "probe", "--component", "one-axis", "--scope", "src/**",
     ], { cwd: tmpDir, encoding: "utf-8" });
 
     assert.equal(run.status, 1);
-    assert.equal(run.stderr, "");
-    const result = JSON.parse(run.stdout);
-    assert.equal(result.action, "sprint-init");
-    assert.equal(result.dryRun, true);
-    assert.equal(result.created, false);
-    assert.match(result.refusalReason, /cannot be used together/);
+    assert.match(run.stdout, /cannot be used together/);
     assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
+  });
+
+  it("exits 1 and creates nothing on a retired flag (#457)", () => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const run = spawnSync(process.execPath, [cli, "probe", "--dry-run"], { cwd: tmpDir, encoding: "utf-8" });
+
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /Unknown argument: --dry-run/);
+    assert.equal(fs.existsSync(path.join(tmpDir, ".dev-backlog")), false);
+  });
+
+  it("writes a skeleton with an empty Plan and no placeholder prose", () => {
+    const result = createSprintFile({
+      topic: "misc",
+      milestone: "Sprint W14",
+      sprintsDir: tmpDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    });
+
+    assert.doesNotMatch(result.content, /Order into parallel-safe batches|add issues here/);
+    assert.match(fs.readFileSync(result.sprintFile, "utf-8"), /## Plan\n\n/);
   });
 
   it("creates a disjoint-scope second active track without refusal (#292)", () => {
@@ -406,7 +392,6 @@ describe("createSprintFile", () => {
       topic: "billing",
       milestone: "Sprint W14",
       scope: ["src/billing/**"],
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -424,7 +409,6 @@ describe("createSprintFile", () => {
     const result = createSprintFile({
       topic: "next-sprint",
       milestone: "Sprint W14",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -443,7 +427,6 @@ describe("createSprintFile", () => {
       topic: "declared-next",
       milestone: "Sprint W14",
       component: "sprint-execution",
-      dryRun: false,
       sprintsDir: tmpDir,
       repoRoot: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
@@ -456,53 +439,18 @@ describe("createSprintFile", () => {
     assert.equal(fs.existsSync(result.sprintFile), true);
   });
 
-  it("returns placeholder metadata on dry-run for the empty Plan", () => {
-    const result = createSprintFile({
-      topic: "misc",
-      milestone: "Sprint W14",
-      dryRun: true,
-      sprintsDir: tmpDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-    });
-
-    assert.equal(result.created, false);
-    assert.equal(result.placeholderIssue, true);
-    assert.equal(result.issueCount, 0);
-    assert.equal(fs.existsSync(result.sprintFile), false);
-    assert.doesNotMatch(result.content, /Order into parallel-safe batches|add issues here/);
-  });
-
-  it("reports existing file during dry-run without overwriting it", () => {
-    const sprintFile = path.join(tmpDir, "2026-04-auth-system.md");
-    fs.writeFileSync(sprintFile, "existing content");
-
-    const result = createSprintFile({
-      topic: "auth-system",
-      milestone: "Sprint W13",
-      dryRun: true,
-      sprintsDir: tmpDir,
-      today: new Date("2026-04-05T09:00:00Z"),
-    });
-
-    assert.equal(result.existingFile, true);
-    assert.equal(result.created, false);
-    assert.equal(result.placeholderIssue, false);
-    assert.equal(result.content, null);
-    assert.equal(fs.readFileSync(sprintFile, "utf-8"), "existing content");
-  });
-
-  it("throws when target sprint file already exists outside dry-run", () => {
+  it("throws when the target sprint file already exists and leaves it untouched", () => {
     fs.writeFileSync(path.join(tmpDir, "2026-04-auth-system.md"), "existing content");
 
     assert.throws(() => {
       createSprintFile({
         topic: "auth-system",
         milestone: "Sprint W13",
-        dryRun: false,
         sprintsDir: tmpDir,
         today: new Date("2026-04-05T09:00:00Z"),
       });
     }, /Sprint file already exists/);
+    assert.equal(fs.readFileSync(path.join(tmpDir, "2026-04-auth-system.md"), "utf-8"), "existing content");
   });
 
   it("creates sprintsDir when it does not exist", () => {
@@ -511,7 +459,6 @@ describe("createSprintFile", () => {
     createSprintFile({
       topic: "setup",
       milestone: "Sprint W15",
-      dryRun: false,
       sprintsDir: nested,
       today: new Date("2026-04-05T09:00:00Z"),
     });
@@ -522,13 +469,10 @@ describe("createSprintFile", () => {
     assert.match(files[0], /^2026-04-setup\.md$/);
   });
 
-
-
   it("produces frontmatter compatible with find_active_sprint", () => {
     const result = createSprintFile({
       topic: "compat-check",
       milestone: "Sprint W15",
-      dryRun: false,
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });

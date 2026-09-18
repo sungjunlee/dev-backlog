@@ -64,12 +64,11 @@ describe("sprint-init makes no provider call at all (#445)", () => {
     it(`${failMode}: the sprint file is still written and no gh call is made`, (t) => {
       const fixture = prepareFixture(t, { failMode });
       const result = run(process.execPath, [
-        SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone", "--json",
+        SPRINT_INIT_PATH, "cycle", "--milestone", "Cycle Milestone",
       ], fixture);
       assert.equal(result.status, 0, `sprint init must not need gh:\n${result.stderr}`);
-      const parsed = JSON.parse(result.stdout);
-      assert.equal(parsed.created, true);
-      assert.equal(parsed.due, "TBD");
+      assert.match(result.stdout, /Created:/);
+      assert.match(result.stdout, /due: TBD/);
       assert.deepEqual(fixture.calls(), []);
     });
   }

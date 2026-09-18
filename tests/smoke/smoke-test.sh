@@ -975,13 +975,10 @@ mkdir -p "$COLD_INIT_DIR/.dev-backlog/sprints" "$COLD_INIT_DIR/.dev-backlog/task
 git -C "$COLD_INIT_DIR" init -q
 install_isolated_gh "$COLD_INIT_DIR"
 set +e
-INIT_JSON=$(cd "$COLD_INIT_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "cold-probe" --dry-run --json 2>/dev/null)
+(cd "$COLD_INIT_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "cold-probe" >/dev/null 2>&1)
 set -e
-if printf "%s" "$INIT_JSON" | node -e '
-const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
-const emitsSpecFields = /^objectives:/m.test(j.content) || /^component:/m.test(j.content);
-process.exit(emitsSpecFields ? 1 : 0);
-'; then B3_RES="pass"; else B3_RES="fail"; fi
+COLD_INIT_CONTENT=$(cat "$COLD_INIT_DIR/.dev-backlog/sprints/"*cold-probe*.md)
+if printf "%s" "$COLD_INIT_CONTENT" | grep -E '^(objectives|component):' >/dev/null; then B3_RES="fail"; else B3_RES="pass"; fi
 gated_assert "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$GATE_B3" "$B3_RES"
 
 # RED until #254/#255 (A2/A3): no skill doc may carry an unconditional
@@ -1139,19 +1136,15 @@ git -C "$MT_LIFE_DIR" init -q
 install_isolated_gh "$MT_LIFE_DIR"
 mt_write_sprint "$MT_LIFE_DIR/.dev-backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" --json 2>/dev/null)
+OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "billing" --scope "src/billing/**" 2>/dev/null)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: disjoint second-track init exit code" "$STATUS" "0"
-assert_json_eval "multi-track #292: disjoint init creates with scope frontmatter, no warnings" "$OUT" '
-const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
-if (j.created !== true) process.exit(1);
-if (!Array.isArray(j.warnings) || j.warnings.length !== 0) process.exit(1);
-if (!/^scope: \["src\/billing\/\*\*"\]$/m.test(j.content)) process.exit(1);
-'
+assert_not_contains "multi-track #292: disjoint init creates with no warnings" "$OUT" "Warning:"
+assert_equals "multi-track #292: disjoint init writes scope frontmatter" "$(grep '^scope:' "$MT_LIFE_DIR/.dev-backlog/sprints/"*billing*.md)" 'scope: ["src/billing/**"]'
 
 set +e
-OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" --dry-run 2>&1)
+OUT=$(cd "$MT_LIFE_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "auth-two" --scope "src/auth/api/**" 2>&1)
 STATUS=$?
 set -e
 assert_equals "multi-track #292: overlapping-scope init exit code" "$STATUS" "1"
@@ -1163,11 +1156,11 @@ mkdir -p "$MT_INIT_SOLO_DIR/.dev-backlog/sprints"
 git -C "$MT_INIT_SOLO_DIR" init -q
 install_isolated_gh "$MT_INIT_SOLO_DIR"
 set +e
-OUT=$(cd "$MT_INIT_SOLO_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "solo-probe" --dry-run 2>/dev/null)
+OUT=$(cd "$MT_INIT_SOLO_DIR" && isolated_node "$SCRIPT_DIR/sprint-init.js" "solo-probe" 2>/dev/null)
 STATUS=$?
 set -e
-assert_equals "multi-track G4 #292: single-track init dry-run exit code" "$STATUS" "0"
-assert_contains "multi-track G4 #292: single-track init dry-run text" "$OUT" "[dry-run] Would create:"
+assert_equals "multi-track G4 #292: single-track init exit code" "$STATUS" "0"
+assert_contains "multi-track G4 #292: single-track init Created: text" "$OUT" "Created:"
 
 # close: --track picks one track out of a portfolio; ambiguous close still
 # refuses (now with a --track hint); a no-match selector fails loud.
