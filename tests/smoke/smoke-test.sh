@@ -912,6 +912,27 @@ assert_contains "close --close-milestone non-github authority: refusal message" 
 	"Refusing --close-milestone: task authority is 'backlog' (.dev-backlog/.tracker); milestones are GitHub-only."
 assert_contains "close --close-milestone non-github authority: sprint file untouched" \
 	"$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-authority.md")" "active"
+# the guard also runs under --dry-run, and an irregular .tracker never defaults to github
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --dry-run --close-milestone 2>&1)
+STATUS=$?
+set -e
+assert_equals "close --dry-run --close-milestone non-github authority: exit code" "$STATUS" "1"
+rm -f "$TEST_DIR/.dev-backlog/.tracker"
+mkdir -p "$TEST_DIR/.dev-backlog/.tracker"
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --close-milestone 2>&1)
+STATUS=$?
+set -e
+assert_equals "close --close-milestone with .tracker as a directory: exit code" "$STATUS" "1"
+assert_contains "close --close-milestone with .tracker as a directory: message" "$OUT" "cannot read task authority"
+rmdir "$TEST_DIR/.dev-backlog/.tracker"
+printf 'GitHub\r\n' >"$TEST_DIR/.dev-backlog/.tracker"
+set +e
+OUT=$(bash "$SCRIPT_DIR/sprint-close.sh" "$TEST_DIR/.dev-backlog" --dry-run --close-milestone 2>&1)
+STATUS=$?
+set -e
+assert_not_contains "close --close-milestone CRLF/uppercase github passes the authority guard" "$OUT" "Refusing --close-milestone"
 rm -f "$TEST_DIR/.dev-backlog/.tracker"
 
 # ============================================================

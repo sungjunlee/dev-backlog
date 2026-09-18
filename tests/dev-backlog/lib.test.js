@@ -257,6 +257,20 @@ describe("readTaskAuthority", () => {
     assert.equal(readTaskAuthority(dir), "github");
   });
 
+  it("rejects inherited object keys such as __proto__ and constructor", (t) => {
+    for (const value of ["__proto__", "constructor", "tostring"]) {
+      const dir = root(t);
+      write(dir, `${value}\n`);
+      assert.throws(() => readTaskAuthority(dir), /Unknown task authority/);
+    }
+  });
+
+  it("names the path when .tracker is a directory", (t) => {
+    const dir = root(t);
+    fs.mkdirSync(path.join(dir, ".tracker"));
+    assert.throws(() => readTaskAuthority(dir), /Cannot read task authority: .*\.tracker is a directory\./);
+  });
+
   it("throws on an unknown value, naming the value and the file", (t) => {
     const dir = root(t);
     write(dir, "local\n");

@@ -11,9 +11,10 @@ function readTaskAuthority(backlogDir) {
   try {
     line = fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
   } catch (error) {
+    if (error.code === "EISDIR") throw new Error(`Cannot read task authority: ${trackerPath} is a directory.`);
     if (error.code !== "ENOENT") throw error;
   }
-  if (!(line in TASK_AUTHORITIES)) {
+  if (!Object.hasOwn(TASK_AUTHORITIES, line)) {
     throw new Error(`Unknown task authority "${line}" in ${trackerPath}; expected github, backlog, or gitlab.`);
   }
   return TASK_AUTHORITIES[line];
