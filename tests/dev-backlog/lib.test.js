@@ -1,17 +1,14 @@
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("fs");
 const path = require("path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   slugify,
   scopesOverlap,
-  readTriageConfig,
   parseSimpleYaml,
   parseIssueRef,
   parsePlanCheckbox,
   containsIssueRef,
-  TRIAGE_CONFIG_DEFAULTS,
 } = require(path.join(SKILL_SCRIPTS, "lib.js"));
 
 // --- slugify ---
@@ -185,50 +182,6 @@ describe("parseSimpleYaml", () => {
   it("handles malformed and empty input gracefully", () => {
     assert.deepEqual(parseSimpleYaml("not valid yaml: [\n"), {});
     assert.deepEqual(parseSimpleYaml(""), {});
-  });
-});
-
-describe("readTriageConfig", () => {
-  const tmpDir = path.join(__dirname, "__tmp_triage_config_test__");
-
-  beforeEach(() => {
-    fs.mkdirSync(tmpDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("returns nested defaults when the config file is missing", () => {
-    const config = readTriageConfig(path.join(tmpDir, "missing"));
-    assert.deepEqual(config, TRIAGE_CONFIG_DEFAULTS);
-  });
-
-  it("reads nested theme keywords and activity thresholds", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "triage-config.yml"),
-      [
-        "theme_keywords:",
-        "  auth: [auth, oauth, token]",
-        "  docs: [docs, readme]",
-        "activity_days:",
-        "  warm: 10",
-        "  cold: 45",
-        "stale_days: 75",
-        "closed_issue_days: 30",
-        "",
-      ].join("\n")
-    );
-
-    const config = readTriageConfig(tmpDir);
-
-    assert.deepEqual(config.theme_keywords, {
-      auth: ["auth", "oauth", "token"],
-      docs: ["docs", "readme"],
-    });
-    assert.deepEqual(config.activity_days, { warm: 10, cold: 45 });
-    assert.equal(config.stale_days, 75);
-    assert.equal(config.closed_issue_days, 30);
   });
 });
 

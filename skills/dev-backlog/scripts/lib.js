@@ -1,9 +1,5 @@
-/**
- * Shared library for dev-backlog Node scripts.
- */
+/** Shared library for dev-backlog Node scripts. */
 
-const fs = require("fs");
-const path = require("path");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
 
 const GH_EXEC_DEFAULTS = Object.freeze({
@@ -49,11 +45,6 @@ function containsIssueRef(text, identity) {
   return false;
 }
 
-// Progress-issue publication was removed (#340); this marker survives only to
-// recognize leftover machine-managed issue bodies in triage-collect.
-const PROGRESS_MARKER_PREFIX = "<!-- dev-backlog:progress-issue month=";
-const MARKER_SUFFIX = " -->";
-
 function slugify(text) {
   return text
     .replace(/[^a-zA-Z0-9]/g, "-")
@@ -61,24 +52,6 @@ function slugify(text) {
     .replace(/^-|-$/g, "")
     .toLowerCase();
 }
-
-function parseMarkerMonth(body) {
-  if (!body) return null;
-  const start = body.indexOf(PROGRESS_MARKER_PREFIX);
-  if (start === -1) return null;
-  const valueStart = start + PROGRESS_MARKER_PREFIX.length;
-  const end = body.indexOf(MARKER_SUFFIX, valueStart);
-  return end === -1 ? null : body.slice(valueStart, end).trim();
-}
-
-const TRIAGE_CONFIG_DEFAULTS = {
-  theme_keywords: {},
-  activity_days: {
-    warm: 14,
-    cold: 60,
-  },
-  stale_days: 60,
-};
 
 function stripQuotes(text) {
   if (
@@ -89,13 +62,11 @@ function stripQuotes(text) {
   }
   return text;
 }
-
 function parseInlineArray(raw) {
   const inner = raw.slice(1, -1).trim();
   if (!inner) return [];
   return inner.split(",").map((part) => stripQuotes(part.trim()));
 }
-
 function stripYamlSeparationComment(raw) {
   let quote = null;
   const firstNonSpace = raw.search(/\S/);
@@ -123,7 +94,6 @@ function stripYamlSeparationComment(raw) {
   }
   return raw;
 }
-
 function parseYamlScalar(raw) {
   const value = stripYamlSeparationComment(raw).trim();
   if (!value) return "";
@@ -143,12 +113,10 @@ function parseYamlScalar(raw) {
   if (value === "false") return false;
   return value;
 }
-
 function isBlockScalarValue(raw) {
   const value = stripYamlSeparationComment(raw).trim();
   return /^(?:(?:[&!]\S+)\s+)*(?:[>|](?:[1-9][+-]?|[+-][1-9]?)?)$/.test(value);
 }
-
 function quotedScalarCloses(text, quote, start = 0) {
   for (let index = start; index < text.length; index += 1) {
     if (quote === "'" && text[index] === "'" && text[index + 1] === "'") {
@@ -161,7 +129,6 @@ function quotedScalarCloses(text, quote, start = 0) {
   }
   return false;
 }
-
 function parseSimpleYaml(raw) {
   const root = {};
   const stack = [{ indent: -1, value: root }];
@@ -212,38 +179,6 @@ function parseSimpleYaml(raw) {
   return root;
 }
 
-function isPlainObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function mergeConfig(defaults, parsed) {
-  const merged = { ...defaults };
-  for (const [key, value] of Object.entries(parsed || {})) {
-    if (isPlainObject(value) && isPlainObject(defaults[key])) {
-      merged[key] = mergeConfig(defaults[key], value);
-      continue;
-    }
-    merged[key] = value;
-  }
-  return merged;
-}
-
-function readYamlConfig(configPath, defaults) {
-  try {
-    const raw = fs.readFileSync(configPath, "utf-8");
-    return mergeConfig(defaults, parseSimpleYaml(raw));
-  } catch {
-    return mergeConfig(defaults, {});
-  }
-}
-
-function readTriageConfig(backlogDir) {
-  return readYamlConfig(
-    path.join(backlogDir || DEFAULT_BACKLOG_DIR, "triage-config.yml"),
-    TRIAGE_CONFIG_DEFAULTS
-  );
-}
-
 /**
  * Resolve a sprint's scope key from its frontmatter (multi-track partitioning).
  * Priority: non-empty `component:` wins; else `scope:` path globs; else none.
@@ -260,8 +195,7 @@ function sprintScopeKey(frontmatter) {
   return { kind: "none" };
 }
 
-// Reduce a path glob to a comparable directory prefix:
-// "src/auth/**" -> "src/auth", "src/auth/*" -> "src/auth", "src/auth/" -> "src/auth".
+// Path glob -> directory prefix: "src/auth/**" / "src/auth/*" / "src/auth/" -> "src/auth".
 function normalizeScopePrefix(glob) {
   return String(glob).replace(/\/+\**$/, "").replace(/\/+$/, "");
 }
@@ -293,16 +227,13 @@ function scopesOverlap(frontmatterA, frontmatterB) {
 
 module.exports = {
   slugify,
-  parseMarkerMonth,
   parseSimpleYaml,
   sprintScopeKey,
   scopesOverlap,
-  readTriageConfig,
   ISSUE_REF_RE,
   parseIssueRef,
   parsePlanCheckbox,
   containsIssueRef,
-  TRIAGE_CONFIG_DEFAULTS,
   DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
 };

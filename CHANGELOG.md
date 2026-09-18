@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- **Doctor advisory checks and dead lib.js readers deleted** — `backlog-doctor.js` drops `in_flight_staleness` (`--stale-days`) and `context_bloat`; both re-derive from `status.sh --json` `age_days` and `wc -l` and nothing consumed them. `lib.js` drops `parseMarkerMonth` and the triage config readers orphaned by #433 (259 lines with tests). The three guard checks and their JSON shapes are unchanged. Closes [#458](https://github.com/sungjunlee/dev-backlog/issues/458).
 - **status.sh trailing sections deleted** — the Local Files block (counted `tasks/*.md` mirrors by a Backlog.md `status:` field, a format parked at `v0.11.0`), the Relay Runs block (re-derived another tool's run-directory slug and grepped its manifests), and the Past sprints line are gone (54 lines with their smoke fixture); each was one command away and nothing consumed them. Output now ends after the Active Sprint block; `--json` and `--track` are unchanged. Closes [#459](https://github.com/sungjunlee/dev-backlog/issues/459).
 
 ## [0.12.0] — 2026-09-17
