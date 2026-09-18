@@ -594,7 +594,8 @@ describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
   it("next: missing sprints dir prints the setup hint and exits 1", () => {
     const res = run("--mode", "next", "--format", "text", "nope");
     assert.equal(res.status, 1);
-    assert.match(res.stdout, /^No nope\/sprints directory\. Run setup-dev-backlog\.js first\.\n$/);
+    const expected = `No ${path.join("nope", "sprints")} directory. Run setup-dev-backlog.js first.\n`;
+    assert.equal(res.stdout, expected);
   });
 
   it("next/status: no active sprint exits 0 with the neutral hint", () => {
