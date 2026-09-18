@@ -891,39 +891,7 @@ assert_contains "close: no active sprint" "$OUT" "No active sprint"
 # cold-adopter portability (adoption-hardening V1, PRD 2026-07)
 # ============================================================
 # A fresh agent in a repo with NO spec/, NO root CHARTER.md, and NO craftkit
-# spec-* skills must still reach a first closed sprint. Some targets are RED at
-# introduction and turn GREEN when their fix lands; those are gated as
-# expected-fail so CI stays green while the baseline is recorded. Flip the gate
-# (env var → 1) when the named issue merges; an XPASS reminder fires if the fix
-# lands before the gate is flipped.
-
-XFAIL=0
-XPASS=0
-GATE_B3="${GATE_B3:-1}"     # #258 landed: enforced — sprint-init omits spec fields (unconditional since #426)
-GATE_A2A3="${GATE_A2A3:-1}" # #254/#255 landed: enforced regression guard against re-adding ../spec-charter reads
-
-# gated_assert LABEL GATE RESULT("pass"|"fail")
-#   GATE=1 → enforced like a normal assertion (feeds PASS/FAIL).
-#   GATE=0 → expected-fail: RESULT=fail is the known-RED baseline (XFAIL, ok);
-#            RESULT=pass means the fix landed early (XPASS) — flip the gate.
-gated_assert() {
-	local label="$1" gate="$2" result="$3"
-	if [ "$gate" = "1" ]; then
-		if [ "$result" = "pass" ]; then
-			PASS=$((PASS + 1))
-		else
-			FAIL=$((FAIL + 1))
-			echo "FAIL: $label"
-		fi
-	else
-		if [ "$result" = "pass" ]; then
-			XPASS=$((XPASS + 1))
-			echo "XPASS: $label — fix appears to have landed; set its gate to 1 to enforce."
-		else
-			XFAIL=$((XFAIL + 1))
-		fi
-	fi
-}
+# spec-* skills must still reach a first closed sprint.
 
 # Build a genuinely spec-less project: run scripts with cwd inside it so spec
 # resolution finds nothing (scripts resolve their own path via SCRIPT_DIR).
@@ -979,7 +947,7 @@ set +e
 set -e
 COLD_INIT_CONTENT=$(cat "$COLD_INIT_DIR/.dev-backlog/sprints/"*cold-probe*.md)
 if printf "%s" "$COLD_INIT_CONTENT" | grep -E '^(objectives|component):' >/dev/null; then B3_RES="fail"; else B3_RES="pass"; fi
-gated_assert "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$GATE_B3" "$B3_RES"
+assert_equals "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$B3_RES" "pass"
 
 # RED until #254/#255 (A2/A3): no skill doc may carry an unconditional
 # required-read of a cross-repo ../spec-charter/references/ path (dangles for
@@ -992,21 +960,15 @@ if grep -rlF "../spec-charter/references/" --include="*.md" "$REPO_ROOT/skills/"
 else
 	A2A3_RES="pass"
 fi
-gated_assert "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$GATE_A2A3" "$A2A3_RES"
+assert_equals "cold: skills/ carry no required ../spec-charter read (#254/#255 A2/A3)" "$A2A3_RES" "pass"
 
 # ============================================================
-# multi-track sprints gates (PRD 2026-07-multi-track-sprints, #290)
+# multi-track sprints (PRD 2026-07-multi-track-sprints, #290, #293)
 # ============================================================
 # Two disjoint-scope sprints may be active at once (a portfolio); overlapping
-# scopes fail with the doctor's scope-overlap message. Born RED at #290;
-# enforced since #293 landed the doctor disjointness rewrite. NOTE: exit-fail
-# alone was never a valid signal for the overlap case — pre-#293 HEAD already
-# failed on ANY two actives with a DIFFERENT message ("Multiple active sprint
-# files found"), so the overlap fixture keys on the active_sprint verdict's
-# "Active tracks overlap on scope" message, not the exit code (#290 B2).
-GATE_MT_DISJOINT="${GATE_MT_DISJOINT:-1}" # #291+#293 landed: enforced — doctor passes on disjoint-scope tracks
-GATE_MT_OVERLAP="${GATE_MT_OVERLAP:-1}"   # #293 landed: enforced — doctor active_sprint verdict emits the scope-overlap message
-
+# scopes fail with the doctor's scope-overlap message. The overlap fixture keys
+# on the active_sprint verdict's "Active tracks overlap on scope" message, not
+# the exit code: any two actives already failed with a different message.
 # helper: write a minimal, shape-valid active sprint with a given scope
 mt_write_sprint() { # dir file title issue scope_yaml
 	local file="$1" title="$2" issue="$3" scope="$4"
@@ -1048,7 +1010,7 @@ const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
 const c = (j.checks || []).find((x) => x.name === "active_sprint");
 process.exit(c && c.status === "pass" ? 0 : 1);
 ' 2>/dev/null; then MT_DISJOINT_RES="pass"; else MT_DISJOINT_RES="fail"; fi
-gated_assert "multi-track: doctor passes on two disjoint-scope active tracks (#291/#293)" "$GATE_MT_DISJOINT" "$MT_DISJOINT_RES"
+assert_equals "multi-track: doctor passes on two disjoint-scope active tracks (#291/#293)" "$MT_DISJOINT_RES" "pass"
 
 # (2) Overlap. Two active tracks share a scope. HEAD emits the generic
 #     "Multiple active sprint files found"; target (#293) emits the specific
@@ -1070,7 +1032,7 @@ const c = (j.checks || []).find((x) => x.name === "active_sprint");
 const summary = (c && c.detail && c.detail.summary) || "";
 process.exit(/Active tracks overlap on scope/.test(summary) ? 0 : 1);
 ' 2>/dev/null; then MT_OVERLAP_RES="pass"; else MT_OVERLAP_RES="fail"; fi
-gated_assert "multi-track: doctor active_sprint verdict emits scope-overlap message (#293 B2)" "$GATE_MT_OVERLAP" "$MT_OVERLAP_RES"
+assert_equals "multi-track: doctor active_sprint verdict emits scope-overlap message (#293 B2)" "$MT_OVERLAP_RES" "pass"
 
 # (2b) #293 enforced extras: a disjoint portfolio is fully healthy (exit 0) and
 #      the per-sprint checks fan out per active track with track-tagged verdicts.
@@ -1232,9 +1194,6 @@ assert_not_contains "multi-track #291: next.sh --track excludes other tracks" "$
 echo ""
 TOTAL=$((PASS + FAIL))
 echo "$TOTAL tests: $PASS passed, $FAIL failed"
-if [ "$((XFAIL + XPASS))" -gt 0 ]; then
-	echo "known-RED gates: $XFAIL xfail (expected RED), $XPASS xpass (flip the gate)"
-fi
 if [ "$FAIL" -gt 0 ]; then
 	exit 1
 fi
