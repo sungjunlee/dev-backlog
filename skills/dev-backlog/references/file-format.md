@@ -59,12 +59,15 @@ Order Plan items into parallel-safe batches. An empty `## Plan` is valid until
 issues are selected; every nonblank, non-heading Plan line must parse as a
 task item.
 
-## No tracker selection
+## .dev-backlog/.tracker
 
-GitHub Issues are the only task authority (charter rev 19). Nothing is
-selected: setup writes no `.dev-backlog/.tracker`, runtime reads none, and a
-leftover `.tracker` file is ignored rather than deleted. The `files` adapter
-and the frozen adapter ports are retrievable at tag `v0.11.0`.
+One line naming the task authority: `github` (the default when the file is
+absent), `backlog` (the Backlog.md CLI; `files` is accepted as the legacy
+spelling), or `gitlab`. Setup never writes it; a maintainer creates it by hand
+to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). Only the
+session and `sprint-state.js` (for the JSON `tracker` field) read it; any other
+value fails loud. No adapter code: the `files` adapter and the frozen ports
+stay at tag `v0.11.0`.
 
 ## .dev-backlog/config.yml
 

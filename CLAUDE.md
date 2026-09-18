@@ -1,6 +1,6 @@
 # dev-backlog
 
-GitHub Issues as task truth + local sprint files for execution continuity,
+One task authority (GitHub Issues by default) as task truth + local sprint files for execution continuity,
 for Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
 `backlog-triage` (advisory open-issue grooming).
 
@@ -29,17 +29,17 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
-- **GitHub Issues = sole task authority** — there is no tracker abstraction and no adapter layer; the `files` adapter and `.dev-backlog/.tracker` are parked at tag `v0.11.0` and a leftover `.tracker` is ignored. Task definition, AC, and lifecycle are read live with `gh issue view N --json body,comments` (an `## Agent Brief` comment overrides the body, a `spec_ref:` line overrides both); no task-file directory required
+- **One declared task authority (GitHub Issues by default)** — `.dev-backlog/.tracker` is one line (absent = `github`; `backlog` for the Backlog.md CLI; `gitlab`) that the session reads; there is no adapter layer, the `files` adapter stays parked at tag `v0.11.0`. Task definition, AC, and lifecycle are read live with the authority's Read verb (`gh issue view N --json body,comments` by default; an `## Agent Brief` comment overrides the body on GitHub, a `spec_ref:` line overrides the body everywhere); no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
 - **Multi-track sprints** — concurrent `status: active` tracks must declare
   provably disjoint scopes (`component:` or `scope:` globs, one shared
   `scopesOverlap` predicate); overlap fails loud
-- **Deliberate mutations only** — no hidden sync. GitHub writes are explicit.
+- **Deliberate mutations only** — no hidden sync. Authority writes are explicit.
   Routing and optional-integration boundaries live in
   `skills/dev-backlog/references/authority-contract.md`.
-- **Fail-closed GitHub read** — a failed `gh` read stops execution; it never
+- **Fail-closed authority read** — a failed CLI read stops execution; it never
   falls back to sprint text or a local copy.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
   through validated wire contracts (anchor comments);
@@ -48,7 +48,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 ## Architecture
 
 ```
-GitHub Issues (what: definition, AC, lifecycle)
+Task authority, GitHub Issues by default (what: definition, AC, lifecycle)
       ↕ gh
 .dev-backlog/sprints/ (how: batches, running context, progress)
 ```
