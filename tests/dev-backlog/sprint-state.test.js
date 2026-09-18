@@ -7,6 +7,8 @@ const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts"
 const {
   readSprintState,
   parseSprintContent,
+  parseArgs,
+  textReport,
 } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
 
 function writeFile(filePath, content) {
@@ -327,5 +329,256 @@ started: 2026-06-30
       ["#1", "2026-07-03"],
       ["#11", "2026-07-02"],
     ]);
+  });
+});
+
+const BATCHED_SPRINT = `---
+milestone: Text Sprint
+status: active
+started: 2026-09-01
+---
+
+# Text Sprint
+
+## Goal
+Render text through one parser.
+
+## Plan
+### Batch 1 — Done
+- [x] #1 Setup
+
+### Batch 2 — In flight
+- [~] #2 Dispatch (~2hr) → PR #87 (reviewing)
+
+### Batch 3 — Remaining
+- [ ] #3 Render text
+- [ ] #4 Delete the bash parser
+
+## Running Context
+
+## Progress
+- 2026-09-01: Batch 1 done.
+`;
+
+function track(name, started, plan) {
+  return `---
+status: active
+started: ${started}
+component: "${name}"
+---
+
+## Goal
+${name} goal.
+
+## Plan
+${plan}
+
+## Progress
+`;
+}
+
+describe("textReport", () => {
+  let tmpDir;
+  let backlogDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dev-backlog-text-"));
+    backlogDir = path.join(tmpDir, ".dev-backlog");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("renders the next stanza for a single track with batches and in-flight items", () => {
+    writeFile(path.join(backlogDir, "sprints", "2026-09-text.md"), BATCHED_SPRINT);
+
+    assert.deepEqual(textReport({ mode: "next", backlogDir }), {
+      code: 0,
+      lines: [
+        "=== Sprint: 2026-09-text ===",
+        "",
+        "Goal: Render text through one parser.",
+        "",
+        "Progress: 1/4 done (1 in-flight, 2 remaining)",
+        "",
+        "In flight:",
+        "  - [~] #2 Dispatch (~2hr) → PR #87 (reviewing)",
+        "",
+        "Next: ### Batch 3 — Remaining",
+        "  - [ ] #3 Render text",
+        "  - [ ] #4 Delete the bash parser",
+        "",
+        "Last: - 2026-09-01: Batch 1 done.",
+      ],
+    });
+  });
+
+  it("renders the status stanza with capped in-flight and next-up lists", () => {
+    writeFile(path.join(backlogDir, "sprints", "2026-09-text.md"), BATCHED_SPRINT);
+
+    assert.deepEqual(textReport({ mode: "status", backlogDir }), {
+      code: 0,
+      lines: [
+        "=== Active Sprint ===",
+        "2026-09-text: 1/4 tasks (25%) — 1 in-flight",
+        "",
+        "In flight:",
+        "  - [~] #2 Dispatch (~2hr) → PR #87 (reviewing)",
+        "",
+        "Next up:",
+        "  - [ ] #3 Render text",
+        "  - [ ] #4 Delete the bash parser",
+      ],
+    });
+  });
+
+  it("announces a closeable sprint on both surfaces", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-done.md"),
+      track("done", "2026-09-01", "- [x] #1 One\n- [x] #2 Two")
+    );
+
+    assert.ok(textReport({ mode: "next", backlogDir }).lines
+      .includes("All items checked! Ready to close sprint."));
+    assert.ok(textReport({ mode: "status", backlogDir }).lines
+      .includes(">> All items done — ready to close sprint"));
+  });
+
+  it("renders a portfolio stanza for N disjoint tracks", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-auth.md"),
+      track("auth", "2026-09-01", "- [~] #1 Auth work → PR #5 (reviewing)\n- [ ] #2 Auth next")
+    );
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-billing.md"),
+      track("billing", "2026-09-02", "- [x] #3 Billing work")
+    );
+
+    assert.deepEqual(textReport({ mode: "next", backlogDir }), {
+      code: 0,
+      lines: [
+        "=== 2 active tracks (portfolio) ===",
+        "",
+        "2026-09-auth: 0/2 done, 1 in-flight",
+        "  Next: #2 Auth next",
+        "2026-09-billing: 1/1 done",
+        "",
+        "Use 'next.sh --track <slug>' for a single track.",
+      ],
+    });
+    assert.deepEqual(textReport({ mode: "status", backlogDir }).lines, [
+      "=== Active Sprint ===",
+      "2 active tracks (portfolio):",
+      "  2026-09-auth: 0/2 (0%) — 1 in-flight",
+      "  2026-09-billing: 1/1 (100%)",
+    ]);
+  });
+
+  it("renders only the selected track for --track", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-auth.md"),
+      track("auth", "2026-09-01", "- [ ] #1 Auth next")
+    );
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-billing.md"),
+      track("billing", "2026-09-02", "- [ ] #2 Billing next")
+    );
+
+    const report = textReport({ mode: "next", backlogDir, track: "2026-09-auth" });
+    assert.equal(report.code, 0);
+    assert.ok(report.lines.includes("=== Sprint: 2026-09-auth ==="));
+    assert.ok(!report.lines.some((line) => line.includes("Billing next")));
+  });
+
+  it("fails loud and lists the active tracks when --track matches nothing", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-auth.md"),
+      track("auth", "2026-09-01", "- [ ] #1 Auth next")
+    );
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-billing.md"),
+      track("billing", "2026-09-02", "- [ ] #2 Billing next")
+    );
+
+    assert.deepEqual(textReport({ mode: "next", backlogDir, track: "bogus" }), {
+      code: 1,
+      lines: [
+        "No active track matches 'bogus'. Active tracks:",
+        "  - 2026-09-auth",
+        "  - 2026-09-billing",
+      ],
+    });
+    assert.deepEqual(textReport({ mode: "status", backlogDir, track: "bogus" }), {
+      code: 0,
+      lines: ["=== Active Sprint ===", "(no active track matches 'bogus')"],
+    });
+  });
+
+  it("reports no active sprint without naming a tracker command", () => {
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-08-past.md"),
+      "---\nstatus: completed\n---\n"
+    );
+
+    const report = textReport({ mode: "next", backlogDir });
+    assert.equal(report.code, 0);
+    assert.equal(report.lines[0], "No active sprint found.");
+    assert.ok(!report.lines.join("\n").includes("gh issue"));
+    assert.deepEqual(textReport({ mode: "status", backlogDir }).lines, [
+      "=== Active Sprint ===",
+      "(no active sprint)",
+    ]);
+  });
+
+  it("stops next and degrades status when the sprints directory is missing", () => {
+    const sprintsDir = path.join(backlogDir, "sprints");
+
+    assert.deepEqual(textReport({ mode: "next", backlogDir }), {
+      code: 1,
+      lines: [`No ${sprintsDir} directory. Run setup-dev-backlog.js first.`],
+    });
+    assert.deepEqual(textReport({ mode: "status", backlogDir }), {
+      code: 0,
+      lines: ["=== Active Sprint ===", `(no ${sprintsDir}/ directory)`],
+    });
+  });
+
+  it("lists every unchecked item when the plan has no batch headings", () => {
+    const todos = ["#2 Todo one", "#3 Todo two", "#4 Todo three", "#5 Todo four"];
+    writeFile(
+      path.join(backlogDir, "sprints", "2026-09-flat.md"),
+      track("flat", "2026-09-01", ["- [x] #1 Done", ...todos.map((t) => `- [ ] ${t}`)].join("\n"))
+    );
+
+    const lines = textReport({ mode: "next", backlogDir }).lines;
+    assert.ok(lines.includes("Next items:"));
+    assert.deepEqual(
+      // the trailing blank (the Last: separator) is trimmed when printed
+      lines.slice(lines.indexOf("Next items:") + 1).filter((line) => line !== ""),
+      todos.map((todo) => `  - [ ] ${todo}`)
+    );
+
+    // status caps both lists at 3 entries; next shows the whole batch.
+    const statusLines = textReport({ mode: "status", backlogDir }).lines;
+    assert.deepEqual(
+      statusLines.slice(statusLines.indexOf("Next up:") + 1),
+      todos.slice(0, 3).map((todo) => `  - [ ] ${todo}`)
+    );
+  });
+});
+
+describe("parseArgs --format", () => {
+  it("defaults to json and accepts text in both spellings", () => {
+    assert.equal(parseArgs([]).format, "json");
+    assert.equal(parseArgs(["--format", "text"]).format, "text");
+    assert.equal(parseArgs(["--format=text"]).format, "text");
+    assert.equal(parseArgs(["--json"]).format, "json");
+  });
+
+  it("rejects an unknown --format value with the usage string", () => {
+    const parsed = parseArgs(["--format", "yaml"]);
+    assert.match(parsed.error, /^Invalid --format: yaml\./);
+    assert.match(parsed.error, /Usage: sprint-state\.js .*--format json\|text/);
   });
 });

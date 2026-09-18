@@ -9,6 +9,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 ### Changed
 
 - `tests/smoke/smoke-test.sh`: the `GATE_*` / `gated_assert` rollout scaffolding is deleted; the four formerly gated assertions are plain assertions with the same labels (#469).
+- **next.sh / status.sh render through `sprint-state.js --format text`** — the shell scripts are argument plumbing only; bash sprint parsing (`next_todo_item`, the batch loop, the checkbox/goal/progress reads) is deleted and `lib.sh` keeps only what `sprint-close.sh` and the smoke test still call. Text output is byte-identical apart from the tracker-neutral no-sprint hint; `--json` (schema_version 2) is unchanged. Closes [#468](https://github.com/sungjunlee/dev-backlog/issues/468).
 
 ## [0.13.0] — 2026-09-18
 
