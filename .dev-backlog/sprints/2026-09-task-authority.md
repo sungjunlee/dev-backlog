@@ -1,6 +1,6 @@
 ---
 milestone: 2026-09 task authority (wave 5)
-status: active
+status: completed
 started: 2026-09-18
 due: TBD
 scope: ["skills/**", "tests/**", "docs/**", "spec/**", "README.md", "CLAUDE.md", "CHANGELOG.md", "VERSION"]
@@ -21,7 +21,7 @@ The task authority is one `.dev-backlog/.tracker` line (absent = GitHub) and a t
 
 ### Batch 2 — evals, conformance, release
 
-- [~] #477 eval scenarios, conformance before/after, release v0.15.0 [branch:477-release-v0.15.0]
+- [x] #477 eval scenarios, conformance before/after, release v0.15.0 → PR #480 (merged)
 
 ## Running Context
 
@@ -35,3 +35,5 @@ The task authority is one `.dev-backlog/.tracker` line (absent = GitHub) and a t
 - 2026-09-18: #475 merged (PR #478, Sol MERGE WITH EDITS → applied: GitLab exception stated, no gh-fixed task path, Backlog terminal-status note, stronger prose assertion). Conformance before/after done: new scenarios 12–13 FAIL on v0.14.0 SKILL.md → PASS on the new one, both models; 1–11 unchanged.
   
 - 2026-09-18: #476 merged (PR #479; Astra DO NOT MERGE → direct fix: no github fallback on .tracker read errors, Object.hasOwn, dry-run covered; acceptance amended ≤ 15 → ≤ 30 shipped lines for readability). Batch 2 (#477) started.
+- 2026-09-18: #477 merged (PR #480; Astra cumulative RELEASE WITH EDITS → applied: +56 script delta, fuller BREAKING note, files alias, parser parity, spec_ref precedence, README mkdir, eval 12 terminal status). Tag v0.15.0 + release published; epic #472 and milestone 27 closed.
+- 2026-09-18: Sprint closed. 3/3 tasks completed.
