@@ -469,7 +469,9 @@ function readSprintState({
 }
 
 // ---------------------------------------------------------------------------
-// Text rendering. Line-for-line the output next.sh / status.sh printed in bash
+// Text rendering. The shape next.sh / status.sh printed in bash before #468,
+// on JSON semantics (Plan-only counts, started-ordered portfolio, fail-loud
+// overlap, trimmed trailing blanks);
 // before #468; the shell scripts now exec `--format text` instead of parsing.
 // ---------------------------------------------------------------------------
 

@@ -949,7 +949,7 @@ COLD_INIT_CONTENT=$(cat "$COLD_INIT_DIR/.dev-backlog/sprints/"*cold-probe*.md)
 if printf "%s" "$COLD_INIT_CONTENT" | grep -E '^(objectives|component):' >/dev/null; then B3_RES="fail"; else B3_RES="pass"; fi
 assert_equals "cold: sprint-init omits spec fields when no spec files (#258 B3)" "$B3_RES" "pass"
 
-# RED until #254/#255 (A2/A3): no skill doc may carry an unconditional
+# Regression guard (#254/#255 A2/A3): no skill doc may carry an unconditional
 # required-read of a cross-repo ../spec-charter/references/ path (dangles for
 # adopters without craftkit). Re-pointing to the local fallback clears this.
 # Scope to markdown skill docs — this excludes .sh files (so the gate never
@@ -996,8 +996,7 @@ ${title} done.
 EOF
 }
 
-# (1) Disjoint portfolio. HEAD: doctor active_sprint FAILS (any 2 actives).
-#     Target (#291+#293): disjoint scopes → active_sprint PASS.
+# (1) Disjoint portfolio (#291+#293): disjoint scopes → active_sprint PASS.
 MT_DISJOINT_DIR="$TEST_DIR/mt-disjoint"
 mkdir -p "$MT_DISJOINT_DIR/.dev-backlog/sprints"
 mt_write_sprint "$MT_DISJOINT_DIR/.dev-backlog/sprints/2026-07-auth.md" "Auth" 1 '["src/auth/**"]'
@@ -1012,9 +1011,9 @@ process.exit(c && c.status === "pass" ? 0 : 1);
 ' 2>/dev/null; then MT_DISJOINT_RES="pass"; else MT_DISJOINT_RES="fail"; fi
 assert_equals "multi-track: doctor passes on two disjoint-scope active tracks (#291/#293)" "$MT_DISJOINT_RES" "pass"
 
-# (2) Overlap. Two active tracks share a scope. HEAD emits the generic
-#     "Multiple active sprint files found"; target (#293) emits the specific
-#     "Active tracks overlap on scope". Key on the message, not exit code.
+# (2) Overlap. Two active tracks share a scope: the active_sprint verdict
+#     carries "Active tracks overlap on scope" (#293). Key on the message,
+#     not the exit code.
 MT_OVERLAP_DIR="$TEST_DIR/mt-overlap"
 mkdir -p "$MT_OVERLAP_DIR/.dev-backlog/sprints"
 mt_write_sprint "$MT_OVERLAP_DIR/.dev-backlog/sprints/2026-07-auth-a.md" "AuthA" 3 '["src/auth/**"]'
