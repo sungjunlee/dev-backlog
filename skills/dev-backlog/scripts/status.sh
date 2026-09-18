@@ -1,20 +1,22 @@
 #!/bin/bash
 set -uo pipefail
 # Project status from the active sprint file(s).
+# Argument plumbing only — sprint-state.js owns the parsing and the rendering.
 # Open Issues are a `gh issue list` the session runs itself.
-# Usage: bash scripts/status.sh [--json] [backlog-dir]
+#
+# Usage: bash scripts/status.sh [--json] [--track slug] [backlog-dir]
+#        backlog-dir defaults to ./.dev-backlog
 
 # Resolve without `dirname` — restricted PATH (Windows Git Bash) often has a
-# broken dirname symlink, which emptied SCRIPT_DIR and skipped lib.sh.
+# broken dirname symlink, which emptied SCRIPT_DIR and skipped the sibling.
 # Normalize backslashes first: `%/*` only strips `/`, so a Windows path
 # would otherwise equal BASH_SOURCE and fall back to `.` (the caller's cwd).
 _src="${BASH_SOURCE[0]//\\//}"
 SCRIPT_DIR="${_src%/*}"
 [ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
-source "$SCRIPT_DIR/lib.sh"
 
-BACKLOG_DIR="${DEFAULT_BACKLOG_DIR:-.dev-backlog}"
+BACKLOG_DIR=".dev-backlog" # keep in sync with execution-root.js DEFAULT_BACKLOG_DIR
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do
@@ -30,80 +32,7 @@ while [ "$#" -gt 0 ]; do
 	shift
 done
 
-if [ "$JSON" -eq 1 ]; then
-	if [ -n "$TRACK" ]; then
-		exec node "$SCRIPT_DIR/sprint-state.js" --mode status --track "$TRACK" "$BACKLOG_DIR"
-	fi
-	exec node "$SCRIPT_DIR/sprint-state.js" --mode status "$BACKLOG_DIR"
-fi
-
-SPRINTS_DIR="$BACKLOG_DIR/sprints"
-
-# --- Active Sprint ---
-echo "=== Active Sprint ==="
-if [ -d "$SPRINTS_DIR" ]; then
-	if [ -n "$TRACK" ]; then
-		ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
-		if [ -z "$ACTIVE" ]; then ACTIVE_STATUS=1; else ACTIVE_STATUS=0; fi
-	else
-		ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
-		ACTIVE_STATUS=$?
-	fi
-	if [ "$ACTIVE_STATUS" -eq 2 ]; then
-		ACTIVE_COUNT=$(find_active_sprints "$SPRINTS_DIR" | grep -c . || true)
-		echo "$ACTIVE_COUNT active tracks (portfolio):"
-		find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
-			[ -z "$sprint" ] && continue
-			NAME=$(basename "$sprint" .md)
-			count_checkboxes "$sprint"
-			if [ "$CB_TOTAL" -gt 0 ]; then PCT=$((CB_DONE * 100 / CB_TOTAL)); else PCT=0; fi
-			if [ "$CB_IN_FLIGHT" -gt 0 ]; then
-				echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%) — $CB_IN_FLIGHT in-flight"
-			else
-				echo "  $NAME: $CB_DONE/$CB_TOTAL ($PCT%)"
-			fi
-		done
-	elif [ "$ACTIVE_STATUS" -eq 0 ]; then
-		SPRINT_NAME=$(basename "$ACTIVE" .md)
-		count_checkboxes "$ACTIVE"
-		if [ "$CB_TOTAL" -gt 0 ]; then
-			PCT=$((CB_DONE * 100 / CB_TOTAL))
-		else
-			PCT=0
-		fi
-		if [ "$CB_IN_FLIGHT" -gt 0 ]; then
-			echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%) — $CB_IN_FLIGHT in-flight"
-		else
-			echo "$SPRINT_NAME: $CB_DONE/$CB_TOTAL tasks ($PCT%)"
-		fi
-
-		# Show in-flight items (dispatched via dev-relay)
-		IN_FLIGHT_ITEMS=$(checkbox_lines "$ACTIVE" "~" | head -3)
-		if [ -n "$IN_FLIGHT_ITEMS" ]; then
-			echo ""
-			echo "In flight:"
-			echo "$IN_FLIGHT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
-		fi
-
-		# Show next unchecked items
-		NEXT_ITEMS=$(checkbox_lines "$ACTIVE" " " | head -3)
-		if [ -n "$NEXT_ITEMS" ]; then
-			echo ""
-			echo "Next up:"
-			echo "$NEXT_ITEMS" | while IFS= read -r line; do echo "  $line"; done
-		fi
-
-		if [ "$CB_TODO" -eq 0 ] && [ "$CB_IN_FLIGHT" -eq 0 ] && [ "$CB_TOTAL" -gt 0 ]; then
-			echo ""
-			echo ">> All items done — ready to close sprint"
-		fi
-	else
-		if [ -n "$TRACK" ]; then
-			echo "(no active track matches '$TRACK')"
-		else
-			echo "(no active sprint)"
-		fi
-	fi
-else
-	echo "(no $BACKLOG_DIR/sprints/ directory)"
-fi
+ARGS=(--mode status)
+[ "$JSON" -eq 0 ] && ARGS+=(--format text)
+[ -n "$TRACK" ] && ARGS+=(--track "$TRACK")
+exec node "$SCRIPT_DIR/sprint-state.js" "${ARGS[@]}" "$BACKLOG_DIR"

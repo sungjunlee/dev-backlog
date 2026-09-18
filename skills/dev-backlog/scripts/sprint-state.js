@@ -2,8 +2,9 @@
 /**
  * Emit actor-readable state from the active sprint file.
  *
- * Human status/next output stays in the shell scripts; their --json paths
- * delegate here so markdown parsing for structured reads has one owner.
+ * The one sprint-markdown parser: --format json is the wire contract
+ * (schema_version 2) dev-relay reads, --format text is the human surface
+ * next.sh / status.sh exec into. The shell scripts only plumb arguments.
  */
 
 const fs = require("fs");
@@ -34,12 +35,14 @@ const STATE_BY_MARKER = {
 };
 
 function usage() {
-  return "Usage: sprint-state.js [--mode status|next] [--track slug | --component slug] [backlog-dir]";
+  return "Usage: sprint-state.js [--mode status|next] [--format json|text]"
+    + " [--track slug | --component slug] [backlog-dir]";
 }
 
 function parseArgs(args) {
   const options = {
     mode: "status",
+    format: "json",
     backlogDir: DEFAULT_BACKLOG_DIR,
     track: null,
     component: null,
@@ -76,7 +79,7 @@ function parseArgs(args) {
       continue;
     }
     let handled = false;
-    for (const [name, key] of [["track", "track"], ["component", "component"]]) {
+    for (const [name, key] of [["track", "track"], ["component", "component"], ["format", "format"]]) {
       const res = valueFlag(arg, i, name, key);
       if (res) {
         if (res.error) return { ...options, error: res.error };
@@ -98,6 +101,10 @@ function parseArgs(args) {
 
   if (!["status", "next"].includes(options.mode)) {
     return { ...options, error: `Invalid --mode: ${options.mode}. ${usage()}` };
+  }
+
+  if (!["json", "text"].includes(options.format)) {
+    return { ...options, error: `Invalid --format: ${options.format}. ${usage()}` };
   }
 
   if (options.track && options.component) {
@@ -461,6 +468,180 @@ function readSprintState({
   return portfolioState(perSprints);
 }
 
+// ---------------------------------------------------------------------------
+// Text rendering. Line-for-line the output next.sh / status.sh printed in bash
+// before #468; the shell scripts now exec `--format text` instead of parsing.
+// ---------------------------------------------------------------------------
+
+const NO_SPRINT_HINT = "List open tasks in the task authority.";
+
+function countStates(planItems) {
+  const count = (state) => planItems.filter((item) => item.state === state).length;
+  return {
+    done: count("done"),
+    in_flight: count("in_flight"),
+    todo: count("todo"),
+    total: planItems.length,
+  };
+}
+
+function isReadyToClose(counts) {
+  return counts.todo === 0 && counts.in_flight === 0 && counts.total > 0;
+}
+
+function percentDone(counts) {
+  return counts.total > 0 ? Math.floor((counts.done * 100) / counts.total) : 0;
+}
+
+// Plan lines render verbatim (the checkbox line is the display form).
+function itemLines(planItems, state, limit = Infinity) {
+  return planItems
+    .filter((item) => item.state === state)
+    .slice(0, limit)
+    .map((item) => `  ${item.line}`);
+}
+
+function goalLines(goal) {
+  if (!goal) return [];
+  return goal.split("\n").slice(0, 3).map((line) => line.replace(/^ +/, ""));
+}
+
+function progressLine(counts) {
+  const detail = counts.in_flight > 0
+    ? `${counts.in_flight} in-flight, ${counts.todo} remaining`
+    : `${counts.todo} remaining`;
+  return `Progress: ${counts.done}/${counts.total} done (${detail})`;
+}
+
+// A batch-less plan lists every todo; no todos still prints the bare header
+// (bash parity — the sprint is then all in-flight or empty).
+function nextBatchLines(nextBatch) {
+  const heading = nextBatch ? nextBatch.heading : null;
+  const items = nextBatch ? nextBatch.items : [];
+  return [
+    heading ? `Next: ${heading}` : "Next items:",
+    ...items.map((item) => `  ${item.line}`),
+  ];
+}
+
+function nextSingleLines(perSprint) {
+  const counts = countStates(perSprint.plan_items);
+  const lines = [`=== Sprint: ${sprintSlug(perSprint.active_sprint.path)} ===`, ""];
+  const goal = goalLines(perSprint.active_sprint.goal);
+  if (goal.length > 0) lines.push(`Goal: ${goal[0]}`, ...goal.slice(1), "");
+  lines.push(progressLine(counts), "");
+  if (isReadyToClose(counts)) return [...lines, "All items checked! Ready to close sprint."];
+  if (counts.in_flight > 0) {
+    lines.push("In flight:", ...itemLines(perSprint.plan_items, "in_flight"), "");
+  }
+  lines.push(...nextBatchLines(perSprint.next_batch), "");
+  const last = perSprint.latest_progress[0];
+  return last ? [...lines, `Last: ${last.line}`] : lines;
+}
+
+function nextTrackLines(perSprint) {
+  const counts = countStates(perSprint.plan_items);
+  const inFlight = counts.in_flight > 0 ? `, ${counts.in_flight} in-flight` : "";
+  const slug = sprintSlug(perSprint.active_sprint.path);
+  const lines = [`${slug}: ${counts.done}/${counts.total} done${inFlight}`];
+  const todo = perSprint.plan_items.find((item) => item.state === "todo");
+  if (todo) lines.push(`  Next: ${todo.line.replace(/^- \[ \] /, "")}`);
+  return lines;
+}
+
+function nextPortfolioLines(perSprints) {
+  return [
+    `=== ${perSprints.length} active tracks (portfolio) ===`,
+    "",
+    ...perSprints.flatMap((perSprint) => nextTrackLines(perSprint)),
+    "",
+    "Use 'next.sh --track <slug>' for a single track.",
+  ];
+}
+
+function statusCountLine(perSprint, { indent = "", unit = "" } = {}) {
+  const counts = countStates(perSprint.plan_items);
+  const inFlight = counts.in_flight > 0 ? ` — ${counts.in_flight} in-flight` : "";
+  const slug = sprintSlug(perSprint.active_sprint.path);
+  return `${indent}${slug}: ${counts.done}/${counts.total}${unit}`
+    + ` (${percentDone(counts)}%)${inFlight}`;
+}
+
+function statusSingleLines(perSprint) {
+  const counts = countStates(perSprint.plan_items);
+  const lines = [statusCountLine(perSprint, { unit: " tasks" })];
+  const inFlight = itemLines(perSprint.plan_items, "in_flight", 3);
+  if (inFlight.length > 0) lines.push("", "In flight:", ...inFlight);
+  const todo = itemLines(perSprint.plan_items, "todo", 3);
+  if (todo.length > 0) lines.push("", "Next up:", ...todo);
+  if (isReadyToClose(counts)) lines.push("", ">> All items done — ready to close sprint");
+  return lines;
+}
+
+function statusPortfolioLines(perSprints) {
+  return [
+    `${perSprints.length} active tracks (portfolio):`,
+    ...perSprints.map((perSprint) => statusCountLine(perSprint, { indent: "  " })),
+  ];
+}
+
+function noTrackReport(sprintsDir, selector) {
+  const slugs = findActiveSprintFiles(sprintsDir).map(sprintSlug);
+  return {
+    lines: [
+      `No active track matches '${selector}'. Active tracks:`,
+      ...slugs.map((slug) => `  - ${slug}`),
+    ],
+    code: 1,
+  };
+}
+
+function nextReport(options, sprintsDir, selector) {
+  if (!fs.existsSync(sprintsDir)) {
+    return { lines: [`No ${sprintsDir} directory. Run setup-dev-backlog.js first.`], code: 1 };
+  }
+  const state = readSprintState(options);
+  if (state.active_sprints.length === 0) {
+    if (selector) return noTrackReport(sprintsDir, selector);
+    return { lines: ["No active sprint found.", NO_SPRINT_HINT], code: 0 };
+  }
+  const lines = state.active_sprint
+    ? nextSingleLines(state)
+    : nextPortfolioLines(state.active_sprints);
+  return { lines, code: 0 };
+}
+
+function statusReport(options, sprintsDir, selector) {
+  const header = "=== Active Sprint ===";
+  if (!fs.existsSync(sprintsDir)) {
+    return { lines: [header, `(no ${sprintsDir}/ directory)`], code: 0 };
+  }
+  const state = readSprintState(options);
+  if (state.active_sprints.length === 0) {
+    const empty = selector ? `(no active track matches '${selector}')` : "(no active sprint)";
+    return { lines: [header, empty], code: 0 };
+  }
+  const body = state.active_sprint
+    ? statusSingleLines(state)
+    : statusPortfolioLines(state.active_sprints);
+  return { lines: [header, ...body], code: 0 };
+}
+
+// { lines, code } so the caller owns printing and the exit status.
+function textReport(options) {
+  const sprintsDir = path.join(options.backlogDir || DEFAULT_BACKLOG_DIR, "sprints");
+  const selector = options.track || options.component || null;
+  return options.mode === "next"
+    ? nextReport(options, sprintsDir, selector)
+    : statusReport(options, sprintsDir, selector);
+}
+
+function trimTrailingBlanks(lines) {
+  const out = [...lines];
+  while (out.length > 0 && out[out.length - 1] === "") out.pop();
+  return out;
+}
+
 function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (parsed.error) {
@@ -473,6 +654,13 @@ function main() {
   }
 
   try {
+    if (parsed.format === "text") {
+      const report = textReport(parsed);
+      const text = trimTrailingBlanks(report.lines).join("\n");
+      if (text) console.log(text);
+      process.exitCode = report.code;
+      return;
+    }
     const state = readSprintState({
       backlogDir: parsed.backlogDir,
       track: parsed.track,
@@ -501,4 +689,5 @@ module.exports = {
   computeAge,
   parseSprintContent,
   readSprintState,
+  textReport,
 };

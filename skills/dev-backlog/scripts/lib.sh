@@ -1,5 +1,7 @@
 #!/bin/bash
-# Shared library for dev-backlog bash scripts.
+# Shared library for sprint-close.sh (the last bash script that parses a
+# sprint file) and the smoke test. Every other surface reads sprint state
+# through sprint-state.js.
 # Source this file: source "$(dirname "$0")/lib.sh"
 
 # Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
@@ -85,14 +87,6 @@ count_checkboxes() {
   CB_IN_FLIGHT=$(checkbox_lines "$file" "~" | grep -c . || true)
   CB_TODO=$(checkbox_lines "$file" " " | grep -c . || true)
   CB_TOTAL=$((CB_DONE + CB_IN_FLIGHT + CB_TODO))
-}
-
-# Return the first unchecked todo item (stripped of "- [ ] " prefix).
-# Usage: NEXT=$(next_todo_item "$FILE")
-next_todo_item() {
-  local file="$1"
-  # Strip the stable checkbox display prefix while keeping the parsed task ref.
-  checkbox_lines "$file" " " | head -1 | sed 's/^- \[ \] //'
 }
 
 # Extract a markdown section by heading (## level).
