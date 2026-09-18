@@ -2,10 +2,10 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. GitHub Issues are the canonical task-definition and lifecycle authority, read and written by the session through `gh` (the only scripted writer is `triage-apply`, under its human gate). No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
+dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. One declared task authority — GitHub Issues by default, the Backlog.md CLI or GitLab by a one-line `.dev-backlog/.tracker` — is the canonical task-definition and lifecycle authority, read and written by the session through that authority's CLI (the only scripted writer is `triage-apply`, GitHub-only, under its human gate). No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
 
 ```text
-GitHub Issue (spec + lifecycle + native planning fields)
+Task authority: GitHub Issue by default (spec + lifecycle + native planning fields)
         |
         +-- simple work -----> implementation -> PR -> close
         |
@@ -20,7 +20,7 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 ## Runtime Boundaries
 
-- GitHub Issues own task specification, native planning metadata, and lifecycle.
+- The declared task authority (GitHub Issues by default) owns task specification, native planning metadata, and lifecycle.
   Routing table: [`../skills/dev-backlog/references/authority-contract.md`](../skills/dev-backlog/references/authority-contract.md).
 - Sprint files own only admitted complex execution state.
 - `skills/backlog-triage/` owns advisory grooming; GitHub mutation is explicit (`--apply`).
@@ -28,20 +28,20 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 ## Core Flows
 
-1. **Read** the live GitHub Issue (`gh issue view --json body,comments`; an `## Agent Brief` comment overrides the body).
+1. **Read** the live task with the authority's Read verb (`gh issue view --json body,comments` by default; on GitHub an `## Agent Brief` comment overrides the body).
 2. **Admit** a sprint only for ordered multi-Issue batches, delegated/parallel
    handoff, cross-Issue/session context, or concurrent-track coordination.
-3. **Execute**: Issue AC and lifecycle stay on GitHub; an admitted sprint carries
+3. **Execute**: Issue AC and lifecycle stay on the task authority; an admitted sprint carries
    Plan, Running Context, and Progress.
 4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when its whole Plan is done.
 5. **Groom** (optional): triage is advisory until `--apply`.
 
 ## Storage And External Systems
 
-- GitHub Issues — sole task authority (`gh`; tests use an argv recorder).
+- Task authority — GitHub Issues by default (`gh`), or the Backlog.md CLI / GitLab (`glab`) when `.dev-backlog/.tracker` says so; sole task authority, read by the session, never by a script.
 - `.dev-backlog/sprints/` — admitted execution state; completed sprints are history.
 - `spec/*` — durable direction when present.
-- No tracker selection: the `files` adapter and `.dev-backlog/.tracker` are parked at `v0.11.0` (GitLab at `a8ddb7d`); a leftover `.tracker` file is ignored.
+- `.dev-backlog/.tracker` — one line (`github` when absent, `backlog`, `gitlab`); no adapter code: the `files` adapter stays parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`.
 
 ## Project-Wide Invariants
 

@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+### Changed
+
+- **Task authority is one `.dev-backlog/.tracker` line** (absent = `github`; `backlog` for the Backlog.md CLI, `files` as its legacy spelling; `gitlab`) and SKILL.md carries a three-verb table (read / create / close) in place of the four `gh` rails. Charter rev 20 (epic #472); references, README, CLAUDE.md, and the prose tests follow. No adapter code; the parked `files` adapter stays parked (#475).
+
 ## [0.14.0] — 2026-09-18
 
 Headline: **one implementation of the next batch.** Epic #467 closed the two keep-test candidates left open at v0.13.0. `next.sh` and `status.sh` used to re-implement `sprint-state.js`'s batch selection and checkbox counting in bash through `lib.sh`; they are now argument plumbing that exec `sprint-state.js --format text`, so the human text surface and the dev-relay JSON surface (schema_version 2, byte-identical) come from the same parser. The smoke test drops the `GATE_*` / `gated_assert` rollout scaffolding that had been fully enforced for months. Measured: `next.sh` 157 → 34, `status.sh` 109 → 38, `lib.sh` 111 → 105, `sprint-state.js` 504 → 693; scripts total 2,255 → 2,244 lines / 11 files (the win is one parser, not line count); smoke test 1,240 → 1,199 lines; SKILL.md unchanged at 157 lines. Conformance is `docs/conformance/2026-09-18-wave4.md`. BEHAVIOUR: text mode now follows the JSON semantics — counts come from `## Plan` only, the portfolio is ordered by `started` then path, overlapping active tracks fail loud (exit 1) instead of rendering a portfolio, and the no-sprint hint no longer names `gh`. Rollback point: tag `v0.13.0`.

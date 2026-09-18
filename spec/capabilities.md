@@ -17,28 +17,28 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 
 ## Capability: tracker-task-truth
 
-**Goal:** A repository uses GitHub Issues as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
+**Goal:** A repository uses one declared task authority — GitHub Issues by default; the Backlog.md CLI or GitLab by a one-line `.dev-backlog/.tracker` — as the standalone task-definition and lifecycle authority without mirrors, projections, or execution tools becoming co-authoritative.
 
 **In-scope:**
-- Live GitHub Issue read/create/update/close lifecycle through `gh`, performed by the session
-- Stable `#N` identity, Issue URLs, labels, milestone, assignees, and native relationships
-- Fail-loud `gh` availability and authentication errors: a failed live read stops execution
+- Live task read/create/close lifecycle through the declared authority's CLI (`gh`, `backlog`, or `glab`), performed by the session; the verbs are the SKILL.md Task Authority table
+- Stable `#N` identity (task N in the declared authority), plus the authority's native URLs, labels, milestone, assignees, and relationships when it has them
+- Fail-loud CLI availability and authentication errors: a failed live read stops execution
 
 **Out-of-scope:**
-- Any tracker other than GitHub Issues, a tracker abstraction, or runtime tracker switching (the `files` adapter and ports are parked at `v0.11.0`, GitLab at `a8ddb7d`; re-admission needs a measured consumer)
+- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs), and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one line of prose and no code, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
 - Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage snapshots are advisory input to a report, never authority)
-- Scripts that wrap `gh` for reading Issues, resolving specifications, or seeding Plans
+- Scripts that wrap the authority CLI for reading tasks, resolving specifications, or seeding Plans; scripts never invoke `gh`, `backlog`, or `glab` for task state (`triage-apply` and `--close-milestone` are the GitHub-only exceptions)
 - GitHub Projects fields as task specification or lifecycle state
 
 ### Expected Behaviors
-- Task work reads the live Issue with `gh issue view --json body,comments`; the newest comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in the body naming a file or URL overrides both. If that read fails, execution stops fail-closed.
-- Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through `gh`.
+- Task work reads the live task with the declared authority's Read verb (`gh issue view --json body,comments` by default); on GitHub the newest comment titled `## Agent Brief` overrides the body, and in every authority a `spec_ref:` line in the body naming a file or URL overrides the body. If that read fails, execution stops fail-closed; the authority is never inferred from which CLI is installed.
+- Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through the declared authority's CLI.
 - Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
-- Never treat sprint text, Projects fields, retrieval output, or generated memory as fallback authority after a GitHub read failure.
-- Never write Issue bodies, comments, labels, or state from a script; every GitHub mutation is a deliberate `gh` call the session makes. The one scripted exception is `triage-apply`, which mutates only anchors a human checked.
+- Never treat sprint text, Projects fields, retrieval output, or generated memory as fallback authority after an authority read failure.
+- Never write task bodies, comments, labels, or state from a script; every authority mutation is a deliberate CLI call the session makes. The one scripted exception is `triage-apply`, which mutates only anchors a human checked.
 
 ### Learnings
 <!-- LEARN:BEGIN -->
@@ -55,6 +55,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-15 | `.tracker=gitlab` is a first-class forge adapter via `glab` on the frozen ports (#415) | thin CLI translation like github-tracker.js; identities `gitlab#N`; fail-closed; never co-authority; Forgejo/Gitea share forge field shapes and stay follow-ups | `TRACKER_KEYS` without gitlab |
 | 2026-09-17 | GitHub-only again (G1/G2, charter rev 19, epic #440): `files` adapter, ports, `.tracker` selection, and `BACK-N` parked at `v0.11.0`; diagnostic export deleted; task reading is a session `gh` call, not a script (gate 2026-09-17) | no measured consumer for `files` or the export; tracker generality is a charter Non-Goal | 2026-09-15 `files` row; 2026-09-15 ports-freeze row; 2026-08-16/17 export rows |
 | 2026-09-17 | `gitlab` is parked: no measured consumer (no `glab` installed, no repo pins the key); `TRACKER_KEYS` returns to `github`, `files`; the adapter stays retrievable at `a8ddb7d` (#421, #424; gate 2026-09-17) | charter measured-consumer rule | 2026-09-15 gitlab row |
+| 2026-09-18 | Task authority generalized without code (charter rev 20, epic #472): `.dev-backlog/.tracker` is one line the session reads (absent = `github`; `backlog`/`files`; `gitlab`), the SKILL.md Task Authority table carries the read/create/close verbs, scripts stay authority-neutral (`sprint-state` JSON `tracker` field reflects the line; `--close-milestone` refuses non-GitHub). `backlog` is measured (maintainer repos on the Backlog.md CLI with no GitHub remote); `gitlab` is a documented, unmeasured row | GitHub-less and self-hosted use are maintainer needs; the remaining coupling was prose | 2026-09-17 G1/G2 row's prose (adapter parking stands); 2026-09-17 gitlab-parked row's prose (adapter stays at `a8ddb7d`) |
 
 ---
 

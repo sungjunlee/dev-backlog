@@ -3,7 +3,7 @@
 [![CI](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml/badge.svg)](https://github.com/sungjunlee/dev-backlog/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-GitHub Issues are the canonical task authority. Simple work stays Issue → PR.
+One task authority — GitHub Issues by default — is canonical. Simple work stays Issue → PR.
 Open a local sprint file only when execution needs shared batching, context,
 progress, or handoff across issues, actors, or sessions.
 
@@ -21,7 +21,14 @@ npx skills add sungjunlee/dev-backlog -g -y
 ```
 
 Needs [Claude Code](https://claude.ai/code) or [Codex](https://chatgpt.com/codex),
-an authenticated [`gh` CLI](https://cli.github.com/), Git, and Node.js 18+.
+Git, Node.js 18+, and the task authority's CLI: an authenticated
+[`gh`](https://cli.github.com/) by default, or the [Backlog.md](https://backlog.md)
+CLI / [`glab`](https://gitlab.com/gitlab-org/cli) when you opt out of GitHub
+with one line:
+
+```bash
+printf 'backlog\n' > .dev-backlog/.tracker   # or: gitlab
+```
 
 To inspect scripts from a clone:
 
@@ -33,7 +40,7 @@ git clone https://github.com/sungjunlee/dev-backlog.git
 
 Work from the live Issue. No sprint, no pull step, and no task-file directory required.
 
-1. Create or pick a GitHub Issue with acceptance criteria.
+1. Create or pick an Issue (GitHub by default) with acceptance criteria.
 2. Implement and open a PR.
 3. Verify every AC item, then close the Issue.
 
@@ -42,7 +49,7 @@ Work from the live Issue. No sprint, no pull step, and no task-file directory re
 /dev-backlog work 42
 ```
 
-Read intent and AC from the live Issue:
+Read intent and AC from the live Issue (`backlog task 42 --plain` / `glab issue view 42` under the other authorities):
 
 ```bash
 gh issue view 42 --json body,comments

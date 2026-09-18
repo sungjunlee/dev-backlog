@@ -1,11 +1,14 @@
-# GitHub-native authority and routing contract
+# Authority and routing contract
 
-GitHub Issues own task specification and lifecycle. There is no tracker
-abstraction and no adapter layer (charter rev 19); the `files` adapter and
-`.dev-backlog/.tracker` are parked at tag `v0.11.0` and a leftover `.tracker`
-file is ignored. A sprint file exists only when execution needs continuity
-beyond one Issue and its PR. A failed `gh` read is fail-closed: no local-file
-or second-authority fallback.
+One declared task authority owns task specification and lifecycle:
+`.dev-backlog/.tracker` names it in one line (absent = `github`; `backlog` for
+the Backlog.md CLI, `files` accepted as its legacy spelling; `gitlab`). The
+session reads that line and uses the authority's CLI verbs from the SKILL.md
+Task Authority table; there is no adapter layer in code (charter rev 20) and
+the `files` adapter stays parked at tag `v0.11.0`. A sprint file exists only
+when execution needs continuity beyond one task and its PR. A failed authority
+read is fail-closed: no local-file or second-authority fallback, and the
+authority is never inferred from which CLI is installed.
 
 ## Authority and routing table
 
@@ -14,12 +17,12 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | The GitHub Issue body and acceptance criteria; the newest posted `## Agent Brief` comment overrides the body, and a `spec_ref:` line in the body overrides both | Create or amend the live Issue with `gh` (or post the brief as a comment), then read it back with `gh issue view N --json body,comments`; never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
-| Task lifecycle | GitHub Issue state and native metadata | Update the live Issue state with `gh issue close` / `gh issue edit` | Sprint checkboxes, project-board fields |
-| Planning fields | GitHub native metadata (labels, milestone, assignees, and relationships) | Use GitHub's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
+| Task specification | The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body | Create or amend the live task with the authority's CLI, then read it back with its Read verb (`gh issue view N --json body,comments` by default); never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
+| Task lifecycle | The declared authority's task state and native metadata | Update the live task state with the authority's Close verb (`gh issue close` by default) | Sprint checkboxes, project-board fields |
+| Planning fields | The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them) | Use the authority's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
-| Historical evidence | GitHub repository history | Read closed Issues/PRs, commits, and committed completed sprint files at their original locations | Copied summaries, search indexes, compiled memory |
+| Historical evidence | Repository history (git plus the authority's closed tasks and PRs) | Read closed Issues/PRs, commits, and committed completed sprint files at their original locations | Copied summaries, search indexes, compiled memory |
 | Derived retrieval output | Its named upstream authority | Recompute from live authorities and identify the source record in every result | Search caches, embeddings, generated summaries, benchmark output |
 
 `Derived retrieval output` is a view, not a new state owner: the sole owner of
@@ -66,18 +69,17 @@ lifecycle.
 The core product excludes:
 
 - dual-write or bidirectional task state;
-- silent fallback to local files when a `gh` read fails;
+- silent fallback to local files when an authority read fails;
 - automatic writes from search, retrieval, summaries, or memory compilers;
 - required Relay, Matt Pocock skill, or GitHub Projects runtime dependencies;
 - a second task-spec or lifecycle authority in the same repo.
 
-Do not reintroduce a tracker abstraction, adapter ports, or `.tracker`
-selection: tracker generality is a charter Non-Goal and the `files` adapter is
-parked at tag `v0.11.0`. Do not add bidirectional compatibility machinery,
-task-mirror lifecycle features, or a committed memory/compiler layer without
-new measured adoption evidence and an explicit authority-contract amendment.
-Measured adoption: 0 of 17 selected a non-default tracker; all 18 then-known
-consumers had a GitHub remote. That evidence froze the GitHub-native core.
+Do not reintroduce a tracker abstraction or adapter ports: the authority is a
+one-line selection the session reads, the `files` adapter is parked at tag
+`v0.11.0`, and a new authority is a documented table row that needs a measured
+consumer. Do not add bidirectional compatibility machinery, task-mirror
+lifecycle features, or a committed memory/compiler layer without new measured
+adoption evidence and an explicit authority-contract amendment.
 
 ## Optional boundaries
 
@@ -86,13 +88,13 @@ consumers had a GitHub remote. That evidence froze the GitHub-native core.
 | Relay | Optional implementation/review delegation | May update an admitted sprint through its integration contract; never required for task resolution or sprint execution |
 | Matt Pocock skills | Optional shaping and execution techniques | May help an actor plan or implement; no persisted dev-backlog state or hard dependency |
 | GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
-| Backlog.md | Leftover operator tree under `backlog/` | Leftover `backlog/tasks/*.md` is never a product parser API and never task authority; the `files` adapter is parked at `v0.11.0` |
+| Backlog.md | Task authority when `.tracker` says `backlog`, through its CLI only | `backlog/tasks/*.md` is never a product parser API; the parked `files` adapter (`v0.11.0`) is not revived — the session calls the CLI verbs itself |
 | Spec axis | Optional durable project contract | Human-gated when present; absence must not block task work or the complete sprint cycle |
 | Retrieval/memory experiments | Optional, report-only evidence tools | #350 closed **no-go** (2026-08-17): Arm B (live sources) suffices. No compiler, no committed memory artifact, no project-memory skill |
 
 ## No-spec / no-Relay invariant
 
-A repository with GitHub Issues but no `.dev-backlog/`, no `spec/`, and no Relay
+A repository with a task authority (GitHub Issues by default) but no `.dev-backlog/`, no `spec/`, and no Relay
 installation must be able to:
 
 1. complete a simple Issue → PR path without creating a sprint; and
@@ -100,4 +102,5 @@ installation must be able to:
    this bundle, with `objectives:` and `component:` omitted.
 
 No path may require a cross-repository spec reference, Relay artifact, Projects
-board, local task copy, generated memory, or a Backlog.md installation.
+board, local task copy, generated memory, or a CLI other than the declared
+authority's.
