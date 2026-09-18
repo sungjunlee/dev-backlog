@@ -4,7 +4,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");
-const { toPortablePath } = require("./portable-path.js");
+const { toPortablePath } = require("../../skills/dev-backlog/scripts/portable-path.js");
 
 function resolveBashExecutable({
   platform = process.platform,

@@ -5,7 +5,7 @@
  * deleted script (the `progress-sync` gotchas survived their script's
  * deletion by two weeks before the 2026-08-15 cleanup found them).
  *
- * Usage: ./scripts/doc-drift-check.js [--root PATH] [--json]
+ * Usage: node tests/tools/doc-drift-check.js [--root PATH] [--json]
  *
  * Behavior:
  *   - Doc surface: skills/<skill>/SKILL.md, skills/<skill>/references/*.md,
@@ -24,7 +24,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { defaultSprintsDir } = require("./execution-root.js");
+const { defaultSprintsDir } = require("../../skills/dev-backlog/scripts/execution-root.js");
 
 const TOKEN_RE = /[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:js|sh)\b/g;
 const IGNORED_TOKENS = new Set(["Node.js"]);

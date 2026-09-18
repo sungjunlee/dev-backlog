@@ -4,6 +4,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const TOOLS = path.resolve(__dirname, "../tools");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   parseArgs,
@@ -11,9 +12,9 @@ const {
   collectScriptInventory,
   extractMentions,
   checkDocDrift,
-} = require(path.join(SKILL_SCRIPTS, "doc-drift-check.js"));
+} = require(path.join(TOOLS, "doc-drift-check.js"));
 
-const SCRIPT = path.join(SKILL_SCRIPTS, "doc-drift-check.js");
+const SCRIPT = path.join(TOOLS, "doc-drift-check.js");
 const REPO_ROOT = path.join(__dirname, "..", "..");
 
 function makeTempDir() {
