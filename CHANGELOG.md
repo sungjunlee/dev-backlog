@@ -6,12 +6,17 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-09-18
+
+Headline: **the keep-test follow-up release.** Epic #456 re-ran the keep test (guard shared/irreversible state, deterministic check the model cannot cheaply redo, or wire contract another tool consumes) against every surface that survived v0.12.0 with a consumer grep, and deleted the five that failed on all three counts: `sprint-init.js` `--dry-run`/`--json`/structured refusal, the doctor's `in_flight_staleness` and `context_bloat`, `status.sh`'s Local Files / Relay Runs / Past sprints blocks, and `lib.js`'s orphaned config readers; the repo's own lint and test helper moved out of the shipped bundle into `tests/tools/`. Measured: dev-backlog scripts 2,807 lines / 13 files → 2,255 / 11 (the v0.12.0 close-out miscounted 13 as 14), SKILL.md unchanged at 157 lines / never-only-must 5. Conformance is `docs/conformance/2026-09-18-wave3.md` (one after-run per model against the v0.12.0 baseline, identical profile: Claude Fable 5.1 11/11, GPT-6 Astra 11/11). Retired raw conformance directories from 2026-09-17 are pruned per the retention rule; the #433 fixture A/B decision record is kept. BREAKING: `sprint-init.js` now rejects `--dry-run`, `--json`, any unknown flag, and a valueless `--milestone` before any effect; `backlog-doctor.js --stale-days` is an unknown argument; `status.sh` text output ends after the Active Sprint block. Rollback point: tag `v0.12.0`.
+
 ### Changed
 
 - **sprint-init.js debug surfaces deleted** — `--dry-run`, `--json`, the structured refusal JSON, and the vestigial `issueCount` / `placeholderIssue` fields are gone (247 lines with tests); only tests consumed them. Overlap refusal and `--component` validation are unchanged. Closes [#457](https://github.com/sungjunlee/dev-backlog/issues/457).
 - **Repo-only helpers leave the shipped bundle** — `doc-drift-check.js` (this repo's lint over its own docs) and `bash-runtime.js` (a test helper that locates bash) moved from `skills/dev-backlog/scripts/` to `tests/tools/` with their tests; no operator script or SKILL.md rail used them. The shipped script inventory is 14 → 12 files. Closes [#460](https://github.com/sungjunlee/dev-backlog/issues/460).
 - **Doctor advisory checks and dead lib.js readers deleted** — `backlog-doctor.js` drops `in_flight_staleness` (`--stale-days`) and `context_bloat`; both re-derive from `status.sh --json` `age_days` and `wc -l` and nothing consumed them. `lib.js` drops `parseMarkerMonth` and the triage config readers orphaned by #433 (259 lines with tests). The three guard checks and their JSON shapes are unchanged. Closes [#458](https://github.com/sungjunlee/dev-backlog/issues/458).
 - **status.sh trailing sections deleted** — the Local Files block (counted `tasks/*.md` mirrors by a Backlog.md `status:` field, a format parked at `v0.11.0`), the Relay Runs block (re-derived another tool's run-directory slug and grepped its manifests), and the Past sprints line are gone (54 lines with their smoke fixture); each was one command away and nothing consumed them. Output now ends after the Active Sprint block; `--json` and `--track` are unchanged. Closes [#459](https://github.com/sungjunlee/dev-backlog/issues/459).
+- **Release v0.13.0** — closes [#461](https://github.com/sungjunlee/dev-backlog/issues/461).
 
 ## [0.12.0] — 2026-09-17
 
