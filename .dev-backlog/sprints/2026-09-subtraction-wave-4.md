@@ -16,12 +16,12 @@ The two keep-test candidates left open at v0.13.0 are gone — one implementatio
 
 ### Batch 1 — parallel (disjoint files)
 
-- [~] #468 next.sh / status.sh render text from sprint-state.js; delete bash sprint parsing [branch:468-next-status-text-from-sprint-state]
+- [x] #468 next.sh / status.sh render text from sprint-state.js; delete bash sprint parsing → PR #473 (merged)
 - [x] #469 smoke-test.sh: delete GATE_* / gated_assert scaffolding → PR #471 (merged)
 
 ### Batch 2 — release
 
-- [ ] #470 release v0.14.0: CHANGELOG, VERSION, conformance after-run, tag (est: 1h)
+- [~] #470 release v0.14.0: CHANGELOG, VERSION, conformance after-run, tag [branch:470-release-v0.14.0]
 
 ## Running Context
 
@@ -31,5 +31,5 @@ The two keep-test candidates left open at v0.13.0 are gone — one implementatio
 ## Progress
 
 - 2026-09-18: sprint opened; epic #467, issues #468–#470, milestone 26.
-- 2026-09-18: #469 merged (PR #471, Sol MERGE); #468 in flight.
+- 2026-09-18: #469 merged (PR #471, Sol MERGE); #468 merged (PR #473, Astra DO NOT MERGE → direct fix: env-var regression, CHANGELOG claim, CLI exit-code tests; one Windows path-separator fix in my own test). Batch 2 (#470) started.
   
