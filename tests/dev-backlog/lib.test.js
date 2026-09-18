@@ -276,7 +276,7 @@ describe("readTaskAuthority", () => {
     write(dir, "local\n");
     assert.throws(
       () => readTaskAuthority(dir),
-      /Unknown task authority "local" in .*\.tracker; expected github, backlog, or gitlab\./
+      /Unknown task authority "local" in .*\.tracker; expected github, backlog \(or files\), or gitlab\./
     );
   });
 });

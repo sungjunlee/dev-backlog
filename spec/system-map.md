@@ -41,7 +41,7 @@ Retrieval/memory is not a product surface (#350 no-go).
 - Task authority — GitHub Issues by default (`gh`), or the Backlog.md CLI / GitLab (`glab`) when `.dev-backlog/.tracker` says so; sole task authority, read by the session, never by a script.
 - `.dev-backlog/sprints/` — admitted execution state; completed sprints are history.
 - `spec/*` — durable direction when present.
-- `.dev-backlog/.tracker` — one line (`github` when absent, `backlog`, `gitlab`); no adapter code: the `files` adapter stays parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`.
+- `.dev-backlog/.tracker` — one line (`github` when absent, `backlog` or its legacy spelling `files`, `gitlab`); no adapter code: the `files` adapter stays parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`.
 
 ## Project-Wide Invariants
 

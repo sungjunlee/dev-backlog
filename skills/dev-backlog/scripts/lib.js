@@ -4,18 +4,29 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
 const TASK_AUTHORITIES = { github: "github", backlog: "backlog", files: "backlog", gitlab: "gitlab" };
-/** `<backlogDir>/.tracker`, one line; absent -> "github". Unknown values fail loud (#476). */
-function readTaskAuthority(backlogDir) {
-  const trackerPath = path.join(backlogDir, ".tracker");
-  let line = "github";
+/** First line of `<backlogDir>/.tracker`, or null when the file is absent (#476). */
+function readTrackerLine(trackerPath) {
   try {
-    line = fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
+    return fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
   } catch (error) {
     if (error.code === "EISDIR") throw new Error(`Cannot read task authority: ${trackerPath} is a directory.`);
     if (error.code !== "ENOENT") throw error;
+    if (fs.existsSync(trackerPath) || isSymlink(trackerPath)) throw new Error(`Cannot read task authority: ${trackerPath} is unreadable.`);
+    return null;
   }
+}
+
+function isSymlink(targetPath) {
+  try { return fs.lstatSync(targetPath).isSymbolicLink(); } catch { return false; }
+}
+
+/** `.tracker` one line; absent -> "github"; `files` is the legacy spelling of `backlog`. */
+function readTaskAuthority(backlogDir) {
+  const trackerPath = path.join(backlogDir, ".tracker");
+  const line = readTrackerLine(trackerPath);
+  if (line === null) return "github";
   if (!Object.hasOwn(TASK_AUTHORITIES, line)) {
-    throw new Error(`Unknown task authority "${line}" in ${trackerPath}; expected github, backlog, or gitlab.`);
+    throw new Error(`Unknown task authority "${line}" in ${trackerPath}; expected github, backlog (or files), or gitlab.`);
   }
   return TASK_AUTHORITIES[line];
 }

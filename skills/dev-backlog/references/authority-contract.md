@@ -17,7 +17,7 @@ easier to view or retrieve, but it never accepts an independent write.
 
 | State class | Sole authority | Write and read route | Non-authoritative surfaces |
 | --- | --- | --- | --- |
-| Task specification | The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body | Create or amend the live task with the authority's CLI, then read it back with its Read verb (`gh issue view N --json body,comments` by default); never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
+| Task specification | The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body (on GitHub, the Agent Brief as well) | Create or amend the live task with the authority's CLI, then read it back with its Read verb (`gh issue view N --json body,comments` by default); never leftover `tasks/*.md` | Sprint Plan text, GitHub Projects |
 | Task lifecycle | The declared authority's task state and native metadata | Update the live task state with the authority's Close verb (`gh issue close` by default) | Sprint checkboxes, project-board fields |
 | Planning fields | The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them) | Use the authority's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Relay run artifacts, PR tabs, chat history, status projections |
@@ -76,8 +76,9 @@ The core product excludes:
 
 Do not reintroduce a tracker abstraction or adapter ports: the authority is a
 one-line selection the session reads, the `files` adapter is parked at tag
-`v0.11.0`, and a new authority is a documented table row that needs a measured
-consumer. Do not add bidirectional compatibility machinery, task-mirror
+`v0.11.0`, and a new authority is a documented table row plus its entry in the scripts'
+allow-list, and needs a measured consumer (the GitLab row is the stated
+exception; see the charter Non-Goals). Do not add bidirectional compatibility machinery, task-mirror
 lifecycle features, or a committed memory/compiler layer without new measured
 adoption evidence and an explicit authority-contract amendment.
 

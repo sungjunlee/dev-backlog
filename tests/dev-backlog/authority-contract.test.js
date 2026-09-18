@@ -18,7 +18,7 @@ const EXPECTED_STATE_CLASSES = [
   "Derived retrieval output",
 ];
 const EXPECTED_SOLE_AUTHORITIES = [
-  "The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body",
+  "The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body (on GitHub, the Agent Brief as well)",
   "The declared authority's task state and native metadata",
   "The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them)",
   "One active sprint file for the admitted track",

@@ -6,10 +6,15 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-09-18
+
+Headline: **one task authority, declared in one line.** Epic #472 (charter rev 20) generalizes the task authority without bringing back the adapter layer that v0.12.0 removed: `.dev-backlog/.tracker` is one line the session reads — absent means `github`, `backlog` selects the Backlog.md CLI so a repo with no GitHub remote runs the Issue → PR loop and the sprint cycle through that CLI, `gitlab` selects `glab` (a documented row, unmeasured until a repo pins it). SKILL.md replaces its four `gh` rails with a read / create / close table (157 → 165 lines, no new reference file); scripts stay authority-neutral (+56 lines: `lib.js` reads the line so the `sprint-state` JSON `tracker` field is honest, `--close-milestone` refuses non-GitHub, setup names the authority; unknown values fail loud; JSON byte-identical when the file is absent). Conformance is `docs/conformance/2026-09-18-wave5.md`: two new GitHub-less eval scenarios flip FAIL → PASS on Claude Fable 5.1 and GPT-6 Astra with the eleven existing scenarios unchanged. BREAKING: a leftover `.dev-backlog/.tracker` is no longer ignored — `files` now selects the Backlog.md authority, and an empty, unknown (for example `local`), unreadable, or directory `.tracker` stops `sprint-state.js` (and so `next.sh` / `status.sh`, even with no active sprint), `setup-dev-backlog.js` (after its legacy migration step has already run), and `sprint-close.sh --close-milestone` (also under `--dry-run`); delete the file or set it to `github`. Setup's human output now names the authority instead of printing the `gh auth status` hint. Repos without a `.tracker` see no behaviour change; the `sprint-state` JSON is byte-identical. Rollback point: tag `v0.14.0`.
+
 ### Changed
 
 - **Task authority is one `.dev-backlog/.tracker` line** (absent = `github`; `backlog` for the Backlog.md CLI, `files` as its legacy spelling; `gitlab`) and SKILL.md carries a three-verb table (read / create / close) in place of the four `gh` rails. Charter rev 20 (epic #472); references, README, CLAUDE.md, and the prose tests follow. No adapter code; the parked `files` adapter stays parked (#475).
 - Scripts read an optional `.dev-backlog/.tracker` declared task authority (default `github`; `backlog`/legacy `files`; `gitlab`; unknown value fails loud) into `sprint-state.js`'s `tracker` field, `sprint-close.sh --close-milestone`'s GitHub-only refusal, and `setup-dev-backlog.js`'s human result line; `readTaskAuthority` is exported from `lib.js`. Setup never writes `.tracker`. Closes [#476](https://github.com/sungjunlee/dev-backlog/issues/476).
+- `tests/evals/dev-backlog.md`: scenarios 12 (work a task under the `backlog` authority with no GitHub remote) and 13 (`.tracker` says `backlog` but the CLI is missing: stop, never switch) (#477).
 
 ## [0.14.0] — 2026-09-18
 

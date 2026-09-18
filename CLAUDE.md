@@ -29,7 +29,7 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 
 ## Key Design Decisions
 
-- **One declared task authority (GitHub Issues by default)** — `.dev-backlog/.tracker` is one line (absent = `github`; `backlog` for the Backlog.md CLI; `gitlab`) that the session reads; there is no adapter layer, the `files` adapter stays parked at tag `v0.11.0`. Task definition, AC, and lifecycle are read live with the authority's Read verb (`gh issue view N --json body,comments` by default; an `## Agent Brief` comment overrides the body on GitHub, a `spec_ref:` line overrides the body everywhere); no task-file directory required
+- **One declared task authority (GitHub Issues by default)** — `.dev-backlog/.tracker` is one line (absent = `github`; `backlog` for the Backlog.md CLI, `files` as its legacy spelling; `gitlab`) that the session reads; there is no adapter layer, the `files` adapter stays parked at tag `v0.11.0`. Task definition, AC, and lifecycle are read live with the authority's Read verb (`gh issue view N --json body,comments` by default; an `## Agent Brief` comment overrides the body on GitHub, a `spec_ref:` line overrides the body everywhere); no task-file directory required
 - **Sprint files = execution hub, admitted by complexity** — the default path
   is sprint-free Issue → PR; a sprint exists only when execution needs
   continuity (ordered batches, handoff, cross-session context)
