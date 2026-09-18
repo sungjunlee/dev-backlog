@@ -582,3 +582,34 @@ describe("parseArgs --format", () => {
     assert.match(parsed.error, /Usage: sprint-state\.js .*--format json\|text/);
   });
 });
+
+describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
+  const { spawnSync } = require("child_process");
+  const BIN = path.resolve(__dirname, "../../skills/dev-backlog/scripts/sprint-state.js");
+  let root;
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "ss-cli-")); });
+  afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
+  const run = (...args) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, encoding: "utf8" });
+
+  it("next: missing sprints dir prints the setup hint and exits 1", () => {
+    const res = run("--mode", "next", "--format", "text", "nope");
+    assert.equal(res.status, 1);
+    assert.match(res.stdout, /^No nope\/sprints directory\. Run setup-dev-backlog\.js first\.\n$/);
+  });
+
+  it("next/status: no active sprint exits 0 with the neutral hint", () => {
+    fs.mkdirSync(path.join(root, ".dev-backlog", "sprints"), { recursive: true });
+    const next = run("--mode", "next", "--format", "text");
+    assert.equal(next.status, 0);
+    assert.equal(next.stdout, "No active sprint found.\nList open tasks in the task authority.\n");
+    const status = run("--mode", "status", "--format", "text");
+    assert.equal(status.status, 0);
+    assert.equal(status.stdout, "=== Active Sprint ===\n(no active sprint)\n");
+  });
+
+  it("rejects an unknown --format on the CLI with exit 1", () => {
+    const res = run("--mode", "next", "--format", "yaml");
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /Invalid --format: yaml/);
+  });
+});

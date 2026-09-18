@@ -15,7 +15,7 @@ SCRIPT_DIR="${_src%/*}"
 [ "$SCRIPT_DIR" = "$_src" ] && SCRIPT_DIR="."
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 
-BACKLOG_DIR="${DEFAULT_BACKLOG_DIR:-.dev-backlog}"
+BACKLOG_DIR=".dev-backlog" # keep in sync with execution-root.js DEFAULT_BACKLOG_DIR
 JSON=0
 TRACK=""
 while [ "$#" -gt 0 ]; do
