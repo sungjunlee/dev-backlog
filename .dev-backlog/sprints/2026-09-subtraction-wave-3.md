@@ -1,6 +1,6 @@
 ---
 milestone: 2026-09 subtraction wave 3
-status: active
+status: completed
 started: 2026-09-17
 due: TBD
 scope: ["skills/**", "tests/**", "docs/**", "README.md", "CHANGELOG.md", "VERSION"]
@@ -20,7 +20,7 @@ Every dev-backlog script surface that fails the keep test after v0.12.0 is delet
 - [x] #460 move doc-drift-check.js + bash-runtime.js to tests/tools/ → PR #462 (merged)
 
 ### Batch 2 — close-out
-- [~] #461 after-run conformance (Fable 5.1 + GPT-6 Astra), Astra cumulative review, release v0.13.0 → PR #466 (open)
+- [x] #461 after-run conformance (Fable 5.1 + GPT-6 Astra), Astra cumulative review, release v0.13.0 → PR #466 (merged)
 
 ## Running Context
 - Keep test unchanged from #440: guard shared/irreversible state, deterministic check the model cannot cheaply redo, or wire contract another tool consumes; fail all three → delete, do not rewrite.
@@ -33,3 +33,4 @@ Every dev-backlog script surface that fails the keep test after v0.12.0 is delet
   - 2026-09-18: Batch 1 in flight. #459 → PR #463, #460 → PR #462 (session-authored, Sol review). #457/#458 dispatched to Grok 4.6 in worktrees. Hotfix fd9422d: `_context.md` named a deleted script; main CI had been red since 76f8377.
 - 2026-09-18: #459 PR #463, #460 PR #462, #458 PR #465 merged. Sol on #462: keep helper tests under tests/dev-backlog (applied); Sol on #463: 109 > 100 lines (acceptance amended to 110, remaining lines are the protected Active Sprint block). Astra on #458: MERGE. Astra on #457: DO NOT MERGE (retired flags silently created files) → direct fix, PR #464 awaiting CI.
 - 2026-09-18: #457 PR #464 merged after the Astra fix; Batch 1 done (scripts 2,807/13 → 2,255/11). After-run conformance fable 11/11, astra 11/11 (same profile as v0.12.0). Release PR #466 open; Astra cumulative review pending.
+- 2026-09-18: Sprint closed. 5/5 tasks completed.
