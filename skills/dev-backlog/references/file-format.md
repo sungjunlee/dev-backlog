@@ -6,7 +6,7 @@ Sprint files and `.dev-backlog/` layout.
 
 Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Required
 headings: `## Goal`, `## Plan`, `## Running Context`, `## Progress`. Plan item
-grammar: `- [ ] #N …` — a complete GitHub Issue ref and nothing else; `[~]`
+grammar: `- [ ] #N …` — task N in the declared authority and nothing else; `[~]`
 in-flight and `[x]` done may append `→ PR #N (state)` (end of line), `[branch:name]`, and/or `[run:…]` (end of line). Section semantics live in
 [SKILL.md](../SKILL.md).
 
@@ -81,10 +81,12 @@ earlier release) is preserved byte-for-byte. `backlog-triage` reads its own
 
 ## Task specification
 
-Work and completion read the live task with `gh issue view N --json
-body,comments`: the newest comment titled `## Agent Brief` overrides the body,
-and a `spec_ref:` line in the body naming a file or URL overrides both. To
-select a document explicitly, put exactly one such line in the Issue body:
+Work and completion read the live task with the authority's Read verb
+(`gh issue view N --json body,comments` by default; see the SKILL.md Task
+Authority table): on GitHub the newest comment titled `## Agent Brief`
+overrides the body, and in every authority a `spec_ref:` line in the body
+naming a file or URL overrides the body (on GitHub, the Agent Brief as well).
+To select a document explicitly, put exactly one such line in the task body:
 
 ```markdown
 spec_ref: docs/oauth-rollout.md

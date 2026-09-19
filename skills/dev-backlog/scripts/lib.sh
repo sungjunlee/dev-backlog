@@ -13,7 +13,7 @@ RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'
 RE_CB_TODO='^\- \[ \] #'
 
-# Plan refs are complete GitHub Issue refs: `#N`, N >= 1, no decimals.
+# Plan refs are task refs in the declared authority: `#N`, N >= 1, no decimals.
 # Keep in sync with ISSUE_REF_RE / PLAN_CHECKBOX_RE in lib.js.
 RE_ISSUE_REF='#[1-9][0-9]*([[:space:]]|$)'
 

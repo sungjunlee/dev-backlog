@@ -2,7 +2,7 @@
 
 One sole task authority (GitHub Issues by default) as task truth + local sprint files for execution continuity,
 for Claude Code / Codex. Two skills: `dev-backlog` (sprint execution) and
-`backlog-triage` (advisory open-issue grooming).
+`backlog-triage` (advisory open-issue grooming, GitHub-only).
 
 `README.md` is the human quick start. `skills/*/SKILL.md` files are the agent
 execution contracts. `AGENTS.md` is a symbolic link to this file, so Codex and
@@ -73,5 +73,5 @@ amendments are human-gated — propose, apply only on explicit approval.
 - `docs/` holds decision/proof records with a Living/Removed index in
   `docs/README.md` — git history is authoritative; do not re-read removed or
   historical docs as live contracts
-- Test changes by simulating real task management scenarios against GitHub
-  repos; practical, not ceremonial
+- Test changes by simulating real task management scenarios against real
+  repos (GitHub by default); practical, not ceremonial

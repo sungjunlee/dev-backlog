@@ -13,7 +13,7 @@ Task authority: GitHub Issue by default (spec + lifecycle + native planning fiel
               .dev-backlog/sprints/   Plan / Running Context / Progress
 ```
 
-`backlog-triage` is an optional advisory grooming pipeline over the same Issues.
+`backlog-triage` is an optional, GitHub-only advisory grooming skill over the same Issues (a session-written report plus the human-gated `triage-apply`).
 `spec/*` is an optional human-gated yardstick. Relay and GitHub Projects are
 optional and non-authoritative.
 Retrieval/memory is not a product surface (#350 no-go).
@@ -45,8 +45,8 @@ Retrieval/memory is not a product surface (#350 no-go).
 
 ## Project-Wide Invariants
 
-- One task authority. A failed `gh` read is fail-closed: no local store, export, or sprint text stands in for it; no dual write or background sync.
-- A failed live Issue read stops execution.
+- One task authority, declared by `.dev-backlog/.tracker` and never inferred from installed CLIs. A failed authority read is fail-closed: no local store, export, or sprint text stands in for it; no dual write or background sync.
+- A failed live task read stops execution.
 - A sprint is admitted by execution complexity, never duration alone.
 - An unavailable optional surface (Relay, Projects, the spec axis) is reported and skipped before any effect; it never blocks the Issue → PR path and never becomes authority.
 - Automation is report-only toward `spec/*`.
