@@ -35,7 +35,7 @@ const GH_EXEC_DEFAULTS = Object.freeze({
   encoding: "utf-8",
   maxBuffer: 50 * 1024 * 1024,
 });
-// Plan refs are complete GitHub Issue refs and nothing else: `#N`, N >= 1.
+// Plan refs are task refs in the declared authority and nothing else: `#N`, N >= 1.
 const ISSUE_REF_RE = /^#([1-9]\d*)$/;
 const PLAN_CHECKBOX_RE = /^- \[( |~|x)\] (\S+)(?:\s+(.*))?$/;
 

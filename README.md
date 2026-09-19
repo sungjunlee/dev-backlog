@@ -59,7 +59,7 @@ The newest comment titled `## Agent Brief` overrides the body, and a `spec_ref:`
 the body naming a file or URL overrides both.
 
 Sibling skill [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the
-open-issue pile. It is not part of the default loop.
+open-issue pile (GitHub only). It is not part of the default loop.
 
 ## When to open a sprint
 

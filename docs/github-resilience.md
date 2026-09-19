@@ -12,7 +12,10 @@ Since #433 (triage pipeline deleted) and #445 (tracker abstraction deleted),
 the only **scripted** `gh` calls left are `sprint-close.sh --close-milestone`
 and `triage-apply --apply`. Every other GitHub read or write — issue view,
 list, create, edit, close — is a `gh` call the session makes itself and owns
-the failure of; charter rev 19 Non-Goal "Wrapping `gh`".
+the failure of; charter rev 20 Non-Goal "Wrapping the authority CLI". Under a
+non-GitHub `.dev-backlog/.tracker` authority (v0.15.0), `sprint-close.sh
+--close-milestone` refuses before making any `gh` call, and `backlog-triage`
+does not apply.
 
 ### Read class (allowed to keep working during a partial outage)
 

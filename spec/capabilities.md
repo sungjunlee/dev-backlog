@@ -25,8 +25,8 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - Fail-loud CLI availability and authentication errors: a failed live read stops execution
 
 **Out-of-scope:**
-- A tracker abstraction or runtime switching: adding an authority means adding a table row (documented CLI verbs) plus its entry in the scripts' allow-list, and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one line of prose and no code, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
-- Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage snapshots are advisory input to a report, never authority)
+- A tracker abstraction, or an authority inferred from installed CLIs or switched at runtime (the authority is only ever the declared `.tracker` line, `github` when the file is absent): adding an authority means adding a table row (documented CLI verbs) plus its entry in the scripts' allow-list, and a row needs a measured consumer — the GitLab row is the one standing exception (unmeasured as of 2026-09-18, carried because it is one table row and one allow-list entry, no adapter, dropped at the next reassess if still unpinned); the `files` adapter code and ports stay parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`
+- Task mirrors, diagnostic exports, or any local copy of Issue state used as authority (triage reports are advisory, never authority)
 - Scripts that wrap the authority CLI for reading tasks, resolving specifications, or seeding Plans; scripts never invoke `gh`, `backlog`, or `glab` for task state (`triage-apply` and `--close-milestone` are the GitHub-only exceptions)
 - GitHub Projects fields as task specification or lifecycle state
 
@@ -56,6 +56,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-17 | GitHub-only again (G1/G2, charter rev 19, epic #440): `files` adapter, ports, `.tracker` selection, and `BACK-N` parked at `v0.11.0`; diagnostic export deleted; task reading is a session `gh` call, not a script (gate 2026-09-17) | no measured consumer for `files` or the export; tracker generality is a charter Non-Goal | 2026-09-15 `files` row; 2026-09-15 ports-freeze row; 2026-08-16/17 export rows |
 | 2026-09-17 | `gitlab` is parked: no measured consumer (no `glab` installed, no repo pins the key); `TRACKER_KEYS` returns to `github`, `files`; the adapter stays retrievable at `a8ddb7d` (#421, #424; gate 2026-09-17) | charter measured-consumer rule | 2026-09-15 gitlab row |
 | 2026-09-18 | Task authority generalized without code (charter rev 20, epic #472): `.dev-backlog/.tracker` is one line the session reads (absent = `github`; `backlog`/`files`; `gitlab`), the SKILL.md Task Authority table carries the read/create/close verbs, scripts stay authority-neutral (`sprint-state` JSON `tracker` field reflects the line; `--close-milestone` refuses non-GitHub). `backlog` is measured (maintainer repos on the Backlog.md CLI with no GitHub remote); `gitlab` is a documented, unmeasured row | GitHub-less and self-hosted use are maintainer needs; the remaining coupling was prose | 2026-09-17 G1/G2 row's prose (adapter parking stands); 2026-09-17 gitlab-parked row's prose (adapter stays at `a8ddb7d`) |
+| 2026-09-19 | Clarification of the 2026-09-18 row: "without code" means without an adapter — v0.15.0 added 56 authority-neutral script lines (`readTaskAuthority` allow-list, JSON `tracker` field, `--close-milestone` guard, setup line) | the row was published with v0.15.0 and stays; the wording was wrong | wording of the 2026-09-18 row |
 
 ---
 
@@ -69,10 +70,10 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - `sprint-init.js`, `sprint-close.sh`, `find_active_sprint`/`resolve_track`, `next.sh`, `status.sh`
 
 **Out-of-scope:**
-- Tasks outside the active sprint (their specification and lifecycle remain in GitHub Issues)
+- Tasks outside the active sprint (their specification and lifecycle remain in the task authority)
 - Sprint *content* authoring — humans write the Plan; this capability runs it
 - Backlog grooming or stale-issue detection (`triage-grooming` capability)
-- Simple work whose complete continuity fits in one GitHub Issue and its PR
+- Simple work whose complete continuity fits in one Issue and its PR
 
 ### Expected Behaviors
 - The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, milestone membership, and Relay presence alone never trigger one.
@@ -100,6 +101,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-15 | Sprint files, tracker pin, skill config, and triage artifacts live under `.dev-backlog/` (#412) | keep execution continuity off Backlog.md's `backlog/` tree; one root, no dual-write | implicit `backlog/sprints` as the sprint hub |
 | 2026-09-17 | The doctor keeps only shared-state checks (active-track overlap, sprint shape, unmoored `[~]`, in-flight staleness, context bloat); the reassess-signal counter and tracker-selection checks retire (epic #440, #446; gate 2026-09-17) | reassess is a human judgment at sprint close, not a counter | rev-15 reassess cadence bookkeeping |
 | 2026-09-17 | Spec-axis linters removed: `objectives:` and `component:` are unchecked metadata; `component:` is a free track-scope string compared only by `scopesOverlap`; no line budget on this file (#421, #426; gate 2026-09-17) | same upkeep species as the rev-15 status ladder; no consumer read their output | `component:` must resolve to a `## Capability:` heading |
+| 2026-09-18 | The doctor keeps three checks — `active_sprint` (track overlap), `sprint_shape`, `in_flight_trace` (unmoored `[~]`); `in_flight_staleness` and `context_bloat` are deleted (v0.13.0, epic #456, #458). `next.sh` / `status.sh` render through `sprint-state.js --format text`, so the next batch has one implementation (v0.14.0, epic #467, #468) | staleness and bloat were judgments the session makes by reading the file; two parsers of one sprint file could disagree on the next batch | 2026-09-17 doctor row (five checks); bash-side batch selection in `next.sh` |
 
 ---
 
