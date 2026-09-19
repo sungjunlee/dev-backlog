@@ -72,7 +72,14 @@ The core product excludes:
 - silent fallback to local files when an authority read fails;
 - automatic writes from search, retrieval, summaries, or memory compilers;
 - required Relay, Matt Pocock skill, or GitHub Projects runtime dependencies;
-- a second task-spec or lifecycle authority in the same repo.
+- a second task-spec or lifecycle authority in the same repo;
+- retry loops or fallback data sources around the authority CLI: a failed call
+  exits non-zero with the CLI's stderr surfaced, exactly once, and the operator
+  fixes access and re-runs. The only scripted authority calls are
+  `sprint-close.sh --close-milestone` (closes the GitHub milestone before any
+  local mutation, so a failure leaves the sprint active) and `triage-apply
+  --apply` (one call per accepted action); re-running a failed command is safe
+  except for a create whose response was lost — check the authority first.
 
 Do not reintroduce a tracker abstraction or adapter ports: the authority is a
 one-line selection the session reads, the `files` adapter is parked at tag

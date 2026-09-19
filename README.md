@@ -115,7 +115,7 @@ priced in the [authority contract](skills/dev-backlog/references/authority-contr
 - [Agent execution contract](skills/dev-backlog/SKILL.md)
 - [Authority and routing](skills/dev-backlog/references/authority-contract.md)
 - [Project specs](spec/README.md)
-- [Decision records](docs/README.md) — not live contracts
+- [Conformance runs](docs/conformance/README.md) — latest run only; history in git
 
 ## Maintainer checks
 

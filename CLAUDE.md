@@ -70,8 +70,8 @@ amendments are human-gated — propose, apply only on explicit approval.
 - Verify with `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js` and
   `bash tests/smoke/smoke-test.sh`; the test suite includes a
   doc-drift check over script mentions
-- `docs/` holds decision/proof records with a Living/Removed index in
-  `docs/README.md` — git history is authoritative; do not re-read removed or
-  historical docs as live contracts
+- `docs/` holds only the current conformance run; git history is the record
+  for everything else — do not re-read removed or historical docs as live
+  contracts
 - Test changes by simulating real task management scenarios against real
   repos (GitHub by default); practical, not ceremonial
