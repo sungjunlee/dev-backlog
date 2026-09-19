@@ -8,6 +8,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Changed
 
+- `related-skills` frontmatter drops the deprecated relay skills (dev-backlog: `backlog-triage, spec-charter, spec-grill`; backlog-triage: `dev-backlog, spec-charter`); SKILL.md names "a delegate" instead of dev-relay for in-flight/done markers and delegation.
 - `docs/` keeps only the current conformance run: seven earlier conformance reports, the #433 fixture A/B raw directory, `github-resilience.md` (its fail-loud rules moved into `references/authority-contract.md`), and the Removed-docs index are deleted; git history is the record. `tests/evals/README.md` drops its revision log.
 - Docs sync after v0.15.0: system-map, charter Non-Goal heading, capabilities (doctor/next-batch decision row for v0.13.0–v0.14.0, authority-neutral wording), file-format task-spec section, resilience doc, and the `backlog-triage` GitHub-only note; no behaviour change.
 
