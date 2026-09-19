@@ -4,7 +4,7 @@ argument-hint: "[report|apply]"
 description: Triage open GitHub Issues into an advisory report. Use for issue grooming, stale or obsolete detection, relationship mapping, priority and milestone proposals, accepted-action apply, 백로그 정리, 이슈 검토, 트리아지.
 compatibility: Requires gh CLI and git. Works on Claude Code and Codex.
 metadata:
-  related-skills: "spec-charter, dev-backlog, relay, relay-plan"
+  related-skills: "dev-backlog, spec-charter"
 ---
 
 # Backlog Triage

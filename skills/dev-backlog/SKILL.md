@@ -4,7 +4,7 @@ argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
 description: Manage Issue-backed sprint execution (GitHub Issues by default; Backlog.md or GitLab via one `.tracker` line). Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
 compatibility: Requires git, Node.js 18+, and the task authority's CLI (`gh` by default). Works on Claude Code and Codex.
 metadata:
-  related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
+  related-skills: "backlog-triage, spec-charter, spec-grill"
 ---
 
 # Dev Backlog
@@ -82,8 +82,8 @@ Plan checkbox states:
 | Marker | Meaning | Set by |
 | --- | --- | --- |
 | `[ ]` | Not started | `sprint-init.js` or manual planning |
-| `[~]` | In-flight: dispatched, PR under review, or actively worked | Manual or dev-relay |
-| `[x]` | Done: merged or completed | Manual or dev-relay after verification |
+| `[~]` | In-flight: dispatched, PR under review, or actively worked | The session or a delegate |
+| `[x]` | Done: merged or completed | The session or a delegate, after verification |
 
 ## Execution Path
 
@@ -112,7 +112,7 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 ### Work
 
 Goal: verified work reflected on the Issue.
-Rail: the Read verb of the Task Authority table is the specification (Agent Brief and `spec_ref:` precedence as noted there). Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Rail: the Read verb of the Task Authority table is the specification (Agent Brief and `spec_ref:` precedence as noted there). Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
 Boundary: if the authority read fails, diagnose it; do not execute the task or change AC/lifecycle until a live read succeeds.
 Done when verified work is reflected in the Issue's AC/lifecycle and, when
 admitted, sprint progress.
