@@ -313,6 +313,7 @@ started: 2026-07-01
     assert.equal(state.in_flight[0].branch, null);
     assert.equal(state.in_flight[0].unmoored, true);
     assert.equal(state.in_flight[0].age_days, 2);
+    assert.equal(state.in_flight[0].age_source, "started");
   });
 
   it("ignores a legacy trailing [run:…] pointer and keeps the PR pointer and title (#485)", () => {
@@ -324,7 +325,6 @@ started: 2026-07-01
     const bare = parsePlanItem("- [~] #212 Only a run pointer [run:old-relay-id]");
     assert.equal(bare.unmoored, true);
     assert.equal(bare.title, "Only a run pointer");
-    assert.equal(state.in_flight[0].age_source, "started");
   });
 
   it("treats missing sections as empty surfaces", () => {
