@@ -66,14 +66,14 @@ it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
   assert.match(markdown, /silent fallback to local files when an authority read fails/);
   assert.match(markdown, /automatic writes from search, retrieval, summaries, or memory compilers/);
 
-  for (const optional of ["Relay", "Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
+  for (const optional of ["Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
     assert.match(markdown, new RegExp(`\\| ${optional.replace(".", "\\.")} \\|`));
   }
 });
 
-it("keeps both no-spec/no-Relay cold-adopter paths explicit", () => {
+it("keeps both no-spec cold-adopter paths explicit", () => {
   const markdown = contract();
-  assert.match(markdown, /no `\.dev-backlog\/`, no `spec\/`, and no Relay/);
+  assert.match(markdown, /no `\.dev-backlog\/` and no `spec\/`/);
   assert.match(markdown, /complete a simple Issue → PR path without creating a sprint/);
   assert.match(markdown, /create, resume, and close it using only\s+this bundle/);
 });

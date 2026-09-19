@@ -3,8 +3,8 @@
 The middle layer between [`charter.md`](charter.md) and the active sprint.
 
 Capability headings are routing handles. Sprint `component:` is a free
-track-scope string; by convention it names a capability heading here so relay
-Learnings can route, but nothing lints it. Concurrent active tracks partition by
+track-scope string; by convention it names a capability heading here, but
+nothing lints it. Concurrent active tracks partition by
 `component:` equality or by `scope:` globs — one axis per track, never both.
 
 Retired capabilities (never restore as living contracts): `backlog-sync` last
@@ -33,7 +33,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 ### Expected Behaviors
 - Task work reads the live task with the declared authority's Read verb (`gh issue view --json body,comments` by default); on GitHub the newest comment titled `## Agent Brief` overrides the body, and in every authority a `spec_ref:` line in the body naming a file or URL overrides the body (on GitHub, the Agent Brief as well). If that read fails, execution stops fail-closed; the authority is never inferred from which CLI is installed.
 - Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through the declared authority's CLI.
-- Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
+- Optional features report their availability explicitly; absence of Projects or the spec axis does not block the core Issue → PR path.
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
@@ -57,6 +57,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-17 | `gitlab` is parked: no measured consumer (no `glab` installed, no repo pins the key); `TRACKER_KEYS` returns to `github`, `files`; the adapter stays retrievable at `a8ddb7d` (#421, #424; gate 2026-09-17) | charter measured-consumer rule | 2026-09-15 gitlab row |
 | 2026-09-18 | Task authority generalized without code (charter rev 20, epic #472): `.dev-backlog/.tracker` is one line the session reads (absent = `github`; `backlog`/`files`; `gitlab`), the SKILL.md Task Authority table carries the read/create/close verbs, scripts stay authority-neutral (`sprint-state` JSON `tracker` field reflects the line; `--close-milestone` refuses non-GitHub). `backlog` is measured (maintainer repos on the Backlog.md CLI with no GitHub remote); `gitlab` is a documented, unmeasured row | GitHub-less and self-hosted use are maintainer needs; the remaining coupling was prose | 2026-09-17 G1/G2 row's prose (adapter parking stands); 2026-09-17 gitlab-parked row's prose (adapter stays at `a8ddb7d`) |
 | 2026-09-19 | Clarification of the 2026-09-18 row: "without code" means without an adapter — v0.15.0 added 56 authority-neutral script lines (`readTaskAuthority` allow-list, JSON `tracker` field, `--close-milestone` guard, setup line) | the row was published with v0.15.0 and stays; the wording was wrong | wording of the 2026-09-18 row |
+| 2026-09-19 | Relay deprecated: the `sprint-state` JSON is the fresh-session recovery rail, not a consumer contract; `[run:id]` pointers and the `run_id` field are deleted; `[~]` is moored by a PR or branch pointer only | no reader left for run pointers | 2026-09-18 tracker-task-truth wording that named dev-relay as the JSON consumer |
 
 ---
 
@@ -76,9 +77,9 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - Simple work whose complete continuity fits in one Issue and its PR
 
 ### Expected Behaviors
-- The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, milestone membership, and Relay presence alone never trigger one.
+- The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, and milestone membership alone never trigger one.
 - No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
-- Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
+- Every `[~]` line carries a PR or branch pointer in-line — never an unmoored `[~]`.
 - One successful `sprint-close.sh` invocation flips the sprint to `status: completed` and appends final Progress; it runs only when every Plan item is `[x]` or explicitly struck in Progress.
 
 ### Hard Constraints

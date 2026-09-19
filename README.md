@@ -65,8 +65,7 @@ open-issue pile (GitHub only). It is not part of the default loop.
 
 Open a sprint only for ordered multi-Issue work, delegated or parallel handoff,
 cross-Issue or cross-session context, or concurrent-track coordination.
-Duration, estimate, milestone membership, and Relay presence alone do not
-require one.
+Duration, estimate, and milestone membership alone do not require one.
 
 ```bash
 # from the project you manage, not from this repo
@@ -106,9 +105,8 @@ Users can log in and access protected API endpoints.
 ```
 
 Optional surfaces
-(spec axis via [craftkit](https://github.com/sungjunlee/craftkit),
-[dev-relay](https://github.com/sungjunlee/dev-relay), GitHub Projects) are
-priced in the [authority contract](skills/dev-backlog/references/authority-contract.md).
+(spec axis via [craftkit](https://github.com/sungjunlee/craftkit), GitHub
+Projects) are priced in the [authority contract](skills/dev-backlog/references/authority-contract.md).
 
 ## Docs
 

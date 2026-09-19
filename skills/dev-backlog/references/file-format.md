@@ -7,7 +7,7 @@ Sprint files and `.dev-backlog/` layout.
 Each active sprint lives at `.dev-backlog/sprints/YYYY-MM-<topic>.md`. Required
 headings: `## Goal`, `## Plan`, `## Running Context`, `## Progress`. Plan item
 grammar: `- [ ] #N …` — task N in the declared authority and nothing else; `[~]`
-in-flight and `[x]` done may append `→ PR #N (state)` (end of line), `[branch:name]`, and/or `[run:…]` (end of line). Section semantics live in
+in-flight and `[x]` done may append `→ PR #N (state)` (end of line) and/or `[branch:name]`. Section semantics live in
 [SKILL.md](../SKILL.md).
 
 ```markdown
@@ -47,7 +47,7 @@ Users can log in and access protected API endpoints.
 | Field | Optional? | Semantics |
 | --- | --- | --- |
 | `objectives:` | yes | Human-authored charter Objective IDs. Never generated, never resolved against `spec/charter.md`. |
-| `component:` | yes | Free track-scope string, compared only by `scopesOverlap`. By convention a `## Capability:` heading so relay Learnings route, but nothing checks that. |
+| `component:` | yes | Free track-scope string, compared only by `scopesOverlap`. By convention a `## Capability:` heading, but nothing checks that. |
 
 `sprint-init.js` reads no `spec/` file. It emits `component:` only when
 `--component` was given and `scope:` only when `--scope` was given; it never

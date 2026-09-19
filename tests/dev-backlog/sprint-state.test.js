@@ -47,10 +47,10 @@ Expose actor-readable execution state.
 
 ## Plan
 ### Batch 1 - Done
-- [x] #210 Preserve human output → PR #223 (merged) [run:issue-210-20260701090000000]
+- [x] #210 Preserve human output → PR #223 (merged)
 
 ### Batch 2 - Active
-- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing) [run:issue-211-20260701120000000]
+- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing)
 
 ### Batch 3 - Next
 - [ ] #212 Document schema (~30min)
@@ -61,7 +61,7 @@ Expose actor-readable execution state.
 ## Progress
 - 2026-06-30: prework without matching issue.
 - 2026-07-01 09:00: #210 dispatched → PR #223
-- 2026-07-01 12:00: [actor:relay] #211 dispatched → PR #224 [run:issue-211-20260701120000000]
+- 2026-07-01 12:00: [actor:delegate] #211 dispatched → PR #224
 - 2026-07-02 10:00: #211 review pending.
 - 2026-07-02 11:00: context updated.
 - 2026-07-03 08:00: #210 merged.
@@ -81,7 +81,7 @@ Expose actor-readable execution state.
 
     assert.equal(state.plan_items.length, 3);
     assert.deepEqual(state.plan_items[1], {
-      line: "- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing) [run:issue-211-20260701120000000]",
+      line: "- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing)",
       checkbox_state: "~",
       state: "in_flight",
       tracker: "github",
@@ -91,7 +91,6 @@ Expose actor-readable execution state.
       title: "Add JSON surfaces (~2hr)",
       batch_heading: "### Batch 2 - Active",
       pr: { number: 224, state: "reviewing" },
-      run_id: "issue-211-20260701120000000",
       branch: null,
       unmoored: false,
     });
@@ -104,7 +103,7 @@ Expose actor-readable execution state.
         "- 2026-07-03 08:00: #210 merged.",
         "- 2026-07-02 11:00: context updated.",
         "- 2026-07-02 10:00: #211 review pending.",
-        "- 2026-07-01 12:00: [actor:relay] #211 dispatched → PR #224 [run:issue-211-20260701120000000]",
+        "- 2026-07-01 12:00: [actor:delegate] #211 dispatched → PR #224",
         "- 2026-07-01 09:00: #210 dispatched → PR #223",
       ]
     );
@@ -310,7 +309,6 @@ started: 2026-07-01
 
     assert.equal(state.in_flight[0].issue_number, 7);
     assert.equal(state.in_flight[0].pr, null);
-    assert.equal(state.in_flight[0].run_id, null);
     assert.equal(state.in_flight[0].branch, null);
     assert.equal(state.in_flight[0].unmoored, true);
     assert.equal(state.in_flight[0].age_days, 2);

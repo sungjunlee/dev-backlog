@@ -163,8 +163,7 @@ if (inFlight.length !== inFlightPlanItems.length) process.exit(1);
 for (const item of inFlight) {
   const hasPr = item.pr && item.pr.number != null;
   const hasBranch = item.branch != null && item.branch !== "";
-  const hasRun = item.run_id != null && item.run_id !== "";
-  if (!hasPr && !hasBranch && !hasRun) process.exit(1);
+  if (!hasPr && !hasBranch) process.exit(1);
 }
 '
 
@@ -189,7 +188,7 @@ Fixture sprint with only in-flight work.
 
 ## Plan
 - [x] #1 Done item → PR #10 (merged)
-- [~] #2 In-flight item → PR #11 (reviewing) [run:issue-2-fixture]
+- [~] #2 In-flight item → PR #11 (reviewing)
 
 ## Running Context
 - none
@@ -210,8 +209,7 @@ const inFlight = Array.isArray(status.in_flight) ? status.in_flight : [];
 if (inFlight.length !== 1) process.exit(1);
 const item = inFlight[0];
 const hasPr = item.pr && item.pr.number != null;
-const hasRun = item.run_id != null && item.run_id !== "";
-if (!hasPr || !hasRun) process.exit(1);
+if (!hasPr) process.exit(1);
 if (next.next_batch && Array.isArray(next.next_batch.items) && next.next_batch.items.length > 0) {
   process.exit(1);
 }
@@ -695,22 +693,9 @@ assert_equals "contract: Plan heading" \
 assert_equals "contract: Running Context heading" \
 	"$(echo '## Running Context' | grep -c '^## Running Context[ 	]*$')" "1"
 
-# Relay-merge progress log format
+# Progress log format
 assert_equals "contract: progress log" \
 	"$(echo '- 2026-03-25 10:50: #38 dispatched → PR #87 → reviewed (LGTM, round 1) → merged' | grep -c '#[0-9]* dispatched → PR #[0-9]*')" "1"
-
-# Run-ID annotation extraction
-assert_equals "contract: run-id extraction" \
-	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged) [run:issue-42-20260403120000000]' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" "issue-42-20260403120000000"
-
-# Run-ID is optional (no annotation = line unchanged by sed, grep finds 0)
-assert_equals "contract: no run-id is valid" \
-	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | grep -c '\[run:')" "0"
-
-# Extraction sed on line without run-id returns original line (no false positive)
-assert_equals "contract: run-id extraction on absent annotation" \
-	"$(echo '- [x] #42 OAuth2 flow → PR #87 (merged)' | sed 's/.*\[run:\([^]]*\)\]$/\1/')" \
-	"- [x] #42 OAuth2 flow → PR #87 (merged)"
 
 # _context.md section headings
 assert_equals "contract: Architecture Decisions heading" \

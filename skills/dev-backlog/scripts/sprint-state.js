@@ -3,7 +3,7 @@
  * Emit actor-readable state from the active sprint file.
  *
  * The one sprint-markdown parser: --format json is the wire contract
- * (schema_version 2) dev-relay reads, --format text is the human surface
+ * (schema_version 2) is the fresh-session recovery rail (`--json`), --format text is the human surface
  * next.sh / status.sh exec into. The shell scripts only plumb arguments.
  */
 
@@ -23,7 +23,6 @@ const {
 const SCHEMA_VERSION = 2;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const RUN_ID_RE = /\[run:([^\]]+)\]$/;
 const BRANCH_RE = /\[branch:([^\]\s]+)\]/;
 const PR_RE = /→ PR #(\d+) \((\w+)\)$/;
 const PROGRESS_DATE_RE = /^-\s+(\d{4}-\d{2}-\d{2})(?:\s+\d{2}:\d{2})?:/;
@@ -246,12 +245,9 @@ function parsePlanItem(line, batchHeading = null) {
   const identity = checkbox.identity;
   let title = checkbox.title;
 
-  const runMatch = line.match(RUN_ID_RE);
-  const runId = runMatch ? runMatch[1] : null;
   const branchMatch = line.match(BRANCH_RE);
   const branch = branchMatch ? branchMatch[1] : null;
 
-  if (runId) title = title.replace(/\s*\[run:[^\]]+\]$/, "").trim();
   if (branch) title = title.replace(/\s*\[branch:[^\]\s]+\]/g, "").trim();
 
   const prMatch = title.match(PR_RE);
@@ -273,9 +269,8 @@ function parsePlanItem(line, batchHeading = null) {
     title,
     batch_heading: batchHeading,
     pr,
-    run_id: runId,
     branch,
-    unmoored: state === "in_flight" && !pr && !runId && !branch,
+    unmoored: state === "in_flight" && !pr && !branch,
   };
 }
 
