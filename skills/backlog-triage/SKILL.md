@@ -9,7 +9,7 @@ metadata:
 
 # Backlog Triage
 
-Real job: read open GitHub Issues, write one advisory report, and apply only human-accepted mutations through anchor comments. GitHub-only: when `.dev-backlog/.tracker` names another task authority, this skill does not apply. GitHub Issues stay the source of truth; the report is a derived file under `.dev-backlog/triage/`; nothing mutates GitHub until Apply.
+Real job: read open GitHub Issues, write one advisory report, and apply only human-accepted mutations through anchor comments. GitHub-only: the resolved task authority must be exactly `github` (no `.dev-backlog/.tracker`, or one that says `github`); otherwise — another authority, or an empty, unknown, or unreadable file — stop, this skill does not apply. GitHub Issues stay the source of truth; the report is a derived file under `.dev-backlog/triage/`; nothing mutates GitHub until Apply.
 
 ## Report
 
