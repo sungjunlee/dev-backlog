@@ -3,8 +3,8 @@
 The middle layer between [`charter.md`](charter.md) and the active sprint.
 
 Capability headings are routing handles. Sprint `component:` is a free
-track-scope string; by convention it names a capability heading here so relay
-Learnings can route, but nothing lints it. Concurrent active tracks partition by
+track-scope string; by convention it names a capability heading here, but
+nothing lints it. Concurrent active tracks partition by
 `component:` equality or by `scope:` globs — one axis per track, never both.
 
 Retired capabilities (never restore as living contracts): `backlog-sync` last
@@ -33,7 +33,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 ### Expected Behaviors
 - Task work reads the live task with the declared authority's Read verb (`gh issue view --json body,comments` by default); on GitHub the newest comment titled `## Agent Brief` overrides the body, and in every authority a `spec_ref:` line in the body naming a file or URL overrides the body (on GitHub, the Agent Brief as well). If that read fails, execution stops fail-closed; the authority is never inferred from which CLI is installed.
 - Create, plan, work, and complete operations use the `#N` identity and update lifecycle state only through the declared authority's CLI.
-- Optional features report their availability explicitly; absence of Relay, Projects, or the spec axis does not block the core Issue → PR path.
+- Optional features report their availability explicitly; absence of Projects or the spec axis does not block the core Issue → PR path.
 
 ### Hard Constraints
 - Never dual-write task specification or lifecycle state.
@@ -76,9 +76,9 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 - Simple work whose complete continuity fits in one Issue and its PR
 
 ### Expected Behaviors
-- The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, milestone membership, and Relay presence alone never trigger one.
+- The default Issue → implementation → PR → closure path creates no sprint. A sprint is admitted only for ordered multi-Issue batches, delegated/parallel handoff, cross-Issue or cross-session context, or concurrent track coordination; duration, estimate, and milestone membership alone never trigger one.
 - No two sprint files with `status: active` declare overlapping scope — overlap fails loud through the one shared `scopesOverlap` predicate (`component:` equality or `scope:` path-prefix collision; surfaced by `sprint-init` refusal, `sprint-state` `OVERLAPPING_TRACKS`, and the doctor's `Active tracks overlap on scope` verdict). Disjoint-scope tracks coexist as a portfolio; a single active track behaves exactly as before; once more than one track is active, any track without a declared axis cannot be proven disjoint and surfaces an informational doctor warning.
-- Every `[~]` line carries a PR or branch ref in-line, or an explicit "no work yet" annotation — never an unmoored `[~]`.
+- Every `[~]` line carries a PR or branch pointer in-line — never an unmoored `[~]`.
 - One successful `sprint-close.sh` invocation flips the sprint to `status: completed` and appends final Progress; it runs only when every Plan item is `[x]` or explicitly struck in Progress.
 
 ### Hard Constraints
@@ -102,6 +102,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 | 2026-09-17 | The doctor keeps only shared-state checks (active-track overlap, sprint shape, unmoored `[~]`, in-flight staleness, context bloat); the reassess-signal counter and tracker-selection checks retire (epic #440, #446; gate 2026-09-17) | reassess is a human judgment at sprint close, not a counter | rev-15 reassess cadence bookkeeping |
 | 2026-09-17 | Spec-axis linters removed: `objectives:` and `component:` are unchecked metadata; `component:` is a free track-scope string compared only by `scopesOverlap`; no line budget on this file (#421, #426; gate 2026-09-17) | same upkeep species as the rev-15 status ladder; no consumer read their output | `component:` must resolve to a `## Capability:` heading |
 | 2026-09-18 | The doctor keeps three checks — `active_sprint` (track overlap), `sprint_shape`, `in_flight_trace` (unmoored `[~]`); `in_flight_staleness` and `context_bloat` are deleted (v0.13.0, epic #456, #458). `next.sh` / `status.sh` render through `sprint-state.js --format text`, so the next batch has one implementation (v0.14.0, epic #467, #468) | staleness and bloat were judgments the session makes by reading the file; two parsers of one sprint file could disagree on the next batch | 2026-09-17 doctor row (five checks); bash-side batch selection in `next.sh` |
+| 2026-09-19 | Relay deprecated: the `sprint-state` JSON is the fresh-session recovery rail, not a consumer contract; `[run:id]` pointers and the `run_id` field are deleted; `[~]` is moored by a PR or branch pointer only | no reader left for run pointers | the `[run:id]` pointer grammar and the "explicit no-work-yet annotation" clause in sprint-execution's Expected Behaviors (multi-track PRD, 2026-07) |
 
 ---
 

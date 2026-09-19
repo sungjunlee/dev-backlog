@@ -7,7 +7,7 @@
 # Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
 DEFAULT_BACKLOG_DIR=".dev-backlog"
 
-# GitHub checkbox regex aliases — integration contract with dev-relay.
+# Checkbox regex aliases shared by the shell rails and the smoke test.
 RE_CB_ANY='^\- \[.\] #'
 RE_CB_DONE='^\- \[x\] #'
 RE_CB_INFLIGHT='^\- \[~\] #'

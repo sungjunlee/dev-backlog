@@ -402,7 +402,6 @@ describe("runDoctor", () => {
     assert.match(check(report, "in_flight_trace").detail.summary, /unmoored/);
     // C3: the warn itself carries the one-line remediation (no runbook file).
     assert.match(check(report, "in_flight_trace").detail.summary, /→ PR #N \(state\)/);
-    assert.match(check(report, "in_flight_trace").detail.summary, /\[run:id\]/);
     assert.match(check(report, "in_flight_trace").detail.summary, /\[branch:name\]/);
     assert.match(check(report, "in_flight_trace").detail.summary, /revert the item to \[ \]/);
     assert.equal(exitCodeFor(report), 0);

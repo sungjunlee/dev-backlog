@@ -10,7 +10,7 @@ This is a **reference, not a spec**. It does not author spec-axis semantics — 
 
 ## Sprint frontmatter is not spec-checked
 
-`objectives:` and `component:` are optional sprint metadata and nothing resolves them against `spec/` (charter rev 18, #426). `objectives:` is human-authored and never generated. `component:` is a free track-scope string, compared only by `scopesOverlap`; naming a capability heading is a routing convention for relay Learnings, not a checked contract. Sprints carrying `objectives: []` / `component: ""` stay valid.
+`objectives:` and `component:` are optional sprint metadata and nothing resolves them against `spec/` (charter rev 18, #426). `objectives:` is human-authored and never generated. `component:` is a free track-scope string, compared only by `scopesOverlap`; naming a capability heading is a convention, not a checked contract. Sprints carrying `objectives: []` / `component: ""` stay valid.
 
 ## Triage degradation (never silent)
 
@@ -28,5 +28,5 @@ Authoring semantics and the durable spec-axis boundaries live in craftkit's `spe
 Spec absence never creates work. A self-contained GitHub Issue follows the
 sprint-free Issue → PR path. If execution complexity requires a sprint, a cold
 adopter can still create, resume, and close it with `objectives:` and
-`component:` omitted. Neither path may require craftkit, Relay, GitHub
+`component:` omitted. Neither path may require craftkit, GitHub
 Projects, local task copies, or generated memory.

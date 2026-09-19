@@ -58,8 +58,7 @@ The default path is sprint-free Issue → implementation → PR → Issue closur
 Create a sprint only when execution complexity requires continuity beyond one
 Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
 cross-Issue/session context, or concurrent track coordination. Duration,
-estimate, milestone membership, and Relay presence alone do not trigger a
-sprint. Once admitted, the sprint owns execution continuity; task
+estimate, and milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
 specification and lifecycle stay on the Issue.
 
 ## Sprint File Contract
@@ -70,7 +69,7 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | --- | --- | --- |
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
 | `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
-| `component: "slug"` | Free track-scope string; by convention a capability heading so relay Learnings route; also the relay-Learnings route | Optional; compared by `scopesOverlap`. |
+| `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
 | `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, not inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |

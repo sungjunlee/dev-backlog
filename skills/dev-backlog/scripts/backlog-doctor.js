@@ -303,13 +303,13 @@ function checkInFlightTrace({ sprintState, activeStatus }) {
   const unmoored = sprintState.state.in_flight.filter((item) => item.unmoored);
   if (unmoored.length > 0) {
     return verdict("in_flight_trace", "warn", {
-      summary: `${unmoored.length} unmoored in-flight item(s) lack PR, branch, or run pointers. Repair: append a pointer to the Plan line (PR: → PR #N (state); branch: [branch:name]; run: [run:id]) or revert the item to [ ].`,
+      summary: `${unmoored.length} unmoored in-flight item(s) lack PR or branch pointers. Repair: append a pointer to the Plan line (PR: → PR #N (state); branch: [branch:name]) or revert the item to [ ].`,
       items: unmoored.map(publicPlanItem),
     });
   }
 
   return verdict("in_flight_trace", "pass", {
-    summary: "All in-flight items have PR, branch, or run pointers.",
+    summary: "All in-flight items have PR or branch pointers.",
     in_flight_count: sprintState.state.in_flight.length,
   });
 }
@@ -317,7 +317,7 @@ function checkInFlightTrace({ sprintState, activeStatus }) {
 // Whitelist (order-stable) of the plan-item fields a verdict may publish.
 const PUBLIC_PLAN_FIELDS = [
   "line", "tracker", "id", "ref", "issue_number",
-  "age_days", "age_source", "age_basis_date", "pr", "branch", "run_id",
+  "age_days", "age_source", "age_basis_date", "pr", "branch",
 ];
 
 function publicPlanItem(item) {
