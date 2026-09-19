@@ -15,8 +15,9 @@ Task authority: GitHub Issue by default (spec + lifecycle + native planning fiel
 
 `backlog-triage` is an optional, GitHub-only advisory grooming skill over the same Issues (a session-written report plus the human-gated `triage-apply`).
 `spec/*` is an optional human-gated yardstick. GitHub Projects is optional and
-non-authoritative; delegation to another agent is the session's choice and
-leaves no dev-backlog state beyond the Plan pointer.
+non-authoritative; delegation to another agent is the session's choice; it adds no
+delegation-specific state — delegated work is recorded in the same Plan
+pointer, Running Context, and Progress as any other work.
 Retrieval/memory is not a product surface (#350 no-go).
 
 ## Runtime Boundaries

@@ -23,6 +23,8 @@ const {
 const SCHEMA_VERSION = 2;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Legacy `[run:…]` pointers (deprecated relay, 2026-09-19) are stripped and ignored.
+const LEGACY_RUN_RE = /\s*\[run:[^\]]+\]$/;
 const BRANCH_RE = /\[branch:([^\]\s]+)\]/;
 const PR_RE = /→ PR #(\d+) \((\w+)\)$/;
 const PROGRESS_DATE_RE = /^-\s+(\d{4}-\d{2}-\d{2})(?:\s+\d{2}:\d{2})?:/;
@@ -243,7 +245,7 @@ function parsePlanItem(line, batchHeading = null) {
 
   const checkboxState = checkbox.checkboxState;
   const identity = checkbox.identity;
-  let title = checkbox.title;
+  let title = checkbox.title.replace(LEGACY_RUN_RE, "").trim();
 
   const branchMatch = line.match(BRANCH_RE);
   const branch = branchMatch ? branchMatch[1] : null;

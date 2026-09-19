@@ -6,6 +6,7 @@ const path = require("path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
   readSprintState,
+  parsePlanItem,
   parseSprintContent,
   parseArgs,
   textReport,
@@ -312,6 +313,17 @@ started: 2026-07-01
     assert.equal(state.in_flight[0].branch, null);
     assert.equal(state.in_flight[0].unmoored, true);
     assert.equal(state.in_flight[0].age_days, 2);
+  });
+
+  it("ignores a legacy trailing [run:…] pointer and keeps the PR pointer and title (#485)", () => {
+    const item = parsePlanItem("- [~] #211 Work → PR #224 (reviewing) [run:old-relay-id]");
+    assert.deepEqual(item.pr, { number: 224, state: "reviewing" });
+    assert.equal(item.title, "Work");
+    assert.equal(item.unmoored, false);
+    assert.equal("run_id" in item, false);
+    const bare = parsePlanItem("- [~] #212 Only a run pointer [run:old-relay-id]");
+    assert.equal(bare.unmoored, true);
+    assert.equal(bare.title, "Only a run pointer");
     assert.equal(state.in_flight[0].age_source, "started");
   });
 
