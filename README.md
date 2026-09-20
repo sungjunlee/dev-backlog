@@ -94,7 +94,7 @@ Users can log in and access protected API endpoints.
 
 ## Plan
 - [x] #38 DB schema setup
-- [~] #42 OAuth2 flow -> PR #87
+- [~] #42 OAuth2 flow → PR #87 (reviewing)
 - [ ] #43 Rate limiting
 
 ## Running Context

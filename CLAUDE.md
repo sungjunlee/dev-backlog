@@ -42,8 +42,10 @@ not ship those skills. `spec-charter` owns the charter and the system map.
 - **Fail-closed authority read** — a failed CLI read stops execution; it never
   falls back to sprint text or a local copy.
 - **Prompt-judged actions ride deterministic rails** — model judgment enters
-  through validated wire contracts (anchor comments);
-  scripts own everything checkable
+  through validated wire contracts (anchor comments); scripts own the four kept
+  surfaces (sprint-file contract, fail-loud shared-state guards, the
+  `sprint-state` JSON recovery rail, the `triage-apply` human gate) — anything
+  else is deleted, not rewritten
 
 ## Architecture
 

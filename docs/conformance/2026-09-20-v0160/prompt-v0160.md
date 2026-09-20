@@ -13,7 +13,7 @@ Number your answers 1-13 to match the scenarios. Answer all 13. Keep the whole a
 2. "Plan a sprint whose scope overlaps a track that is already `status: active`."
 3. "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan."
 4. "Repo with no spec axis: open GitHub issues but no `.dev-backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. The user names three issues that must land in order. Reach a first active sprint."
-5. "Repo with no spec axis: one self-contained GitHub issue, no `.dev-backlog/`, and no Relay."
+5. "Repo with no spec axis: one self-contained GitHub issue and no `.dev-backlog/`."
 6. "Work issue #42 with no local task files and three live Issue AC checkboxes."
 7. "Fresh online session with no local task files."
 8. "Fresh session with only repo files available, no conversation history, and no GitHub access."
@@ -28,15 +28,15 @@ Number your answers 1-13 to match the scenarios. Answer all 13. Keep the whole a
 ---
 name: dev-backlog
 argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
-description: Manage GitHub-backed sprint execution. Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
-compatibility: Requires git, Node.js 18+, and the gh CLI. Works on Claude Code and Codex.
+description: Manage Issue-backed sprint execution (GitHub Issues by default; Backlog.md or GitLab via one `.tracker` line). Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires git, Node.js 18+, and the task authority's CLI (`gh` by default). Works on Claude Code and Codex.
 metadata:
-  related-skills: "spec-charter, spec-grill, backlog-triage, relay, relay-plan, relay-dispatch, relay-review, relay-merge"
+  related-skills: "backlog-triage, spec-charter, spec-grill"
 ---
 
 # Dev Backlog
 
-Real job: keep GitHub Issues as task-definition and lifecycle truth while using `.dev-backlog/sprints/` when complex execution needs a shared continuity, progress, or handoff record.
+Real job: keep the declared task authority (GitHub Issues by default) as task-definition and lifecycle truth while using `.dev-backlog/sprints/` when complex execution needs a shared continuity, progress, or handoff record.
 
 README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, deterministic rails, and stop conditions.
 
@@ -53,20 +53,31 @@ README covers install and human quick start. This file is the agent execution co
 
 Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
 
-The state ownership, fail-closed GitHub read, and optional-integration boundary are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
+The state ownership, fail-closed authority read, and optional-integration boundary are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
 
 ## Core Contracts
 
 ```
-GitHub Issues                    <- canonical task definition and lifecycle
+Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical task definition and lifecycle
 .dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
 .dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
 
-- GitHub Issues are the canonical task authority; a failed `gh` read is fail-closed.
+- The declared task authority is canonical; a failed authority read is fail-closed (`## Task Authority`).
 - Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
 - The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file, which remains the permanent execution record once completed.
-- Sprint frontmatter (`objectives:`, `component:`, `scope:`) and its optional, unchecked fields: `references/file-format.md`.
+
+## Task Authority
+
+`.dev-backlog/.tracker` names it in one line; absent means `github`. Plan refs are `#N` = task N in that authority. Never infer the authority from which CLI happens to be installed. A failed authority read stops execution — never fall back to sprint text or a local copy.
+
+| `.tracker` | Read the specification | Create | Close |
+| --- | --- | --- | --- |
+| `github` (default) | `gh issue view N --json body,comments`; the newest comment titled `## Agent Brief` overrides the body | `gh issue create` | `gh issue close N` |
+| `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
+| `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
+
+A `spec_ref:` line in the body naming a file or URL overrides the body in every authority, and on GitHub the Agent Brief comment as well. `backlog-triage` and `sprint-close.sh --close-milestone` are GitHub-only.
 
 ## Sprint Admission
 
@@ -74,8 +85,7 @@ The default path is sprint-free Issue → implementation → PR → Issue closur
 Create a sprint only when execution complexity requires continuity beyond one
 Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
 cross-Issue/session context, or concurrent track coordination. Duration,
-estimate, milestone membership, and Relay presence alone do not trigger a
-sprint. Once admitted, the sprint owns execution continuity; task
+estimate, and milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
 specification and lifecycle stay on the Issue.
 
 ## Sprint File Contract
@@ -86,7 +96,7 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | --- | --- | --- |
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
 | `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
-| `component: "slug"` | Free track-scope string; by convention a capability heading so relay Learnings route; also the relay-Learnings route | Optional; compared by `scopesOverlap`. |
+| `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
 | `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, not inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
@@ -98,10 +108,8 @@ Plan checkbox states:
 | Marker | Meaning | Set by |
 | --- | --- | --- |
 | `[ ]` | Not started | `sprint-init.js` or manual planning |
-| `[~]` | In-flight: dispatched, PR under review, or actively worked | Manual or dev-relay |
-| `[x]` | Done: merged or completed | Manual or dev-relay after verification |
-
-Full sprint examples live in `references/file-format.md`.
+| `[~]` | In-flight: dispatched, PR under review, or actively worked | The session or a delegate |
+| `[x]` | Done: merged or completed | The session or a delegate, after verification |
 
 ## Execution Path
 
@@ -117,7 +125,7 @@ Done when you can name the next live Issue and, when a sprint exists, its curren
 ### Create
 
 Goal: a task with acceptance criteria a fresh session can read.
-Rail: `gh issue create`.
+Rail: the Create verb of the Task Authority table.
 Done when the new Issue exists and, when the work was admitted to a sprint, is
 added to the active Plan.
 
@@ -130,16 +138,15 @@ Done when the sprint file is the track's execution hub and each planned issue ha
 ### Work
 
 Goal: verified work reflected on the Issue.
-Rail: `gh issue view N --json body,comments` is the specification; the newest
-comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in the body naming a file or URL overrides both. Implement directly or delegate through dev-relay, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
-Boundary: if the `gh` read fails, diagnose it; do not execute the task or change AC/lifecycle until a live read succeeds.
+Rail: the Read verb of the Task Authority table is the specification (Agent Brief and `spec_ref:` precedence as noted there). Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Boundary: if the authority read fails, diagnose it; do not execute the task or change AC/lifecycle until a live read succeeds.
 Done when verified work is reflected in the Issue's AC/lifecycle and, when
 admitted, sprint progress.
 
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with `gh issue close`. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry (`sprint-close.sh` only warns about them).
 Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
@@ -159,8 +166,8 @@ Done when the Issue exists and, if admitted, is on the Plan.
 
 These stay explicit because they guard shared or irreversible state:
 
-- GitHub Issues are the only task authority; a failed `gh` read stops execution — never fall back to sprint text or any local copy.
-- Every GitHub mutation is deliberate and explicit; there is no background sync.
+- The declared task authority is the only task authority; a failed authority read stops execution — never fall back to sprint text or any local copy.
+- Every authority mutation is deliberate and explicit; there is no background sync.
 - `status: completed` is never flipped back; completed sprints are immutable history.
 - Unattended sessions never `amend` `spec/*`.
 
@@ -178,8 +185,7 @@ Core scripts:
 
 ## References
 
-- `references/file-format.md` — sprint file shape and `.dev-backlog/` layout.
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` layout, and the `.tracker` line.
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
-

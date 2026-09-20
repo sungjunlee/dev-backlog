@@ -35,7 +35,7 @@ Retrieval/memory is not a product surface (#350 no-go).
    handoff, cross-Issue/session context, or concurrent-track coordination.
 3. **Execute**: Issue AC and lifecycle stay on the task authority; an admitted sprint carries
    Plan, Running Context, and Progress.
-4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when its whole Plan is done.
+4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when every Plan item is `[x]` or the rest are struck or carried with a Progress entry (`sprint-close.sh` only warns).
 5. **Groom** (optional): triage is advisory until `--apply`.
 
 ## Storage And External Systems

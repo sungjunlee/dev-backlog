@@ -13,7 +13,7 @@ Number your answers 1-13 to match the scenarios. Answer all 13. Keep the whole a
 2. "Plan a sprint whose scope overlaps a track that is already `status: active`."
 3. "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan."
 4. "Repo with no spec axis: open GitHub issues but no `.dev-backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. The user names three issues that must land in order. Reach a first active sprint."
-5. "Repo with no spec axis: one self-contained GitHub issue, no `.dev-backlog/`, and no Relay."
+5. "Repo with no spec axis: one self-contained GitHub issue and no `.dev-backlog/`."
 6. "Work issue #42 with no local task files and three live Issue AC checkboxes."
 7. "Fresh online session with no local task files."
 8. "Fresh session with only repo files available, no conversation history, and no GitHub access."
@@ -77,7 +77,7 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 | `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
 | `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
 
-A `spec_ref:` line in the body naming a file or URL overrides the body in every authority. `backlog-triage` and `sprint-close.sh --close-milestone` are GitHub-only.
+A `spec_ref:` line in the body naming a file or URL overrides the body in every authority, and on GitHub the Agent Brief comment as well. `backlog-triage` and `sprint-close.sh --close-milestone` are GitHub-only.
 
 ## Sprint Admission
 
@@ -190,4 +190,3 @@ Core scripts:
 - `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
 - `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
 - `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
-
