@@ -119,7 +119,7 @@ admitted, sprint progress.
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until its Plan is done.
+Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry (`sprint-close.sh` only warns about them).
 Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
