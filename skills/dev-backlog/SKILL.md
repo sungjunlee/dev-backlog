@@ -38,7 +38,7 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 
 - The declared task authority is canonical; a failed authority read is fail-closed (`## Task Authority`).
 - Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
-- The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file, which remains the permanent execution record once completed.
+- The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file while it runs; once completed that file is disposable — the record is the Issue, the epic, and the PR.
 
 ## Task Authority
 
@@ -120,7 +120,7 @@ admitted, sprint progress.
 
 Goal: nothing stale left behind.
 Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry (`sprint-close.sh` only warns about them).
-Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md` and leave the sprint file as the permanent record.
+Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md`, which is the only thing worth keeping — the completed sprint file is disposable and may be deleted at any time.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
 ### Next
@@ -141,7 +141,7 @@ These stay explicit because they guard shared or irreversible state:
 
 - The declared task authority is the only task authority; a failed authority read stops execution — never fall back to sprint text or any local copy.
 - Every authority mutation is deliberate and explicit; there is no background sync.
-- `status: completed` is never flipped back; completed sprints are immutable history.
+- `status: completed` is never flipped back (reopening means a new sprint); completed sprint files are disposable and may be deleted at any time — keep only `_context.md`.
 - Unattended sessions never `amend` `spec/*`.
 
 ## Script Resolution
