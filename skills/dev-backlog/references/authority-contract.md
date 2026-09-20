@@ -22,7 +22,7 @@ easier to view or retrieve, but it never accepts an independent write.
 | Planning fields | The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them) | Use the authority's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
 | Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Delegate run artifacts, PR tabs, chat history, status projections |
 | Durable decisions | The bounded `spec/*` contract axis | Amend through the human-gated spec process; route project, system, and capability decisions to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
-| Historical evidence | Repository history (git plus the authority's closed tasks and PRs) | Read closed Issues/PRs, commits, and committed completed sprint files at their original locations | Copied summaries, search indexes, compiled memory |
+| Historical evidence | Repository history (git plus the authority's closed tasks and PRs) | Read closed Issues/PRs and commits (completed sprint files are disposable and may already be deleted) | Copied summaries, search indexes, compiled memory |
 | Derived retrieval output | Its named upstream authority | Recompute from live authorities and identify the source record in every result | Search caches, embeddings, generated summaries, benchmark output |
 
 `Derived retrieval output` is a view, not a new state owner: the sole owner of

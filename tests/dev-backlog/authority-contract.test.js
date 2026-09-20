@@ -85,9 +85,9 @@ it("keeps sprint admission and migration boundaries aligned across public docs",
   const skill = read("skills/dev-backlog/SKILL.md");
   const capabilities = read("spec/capabilities.md");
   const charter = read("spec/charter.md");
-  const sprint = read(
-    ".dev-backlog/sprints/2026-07-github-native-core-simplification.md"
-  );
+  // Completed sprint files are disposable (2026-09-20), so the sprint-shape
+  // check rides a fixture instead of this repo's own sprint directory.
+  const sprint = read("tests/fixtures/admitted-sprint.md");
 
   assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
   assert.match(readme, /Optional surfaces/);
