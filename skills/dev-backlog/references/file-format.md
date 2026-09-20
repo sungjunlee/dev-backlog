@@ -30,7 +30,7 @@ Users can log in and access protected API endpoints.
 - [x] #38 DB schema setup (~15min)
 
 ### Batch 2 - Core auth
-- [~] #42 OAuth2 flow (~2hr) -> PR #87 (reviewing)
+- [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
 
 ### Batch 3 - Hardening
 - [ ] #43 Rate limiting (~30min)
