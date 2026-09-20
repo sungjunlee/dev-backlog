@@ -83,7 +83,7 @@ Mutation: [`spec/README.md`](README.md) § Mutation.
 
 ### Hard Constraints
 - Never mutate a sprint's `status: completed` back to `active`; completed sprints are immutable history.
-- Never silently delete sprint Plan items — strike them with a Progress entry or convert to `[~]` with a parking note instead.
+- Never silently delete sprint Plan items — strike them with a Progress entry or convert to `[~]` moored by a PR or branch pointer plus a parking note instead.
 - Never copy Issue acceptance criteria into a sprint or let sprint checkbox state own Issue lifecycle.
 
 ### Learnings

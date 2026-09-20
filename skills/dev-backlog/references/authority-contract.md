@@ -78,8 +78,10 @@ The core product excludes:
   fixes access and re-runs. The only scripted authority calls are
   `sprint-close.sh --close-milestone` (closes the GitHub milestone before any
   local mutation, so a failure leaves the sprint active) and `triage-apply
-  --apply` (one call per accepted action); re-running a failed command is safe
-  except for a create whose response was lost — check the authority first.
+  --apply` (a close is comment-then-close, a priority change looks the labels up
+  first); nothing retries automatically, and after a lost response verify the
+  target's state before re-running any non-idempotent write — create, comment,
+  or close.
 
 Do not reintroduce a tracker abstraction or adapter ports: the authority is a
 one-line selection the session reads, the `files` adapter is parked at tag
