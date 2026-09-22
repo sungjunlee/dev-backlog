@@ -92,8 +92,9 @@ everything else yourself.
 ### Orient
 
 Goal: know where execution stands and what comes next.
-Rail: `status.sh` / `next.sh` (`--json`; `--track <slug>` for one track of a portfolio). `_context.md` and the active sprint file are the readable picture.
-Done when you can name the next live Issue and, when a sprint exists, its current state and next actionable batch.
+Rail: `status.sh` / `next.sh` (`--json`; `--track <slug>` for one track of a portfolio) for `latest_progress`, `next_batch`, and `in_flight`. `_context.md` and the active sprint file are the readable picture.
+Done when you can name the next live Issue and, when a sprint exists, its latest Progress (or its absence), current state, and next actionable `[ ]` batch (`next_batch`; `[ ]` selection is not `[~]` work and is not dependency authorization).
+Recovery: name every in-flight PR/branch pointer (or `unmoored`) from the JSON rail and any ownership recorded in the active sprint (unknown if absent); when the declared authority is unavailable, treat local orientation as last-recorded/provisional (the next live Issue stays unknown) and stop before dispatch, Plan mutation, execution, or AC/lifecycle claims.
 
 ### Create
 
