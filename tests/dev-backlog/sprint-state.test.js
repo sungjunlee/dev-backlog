@@ -417,6 +417,83 @@ started: 2026-06-30
   });
 });
 
+describe("Orient recovery rail (scenarios 1 and 8, #490)", () => {
+  it("selects the first [ ] batch as next_batch, distinct from [~] work, and reports latest Progress or its absence", () => {
+    const state = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/scenario-1.md",
+      content: `---
+status: active
+started: 2026-07-01
+---
+
+## Plan
+### Batch 1 — Done
+- [x] #1 Landed
+
+### Batch 2 — In flight
+- [~] #2 Running → PR #20 (reviewing)
+
+### Batch 3 — Next
+- [ ] #3 Selected only
+- [ ] #4 Also selected
+
+## Progress
+- 2026-07-02: #2 dispatched → PR #20
+`,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+
+    // next_batch is the first [ ] batch, never the earlier [~]-only batch.
+    assert.equal(state.next_batch.heading, "### Batch 3 — Next");
+    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["#3", "#4"]);
+    assert.deepEqual(state.next_batch.items.map((item) => item.state), ["todo", "todo"]);
+    // [ ] selection is distinct from [~] work.
+    assert.deepEqual(state.in_flight.map((item) => item.ref), ["#2"]);
+    assert.equal(state.in_flight[0].state, "in_flight");
+    assert.deepEqual(state.latest_progress.map((entry) => entry.line), [
+      "- 2026-07-02: #2 dispatched → PR #20",
+    ]);
+
+    // Absence is explicit: an empty latest_progress, not a missing field.
+    const noProgress = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/scenario-1-empty.md",
+      content: "---\nstatus: active\n---\n\n## Plan\n- [ ] #5 Todo\n\n## Progress\n",
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+    assert.deepEqual(noProgress.latest_progress, []);
+    assert.equal(noProgress.next_batch.heading, null);
+    assert.deepEqual(noProgress.next_batch.items.map((item) => item.ref), ["#5"]);
+  });
+
+  it("recovers every in-flight PR/branch pointer, or unmoored, from the JSON rail", () => {
+    const state = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/scenario-8.md",
+      content: `---
+status: active
+started: 2026-07-01
+---
+
+## Plan
+- [~] #1 With a PR → PR #11 (open)
+- [~] #2 With a branch [branch:feat/two]
+- [~] #3 With no pointer
+
+## Progress
+`,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+
+    assert.deepEqual(
+      state.in_flight.map((item) => [item.ref, item.pr, item.branch, item.unmoored]),
+      [
+        ["#1", { number: 11, state: "open" }, null, false],
+        ["#2", null, "feat/two", false],
+        ["#3", null, null, true],
+      ]
+    );
+  });
+});
+
 const BATCHED_SPRINT = `---
 milestone: Text Sprint
 status: active

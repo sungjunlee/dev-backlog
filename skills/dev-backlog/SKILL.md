@@ -93,7 +93,7 @@ everything else yourself.
 
 Goal: know where execution stands and what comes next.
 Rail: `status.sh` / `next.sh` (`--json`; `--track <slug>` for one track of a portfolio) for `latest_progress`, `next_batch`, and `in_flight`. `_context.md` and the active sprint file are the readable picture.
-Done when you can name the next live Issue and, when a sprint exists, its latest Progress (or its absence), current state, and next actionable `[ ]` batch (`next_batch`; `[ ]` selection is not `[~]` work and is not dependency authorization).
+Done when, before acting, you report all of: the next live Issue; the latest recorded Progress entry or its absence (`latest_progress` empty); the rail's `next_batch` (the first `[ ]` item's batch, or every `[ ]` item when the Plan has no batch headings — never an earlier `[~]`-only batch); and every in-flight PR/branch pointer or `unmoored` (`in_flight`). Naming `next_batch` is selection only: `[ ]` is not `[~]` work, and selection is not dependency authorization.
 Recovery: name every in-flight PR/branch pointer (or `unmoored`) from the JSON rail and any ownership recorded in the active sprint (unknown if absent); when the declared authority is unavailable, treat local orientation as last-recorded/provisional (the next live Issue stays unknown) and stop before dispatch, Plan mutation, execution, or AC/lifecycle claims.
 
 ### Create
