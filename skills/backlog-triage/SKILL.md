@@ -22,14 +22,14 @@ Every proposal is an anchor comment followed by a checkbox line:
 - [ ] close #42 - merged PR #87 already exists
 ```
 
-Verbs: `close`, `revisit`, `close-duplicate` (`target=#N`), `set-priority` (`value=high|medium|low`), `assign-milestone` (`milestone="Name"`). Args are `key="value"` or `key=value`; the first `#N` after the verb is the target.
+Verbs: `close` (`reason="..."`), `revisit` (`reason="..."`), `close-duplicate` (`target=#N`), `set-priority` (`value=high|medium|low`), `assign-milestone` (`milestone="Name"`; legacy `name=` is accepted on Apply). Args are `key="value"` or `key=value`; the first `#N` after the verb is the target.
 Boundary: never propose closing an issue named in an active sprint's Plan or Running Context. Never mutate GitHub or `spec/*` in this mode.
 Done when the report exists with every section present, every proposal anchored, and no close targets an in-flight issue.
 
 ## Apply
 
 Goal: only accepted actions reach GitHub.
-Rail: after a human flips `[ ]` → `[x]` next to an anchor, `node <installed skill dir>/scripts/triage-apply.js <report.md>` prints the plan (dry-run); the same with `--apply --yes` executes accepted actions, dedupes by `(verb, issueNumber, normalizedArgs)`, skips unknown verbs, logs `already-applied` on re-runs, and writes an audit log beside the report.
+Rail: after a human flips `[ ]` → `[x]` next to an anchor, `node <installed skill dir>/scripts/triage-apply.js <report.md>` prints the plan (dry-run); the same with `--apply --yes` validates every accepted known action and the GitHub authority before any write, then executes accepted actions, dedupes by `(verb, issueNumber, normalizedArgs)`, skips unknown verbs, logs `already-applied` on re-runs, and writes an audit log beside the report.
 Done when every accepted action is applied or logged `already-applied` and nothing unaccepted was touched.
 
 Scripts resolve from the installed `backlog-triage` skill directory; run from the target project root. Sprint files, milestones, and Issue AC belong to `dev-backlog`.

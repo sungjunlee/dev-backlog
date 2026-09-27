@@ -59,7 +59,7 @@ Examples:
 ```html
 <!-- triage:close #104 reason="inactive/stale: no activity for 107 days" -->
 <!-- triage:set-priority #101 value=high reason="theme auth has 4 recent/warm issues" -->
-<!-- triage:assign-milestone #103 name="Sprint W17" cluster=auth -->
+<!-- triage:assign-milestone #103 milestone="Sprint W17" cluster=auth -->
 <!-- triage:close-duplicate #88 target=#42 reason="duplicate candidate converged on #42" -->
 ```
 
@@ -96,10 +96,12 @@ Multiple actions may target the same issue when the actions are distinct. Exampl
 
 ```html
 <!-- triage:set-priority #42 value=high reason="linked to active auth work" -->
-<!-- triage:assign-milestone #42 name="Sprint W17" cluster=auth -->
+<!-- triage:assign-milestone #42 milestone="Sprint W17" cluster=auth -->
 ```
 
 That is valid. These are separate proposals and therefore separate anchor+checkbox pairs.
+
+For `assign-milestone`, `milestone=` is canonical. Apply accepts legacy `name=` only when `milestone=` is absent; supplying both with different values is invalid. Accepted known actions are validated together before any GitHub call or apply-log write, including in dry-run. A report with invalid accepted arguments or conflicting priority, milestone, or duplicate target assignments fails with report line numbers. Unchecked actions remain inert and unknown verbs keep their skip-and-log behavior. In apply mode, an absent `.dev-backlog/.tracker` or a first line of `github` is required; any other or unreadable authority stops before a write.
 
 The invalid case is duplicating the exact same action for the same issue without new meaning, for example two separate `close` anchors for `#42` that differ only by wording.
 

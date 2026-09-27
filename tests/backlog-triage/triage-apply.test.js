@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
+const { writeGhFixture } = require("../fakes/fake-gh-fixture.js");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/backlog-triage/scripts");
 const {
   parseArgs,
@@ -58,6 +59,15 @@ function makeReport() {
     "<!-- triage:close-duplicate #103 target=#101 reason=\"duplicate candidate converged\" -->",
     "- [x] Close duplicate #103 into #101 _(from Obsolete Candidates)_",
     "",
+  ].join("\n");
+}
+
+function acceptedReport(...anchors) {
+  return [
+    "---",
+    "generated: 2026-04-18",
+    "---",
+    ...anchors.flatMap((anchor) => [anchor, "- [x] Accept", ""]),
   ].join("\n");
 }
 
@@ -186,6 +196,10 @@ describe("toGhCommands", () => {
     assert.deepEqual(
       toGhCommands({ verb: "assign-milestone", issueNumber: 102, args: { name: "Sprint W17" } }),
       [["issue", "edit", "102", "--milestone", "Sprint W17"]]
+    );
+    assert.deepEqual(
+      toGhCommands({ verb: "assign-milestone", issueNumber: 102, args: { milestone: "Sprint W18" } }),
+      [["issue", "edit", "102", "--milestone", "Sprint W18"]]
     );
   });
 });
@@ -394,5 +408,132 @@ describe("execute", () => {
     const result = execute(["missing.md"], { cwd: repoRoot });
     assert.equal(result.exitCode, 1);
     assert.match(result.error, /failed to read report/i);
+  });
+
+  it("accepts canonical and legacy milestone keys and keeps re-runs idempotent", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:assign-milestone #102 milestone="Sprint W17" -->',
+      '<!-- triage:assign-milestone #103 name="Sprint W18" -->'
+    ));
+    const calls = [];
+    const runGh = (argv) => {
+      calls.push(argv);
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    const first = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+    const second = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+
+    assert.equal(first.exitCode, 0);
+    assert.equal(second.exitCode, 0);
+    assert.deepEqual(calls, [
+      ["issue", "edit", "102", "--milestone", "Sprint W17"],
+      ["issue", "edit", "103", "--milestone", "Sprint W18"],
+    ]);
+    assert.deepEqual(second.actions.map((action) => action.result), ["already-applied", "already-applied"]);
+  });
+
+  it("rejects every invalid accepted action before any gh invocation or log write", () => {
+    const cases = [
+      ['<!-- triage:close #42 reason="  " -->', /reason is required/],
+      ['<!-- triage:revisit #42 -->', /reason is required/],
+      ['<!-- triage:set-priority #42 value=urgent -->', /value must be high/],
+      ['<!-- triage:set-priority #42 -->', /value is required/],
+      ['<!-- triage:close-duplicate #42 -->', /target is required/],
+      ['<!-- triage:close-duplicate #42 target=43 -->', /target must be #N/],
+      ['<!-- triage:close-duplicate #42 target=#42 -->', /target must not be the issue itself/],
+      ['<!-- triage:assign-milestone #42 milestone=" " -->', /milestone is required/],
+      ['<!-- triage:assign-milestone #42 milestone="A" name="B" -->', /different values/],
+    ];
+    const fixture = writeGhFixture(tempDir);
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const [anchor, expected] of cases) {
+      fs.writeFileSync(reportPath, acceptedReport(anchor));
+      const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "triage-apply.js"), reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: fixture.env,
+      });
+      assert.equal(result.status, 1, anchor);
+      assert.match(result.stderr, expected, anchor);
+      assert.match(result.stderr, /line 4/, anchor);
+      assert.equal(fixture.calls().length, 0, anchor);
+      assert.equal(fs.existsSync(logPath), false, anchor);
+    }
+  });
+
+  it("aggregates later invalid actions and conflicting assignments in apply and dry-run", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:revisit #42 reason="valid" -->',
+      '<!-- triage:set-priority #42 value=high -->',
+      '<!-- triage:set-priority #42 value=low -->',
+      '<!-- triage:assign-milestone #42 milestone="A" -->',
+      '<!-- triage:assign-milestone #42 name="B" -->',
+      '<!-- triage:close-duplicate #42 target=#40 -->',
+      '<!-- triage:close-duplicate #42 target=#41 -->',
+      '<!-- triage:close #43 reason=" " -->'
+    ));
+    const fixture = writeGhFixture(tempDir);
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    fs.writeFileSync(logPath, "existing log\n");
+    for (const flags of [[], ["--apply", "--yes"]]) {
+      const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "triage-apply.js"), reportPath, ...flags], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: fixture.env,
+      });
+      assert.equal(result.status, 1);
+      for (const line of [10, 16, 22, 25]) assert.match(result.stderr, new RegExp(`line ${line}:`));
+      assert.match(result.stderr, /conflicting priority/);
+      assert.match(result.stderr, /conflicting milestone/);
+      assert.match(result.stderr, /conflicting duplicate target/);
+      assert.match(result.stderr, /reason is required/);
+      assert.equal(fixture.calls().length, 0);
+      assert.equal(fs.readFileSync(logPath, "utf-8"), "existing log\n");
+    }
+  });
+
+  it("leaves unchecked invalid anchors inert and unknown verbs skipped", () => {
+    fs.writeFileSync(reportPath, [
+      "---", "generated: 2026-04-18", "---",
+      '<!-- triage:set-priority #42 value=urgent -->', "- [ ] Leave pending", "",
+      '<!-- triage:future-action #42 -->', "- [x] Accept unknown", "",
+    ].join("\n"));
+    const result = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh: () => assert.fail("gh invoked") });
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.skipped.map((entry) => entry.result), ["skipped-pending", "skipped-unknown-verb"]);
+    assert.equal(fs.readFileSync(resolveLogPath("2026-04-18", repoRoot), "utf-8").trim().split("\n").length, 2);
+  });
+
+  it("guards the task authority before GitHub and apply log writes", () => {
+    fs.writeFileSync(reportPath, acceptedReport('<!-- triage:assign-milestone #42 milestone="A" -->'));
+    const tracker = path.join(repoRoot, ".dev-backlog", ".tracker");
+    const calls = [];
+    const runGh = (argv) => {
+      calls.push(argv);
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const value of ["backlog", "gitlab", "mystery", ""]) {
+      fs.writeFileSync(tracker, `${value}\n`);
+      const result = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+      assert.equal(result.exitCode, 1, value);
+      assert.match(result.error, /authority/i);
+      assert.equal(calls.length, 0);
+      assert.equal(fs.existsSync(logPath), false);
+    }
+    fs.rmSync(tracker);
+    fs.mkdirSync(tracker);
+    const unreadable = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+    assert.equal(unreadable.exitCode, 1);
+    assert.match(unreadable.error, /cannot read task authority/i);
+    assert.equal(calls.length, 0);
+    assert.equal(fs.existsSync(logPath), false);
+    fs.rmdirSync(tracker);
+
+    assert.equal(execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh }).exitCode, 0);
+    assert.equal(calls.length, 1);
+    fs.writeFileSync(tracker, "github\nignored second line\n");
+    assert.equal(execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh }).exitCode, 0);
+    assert.equal(calls.length, 1);
   });
 });
