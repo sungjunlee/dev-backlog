@@ -2,7 +2,7 @@
 
 ## System Shape
 
-dev-backlog is a skill suite plus a few deterministic Node/Bash helpers. One declared task authority — GitHub Issues by default, the Backlog.md CLI or GitLab by a one-line `.dev-backlog/.tracker` — is the canonical task-definition and lifecycle authority, read and written by the session through that authority's CLI (the only scripted writer is `triage-apply`, GitHub-only, under its human gate). No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
+dev-backlog is a skill suite plus a few deterministic Node helpers. One declared task authority — GitHub Issues by default, the Backlog.md CLI or GitLab by a one-line `.dev-backlog/.tracker` — is the canonical task-definition and lifecycle authority, read and written by the session through that authority's CLI (the only scripted writer is `triage-apply`, GitHub-only, under its human gate). No task mirror, no export. A sprint file exists only when execution needs continuity beyond one Issue and its PR.
 
 ```text
 Task authority: GitHub Issue by default (spec + lifecycle + native planning fields)
@@ -35,15 +35,15 @@ Retrieval/memory is not a product surface (#350 no-go).
    handoff, cross-Issue/session context, or concurrent-track coordination.
 3. **Execute**: Issue AC and lifecycle stay on the task authority; an admitted sprint carries
    Plan, Running Context, and Progress.
-4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when every Plan item is `[x]` or the rest are struck or carried with a Progress entry (`sprint-close.sh` only warns).
+4. **Complete**: merge the PR, close the Issue; close an admitted sprint only when every Plan item is `[x]` or the rest are struck or carried with a Progress entry; before the close the session reports what remains and how each item is disposed, then edits the sprint frontmatter and confirms the sprint no longer appears among active tracks; no lifecycle script performs the close.
 5. **Groom** (optional): triage is advisory until `--apply`.
 
 ## Storage And External Systems
 
-- Task authority — selected by `.dev-backlog/.tracker` when present, `github` when the file is absent: GitHub Issues (`gh`), the Backlog.md CLI, or GitLab (`glab`); sole task authority, read by the session, never by a script.
+- Task authority — selected by `.dev-backlog/.tracker` when present, `github` when the file is absent: GitHub Issues (`gh`), the Backlog.md CLI, or GitLab (`glab`, documented, unverified); sole task authority, read by the session, never by a script.
 - `.dev-backlog/sprints/` — admitted execution state; completed sprints are disposable; delete them freely, the record is the Issue/epic/PR.
 - `spec/*` — durable direction when present.
-- `.dev-backlog/.tracker` — one line (`github` when absent, `backlog` or its legacy spelling `files`, `gitlab`); no adapter code: the `files` adapter stays parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`.
+- `.dev-backlog/.tracker` — one line naming a Task Authority table row (`github`, `backlog` or its legacy spelling `files`, `gitlab`); only an absent file defaults to `github`, and a present file that is empty, blank, unreadable, or names no row stops the session; scripts keep no allow-list of authority names; `triage-apply` runs only when the file is absent or names `github`, and otherwise stops before any `gh` call or apply-log write; no adapter code: the `files` adapter stays parked at `v0.11.0`, the GitLab adapter at `a8ddb7d`.
 
 ## Project-Wide Invariants
 
