@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("node:child_process");
-const { GH_EXEC_DEFAULTS } = require("../../dev-backlog/scripts/lib.js");
+const { GH_EXEC_DEFAULTS, readTaskAuthority } = require("../../dev-backlog/scripts/lib.js");
 const { ANCHOR_PATTERN, parseAnchor } = require("./anchor.js");
 
 const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
@@ -233,6 +233,72 @@ function dedupActions(anchors) {
   return [...deduped.values()];
 }
 
+function validateAcceptedActions(actions) {
+  const errors = [];
+  const fieldsByIssue = new Map();
+
+  for (const action of actions) {
+    if (!action.checked || !action.knownVerb) continue;
+
+    const line = action.occurrences.find((occurrence) => occurrence.checked)?.anchorLine
+      || action.occurrences[0].anchorLine;
+    const location = `line ${line}: triage:${action.verb} #${action.issueNumber}`;
+    const args = action.normalizedArgs;
+    const required = {
+      close: ["reason"],
+      revisit: ["reason"],
+      "close-duplicate": ["target"],
+      "set-priority": ["value"],
+      "assign-milestone": [],
+    }[action.verb];
+
+    for (const key of required) {
+      if (!String(args[key] || "").trim()) {
+        errors.push(`${location}: ${key} is required and must not be blank.`);
+      }
+    }
+
+    let field;
+    let value;
+    if (action.verb === "set-priority") {
+      field = "priority";
+      value = args.value;
+      if (value && !["high", "medium", "low"].includes(value)) {
+        errors.push(`${location}: value must be high, medium, or low.`);
+      }
+    } else if (action.verb === "assign-milestone") {
+      field = "milestone";
+      value = args.milestone === undefined ? args.name : args.milestone;
+      if (!String(value || "").trim()) {
+        errors.push(`${location}: milestone is required and must not be blank.`);
+      }
+      if (args.milestone !== undefined && args.name !== undefined && args.milestone !== args.name) {
+        errors.push(`${location}: milestone and legacy name have different values.`);
+      }
+    } else if (action.verb === "close-duplicate") {
+      field = "duplicate target";
+      value = args.target;
+      if (value && !/^#[1-9]\d*$/.test(value)) {
+        errors.push(`${location}: target must be #N with a positive issue number.`);
+      } else if (value && Number(value.slice(1)) === action.issueNumber) {
+        errors.push(`${location}: target must not be the issue itself.`);
+      }
+    }
+
+    if (!field || !value) continue;
+    if (!fieldsByIssue.has(action.issueNumber)) fieldsByIssue.set(action.issueNumber, new Map());
+    const fields = fieldsByIssue.get(action.issueNumber);
+    const previous = fields.get(field);
+    if (previous && previous.value !== value) {
+      errors.push(`${location}: conflicting ${field} ${JSON.stringify(value)}; line ${previous.line} assigns ${JSON.stringify(previous.value)}.`);
+    } else if (!previous) {
+      fields.set(field, { value, line });
+    }
+  }
+
+  return errors;
+}
+
 function formatRevisitComment(reason) {
   return `triage: revisit — ${String(reason || "").trim()}`;
 }
@@ -293,7 +359,7 @@ function toGhCommands(action, context = {}) {
       ];
     case "assign-milestone":
       return [
-        ["issue", "edit", issue, "--milestone", String(args.name || "").trim()],
+        ["issue", "edit", issue, "--milestone", String(args.milestone ?? args.name ?? "").trim()],
       ];
     default:
       return [];
@@ -721,6 +787,26 @@ function execute(argv = process.argv.slice(2), deps = {}) {
     };
   }
 
+  const deduped = dedupActions(report.anchors);
+  const validationErrors = validateAcceptedActions(deduped);
+  if (validationErrors.length > 0) {
+    return {
+      exitCode: 1,
+      error: `Invalid accepted triage actions:\n${validationErrors.map((error) => `- ${error}`).join("\n")}`,
+    };
+  }
+
+  if (options.apply) {
+    try {
+      const authority = readTaskAuthority(path.resolve(cwd, DEFAULT_BACKLOG_DIR));
+      if (authority !== "github") {
+        throw new Error(`task authority is ${JSON.stringify(authority)}; triage apply requires github.`);
+      }
+    } catch (error) {
+      return { exitCode: 1, error: `Cannot apply triage actions: ${error.message}` };
+    }
+  }
+
   try {
     ensureApplyAllowed(options, {
       confirmApply: deps.confirmApply,
@@ -736,7 +822,6 @@ function execute(argv = process.argv.slice(2), deps = {}) {
     };
   }
 
-  const deduped = dedupActions(report.anchors);
   const applyMode = options.apply ? "apply" : "dry-run";
   const result = {
     report: reportPath,
@@ -888,6 +973,7 @@ module.exports = {
   parseFrontmatter,
   parseReport,
   dedupActions,
+  validateAcceptedActions,
   formatRevisitComment,
   formatDuplicateComment,
   buildPriorityEditCommand,
