@@ -299,12 +299,15 @@ describe("runDoctor", () => {
     assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
   });
 
-  it("warns when one active track declares both component and scope (#496)", () => {
+  it("warns when one active track declares both component and scope, or a non-string component (#496)", () => {
     const sprintsDir = path.join(repoRoot, ".dev-backlog", "sprints");
     write(path.join(sprintsDir, "2026-07-auth.md"), sprintNoSpecFields({ component: "auth", scope: '["src/**/*.ts"]' }));
     write(path.join(sprintsDir, "2026-07-other.md"), sprintNoSpecFields({ component: "billing" }));
-    const active = check(runDoctor({ repoRoot }), "active_sprint");
-    assert.equal(active.status, "warn");
+    assert.equal(check(runDoctor({ repoRoot }), "active_sprint").status, "warn");
+
+    write(path.join(sprintsDir, "2026-07-auth.md"), sprintNoSpecFields({ scope: '["src/auth/**"]' }).replace("status: active", "status: active\ncomponent: [1]"));
+    write(path.join(sprintsDir, "2026-07-other.md"), sprintNoSpecFields({ scope: '["src/billing/**"]' }));
+    assert.equal(check(runDoctor({ repoRoot }), "active_sprint").status, "warn");
   });
 
   it("warns when existing scope entries use unsupported glob syntax (#496)", () => {

@@ -7,7 +7,7 @@ const { spawnSync } = require("node:child_process");
 const { resolveBashExecutable, toBashArgs } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 
 const SCRIPTS_DIR = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { isActiveSprint } = require(path.join(SCRIPTS_DIR, "sprint-state.js"));
+const { isActiveSprint, completedSprintContent } = require(path.join(SCRIPTS_DIR, "sprint-state.js"));
 
 function closeSprint(t, statusLine, { extraDir } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sprint-close-"));
@@ -35,6 +35,15 @@ describe("sprint-close status flip (#496)", () => {
       assert.match(content, /^[ \t]*status: completed$/m);
     });
   }
+
+  it("changes only the root status, never a nested or block-text status", () => {
+    const content = [
+      "---", "status: active", "deployment:", "  status: active", "notes: |", "  status: active", "---", "body",
+    ].join("\n");
+    const next = completedSprintContent(content);
+    assert.equal(isActiveSprint(next), false);
+    assert.equal(next.split("\n").filter((line) => line === "  status: active").length, 2);
+  });
 
   it("skips a directory named *.md instead of reporting no active sprint", (t) => {
     const { result, content } = closeSprint(t, "status: active", { extraDir: "not-a-sprint.md" });

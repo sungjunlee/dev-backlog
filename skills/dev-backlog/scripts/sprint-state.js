@@ -167,8 +167,16 @@ function findActiveSprintFiles(sprintsDir, {
   return readdirSync(sprintsDir)
     .filter((file) => file.endsWith(".md") && file !== "_context.md")
     .map((file) => path.join(sprintsDir, file))
-    // A directory named *.md is not a sprint; other read errors still throw.
-    .filter((filePath) => statSync(filePath).isFile())
+    // A directory or dangling link named *.md is not a sprint; other read
+    // errors (permissions) still throw.
+    .filter((filePath) => {
+      try {
+        return statSync(filePath).isFile();
+      } catch (error) {
+        if (error.code === "ENOENT") return false;
+        throw error;
+      }
+    })
     .filter((filePath) => {
       const content = readFileSync(filePath, "utf-8");
       return isActiveSprint(content);
@@ -187,14 +195,27 @@ function isActiveSprint(content) {
   return typeof status === "string" && status.trim() === "active";
 }
 
-// The same file with every frontmatter `status:` line (any indentation) set to
-// completed, or null when the result would still read as active.
+// The same file with the root frontmatter `status:` set to completed, or null
+// when no single line does that. Each `status:` line is tried in turn and kept
+// only if the parser then sees the root status completed and nothing else
+// changed, so a nested or block-text `status:` is never touched.
 function completedSprintContent(content) {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
   if (!match) return null;
-  const frontmatter = match[0].replace(/^([ \t]*)status:.*$/gm, "$1status: completed");
-  const next = frontmatter + content.slice(match[0].length);
-  return isActiveSprint(next) ? null : next;
+  const rest = content.slice(match[0].length);
+  const withoutStatus = (fm) => JSON.stringify({ ...fm, status: undefined });
+  const before = withoutStatus(parseFrontmatter(content));
+  const lines = match[0].split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].match(/^([ \t]*)status:.*?(\r?)$/);
+    if (!line) continue;
+    const candidate = [...lines];
+    candidate[index] = `${line[1]}status: completed${line[2]}`;
+    const next = candidate.join("\n") + rest;
+    const parsed = parseFrontmatter(next);
+    if (parsed.status === "completed" && withoutStatus(parsed) === before) return next;
+  }
+  return null;
 }
 
 function extractSectionLines(content, section) {
@@ -304,6 +325,8 @@ function findNextBatch(planItems) {
     return {
       heading: null,
       items: planItems.filter((item) => item.state === "todo"),
+      waiting_on: [],
+      actionable: true,
     };
   }
 

@@ -337,14 +337,14 @@ describe("createSprintFile", () => {
     }, /Active track overlaps on scope: 2026-04-current\.md/);
   });
 
-  it("refuses when a shared component: overlaps, regardless of scope globs (#292)", () => {
+  it("allows a scope track next to a component track with a cannot-prove-disjoint warning (#292, #496)", () => {
     fs.writeFileSync(
       path.join(tmpDir, "2026-04-current.md"),
       '---\nstatus: active\ncomponent: "auth-system"\n---\n',
     );
 
-    // A scopeless new sprint next to a component-scoped track cannot be proven
-    // to overlap — but two tracks on the SAME component axis can, via frontmatter.
+    // A scope track next to a component track is cross-axis: allowed, with a
+    // cannot-prove-disjoint warning.
     const disjoint = createSprintFile({
       topic: "billing",
       milestone: "Sprint W14",

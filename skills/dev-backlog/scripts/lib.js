@@ -217,9 +217,10 @@ function sprintScopeKey(frontmatter) {
   const fm = frontmatter || {};
   const component = typeof fm.component === "string" ? fm.component.trim() : "";
   // A file declaring both axes breaks the one-axis rule: compare its component
-  // but never report it provably disjoint.
+  // but never report it provably disjoint. A non-string component is unknown.
   const hasScope = Array.isArray(fm.scope) ? fm.scope.length > 0 : fm.scope !== undefined;
   if (component) return hasScope ? { kind: "component", value: component, unknown: true } : { kind: "component", value: component };
+  if (fm.component !== undefined && fm.component !== null && typeof fm.component !== "string") return { kind: "unknown" };
   const scope = Array.isArray(fm.scope)
     ? fm.scope.map((glob) => typeof glob === "string" ? glob.trim() : null)
     : [];

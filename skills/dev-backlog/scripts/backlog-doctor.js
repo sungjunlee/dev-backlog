@@ -112,6 +112,13 @@ function listSprintFiles(sprintsDir) {
   return fs.readdirSync(sprintsDir)
     .filter((file) => file.endsWith(".md") && file !== "_context.md")
     .map((file) => path.join(sprintsDir, file))
+    .filter((filePath) => {
+      try {
+        return fs.statSync(filePath).isFile();
+      } catch {
+        return false;
+      }
+    })
     .sort();
 }
 
