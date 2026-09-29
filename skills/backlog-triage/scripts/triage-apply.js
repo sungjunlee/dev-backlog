@@ -103,8 +103,18 @@ function stableSerialize(value) {
   return JSON.stringify(value);
 }
 
+// Keys treat the legacy milestone alias `name=` as `milestone=`, so an alias pair in one
+// report dedupes and a log written with either spelling matches a rerun with the other.
+function canonicalKeyArgs(verb, normalizedArgs) {
+  if (verb !== "assign-milestone" || normalizedArgs.name === undefined) return normalizedArgs;
+  if (normalizedArgs.milestone !== undefined && normalizedArgs.milestone !== normalizedArgs.name) return normalizedArgs;
+  const { name, ...rest } = normalizedArgs;
+  return { ...rest, milestone: name };
+}
+
 function buildActionKey(action) {
-  return `${action.verb}|${action.issueNumber}|${stableSerialize(action.normalizedArgs || normalizeArgs(action.args))}`;
+  const normalizedArgs = action.normalizedArgs || normalizeArgs(action.args);
+  return `${action.verb}|${action.issueNumber}|${stableSerialize(canonicalKeyArgs(action.verb, normalizedArgs))}`;
 }
 
 function parseFrontmatter(text) {
@@ -175,7 +185,7 @@ function parseReport(text) {
       normalizedArgs,
       checked,
       knownVerb,
-      key: `${anchor.verb}|${anchor.issueNumber}|${stableSerialize(normalizedArgs)}`,
+      key: buildActionKey({ verb: anchor.verb, issueNumber: anchor.issueNumber, normalizedArgs }),
       anchorLine: index + 1,
       checkboxLine: checkboxIndex + 1,
       argErrors: anchor.argErrors,
