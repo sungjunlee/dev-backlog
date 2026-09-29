@@ -520,7 +520,7 @@ describe("execute", () => {
       '<!-- triage:close #43 reason=" " -->',
       '<!-- triage:close #0 reason="stale" -->',
       '<!-- triage:assign-milestone #44 milestone="A\u0000B" -->',
-      `<!-- triage:close #45 reason="${"가".repeat(20001)}" -->`
+      `<!-- triage:close #45 reason="${"가".repeat(5334)}" -->`
     ));
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -539,7 +539,7 @@ describe("execute", () => {
       assert.match(result.stderr, /reason is required/);
       assert.match(result.stderr, /line 28: .*issue number must be a positive safe integer/);
       assert.match(result.stderr, /line 31: .*milestone must not contain a NUL character/);
-      assert.match(result.stderr, /line 34: .*reason must be at most 60000 bytes/);
+      assert.match(result.stderr, /line 34: .*reason must be at most 16000 bytes/);
       assert.equal(fixture.calls().length, 0);
       assert.equal(fs.readFileSync(logPath, "utf-8"), "existing log\n");
     }

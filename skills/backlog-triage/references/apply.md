@@ -105,7 +105,7 @@ For `assign-milestone`, `milestone=` is canonical. Apply accepts legacy `name=` 
 
 - an issue number that is not a positive safe integer;
 - argument text that is not whitespace-separated `key=value` / `key="value"` pairs, or a key given twice;
-- a missing or blank required argument, an invalid `set-priority` value or `close-duplicate` target (`#N` with N a positive safe integer, not the issue itself), or any value containing a NUL character or more than 60,000 UTF-8 bytes;
+- a missing or blank required argument, an invalid `set-priority` value or `close-duplicate` target (`#N` with N a positive safe integer, not the issue itself), or any value containing a NUL character or more than 16,000 UTF-8 bytes;
 - two priority or two milestone assignments for the same issue, whether the values differ or repeat with other arguments changed (legacy `name=` counts as `milestone=`; an otherwise identical alias pair is one action, in the report and in the apply log), or two different duplicate targets;
 - more than one accepted closing action (`close` or `close-duplicate`) for the same issue.
 
