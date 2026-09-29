@@ -299,6 +299,14 @@ describe("runDoctor", () => {
     assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
   });
 
+  it("warns when one active track declares both component and scope (#496)", () => {
+    const sprintsDir = path.join(repoRoot, ".dev-backlog", "sprints");
+    write(path.join(sprintsDir, "2026-07-auth.md"), sprintNoSpecFields({ component: "auth", scope: '["src/**/*.ts"]' }));
+    write(path.join(sprintsDir, "2026-07-other.md"), sprintNoSpecFields({ component: "billing" }));
+    const active = check(runDoctor({ repoRoot }), "active_sprint");
+    assert.equal(active.status, "warn");
+  });
+
   it("warns when existing scope entries use unsupported glob syntax (#496)", () => {
     const sprintsDir = path.join(repoRoot, ".dev-backlog", "sprints");
     const first = path.join(sprintsDir, "2026-07-auth.md");

@@ -131,6 +131,23 @@ if [ "$CB_TODO" -gt 0 ] || [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "Warning: $CB_TODO todo, $CB_IN_FLIGHT in-flight items remaining"
 fi
 
+# The status flip goes through the shared reader: every form it reads as
+# active is rewritten, and a file it cannot close stops here, before Step 0
+# touches GitHub. Usage: complete_sprint_file check|write FILE
+complete_sprint_file() {
+  node -e '
+    const fs = require("node:fs");
+    const { completedSprintContent } = require(process.argv[1]);
+    const next = completedSprintContent(fs.readFileSync(process.argv[3], "utf-8"));
+    if (next === null) process.exit(1);
+    if (process.argv[2] === "write") fs.writeFileSync(process.argv[3], next);
+  ' "$SCRIPT_DIR/sprint-state.js" "$1" "$2"
+}
+if ! complete_sprint_file check "$ACTIVE"; then
+  echo "Cannot set status: completed in $ACTIVE; edit its frontmatter by hand." >&2
+  exit 1
+fi
+
 # --- Step 0: Optional provider mutation runs BEFORE any local mutation ---
 # Fail-loud contract (#366): if the GitHub milestone cannot be closed, the
 # local sprint must remain active — never completed-with-open-milestone.
@@ -177,21 +194,7 @@ DOCTOR_STATUS=$?
 if $DRY_RUN; then
   echo "[dry-run] Would set status: completed in $ACTIVE"
 else
-  # Rewrite the frontmatter status line through the shared reader, so every
-  # form the reader treats as active (trailing space, quotes) is closed, and
-  # stop if the file still reads as active.
-  if ! node -e '
-    const fs = require("node:fs");
-    const { isActiveSprint } = require(process.argv[1]);
-    const file = process.argv[2];
-    const content = fs.readFileSync(file, "utf-8");
-    const match = content.match(/^---\r?\n[\s\S]*?\r?\n---/);
-    if (!match) process.exit(1);
-    const frontmatter = match[0].replace(/^status:.*$/m, "status: completed");
-    const next = frontmatter + content.slice(match[0].length);
-    fs.writeFileSync(file, next);
-    if (isActiveSprint(next)) process.exit(1);
-  ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE"; then
+  if ! complete_sprint_file write "$ACTIVE"; then
     echo "Could not set status: completed in $ACTIVE; edit its frontmatter by hand." >&2
     exit 1
   fi

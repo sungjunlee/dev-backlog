@@ -27,12 +27,12 @@ function closeSprint(t, statusLine, { extraDir } = {}) {
 }
 
 describe("sprint-close status flip (#496)", () => {
-  for (const statusLine of ["status: active", "status: active ", 'status: "active"']) {
+  for (const statusLine of ["status: active", "status: active ", 'status: "active"', " status: active"]) {
     it(`closes a sprint whose frontmatter reads ${JSON.stringify(statusLine)}`, (t) => {
       const { result, content } = closeSprint(t, statusLine);
       assert.equal(result.status, 0, result.stderr);
       assert.equal(isActiveSprint(content), false);
-      assert.match(content, /^status: completed$/m);
+      assert.match(content, /^[ \t]*status: completed$/m);
     });
   }
 

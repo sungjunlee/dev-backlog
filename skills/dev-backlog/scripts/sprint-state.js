@@ -187,6 +187,16 @@ function isActiveSprint(content) {
   return typeof status === "string" && status.trim() === "active";
 }
 
+// The same file with every frontmatter `status:` line (any indentation) set to
+// completed, or null when the result would still read as active.
+function completedSprintContent(content) {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
+  if (!match) return null;
+  const frontmatter = match[0].replace(/^([ \t]*)status:.*$/gm, "$1status: completed");
+  const next = frontmatter + content.slice(match[0].length);
+  return isActiveSprint(next) ? null : next;
+}
+
 function extractSectionLines(content, section) {
   const lines = content.split(/\r?\n/);
   const sectionRe = new RegExp(`^## ${escapeRegExp(section)}[ \\t]*$`);
@@ -715,6 +725,7 @@ module.exports = {
   findActiveSprintFiles,
   parseFrontmatter,
   isActiveSprint,
+  completedSprintContent,
   extractSectionLines,
   hasSection,
   parseProgressEntries,

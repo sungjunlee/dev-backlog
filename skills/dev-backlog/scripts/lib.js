@@ -216,7 +216,10 @@ function parseSimpleYaml(raw) {
 function sprintScopeKey(frontmatter) {
   const fm = frontmatter || {};
   const component = typeof fm.component === "string" ? fm.component.trim() : "";
-  if (component) return { kind: "component", value: component };
+  // A file declaring both axes breaks the one-axis rule: compare its component
+  // but never report it provably disjoint.
+  const hasScope = Array.isArray(fm.scope) ? fm.scope.length > 0 : fm.scope !== undefined;
+  if (component) return hasScope ? { kind: "component", value: component, unknown: true } : { kind: "component", value: component };
   const scope = Array.isArray(fm.scope)
     ? fm.scope.map((glob) => typeof glob === "string" ? glob.trim() : null)
     : [];
