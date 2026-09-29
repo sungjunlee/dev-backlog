@@ -169,8 +169,24 @@ DOCTOR_STATUS=$?
 if $DRY_RUN; then
   echo "[dry-run] Would set status: completed in $ACTIVE"
 else
-  # Replace status: active with status: completed
-  sed -i.bak "s/^status: active$/status: completed/" "$ACTIVE" && rm -f "$ACTIVE.bak"
+  # Rewrite the frontmatter status line through the shared reader, so every
+  # form the reader treats as active (trailing space, quotes) is closed, and
+  # stop if the file still reads as active.
+  if ! node -e '
+    const fs = require("node:fs");
+    const { isActiveSprint } = require(process.argv[1]);
+    const file = process.argv[2];
+    const content = fs.readFileSync(file, "utf-8");
+    const match = content.match(/^---\r?\n[\s\S]*?\r?\n---/);
+    if (!match) process.exit(1);
+    const frontmatter = match[0].replace(/^status:.*$/m, "status: completed");
+    const next = frontmatter + content.slice(match[0].length);
+    fs.writeFileSync(file, next);
+    if (isActiveSprint(next)) process.exit(1);
+  ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE"; then
+    echo "Could not set status: completed in $ACTIVE; edit its frontmatter by hand." >&2
+    exit 1
+  fi
   # Append progress entry
   echo "- $TODAY: Sprint closed. $CB_DONE/$CB_TOTAL tasks completed." >> "$ACTIVE"
   echo "Set status: completed in $ACTIVE"

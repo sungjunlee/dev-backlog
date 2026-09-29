@@ -93,6 +93,7 @@ Expose actor-readable execution state.
       issue_number: 211,
       title: "Add JSON surfaces (~2hr)",
       batch_heading: "### Batch 2 - Active",
+      batch_index: 1,
       pr: { number: 224, state: "reviewing" },
       branch: null,
       unmoored: false,
@@ -471,6 +472,13 @@ status: active
       .replace("### Batch 2\n", "") });
     assert.equal(sameBatch.next_batch.actionable, true);
     assert.deepEqual(sameBatch.next_batch.waiting_on, []);
+
+    // Batches are positional: a repeated heading is still a later batch.
+    const repeated = parseSprintContent({ sprintPath: "repeated.md", content: content
+      .replace("### Batch 2", "### Batch 1") });
+    assert.equal(repeated.next_batch.actionable, false);
+    assert.deepEqual(repeated.next_batch.waiting_on, ["#1"]);
+    assert.deepEqual(repeated.next_batch.items.map((item) => item.ref), ["#2"]);
   });
 
   it("selects the first [ ] batch as next_batch, distinct from [~] work, and reports latest Progress or its absence", () => {

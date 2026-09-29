@@ -230,15 +230,17 @@ function parseProgressEntries(progressLines) {
 function parsePlanItems(planLines) {
   const items = [];
   let batchHeading = null;
+  let batchIndex = null;
 
   for (const line of planLines) {
     if (/^### Batch/.test(line)) {
       batchHeading = line;
+      batchIndex = batchIndex === null ? 0 : batchIndex + 1;
       continue;
     }
 
     const item = parsePlanItem(line, batchHeading);
-    if (item) items.push(item);
+    if (item) items.push({ ...item, batch_index: batchIndex });
   }
 
   return items;
@@ -292,18 +294,17 @@ function findNextBatch(planItems) {
     };
   }
 
-  const firstTodoIndex = planItems.indexOf(firstTodo);
-  const earlierHeadings = new Set(planItems.slice(0, firstTodoIndex)
-    .map((item) => item.batch_heading).filter(Boolean));
-  earlierHeadings.delete(firstTodo.batch_heading);
+  // Batches are identified by position, not heading text, so a repeated
+  // heading cannot merge two batches.
+  const batch = firstTodo.batch_index;
   const waitingOn = planItems.filter((item) =>
-    item.state === "in_flight" && earlierHeadings.has(item.batch_heading)
+    item.state === "in_flight" && item.batch_index !== null && item.batch_index < batch
   ).map((item) => item.ref);
 
   return {
     heading: firstTodo.batch_heading,
     items: planItems.filter(
-      (item) => item.state === "todo" && item.batch_heading === firstTodo.batch_heading
+      (item) => item.state === "todo" && item.batch_index === batch
     ),
     waiting_on: waitingOn,
     actionable: waitingOn.length === 0,
