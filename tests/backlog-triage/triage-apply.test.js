@@ -441,6 +441,7 @@ describe("execute", () => {
       ['<!-- triage:close-duplicate #42 -->', /target is required/],
       ['<!-- triage:close-duplicate #42 target=43 -->', /target must be #N/],
       ['<!-- triage:close-duplicate #42 target=#42 -->', /target must not be the issue itself/],
+      [`<!-- triage:close-duplicate #42 target=#${"9".repeat(59999)} -->`, /target must be #N/],
       ['<!-- triage:assign-milestone #42 milestone=" " -->', /milestone is required/],
       ['<!-- triage:assign-milestone #42 milestone="A" name="B" -->', /different values/],
       ['<!-- triage:close #0 reason="stale" -->', /issue number must be a positive integer/],
