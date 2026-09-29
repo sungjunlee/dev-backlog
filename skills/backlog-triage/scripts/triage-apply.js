@@ -248,6 +248,11 @@ function validateAcceptedActions(actions) {
     if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber < 1) {
       errors.push(`${location}: issue number must be a positive integer.`);
     }
+    for (const [key, argValue] of Object.entries(args)) {
+      if (String(argValue).includes("\u0000")) {
+        errors.push(`${location}: ${key} must not contain a NUL character.`);
+      }
+    }
     const required = {
       close: ["reason"],
       revisit: ["reason"],
