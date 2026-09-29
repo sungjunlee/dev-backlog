@@ -142,6 +142,6 @@ Every proposal emitted in a source section is re-emitted in `## Apply Checklist`
 
 ### Deduplication rule for the apply step
 
-Because the same action anchor appears in both its source section and the Apply Checklist, `triage-apply.js` deduplicates by `(verb, issueNumber, normalizedArgs)`, where `normalizedArgs` means sorted keys with trimmed string values before stable serialization.
+Because the same action anchor appears in both its source section and the Apply Checklist, `triage-apply.js` deduplicates by `(verb, issueNumber, normalizedArgs)`, where `normalizedArgs` means sorted keys with trimmed string values before stable serialization; for `assign-milestone`, a legacy `name=` that does not disagree with `milestone=` is rewritten to `milestone=` first, so the alias pair is one action in the report and in the apply log.
 
 A user may check the box in either location to accept the action; the deduped action is treated as accepted when *any* occurrence of that anchor is checked. Unknown verbs still parse, but `triage-apply.js` logs and skips them during execution.
