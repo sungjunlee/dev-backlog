@@ -178,6 +178,7 @@ function parseReport(text) {
       key: `${anchor.verb}|${anchor.issueNumber}|${stableSerialize(normalizedArgs)}`,
       anchorLine: index + 1,
       checkboxLine: checkboxIndex + 1,
+      argErrors: anchor.argErrors,
     };
 
     anchors.push(entry);
@@ -214,6 +215,7 @@ function dedupActions(anchors) {
             anchorLine: anchor.anchorLine,
             checkboxLine: anchor.checkboxLine,
             checked: anchor.checked,
+            argErrors: anchor.argErrors,
           },
         ],
       });
@@ -227,6 +229,7 @@ function dedupActions(anchors) {
       anchorLine: anchor.anchorLine,
       checkboxLine: anchor.checkboxLine,
       checked: anchor.checked,
+      argErrors: anchor.argErrors,
     });
   }
 
@@ -249,6 +252,12 @@ function validateAcceptedActions(actions) {
       || action.occurrences[0].anchorLine;
     const location = `line ${line}: triage:${action.verb} #${action.issueNumber}`;
     const args = action.normalizedArgs;
+    for (const occurrence of action.occurrences) {
+      if (!occurrence.checked) continue;
+      for (const message of occurrence.argErrors || []) {
+        errors.push(`line ${occurrence.anchorLine}: triage:${action.verb} #${action.issueNumber}: ${message}.`);
+      }
+    }
     if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber < 1) {
       errors.push(`${location}: issue number must be a positive integer.`);
     }
@@ -317,6 +326,8 @@ function validateAcceptedActions(actions) {
     const previous = fields.get(field);
     if (previous && previous.value !== value) {
       errors.push(`${location}: conflicting ${field} ${JSON.stringify(value)}; line ${previous.line} assigns ${JSON.stringify(previous.value)}.`);
+    } else if (previous && field !== "duplicate target") {
+      errors.push(`${location}: ${field} ${JSON.stringify(value)} is already assigned on line ${previous.line}; keep one anchor.`);
     } else if (!previous) {
       fields.set(field, { value, line });
     }
