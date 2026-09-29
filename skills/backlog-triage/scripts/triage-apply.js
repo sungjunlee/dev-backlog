@@ -237,7 +237,8 @@ function dedupActions(anchors) {
 }
 
 // Below GitHub's 65,536-character comment limit and Linux's 128 KiB per-argument limit,
-// so an accepted action cannot fail at spawn time after earlier writes.
+// so an accepted action cannot fail at spawn time after earlier writes. The one joined
+// argument, the close-duplicate comment, adds only a safe-integer target to its reason.
 const MAX_ARG_BYTES = 60000;
 
 function validateAcceptedActions(actions) {
@@ -303,7 +304,7 @@ function validateAcceptedActions(actions) {
     } else if (action.verb === "close-duplicate") {
       field = "duplicate target";
       value = args.target;
-      if (value && !/^#[1-9]\d*$/.test(value)) {
+      if (value && (!/^#[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value.slice(1))))) {
         errors.push(`${location}: target must be #N with a positive issue number.`);
       } else if (value && Number(value.slice(1)) === action.issueNumber) {
         errors.push(`${location}: target must not be the issue itself.`);
