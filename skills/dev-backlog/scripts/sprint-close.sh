@@ -140,7 +140,12 @@ complete_sprint_file() {
     const { completedSprintContent } = require(process.argv[1]);
     const next = completedSprintContent(fs.readFileSync(process.argv[3], "utf-8"));
     if (next === null) process.exit(1);
-    if (process.argv[2] === "write") fs.writeFileSync(process.argv[3], next);
+    if (process.argv[2] === "write") {
+      // Write beside the file, then rename, so a failed write never truncates it.
+      const tmp = `${process.argv[3]}.closing-${process.pid}`;
+      fs.writeFileSync(tmp, next);
+      fs.renameSync(tmp, process.argv[3]);
+    }
   ' "$SCRIPT_DIR/sprint-state.js" "$1" "$2"
 }
 if ! complete_sprint_file check "$ACTIVE"; then
