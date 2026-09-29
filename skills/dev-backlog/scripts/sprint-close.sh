@@ -183,8 +183,16 @@ if $CLOSE_MILESTONE; then
     if (typeof milestone === "string") {
       console.log(milestone.trim());
     } else if (typeof milestone === "number" || typeof milestone === "boolean") {
-      const lines = content.split(/\r?\n/).filter((line) => /^[ \t]*milestone:/.test(line));
-      console.log(lines[lines.length - 1].replace(/^[ \t]*milestone:/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2"));
+      // The root line is the one whose removal changes the parsed root value;
+      // a nested `milestone:` never qualifies.
+      const lines = content.split("\n");
+      for (let index = lines.length - 1; index >= 0; index -= 1) {
+        if (!/^[ \t]*milestone:/.test(lines[index])) continue;
+        const without = lines.filter((_, lineIndex) => lineIndex !== index).join("\n");
+        if (parseFrontmatter(without).milestone === milestone) continue;
+        console.log(lines[index].replace(/^[ \t]*milestone:/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2"));
+        break;
+      }
     }
   ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE")
 fi
