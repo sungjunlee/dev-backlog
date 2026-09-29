@@ -207,10 +207,11 @@ function completedSprintContent(content) {
   const before = withoutStatus(parseFrontmatter(content));
   const lines = match[0].split("\n");
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].match(/^([ \t]*)status:.*?(\r?)$/);
+    const line = lines[index].match(/^([ \t]*)status:.*?(\s+#.*?)?(\r?)$/);
     if (!line) continue;
     const candidate = [...lines];
-    candidate[index] = `${line[1]}status: completed${line[2]}`;
+    // Keep a trailing YAML comment the author wrote on the status line.
+    candidate[index] = `${line[1]}status: completed${line[2] || ""}${line[3]}`;
     const next = candidate.join("\n") + rest;
     const parsed = parseFrontmatter(next);
     if (parsed.status !== "completed" || withoutStatus(parsed) !== before) continue;

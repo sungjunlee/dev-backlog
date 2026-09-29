@@ -295,8 +295,8 @@ describe("runDoctor", () => {
     assert.equal(active.status, "warn");
     assert.match(active.detail.summary, /cannot prove disjoint/);
     assert.doesNotMatch(active.detail.summary, /scopes disjoint/);
-    assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-auth.md")));
-    assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
+    assert.ok(active.detail.summary.includes(".dev-backlog/sprints/2026-07-auth.md"));
+    assert.ok(active.detail.summary.includes(".dev-backlog/sprints/2026-07-other.md"));
   });
 
   it("warns when one active track declares both component and scope, or a non-string component (#496)", () => {
@@ -329,8 +329,8 @@ describe("runDoctor", () => {
       assert.equal(active.status, "warn");
       assert.match(active.detail.summary, /cannot prove disjoint/);
       assert.doesNotMatch(active.detail.summary, /scopes disjoint/);
-      assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-auth.md")));
-      assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
+      assert.ok(active.detail.summary.includes(".dev-backlog/sprints/2026-07-auth.md"));
+      assert.ok(active.detail.summary.includes(".dev-backlog/sprints/2026-07-other.md"));
     }
 
     write(first, sprintNoSpecFields({ scope: '["src/auth/api/**"]' }));

@@ -164,11 +164,13 @@ describe("createSprintFile", () => {
     assert.deepEqual(listActiveSprintFiles(sprintsDir), ["active.md"]);
     assert.equal(readSprintState({ backlogDir }).active_sprint.path, active);
     const doctor = runDoctor({ repoRoot: tmpDir });
-    assert.deepEqual(doctor.checks[0].detail.active_files, [path.join(".dev-backlog", "sprints", "active.md")]);
+    // Doctor display paths are repo-relative and portable (forward slashes).
+    assert.deepEqual(doctor.checks[0].detail.active_files, [".dev-backlog/sprints/active.md"]);
     const shell = spawnBashSync(["-c", 'source "$1"; find_active_sprints "$2"', "bash",
       path.join(SKILL_SCRIPTS, "lib.sh"), sprintsDir], { encoding: "utf8" });
     assert.equal(shell.status, 0);
-    assert.equal(shell.stdout.trim(), active);
+    // One file, whatever path spelling the Bash layer hands back on Windows.
+    assert.deepEqual(shell.stdout.trim().split(/\r?\n/).map((line) => path.basename(line.replace(/\\/g, "/"))), ["active.md"]);
     assert.throws(() => createSprintFile({
       topic: "new", milestone: "M", component: "auth", sprintsDir,
       today: new Date("2026-04-05T09:00:00Z"),

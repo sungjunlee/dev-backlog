@@ -44,6 +44,7 @@ describe("sprint-close status flip (#496)", () => {
     assert.equal(isActiveSprint(next), false);
     assert.equal(next.split("\n").filter((line) => line === "  status: active").length, 2);
     assert.equal(completedSprintContent("---\nstatus: active\nmilestone: M\nstatus: active\n---\n"), null);
+    assert.match(completedSprintContent("---\nstatus: active # managed by hand\n---\n"), /^status: completed # managed by hand$/m);
   });
 
   for (const [frontmatter, title] of [
