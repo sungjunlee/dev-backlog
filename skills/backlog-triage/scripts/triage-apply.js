@@ -246,10 +246,11 @@ function dedupActions(anchors) {
   return [...deduped.values()];
 }
 
-// Below GitHub's 65,536-character comment limit and Linux's 128 KiB per-argument limit,
-// so an accepted action cannot fail at spawn time after earlier writes. The one joined
-// argument, the close-duplicate comment, adds only a safe-integer target to its reason.
-const MAX_ARG_BYTES = 60000;
+// Keeps every gh command line under Windows's 32,767-character limit (and so under GitHub's
+// comment limit and Linux's per-argument limit), so an accepted action cannot fail at spawn
+// time after earlier writes. The one joined argument, the close-duplicate comment, adds only
+// a safe-integer target to its reason.
+const MAX_ARG_BYTES = 16000;
 
 function validateAcceptedActions(actions) {
   const errors = [];
