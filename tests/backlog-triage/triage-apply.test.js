@@ -432,6 +432,27 @@ describe("execute", () => {
     assert.deepEqual(second.actions.map((action) => action.result), ["already-applied", "already-applied"]);
   });
 
+  it("applies a report whose source anchors and checklist copies are all checked exactly once", () => {
+    fs.writeFileSync(reportPath, makeReport().replace(/- \[ \]/g, "- [x]"));
+    const calls = [];
+    const runGh = (argv) => {
+      calls.push(argv);
+      return { status: 0, stdout: argv[1] === "view" ? '{"labels":[]}' : "", stderr: "" };
+    };
+    const result = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+
+    assert.equal(result.exitCode, 0);
+    const writes = calls.filter((argv) => argv[1] !== "view").map((argv) => argv.slice(0, 3).join(" "));
+    assert.deepEqual(writes.sort(), [
+      "issue close 103",
+      "issue close 104",
+      "issue comment 103",
+      "issue comment 104",
+      "issue edit 101",
+      "issue edit 102",
+    ]);
+  });
+
   it("rejects every invalid accepted action before any gh invocation or log write", () => {
     const cases = [
       ['<!-- triage:close #42 reason="  " -->', /reason is required/],
@@ -444,11 +465,11 @@ describe("execute", () => {
       [`<!-- triage:close-duplicate #42 target=#${"9".repeat(59999)} -->`, /target must be #N/],
       ['<!-- triage:assign-milestone #42 milestone=" " -->', /milestone is required/],
       ['<!-- triage:assign-milestone #42 milestone="A" name="B" -->', /different values/],
-      ['<!-- triage:close #0 reason="stale" -->', /issue number must be a positive integer/],
+      ['<!-- triage:close #0 reason="stale" -->', /issue number must be a positive safe integer/],
       ['<!-- triage:close #42 reason="first" reason="second" -->', /reason is given more than once/],
       ['<!-- triage:close #42 reason="stale" garbage -->', /unparsed argument text "garbage"/],
       ['<!-- triage:close #42 reason="bad\u0000reason" -->', /reason must not contain a NUL character/],
-      ['<!-- triage:revisit #99999999999999999 reason="stale" -->', /issue number must be a positive integer/],
+      ['<!-- triage:revisit #99999999999999999 reason="stale" -->', /issue number must be a positive safe integer/],
     ];
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -496,7 +517,7 @@ describe("execute", () => {
       assert.match(result.stderr, /conflicting milestone/);
       assert.match(result.stderr, /conflicting duplicate target/);
       assert.match(result.stderr, /reason is required/);
-      assert.match(result.stderr, /line 28: .*issue number must be a positive integer/);
+      assert.match(result.stderr, /line 28: .*issue number must be a positive safe integer/);
       assert.match(result.stderr, /line 31: .*milestone must not contain a NUL character/);
       assert.match(result.stderr, /line 34: .*reason must be at most 60000 bytes/);
       assert.equal(fixture.calls().length, 0);
