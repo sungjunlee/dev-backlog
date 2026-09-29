@@ -453,6 +453,26 @@ describe("execute", () => {
     ]);
   });
 
+  it("treats the legacy milestone alias as the canonical key within a report and across reruns", () => {
+    const calls = [];
+    const runGh = (argv) => {
+      calls.push(argv);
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:assign-milestone #102 name="Sprint W17" -->',
+      '<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'
+    ));
+    const first = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+    fs.writeFileSync(reportPath, acceptedReport('<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'));
+    const second = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
+
+    assert.equal(first.exitCode, 0);
+    assert.equal(second.exitCode, 0);
+    assert.deepEqual(calls, [["issue", "edit", "102", "--milestone", "Sprint W17"]]);
+    assert.deepEqual(second.actions.map((action) => action.result), ["already-applied"]);
+  });
+
   it("rejects every invalid accepted action before any gh invocation or log write", () => {
     const cases = [
       ['<!-- triage:close #42 reason="  " -->', /reason is required/],
@@ -549,9 +569,9 @@ describe("execute", () => {
     }
   });
 
-  it("rejects a repeated same-value assignment, including the legacy milestone alias", () => {
+  it("rejects a repeated same-value assignment that differs in other arguments, including the legacy alias", () => {
     const pairs = [
-      ['<!-- triage:assign-milestone #42 milestone="A" -->', '<!-- triage:assign-milestone #42 name="A" -->', /milestone "A" is already assigned on line 4/],
+      ['<!-- triage:assign-milestone #42 milestone="A" reason="one" -->', '<!-- triage:assign-milestone #42 name="A" reason="two" -->', /milestone "A" is already assigned on line 4/],
       ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 4/],
     ];
     const fixture = writeGhFixture(tempDir);
