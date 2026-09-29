@@ -34,9 +34,15 @@ find_active_sprints() {
   local sprints_dir="$1"
   node -e '
     const reader = require(process.argv[1]);
+    const { basename } = require("node:path");
     const files = reader.findActiveSprintFiles(process.argv[2]);
-    if (files.length) console.log(files.join("\n"));
-  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$sprints_dir"
+    if (files.length) console.log(files.map((file) => basename(file)).join("\n"));
+  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$sprints_dir" | while IFS= read -r name; do
+    # Print basenames from node and rejoin them here so callers keep the
+    # directory spelling they passed (node would return C:\... on Windows).
+    printf '%s/%s\n' "$sprints_dir" "$name"
+  done
+  return "${PIPESTATUS[0]}"
 }
 
 # Find the active sprint file.
@@ -73,7 +79,8 @@ find_active_sprint() {
 # Return 0 and print the path when found; return 1 when no active track matches.
 # Usage: SPRINT=$(resolve_track "$SPRINTS_DIR" "$TRACK")
 resolve_track() {
-  node -e '
+  local name
+  name=$(node -e '
     const reader = require(process.argv[1]);
     try {
       const state = reader.readSprintState({
@@ -81,12 +88,13 @@ resolve_track() {
         track: process.argv[3],
       });
       if (!state.active_sprint) process.exitCode = 1;
-      else console.log(state.active_sprint.path);
+      else console.log(require("node:path").basename(state.active_sprint.path));
     } catch (error) {
       console.error(error.message);
       process.exitCode = 2;
     }
-  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$1" "$2"
+  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$1" "$2") || return
+  printf '%s/%s\n' "$1" "$name"
 }
 
 # Count checkbox states in a sprint file through the shared ref grammar.
