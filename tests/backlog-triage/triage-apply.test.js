@@ -492,6 +492,30 @@ describe("execute", () => {
     }
   });
 
+  it("rejects a second accepted closing action for the same issue before any write", () => {
+    const pairs = [
+      ['<!-- triage:close #42 reason="stale" -->', '<!-- triage:close #42 reason="stale, no activity" -->'],
+      ['<!-- triage:close-duplicate #42 target=#40 -->', '<!-- triage:close-duplicate #42 target=#40 reason="same bug" -->'],
+      ['<!-- triage:close #42 reason="stale" -->', '<!-- triage:close-duplicate #42 target=#40 -->'],
+    ];
+    const fixture = writeGhFixture(tempDir);
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const [first, second] of pairs) {
+      fs.writeFileSync(reportPath, acceptedReport(first, second));
+      for (const flags of [[], ["--apply", "--yes"]]) {
+        const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "triage-apply.js"), reportPath, ...flags], {
+          cwd: repoRoot,
+          encoding: "utf-8",
+          env: fixture.env,
+        });
+        assert.equal(result.status, 1, second);
+        assert.match(result.stderr, /line 7: .*more than one accepted closing action for #42; line 4 already closes it/, second);
+        assert.equal(fixture.calls().length, 0, second);
+        assert.equal(fs.existsSync(logPath), false, second);
+      }
+    }
+  });
+
   it("leaves unchecked invalid anchors inert and unknown verbs skipped", () => {
     fs.writeFileSync(reportPath, [
       "---", "generated: 2026-04-18", "---",
