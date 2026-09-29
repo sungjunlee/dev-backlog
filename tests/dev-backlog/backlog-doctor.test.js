@@ -308,6 +308,10 @@ describe("runDoctor", () => {
     write(path.join(sprintsDir, "2026-07-auth.md"), sprintNoSpecFields({ scope: '["src/auth/**"]' }).replace("status: active", "status: active\ncomponent: [1]"));
     write(path.join(sprintsDir, "2026-07-other.md"), sprintNoSpecFields({ scope: '["src/billing/**"]' }));
     assert.equal(check(runDoctor({ repoRoot }), "active_sprint").status, "warn");
+
+    // The readable scope axis still decides a real overlap.
+    write(path.join(sprintsDir, "2026-07-other.md"), sprintNoSpecFields({ scope: '["src/auth/**"]' }));
+    assert.equal(check(runDoctor({ repoRoot }), "active_sprint").status, "fail");
   });
 
   it("warns when existing scope entries use unsupported glob syntax (#496)", () => {

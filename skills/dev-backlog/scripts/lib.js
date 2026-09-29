@@ -216,20 +216,26 @@ function parseSimpleYaml(raw) {
 function sprintScopeKey(frontmatter) {
   const fm = frontmatter || {};
   const component = typeof fm.component === "string" ? fm.component.trim() : "";
-  // A file declaring both axes breaks the one-axis rule: compare its component
-  // but never report it provably disjoint. A non-string component is unknown.
+  // Both axes, or a non-string component, break the one-axis rule: the
+  // readable axis still decides overlap, but the track is never provably
+  // disjoint (`unknown`).
+  const malformedComponent = fm.component !== undefined && fm.component !== null
+    && typeof fm.component !== "string";
   const hasScope = Array.isArray(fm.scope) ? fm.scope.length > 0 : fm.scope !== undefined;
-  if (component) return hasScope ? { kind: "component", value: component, unknown: true } : { kind: "component", value: component };
-  if (fm.component !== undefined && fm.component !== null && typeof fm.component !== "string") return { kind: "unknown" };
+  if (component) {
+    return hasScope
+      ? { kind: "component", value: component, unknown: true }
+      : { kind: "component", value: component };
+  }
   const scope = Array.isArray(fm.scope)
     ? fm.scope.map((glob) => typeof glob === "string" ? glob.trim() : null)
     : [];
   if (scope.length) {
     const globs = scope.filter((glob) => normalizeScopePrefix(glob) !== null);
     if (globs.length === 0) return { kind: "unknown" };
-    return { kind: "scope", globs, unknown: globs.length !== scope.length };
+    return { kind: "scope", globs, unknown: globs.length !== scope.length || malformedComponent };
   }
-  return { kind: "none" };
+  return malformedComponent ? { kind: "unknown" } : { kind: "none" };
 }
 
 // Only directory prefixes are supported; other glob syntax has unknown overlap.

@@ -196,7 +196,7 @@ function isActiveSprint(content) {
 }
 
 // The same file with the root frontmatter `status:` set to completed, or null
-// when no single line does that. Each `status:` line is tried in turn and kept
+// when no single line does that (including a duplicated root `status:`). Each `status:` line is tried in turn and kept
 // only if the parser then sees the root status completed and nothing else
 // changed, so a nested or block-text `status:` is never touched.
 function completedSprintContent(content) {
@@ -213,7 +213,10 @@ function completedSprintContent(content) {
     candidate[index] = `${line[1]}status: completed${line[2]}`;
     const next = candidate.join("\n") + rest;
     const parsed = parseFrontmatter(next);
-    if (parsed.status === "completed" && withoutStatus(parsed) === before) return next;
+    if (parsed.status !== "completed" || withoutStatus(parsed) !== before) continue;
+    // A second root `status: active` would survive in the file: stop instead.
+    const remaining = lines.filter((_, lineIndex) => lineIndex !== index).join("\n") + rest;
+    return isActiveSprint(remaining) ? null : next;
   }
   return null;
 }

@@ -9,7 +9,7 @@ const { resolveBashExecutable, toBashArgs } = require(path.resolve(__dirname, ".
 const SCRIPTS_DIR = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const { isActiveSprint, completedSprintContent } = require(path.join(SCRIPTS_DIR, "sprint-state.js"));
 
-function closeSprint(t, statusLine, { extraDir } = {}) {
+function closeSprint(t, statusLine, { extraDir, args = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sprint-close-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const sprintPath = path.join(root, ".dev-backlog", "sprints", "2026-09-close.md");
@@ -19,7 +19,7 @@ function closeSprint(t, statusLine, { extraDir } = {}) {
     "---", statusLine, "---", "", "## Goal", "Done.", "", "## Plan", "- [x] #1 One", "",
     "## Running Context", "", "## Progress", "- 2026-09-29: started",
   ].join("\n") + "\n");
-  const result = spawnSync(resolveBashExecutable(), toBashArgs([path.join(SCRIPTS_DIR, "sprint-close.sh")]), {
+  const result = spawnSync(resolveBashExecutable(), toBashArgs([path.join(SCRIPTS_DIR, "sprint-close.sh"), ...args]), {
     cwd: root,
     encoding: "utf8",
   });
@@ -43,7 +43,20 @@ describe("sprint-close status flip (#496)", () => {
     const next = completedSprintContent(content);
     assert.equal(isActiveSprint(next), false);
     assert.equal(next.split("\n").filter((line) => line === "  status: active").length, 2);
+    assert.equal(completedSprintContent("---\nstatus: active\nmilestone: M\nstatus: active\n---\n"), null);
   });
+
+  for (const [frontmatter, title] of [
+    ["status: active\nmilestone: 1.20", "1.20"],
+    [" status: active\n milestone: Sprint X", "Sprint X"],
+    ['status: active\nmilestone: "2026"', "2026"],
+  ]) {
+    it(`reads the milestone title ${title} through the shared parser for --close-milestone`, (t) => {
+      const { result } = closeSprint(t, frontmatter, { args: ["--close-milestone", "--dry-run"] });
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(result.stdout.split("\n").some((line) => line.includes("milestone") && line.endsWith(` ${title}`)));
+    });
+  }
 
   it("skips a directory named *.md instead of reporting no active sprint", (t) => {
     const { result, content } = closeSprint(t, "status: active", { extraDir: "not-a-sprint.md" });

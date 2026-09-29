@@ -171,13 +171,24 @@ if $CLOSE_MILESTONE; then
     exit 1
   fi
 fi
-if $CLOSE_MILESTONE && ! $DRY_RUN; then
+# The milestone title comes from the shared frontmatter parser (read once, used
+# by Step 0 and Step 4). An unquoted numeric or boolean title keeps its written
+# text; a missing or structured value is no milestone.
+if $CLOSE_MILESTONE; then
   CLOSE_MILESTONE_NAME=$(node -e '
     const fs = require("node:fs");
     const { parseFrontmatter } = require(process.argv[1]);
-    const milestone = parseFrontmatter(fs.readFileSync(process.argv[2], "utf-8")).milestone;
-    if (typeof milestone === "string") console.log(milestone.trim());
+    const content = fs.readFileSync(process.argv[2], "utf-8");
+    const milestone = parseFrontmatter(content).milestone;
+    if (typeof milestone === "string") {
+      console.log(milestone.trim());
+    } else if (typeof milestone === "number" || typeof milestone === "boolean") {
+      const lines = content.split(/\r?\n/).filter((line) => /^[ \t]*milestone:/.test(line));
+      console.log(lines[lines.length - 1].replace(/^[ \t]*milestone:/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2"));
+    }
   ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE")
+fi
+if $CLOSE_MILESTONE && ! $DRY_RUN; then
   if [ -z "$CLOSE_MILESTONE_NAME" ]; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
     exit 1
@@ -220,7 +231,7 @@ fi
 
 # --- Step 4: Optionally close milestone ---
 if $CLOSE_MILESTONE; then
-  MILESTONE=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
+  MILESTONE="$CLOSE_MILESTONE_NAME"
   if [ -n "$MILESTONE" ]; then
     if $DRY_RUN; then
       echo "[dry-run] Would close milestone: $MILESTONE"
