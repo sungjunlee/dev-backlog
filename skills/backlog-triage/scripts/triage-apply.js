@@ -236,6 +236,7 @@ function dedupActions(anchors) {
 function validateAcceptedActions(actions) {
   const errors = [];
   const fieldsByIssue = new Map();
+  const closesByIssue = new Map();
 
   for (const action of actions) {
     if (!action.checked || !action.knownVerb) continue;
@@ -282,6 +283,16 @@ function validateAcceptedActions(actions) {
         errors.push(`${location}: target must be #N with a positive issue number.`);
       } else if (value && Number(value.slice(1)) === action.issueNumber) {
         errors.push(`${location}: target must not be the issue itself.`);
+      }
+    }
+
+    if (action.verb === "close" || action.verb === "close-duplicate") {
+      const previousClose = closesByIssue.get(action.issueNumber);
+      const bothDuplicates = previousClose?.verb === "close-duplicate" && action.verb === "close-duplicate";
+      if (!previousClose) {
+        closesByIssue.set(action.issueNumber, { verb: action.verb, target: args.target, line });
+      } else if (!(bothDuplicates && previousClose.target !== args.target)) {
+        errors.push(`${location}: more than one accepted closing action for #${action.issueNumber}; line ${previousClose.line} already closes it.`);
       }
     }
 

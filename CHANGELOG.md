@@ -9,6 +9,11 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 ### Changed
 
 - Completed sprint files are disposable (maintainer decision 2026-09-20): the "immutable history / permanent record" wording is withdrawn in `spec/capabilities.md` (decision row), `spec/system-map.md`, SKILL.md, and `_context.md`; the repo's own 36 completed sprint files are deleted (git history keeps them); `status: completed` is still never flipped back. BREAKING for nothing in code.
+- Lean contract ratified, charter rev 21 (maintainer approval on #494): `spec/charter.md`, `spec/capabilities.md`, and `spec/system-map.md` state the target behavior that epic #504 implements (one approval surface for triage, runtime retirement, native tools); the runtime is unchanged by this entry. Refs [#494](https://github.com/sungjunlee/dev-backlog/issues/494), PR [#505](https://github.com/sungjunlee/dev-backlog/pull/505).
+
+### Fixed
+
+- `triage-apply.js` validates every accepted action before any GitHub call or apply-log write (dry-run included): required arguments, `set-priority` values, `close-duplicate` targets, canonical `milestone=` with the legacy `name=` fallback, conflicting assignments, and a second accepted closing action for the same issue fail with report line numbers; apply refuses a non-GitHub or unreadable task authority. Closes [#495](https://github.com/sungjunlee/dev-backlog/issues/495), PR [#505](https://github.com/sungjunlee/dev-backlog/pull/505).
 
 ## [0.16.0] — 2026-09-20
 
