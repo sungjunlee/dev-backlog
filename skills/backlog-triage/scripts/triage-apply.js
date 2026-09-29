@@ -260,7 +260,7 @@ function validateAcceptedActions(actions) {
       }
     }
     if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber < 1) {
-      errors.push(`${location}: issue number must be a positive integer.`);
+      errors.push(`${location}: issue number must be a positive safe integer.`);
     }
     for (const [key, argValue] of Object.entries(args)) {
       if (String(argValue).includes("\u0000")) {
