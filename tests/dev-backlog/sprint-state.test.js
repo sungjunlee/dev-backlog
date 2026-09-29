@@ -464,6 +464,9 @@ status: active
       assert.equal(report.code, 0);
       assert.ok(report.lines.some((line) => line.includes("### Batch 2") && line.includes("#1")));
       assert.ok(!report.lines.some((line) => line.startsWith("Next: ### Batch 2")));
+      const status = textReport({ mode: "status", backlogDir });
+      assert.ok(!status.lines.includes("Next up:"));
+      assert.ok(status.lines.some((line) => line.includes("#1") && !line.includes("[~]")));
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -639,7 +642,7 @@ describe("textReport", () => {
     });
   });
 
-  it("renders the status stanza with capped in-flight and next-up lists", () => {
+  it("renders the status stanza with capped in-flight and waiting lists", () => {
     writeFile(path.join(backlogDir, "sprints", "2026-09-text.md"), BATCHED_SPRINT);
 
     assert.deepEqual(textReport({ mode: "status", backlogDir }), {
@@ -651,7 +654,7 @@ describe("textReport", () => {
         "In flight:",
         "  - [~] #2 Dispatch (~2hr) → PR #87 (reviewing)",
         "",
-        "Next up:",
+        "Waiting on #2:",
         "  - [ ] #3 Render text",
         "  - [ ] #4 Delete the bash parser",
       ],

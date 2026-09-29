@@ -172,7 +172,12 @@ if $CLOSE_MILESTONE; then
   fi
 fi
 if $CLOSE_MILESTONE && ! $DRY_RUN; then
-  CLOSE_MILESTONE_NAME=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
+  CLOSE_MILESTONE_NAME=$(node -e '
+    const fs = require("node:fs");
+    const { parseFrontmatter } = require(process.argv[1]);
+    const milestone = parseFrontmatter(fs.readFileSync(process.argv[2], "utf-8")).milestone;
+    if (typeof milestone === "string") console.log(milestone.trim());
+  ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE")
   if [ -z "$CLOSE_MILESTONE_NAME" ]; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
     exit 1

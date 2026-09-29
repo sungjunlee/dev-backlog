@@ -640,7 +640,9 @@ function statusSingleLines(perSprint) {
   const inFlight = itemLines(perSprint.plan_items, "in_flight", 3);
   if (inFlight.length > 0) lines.push("", "In flight:", ...inFlight);
   const todo = itemLines(perSprint.plan_items, "todo", 3);
-  if (todo.length > 0) lines.push("", "Next up:", ...todo);
+  const waitingOn = perSprint.next_batch?.waiting_on || [];
+  const todoLabel = waitingOn.length > 0 ? `Waiting on ${waitingOn.join(", ")}:` : "Next up:";
+  if (todo.length > 0) lines.push("", todoLabel, ...todo);
   if (isReadyToClose(counts)) lines.push("", ">> All items done — ready to close sprint");
   return lines;
 }

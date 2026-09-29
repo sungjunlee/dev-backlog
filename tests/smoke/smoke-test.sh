@@ -442,7 +442,7 @@ assert_not_contains "next: does not show done items as next" "$OUT" "[ ] #1"
 OUT=$(bash "$SCRIPT_DIR/status.sh" "$TEST_DIR/.dev-backlog")
 assert_contains "status: shows in-flight" "$OUT" "1 in-flight"
 assert_contains "status: shows in-flight item" "$OUT" "[~] #3"
-assert_contains "status: shows next up" "$OUT" "Next up:"
+assert_contains "status: later batch waits on the in-flight ref (#496)" "$OUT" "Waiting on #3:"
 assert_contains "status: shows sprint name" "$OUT" "2026-03-test"
 assert_contains "status: shows percentage" "$OUT" "40%"
 
