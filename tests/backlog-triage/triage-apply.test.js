@@ -443,6 +443,8 @@ describe("execute", () => {
       ['<!-- triage:close-duplicate #42 target=#42 -->', /target must not be the issue itself/],
       ['<!-- triage:assign-milestone #42 milestone=" " -->', /milestone is required/],
       ['<!-- triage:assign-milestone #42 milestone="A" name="B" -->', /different values/],
+      ['<!-- triage:close #0 reason="stale" -->', /issue number must be a positive integer/],
+      ['<!-- triage:revisit #99999999999999999 reason="stale" -->', /issue number must be a positive integer/],
     ];
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -470,7 +472,8 @@ describe("execute", () => {
       '<!-- triage:assign-milestone #42 name="B" -->',
       '<!-- triage:close-duplicate #42 target=#40 -->',
       '<!-- triage:close-duplicate #42 target=#41 -->',
-      '<!-- triage:close #43 reason=" " -->'
+      '<!-- triage:close #43 reason=" " -->',
+      '<!-- triage:close #0 reason="stale" -->'
     ));
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -482,11 +485,12 @@ describe("execute", () => {
         env: fixture.env,
       });
       assert.equal(result.status, 1);
-      for (const line of [10, 16, 22, 25]) assert.match(result.stderr, new RegExp(`line ${line}:`));
+      for (const line of [10, 16, 22, 25, 28]) assert.match(result.stderr, new RegExp(`line ${line}:`));
       assert.match(result.stderr, /conflicting priority/);
       assert.match(result.stderr, /conflicting milestone/);
       assert.match(result.stderr, /conflicting duplicate target/);
       assert.match(result.stderr, /reason is required/);
+      assert.match(result.stderr, /line 28: .*issue number must be a positive integer/);
       assert.equal(fixture.calls().length, 0);
       assert.equal(fs.readFileSync(logPath, "utf-8"), "existing log\n");
     }

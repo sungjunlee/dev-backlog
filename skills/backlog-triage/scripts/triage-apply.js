@@ -245,6 +245,9 @@ function validateAcceptedActions(actions) {
       || action.occurrences[0].anchorLine;
     const location = `line ${line}: triage:${action.verb} #${action.issueNumber}`;
     const args = action.normalizedArgs;
+    if (!Number.isSafeInteger(action.issueNumber) || action.issueNumber < 1) {
+      errors.push(`${location}: issue number must be a positive integer.`);
+    }
     const required = {
       close: ["reason"],
       revisit: ["reason"],
