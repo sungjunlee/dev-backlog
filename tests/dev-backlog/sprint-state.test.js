@@ -464,8 +464,10 @@ status: active
       assert.equal(report.code, 0);
       assert.ok(report.lines.some((line) => line.includes("### Batch 2") && line.includes("#1")));
       assert.ok(!report.lines.some((line) => line.startsWith("Next: ### Batch 2")));
+      writeFile(path.join(backlogDir, "sprints", "waiting.md"), `${content}\n### Batch 3\n- [ ] #3 Later still\n`);
       const status = textReport({ mode: "status", backlogDir });
       assert.ok(!status.lines.includes("Next up:"));
+      assert.ok(!status.lines.some((line) => line.includes("#3")));
       assert.ok(status.lines.some((line) => line.includes("#1") && !line.includes("[~]")));
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });

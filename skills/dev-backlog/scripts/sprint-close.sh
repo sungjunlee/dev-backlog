@@ -190,7 +190,8 @@ if $CLOSE_MILESTONE; then
         if (!/^[ \t]*milestone:/.test(lines[index])) continue;
         const without = lines.filter((_, lineIndex) => lineIndex !== index).join("\n");
         if (parseFrontmatter(without).milestone === milestone) continue;
-        console.log(lines[index].replace(/^[ \t]*milestone:/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2"));
+        // Unquoted (it parsed as a number or boolean), so a " #" starts a comment.
+        console.log(lines[index].replace(/^[ \t]*milestone:/, "").replace(/\s+#.*$/, "").trim());
         break;
       }
     }

@@ -642,10 +642,15 @@ function statusSingleLines(perSprint) {
   const lines = [statusCountLine(perSprint, { unit: " tasks" })];
   const inFlight = itemLines(perSprint.plan_items, "in_flight", 3);
   if (inFlight.length > 0) lines.push("", "In flight:", ...inFlight);
-  const todo = itemLines(perSprint.plan_items, "todo", 3);
   const waitingOn = perSprint.next_batch?.waiting_on || [];
-  const todoLabel = waitingOn.length > 0 ? `Waiting on ${waitingOn.join(", ")}:` : "Next up:";
-  if (todo.length > 0) lines.push("", todoLabel, ...todo);
+  if (waitingOn.length > 0) {
+    // Only the blocked batch waits; later batches are not listed under it.
+    const waiting = perSprint.next_batch.items.slice(0, 3).map((item) => `  ${item.line}`);
+    lines.push("", `Waiting on ${waitingOn.join(", ")}:`, ...waiting);
+  } else {
+    const todo = itemLines(perSprint.plan_items, "todo", 3);
+    if (todo.length > 0) lines.push("", "Next up:", ...todo);
+  }
   if (isReadyToClose(counts)) lines.push("", ">> All items done — ready to close sprint");
   return lines;
 }

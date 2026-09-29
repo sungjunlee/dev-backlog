@@ -51,6 +51,7 @@ describe("sprint-close status flip (#496)", () => {
     [" status: active\n milestone: Sprint X", "Sprint X"],
     ['status: active\nmilestone: "2026"', "2026"],
     ["status: active\nmilestone: 2026\ndeployment:\n  milestone: 123", "2026"],
+    ["status: active\nmilestone: 1.20 # quarterly", "1.20"],
   ]) {
     it(`reads the milestone title ${title} through the shared parser for --close-milestone`, (t) => {
       const { result } = closeSprint(t, frontmatter, { args: ["--close-milestone", "--dry-run"] });
