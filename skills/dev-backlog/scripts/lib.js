@@ -218,21 +218,29 @@ function sprintScopeKey(frontmatter) {
   const component = typeof fm.component === "string" ? fm.component.trim() : "";
   if (component) return { kind: "component", value: component };
   const scope = Array.isArray(fm.scope)
-    ? fm.scope.map((glob) => String(glob).trim()).filter(Boolean)
+    ? fm.scope.map((glob) => typeof glob === "string" ? glob.trim() : null)
     : [];
-  if (scope.length) return { kind: "scope", globs: scope };
+  if (scope.length) {
+    const globs = scope.filter((glob) => normalizeScopePrefix(glob) !== null);
+    if (globs.length === 0) return { kind: "unknown" };
+    return { kind: "scope", globs, unknown: globs.length !== scope.length };
+  }
   return { kind: "none" };
 }
 
-// Path glob -> directory prefix: "src/auth/**" / "src/auth/*" / "src/auth/" -> "src/auth".
+// Only directory prefixes are supported; other glob syntax has unknown overlap.
 function normalizeScopePrefix(glob) {
-  return String(glob).replace(/\/+\**$/, "").replace(/\/+$/, "");
+  if (typeof glob !== "string") return null;
+  const prefix = glob.replace(/\/(?:\*{1,2})?$/, "");
+  if (!prefix || prefix.startsWith("/") || /[?*\[\]{}!\\"',\r\n]/.test(prefix)) return null;
+  if (prefix.split("/").some((segment) => !segment || segment === "." || segment === "..")) return null;
+  return prefix;
 }
 
 function globsOverlap(a, b) {
   const na = normalizeScopePrefix(a);
   const nb = normalizeScopePrefix(b);
-  if (na === "" || nb === "") return true; // a root scope overlaps anything
+  if (na === null || nb === null) return false;
   if (na === nb) return true;
   return na.startsWith(`${nb}/`) || nb.startsWith(`${na}/`); // nested paths overlap
 }
@@ -240,9 +248,8 @@ function globsOverlap(a, b) {
 /**
  * Do two sprints' scopes overlap? The single shared predicate consumed by
  * sprint-state (OVERLAPPING_TRACKS), sprint-init (refuse), and backlog-doctor.
- * component: exact equality; scope: globs: normalized path-prefix containment.
- * Cross-axis or scopeless pairs return false — "cannot prove overlap" — and the
- * doctor separately warns when a multi-track portfolio has a scopeless track.
+ * component: exact equality; supported scope: directory-prefix containment.
+ * Cross-axis, scopeless, and unsupported scope pairs return false (unknown).
  */
 function scopesOverlap(frontmatterA, frontmatterB) {
   const a = sprintScopeKey(frontmatterA);
@@ -259,6 +266,7 @@ module.exports = {
   parseSimpleYaml,
   sprintScopeKey,
   scopesOverlap,
+  normalizeScopePrefix,
   ISSUE_REF_RE,
   parseIssueRef,
   parsePlanCheckbox,

@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const {
   readSprintState,
   parsePlanItem,
@@ -180,6 +182,24 @@ Expose actor-readable execution state.
     const noMatch = readSprintState({ backlogDir, component: "missing" });
     assert.equal(noMatch.active_sprint, null);
     assert.deepEqual(noMatch.active_sprints, []);
+  });
+
+  it("fails on a selector shared by a slug and another active component (#496)", () => {
+    const slugMatch = path.join(backlogDir, "sprints", "auth.md");
+    const componentMatch = path.join(backlogDir, "sprints", "other.md");
+    writeFile(slugMatch, '---\nstatus: active\ncomponent: billing\n---\n');
+    writeFile(componentMatch, '---\nstatus: active\ncomponent: auth\n---\n');
+    const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "sprint-state.js"),
+      "--mode", "next", "--track", "auth", backlogDir], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.ok(result.stderr.includes(slugMatch));
+    assert.ok(result.stderr.includes(componentMatch));
+    const shell = spawnBashSync(["-c", 'source "$1"; resolve_track "$2" "$3"', "bash",
+      path.join(SKILL_SCRIPTS, "lib.sh"), path.join(backlogDir, "sprints"), "auth"],
+    { encoding: "utf8" });
+    assert.notEqual(shell.status, 0);
+    assert.ok(shell.stderr.includes(slugMatch));
+    assert.ok(shell.stderr.includes(componentMatch));
   });
 
   it("keeps the GitHub wire identity and ignores refs outside the #N grammar", () => {
@@ -418,6 +438,41 @@ started: 2026-06-30
 });
 
 describe("Orient recovery rail (scenarios 1 and 8, #490)", () => {
+  it("marks a later todo batch waiting on earlier in-flight refs in JSON and next text (#496)", () => {
+    const content = `---
+status: active
+---
+
+## Plan
+### Batch 1
+- [~] #1 Running [branch:work]
+
+### Batch 2
+- [ ] #2 Later
+`;
+    const state = parseSprintContent({ sprintPath: "waiting.md", content });
+    assert.equal(state.next_batch.actionable, false);
+    assert.deepEqual(state.next_batch.waiting_on, ["#1"]);
+    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["#2"]);
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dev-backlog-waiting-"));
+    try {
+      const backlogDir = path.join(tmpDir, ".dev-backlog");
+      writeFile(path.join(backlogDir, "sprints", "waiting.md"), content);
+      const report = textReport({ mode: "next", backlogDir });
+      assert.equal(report.code, 0);
+      assert.ok(report.lines.some((line) => line.includes("Waiting") && line.includes("#1")));
+      assert.ok(!report.lines.some((line) => line.startsWith("Next: ### Batch 2")));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+
+    const sameBatch = parseSprintContent({ sprintPath: "same.md", content: content
+      .replace("### Batch 2\n", "") });
+    assert.equal(sameBatch.next_batch.actionable, true);
+    assert.deepEqual(sameBatch.next_batch.waiting_on, []);
+  });
+
   it("selects the first [ ] batch as next_batch, distinct from [~] work, and reports latest Progress or its absence", () => {
     const state = parseSprintContent({
       sprintPath: ".dev-backlog/sprints/scenario-1.md",
@@ -567,7 +622,7 @@ describe("textReport", () => {
         "In flight:",
         "  - [~] #2 Dispatch (~2hr) → PR #87 (reviewing)",
         "",
-        "Next: ### Batch 3 — Remaining",
+        "Waiting: ### Batch 3 — Remaining (on #2)",
         "  - [ ] #3 Render text",
         "  - [ ] #4 Delete the bash parser",
         "",

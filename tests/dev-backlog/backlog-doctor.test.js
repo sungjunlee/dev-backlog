@@ -285,6 +285,44 @@ describe("runDoctor", () => {
     assert.equal(exitCodeFor(report), 1);
   });
 
+  it("warns when component and scope axes cannot prove disjoint (#496)", () => {
+    const sprintsDir = path.join(repoRoot, ".dev-backlog", "sprints");
+    const first = path.join(sprintsDir, "2026-07-auth.md");
+    const second = path.join(sprintsDir, "2026-07-other.md");
+    write(first, sprintNoSpecFields({ component: "auth" }));
+    write(second, sprintNoSpecFields({ scope: '["src/auth/**"]' }));
+    const active = check(runDoctor({ repoRoot }), "active_sprint");
+    assert.equal(active.status, "warn");
+    assert.match(active.detail.summary, /cannot prove disjoint/);
+    assert.doesNotMatch(active.detail.summary, /scopes disjoint/);
+    assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-auth.md")));
+    assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
+  });
+
+  it("warns when existing scope entries use unsupported glob syntax (#496)", () => {
+    const sprintsDir = path.join(repoRoot, ".dev-backlog", "sprints");
+    const first = path.join(sprintsDir, "2026-07-auth.md");
+    const second = path.join(sprintsDir, "2026-07-other.md");
+    for (const { firstTrack, scope } of [
+      { firstTrack: { scope: '["src/billing/**"]' }, scope: '["src/**/*.ts"]' },
+      { firstTrack: { scope: '["src/a.ts"]' }, scope: '["src/*.ts"]' },
+      { firstTrack: { scope: '["src/authz/**"]' }, scope: '["src/auth*"]' },
+    ]) {
+      write(first, sprintNoSpecFields(firstTrack));
+      write(second, sprintNoSpecFields({ scope }));
+      const active = check(runDoctor({ repoRoot }), "active_sprint");
+      assert.equal(active.status, "warn");
+      assert.match(active.detail.summary, /cannot prove disjoint/);
+      assert.doesNotMatch(active.detail.summary, /scopes disjoint/);
+      assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-auth.md")));
+      assert.ok(active.detail.summary.includes(path.join(".dev-backlog", "sprints", "2026-07-other.md")));
+    }
+
+    write(first, sprintNoSpecFields({ scope: '["src/auth/api/**"]' }));
+    write(second, sprintNoSpecFields({ scope: '["src/auth/**", "src/**/*.ts"]' }));
+    assert.equal(check(runDoctor({ repoRoot }), "active_sprint").status, "fail");
+  });
+
   it("warns informationally when one of two active tracks is scopeless (#337)", () => {
     write(
       path.join(repoRoot, ".dev-backlog", "sprints", "2026-07-declared.md"),

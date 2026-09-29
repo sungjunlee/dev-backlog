@@ -6,6 +6,10 @@
 
 # Keep in sync with execution-root.js DEFAULT_BACKLOG_DIR.
 DEFAULT_BACKLOG_DIR=".dev-backlog"
+_lib_source="${BASH_SOURCE[0]//\\//}"
+_lib_dir="${_lib_source%/*}"
+[ "$_lib_dir" = "$_lib_source" ] && _lib_dir="."
+LIB_SCRIPT_DIR="$(cd "$_lib_dir" && pwd)"
 
 # Checkbox regex aliases shared by the shell rails and the smoke test.
 RE_CB_ANY='^\- \[.\] #'
@@ -28,8 +32,11 @@ checkbox_lines() {
 # Usage: find_active_sprints "$SPRINTS_DIR"
 find_active_sprints() {
   local sprints_dir="$1"
-  find "$sprints_dir" -maxdepth 1 -name "*.md" ! -name "_context.md" \
-    -exec grep -l "^status: active" {} + 2>/dev/null | sort
+  node -e '
+    const reader = require(process.argv[1]);
+    const files = reader.findActiveSprintFiles(process.argv[2]);
+    if (files.length) console.log(files.join("\n"));
+  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$sprints_dir"
 }
 
 # Find the active sprint file.
@@ -65,17 +72,20 @@ find_active_sprint() {
 # Return 0 and print the path when found; return 1 when no active track matches.
 # Usage: SPRINT=$(resolve_track "$SPRINTS_DIR" "$TRACK")
 resolve_track() {
-  local sprints_dir="$1" track="$2" f slug component
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    slug=$(basename "$f" .md)
-    component=$(awk -F': *' '/^component:/{gsub(/["'"'"']/,"",$2); print $2; exit}' "$f")
-    if [ "$slug" = "$track" ] || [ "$component" = "$track" ]; then
-      printf '%s\n' "$f"
-      return 0
-    fi
-  done < <(find_active_sprints "$sprints_dir")
-  return 1
+  node -e '
+    const reader = require(process.argv[1]);
+    try {
+      const state = reader.readSprintState({
+        backlogDir: require("node:path").dirname(process.argv[2]),
+        track: process.argv[3],
+      });
+      if (!state.active_sprint) process.exitCode = 1;
+      else console.log(state.active_sprint.path);
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 2;
+    }
+  ' "$LIB_SCRIPT_DIR/sprint-state.js" "$1" "$2"
 }
 
 # Count checkbox states in a sprint file through the shared ref grammar.

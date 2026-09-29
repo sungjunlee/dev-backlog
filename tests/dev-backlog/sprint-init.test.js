@@ -5,7 +5,10 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
+const { runDoctor } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
+const { readSprintState } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
 const {
   parseArgs,
   buildComponentFrontmatterLine,
@@ -147,6 +150,47 @@ describe("createSprintFile", () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("uses only trimmed frontmatter status across Node readers and the shell bridge (#496)", () => {
+    const backlogDir = path.join(tmpDir, ".dev-backlog");
+    const sprintsDir = path.join(backlogDir, "sprints");
+    fs.mkdirSync(sprintsDir, { recursive: true });
+    const bodyOnly = path.join(sprintsDir, "body-only.md");
+    const active = path.join(sprintsDir, "active.md");
+    fs.writeFileSync(bodyOnly, "---\nstatus: completed\n---\n\nstatus: active\n");
+    fs.writeFileSync(active, "---\nstatus: active \ncomponent: auth\n---\n");
+
+    assert.deepEqual(listActiveSprintFiles(sprintsDir), ["active.md"]);
+    assert.equal(readSprintState({ backlogDir }).active_sprint.path, active);
+    const doctor = runDoctor({ repoRoot: tmpDir });
+    assert.deepEqual(doctor.checks[0].detail.active_files, [path.join(".dev-backlog", "sprints", "active.md")]);
+    const shell = spawnBashSync(["-c", 'source "$1"; find_active_sprints "$2"', "bash",
+      path.join(SKILL_SCRIPTS, "lib.sh"), sprintsDir], { encoding: "utf8" });
+    assert.equal(shell.status, 0);
+    assert.equal(shell.stdout.trim(), active);
+    assert.throws(() => createSprintFile({
+      topic: "new", milestone: "M", component: "auth", sprintsDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    }), /active\.md/);
+  });
+
+  it("refuses unsupported scope syntax and enforces a supported parent prefix (#496)", () => {
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
+    fs.mkdirSync(sprintsDir, { recursive: true });
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const invoke = (topic, scope) => spawnSync(process.execPath,
+      [cli, topic, "--scope", scope], { cwd: tmpDir, encoding: "utf8" });
+    const invalid = invoke("invalid", "src/**/*.ts");
+    assert.equal(invalid.status, 1);
+    assert.match(invalid.stdout + invalid.stderr, /directory prefixes/);
+    fs.writeFileSync(path.join(sprintsDir, "parent.md"),
+      '---\nstatus: active\nscope: ["src/**"]\n---\n');
+    const blocked = invoke("nested", "src/auth/**");
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stdout + blocked.stderr, /parent\.md/);
+    fs.rmSync(path.join(sprintsDir, "parent.md"));
+    assert.equal(invoke("nested", "src/auth/**").status, 0);
   });
 
   it("writes sprint file and returns structured result", () => {
@@ -308,7 +352,8 @@ describe("createSprintFile", () => {
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
-    assert.deepEqual(disjoint.warnings, []);
+    assert.equal(disjoint.warnings.length, 1);
+    assert.match(disjoint.warnings[0], /cannot prove disjoint/);
   });
 
   it("refuses equal components and allows distinct ones without a scopeless warning (#331)", () => {

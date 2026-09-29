@@ -170,14 +170,18 @@ function checkActiveSprint({ repoRoot, sprintsDir, tracks = loadActiveTracks(spr
       });
     }
 
-    const scopeless = tracks.filter((track) => sprintScopeKey(track.frontmatter).kind === "none");
-    if (scopeless.length >= 1) {
-      // informational: a scopeless track cannot be proven disjoint, but
-      // cannot be proven overlapping either.
-      const scopelessFiles = scopeless.map((track) => displayPath(repoRoot, track.path));
+    const unprovable = tracks.filter((track) => {
+      const key = sprintScopeKey(track.frontmatter);
+      return key.kind === "none" || key.kind === "unknown" || key.unknown;
+    });
+    const kinds = new Set(tracks.map((track) => sprintScopeKey(track.frontmatter).kind));
+    if (unprovable.length > 0 || (kinds.has("component") && kinds.has("scope"))) {
+      const scopelessFiles = tracks
+        .filter((track) => sprintScopeKey(track.frontmatter).kind === "none")
+        .map((track) => displayPath(repoRoot, track.path));
       return {
         ...verdict("active_sprint", "warn", {
-          summary: `${tracks.length} active tracks; cannot prove disjoint. Without component:/scope: (${scopelessFiles.join(", ")}). Declare component: or scope: on every active track.`,
+          summary: `${tracks.length} active tracks; cannot prove disjoint: ${displayActive.join(", ")}. Check scope axes and supported directory prefixes.`,
           active_files: displayActive,
           scopeless_files: scopelessFiles,
           sprint_count: sprintFiles.length,

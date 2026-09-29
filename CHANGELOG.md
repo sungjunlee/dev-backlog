@@ -13,6 +13,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Fixed
 
+- Sprint readers use frontmatter-only active status, reject ambiguous track selectors and unsupported `--scope` patterns, warn when scopes cannot be proven disjoint, and show later batches waiting on earlier in-flight refs. Refs [#496](https://github.com/sungjunlee/dev-backlog/issues/496).
 - `triage-apply.js` validates every accepted action before any GitHub call or apply-log write (dry-run included) — issue numbers, strict `key=value` argument grammar, required and bounded values, canonical `milestone=` with the legacy `name=` fallback, one priority / milestone / closing action per issue — and fails with report line numbers (rules in `skills/backlog-triage/references/apply.md`); apply refuses a non-GitHub or unreadable task authority. Closes [#495](https://github.com/sungjunlee/dev-backlog/issues/495), PR [#505](https://github.com/sungjunlee/dev-backlog/pull/505).
 
 ## [0.16.0] — 2026-09-20

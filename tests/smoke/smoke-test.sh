@@ -577,8 +577,8 @@ status: active
 EOF
 
 OUT=$(bash "$SCRIPT_DIR/next.sh" "$TEST_DIR/.dev-backlog")
-assert_contains "malformed: still finds active" "$OUT" "Sprint:"
-assert_contains "malformed: counts tasks" "$OUT" "0/1 done"
+assert_contains "malformed: no frontmatter is inactive" "$OUT" "No active sprint found."
+assert_not_contains "malformed: does not count tasks" "$OUT" "0/1 done"
 
 # --- No active sprint ---
 rm "$TEST_DIR/.dev-backlog/sprints/2026-03-test.md"

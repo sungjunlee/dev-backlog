@@ -168,7 +168,7 @@ function findActiveSprintFiles(sprintsDir, {
     .map((file) => path.join(sprintsDir, file))
     .filter((filePath) => {
       const content = readFileSync(filePath, "utf-8");
-      return /^status:\s*active\s*$/m.test(content);
+      return isActiveSprint(content);
     })
     .sort();
 }
@@ -177,6 +177,11 @@ function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) return {};
   return parseSimpleYaml(match[1]);
+}
+
+function isActiveSprint(content) {
+  const status = parseFrontmatter(content).status;
+  return typeof status === "string" && status.trim() === "active";
 }
 
 function extractSectionLines(content, section) {
@@ -287,11 +292,21 @@ function findNextBatch(planItems) {
     };
   }
 
+  const firstTodoIndex = planItems.indexOf(firstTodo);
+  const earlierHeadings = new Set(planItems.slice(0, firstTodoIndex)
+    .map((item) => item.batch_heading).filter(Boolean));
+  earlierHeadings.delete(firstTodo.batch_heading);
+  const waitingOn = planItems.filter((item) =>
+    item.state === "in_flight" && earlierHeadings.has(item.batch_heading)
+  ).map((item) => item.ref);
+
   return {
     heading: firstTodo.batch_heading,
     items: planItems.filter(
       (item) => item.state === "todo" && item.batch_heading === firstTodo.batch_heading
     ),
+    waiting_on: waitingOn,
+    actionable: waitingOn.length === 0,
   };
 }
 
@@ -448,6 +463,11 @@ function readSprintState({
   if (track || component) {
     const matches = perSprints.filter((s) => matchesSelector(s, { track, component }));
     if (matches.length === 0) return emptyState();
+    if (matches.length > 1) {
+      const selector = track || component;
+      throw new Error(`Ambiguous active track '${selector}':\n`
+        + matches.map((s) => `  ${s.active_sprint.path}`).join("\n"));
+    }
     return singleState(matches[0]);
   }
 
@@ -519,8 +539,11 @@ function progressLine(counts) {
 function nextBatchLines(nextBatch) {
   const heading = nextBatch ? nextBatch.heading : null;
   const items = nextBatch ? nextBatch.items : [];
+  const waitingOn = nextBatch?.waiting_on || [];
   return [
-    heading ? `Next: ${heading}` : "Next items:",
+    waitingOn.length > 0
+      ? `Waiting: ${heading} (on ${waitingOn.join(", ")})`
+      : (heading ? `Next: ${heading}` : "Next items:"),
     ...items.map((item) => `  ${item.line}`),
   ];
 }
@@ -546,7 +569,11 @@ function nextTrackLines(perSprint) {
   const slug = sprintSlug(perSprint.active_sprint.path);
   const lines = [`${slug}: ${counts.done}/${counts.total} done${inFlight}`];
   const todo = perSprint.plan_items.find((item) => item.state === "todo");
-  if (todo) lines.push(`  Next: ${todo.line.replace(/^- \[ \] /, "")}`);
+  if (todo) {
+    const waitingOn = perSprint.next_batch?.waiting_on || [];
+    const label = waitingOn.length ? `Waiting on ${waitingOn.join(", ")}` : "Next";
+    lines.push(`  ${label}: ${todo.line.replace(/^- \[ \] /, "")}`);
+  }
   return lines;
 }
 
@@ -681,6 +708,7 @@ module.exports = {
   parseArgs,
   findActiveSprintFiles,
   parseFrontmatter,
+  isActiveSprint,
   extractSectionLines,
   hasSection,
   parseProgressEntries,

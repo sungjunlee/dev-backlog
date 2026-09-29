@@ -85,6 +85,9 @@ fi
 
 if [ -n "$TRACK" ]; then
   ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+  RESOLVE_STATUS=$?
+  # 2 = ambiguous selector; resolve_track already named the candidates.
+  [ "$RESOLVE_STATUS" -eq 2 ] && exit 1
   if [ -z "$ACTIVE" ]; then
     echo "No active track matches '$TRACK'. Active tracks:"
     find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
