@@ -233,6 +233,10 @@ function dedupActions(anchors) {
   return [...deduped.values()];
 }
 
+// Below GitHub's 65,536-character comment limit and Linux's 128 KiB per-argument limit,
+// so an accepted action cannot fail at spawn time after earlier writes.
+const MAX_ARG_BYTES = 60000;
+
 function validateAcceptedActions(actions) {
   const errors = [];
   const fieldsByIssue = new Map();
@@ -251,6 +255,9 @@ function validateAcceptedActions(actions) {
     for (const [key, argValue] of Object.entries(args)) {
       if (String(argValue).includes("\u0000")) {
         errors.push(`${location}: ${key} must not contain a NUL character.`);
+      }
+      if (Buffer.byteLength(String(argValue), "utf8") > MAX_ARG_BYTES) {
+        errors.push(`${location}: ${key} must be at most ${MAX_ARG_BYTES} bytes.`);
       }
     }
     const required = {
