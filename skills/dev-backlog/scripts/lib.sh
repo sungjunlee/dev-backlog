@@ -44,13 +44,14 @@ find_active_sprints() {
 #   0: exactly one active sprint, printed to stdout
 #   1: no active sprint
 #   2: multiple active sprints, printed to stderr
+#   3: the sprint files could not be read (reader error on stderr)
 # Usage: ACTIVE=$(find_active_sprint "$SPRINTS_DIR")
 find_active_sprint() {
   local sprints_dir="$1"
   local active
   local count
 
-  active=$(find_active_sprints "$sprints_dir")
+  active=$(find_active_sprints "$sprints_dir") || return 3
   count=$(printf "%s\n" "$active" | grep -c . || true)
 
   if [ "$count" -eq 0 ]; then

@@ -160,12 +160,15 @@ function findActiveSprintFiles(sprintsDir, {
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
+  statSync = fs.statSync,
 } = {}) {
   if (!existsSync(sprintsDir)) return [];
 
   return readdirSync(sprintsDir)
     .filter((file) => file.endsWith(".md") && file !== "_context.md")
     .map((file) => path.join(sprintsDir, file))
+    // A directory named *.md is not a sprint; other read errors still throw.
+    .filter((filePath) => statSync(filePath).isFile())
     .filter((filePath) => {
       const content = readFileSync(filePath, "utf-8");
       return isActiveSprint(content);
@@ -440,6 +443,7 @@ function readSprintState({
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
+  statSync = fs.statSync,
 } = {}) {
   const sprintsDir = path.join(backlogDir, "sprints");
   const authority = readTaskAuthority(backlogDir); // #476: read once per run
@@ -447,6 +451,7 @@ function readSprintState({
     existsSync,
     readdirSync,
     readFileSync,
+    statSync,
   });
 
   if (activeFiles.length === 0) return emptyState();

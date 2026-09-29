@@ -183,7 +183,7 @@ describe("createSprintFile", () => {
       [cli, topic, "--scope", scope], { cwd: tmpDir, encoding: "utf8" });
     const invalid = invoke("invalid", "src/**/*.ts");
     assert.equal(invalid.status, 1);
-    assert.match(invalid.stdout + invalid.stderr, /directory prefixes/);
+    assert.deepEqual(fs.readdirSync(sprintsDir), []);
     fs.writeFileSync(path.join(sprintsDir, "parent.md"),
       '---\nstatus: active\nscope: ["src/**"]\n---\n');
     const blocked = invoke("nested", "src/auth/**");

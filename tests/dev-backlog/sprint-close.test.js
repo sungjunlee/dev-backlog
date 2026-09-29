@@ -9,11 +9,12 @@ const { resolveBashExecutable, toBashArgs } = require(path.resolve(__dirname, ".
 const SCRIPTS_DIR = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const { isActiveSprint } = require(path.join(SCRIPTS_DIR, "sprint-state.js"));
 
-function closeSprint(t, statusLine) {
+function closeSprint(t, statusLine, { extraDir } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sprint-close-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const sprintPath = path.join(root, ".dev-backlog", "sprints", "2026-09-close.md");
   fs.mkdirSync(path.dirname(sprintPath), { recursive: true });
+  if (extraDir) fs.mkdirSync(path.join(path.dirname(sprintPath), extraDir));
   fs.writeFileSync(sprintPath, [
     "---", statusLine, "---", "", "## Goal", "Done.", "", "## Plan", "- [x] #1 One", "",
     "## Running Context", "", "## Progress", "- 2026-09-29: started",
@@ -34,4 +35,10 @@ describe("sprint-close status flip (#496)", () => {
       assert.match(content, /^status: completed$/m);
     });
   }
+
+  it("skips a directory named *.md instead of reporting no active sprint", (t) => {
+    const { result, content } = closeSprint(t, "status: active", { extraDir: "not-a-sprint.md" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(isActiveSprint(content), false);
+  });
 });

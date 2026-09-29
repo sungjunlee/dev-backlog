@@ -18,7 +18,7 @@ const { slugify, sprintScopeKey, scopesOverlap, normalizeScopePrefix } = require
 const { defaultSprintsDir } = require("./execution-root.js");
 const { parseFrontmatter, findActiveSprintFiles } = require("./sprint-state.js");
 
-const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "glob[,glob]"]';
+const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "dir/**[,dir/**]"]';
 
 function parseTrackAxis(args) {
   const componentIdx = args.indexOf("--component");

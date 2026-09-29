@@ -97,8 +97,16 @@ if [ -n "$TRACK" ]; then
     exit 1
   fi
 else
-  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+  FIND_ERR=$(mktemp)
+  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>"$FIND_ERR")
   ACTIVE_STATUS=$?
+  if [ "$ACTIVE_STATUS" -eq 3 ]; then
+    cat "$FIND_ERR" >&2
+    rm -f "$FIND_ERR"
+    echo "Could not read the sprint files in $SPRINTS_DIR." >&2
+    exit 1
+  fi
+  rm -f "$FIND_ERR"
   if [ "$ACTIVE_STATUS" -eq 2 ]; then
     echo "Multiple active sprints found. Refusing to close an ambiguous sprint:"
     find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do

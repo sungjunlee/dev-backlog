@@ -462,7 +462,7 @@ status: active
       writeFile(path.join(backlogDir, "sprints", "waiting.md"), content);
       const report = textReport({ mode: "next", backlogDir });
       assert.equal(report.code, 0);
-      assert.ok(report.lines.some((line) => line.includes("Waiting") && line.includes("#1")));
+      assert.ok(report.lines.some((line) => line.includes("### Batch 2") && line.includes("#1")));
       assert.ok(!report.lines.some((line) => line.startsWith("Next: ### Batch 2")));
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
