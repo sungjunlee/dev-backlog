@@ -13,7 +13,7 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Fixed
 
-- `triage-apply.js` validates every accepted action before any GitHub call or apply-log write (dry-run included): positive issue numbers, required arguments, `set-priority` values, `close-duplicate` targets, canonical `milestone=` with the legacy `name=` fallback, conflicting assignments, and a second accepted closing action for the same issue fail with report line numbers; apply refuses a non-GitHub or unreadable task authority. Closes [#495](https://github.com/sungjunlee/dev-backlog/issues/495), PR [#505](https://github.com/sungjunlee/dev-backlog/pull/505).
+- `triage-apply.js` validates every accepted action before any GitHub call or apply-log write (dry-run included) — issue numbers, strict `key=value` argument grammar, required and bounded values, canonical `milestone=` with the legacy `name=` fallback, one priority / milestone / closing action per issue — and fails with report line numbers (rules in `skills/backlog-triage/references/apply.md`); apply refuses a non-GitHub or unreadable task authority. Closes [#495](https://github.com/sungjunlee/dev-backlog/issues/495), PR [#505](https://github.com/sungjunlee/dev-backlog/pull/505).
 
 ## [0.16.0] — 2026-09-20
 

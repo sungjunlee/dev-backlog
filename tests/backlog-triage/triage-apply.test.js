@@ -444,6 +444,8 @@ describe("execute", () => {
       ['<!-- triage:assign-milestone #42 milestone=" " -->', /milestone is required/],
       ['<!-- triage:assign-milestone #42 milestone="A" name="B" -->', /different values/],
       ['<!-- triage:close #0 reason="stale" -->', /issue number must be a positive integer/],
+      ['<!-- triage:close #42 reason="first" reason="second" -->', /reason is given more than once/],
+      ['<!-- triage:close #42 reason="stale" garbage -->', /unparsed argument text "garbage"/],
       ['<!-- triage:close #42 reason="bad\u0000reason" -->', /reason must not contain a NUL character/],
       ['<!-- triage:revisit #99999999999999999 reason="stale" -->', /issue number must be a positive integer/],
     ];
@@ -522,6 +524,27 @@ describe("execute", () => {
         assert.equal(fixture.calls().length, 0, second);
         assert.equal(fs.existsSync(logPath), false, second);
       }
+    }
+  });
+
+  it("rejects a repeated same-value assignment, including the legacy milestone alias", () => {
+    const pairs = [
+      ['<!-- triage:assign-milestone #42 milestone="A" -->', '<!-- triage:assign-milestone #42 name="A" -->', /milestone "A" is already assigned on line 4/],
+      ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 4/],
+    ];
+    const fixture = writeGhFixture(tempDir);
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const [first, second, expected] of pairs) {
+      fs.writeFileSync(reportPath, acceptedReport(first, second));
+      const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "triage-apply.js"), reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: fixture.env,
+      });
+      assert.equal(result.status, 1, second);
+      assert.match(result.stderr, new RegExp(`line 7: .*${expected.source}`), second);
+      assert.equal(fixture.calls().length, 0, second);
+      assert.equal(fs.existsSync(logPath), false, second);
     }
   });
 

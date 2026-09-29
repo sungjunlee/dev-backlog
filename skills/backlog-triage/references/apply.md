@@ -101,7 +101,15 @@ Multiple actions may target the same issue when the actions are distinct. Exampl
 
 That is valid. These are separate proposals and therefore separate anchor+checkbox pairs.
 
-For `assign-milestone`, `milestone=` is canonical. Apply accepts legacy `name=` only when `milestone=` is absent; supplying both with different values is invalid. Accepted known actions are validated together before any GitHub call or apply-log write, including in dry-run. A report with an accepted anchor whose issue number is not a positive integer, invalid accepted arguments (including a NUL character or more than 60,000 UTF-8 bytes in any value), or conflicting priority, milestone, or duplicate target assignments, or more than one accepted closing action (`close` or `close-duplicate`) for the same issue, fails with report line numbers. Unchecked actions remain inert and unknown verbs keep their skip-and-log behavior. In apply mode, an absent `.dev-backlog/.tracker` or a first line of `github` is required; any other or unreadable authority stops before a write.
+For `assign-milestone`, `milestone=` is canonical. Apply accepts legacy `name=` only when `milestone=` is absent; supplying both with different values is invalid. Accepted known actions are validated together before any GitHub call or apply-log write, including in dry-run. Any of the following fails the whole report with its line numbers:
+
+- an issue number that is not a positive integer;
+- argument text that is not whitespace-separated `key=value` / `key="value"` pairs, or a key given twice;
+- a missing or blank required argument, an invalid `set-priority` value or `close-duplicate` target, or any value containing a NUL character or more than 60,000 UTF-8 bytes;
+- two priority or two milestone assignments for the same issue, whether the values differ or repeat (legacy `name=` counts as `milestone=`), or two different duplicate targets;
+- more than one accepted closing action (`close` or `close-duplicate`) for the same issue.
+
+Unchecked actions remain inert and unknown verbs keep their skip-and-log behavior. In apply mode, an absent `.dev-backlog/.tracker` or a first line of `github` is required; any other or unreadable authority stops before a write.
 
 The invalid case is duplicating the exact same action for the same issue without new meaning, for example two separate `close` anchors for `#42` that differ only by wording.
 
