@@ -14,11 +14,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { slugify, sprintScopeKey, scopesOverlap } = require("./lib");
+const { slugify, sprintScopeKey, scopesOverlap, normalizeScopePrefix } = require("./lib");
 const { defaultSprintsDir } = require("./execution-root.js");
-const { parseFrontmatter } = require("./sprint-state.js");
+const { parseFrontmatter, findActiveSprintFiles } = require("./sprint-state.js");
 
-const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "glob[,glob]"]';
+const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "dir/**[,dir/**]"]';
 
 function parseTrackAxis(args) {
   const componentIdx = args.indexOf("--component");
@@ -36,7 +36,11 @@ function parseTrackAxis(args) {
   }
   if (componentIdx !== -1) return { component };
   if (scopeIdx !== -1) {
-    return { scope: rawScope.split(",").map((glob) => glob.trim()).filter(Boolean) };
+    const scope = rawScope.split(",").map((glob) => glob.trim()).filter(Boolean);
+    if (scope.length === 0 || scope.some((glob) => normalizeScopePrefix(glob) === null)) {
+      return { error: "--scope accepts directory prefixes only: dir, dir/, dir/*, dir/**." };
+    }
+    return { scope };
   }
   return {};
 }
@@ -114,14 +118,7 @@ ${scopeLine}${componentLine}---
 }
 
 function listActiveSprintFiles(sprintsDir) {
-  if (!fs.existsSync(sprintsDir)) return [];
-  return fs.readdirSync(sprintsDir)
-    .filter((file) => file.endsWith(".md") && file !== "_context.md")
-    .filter((file) => {
-      const content = fs.readFileSync(path.join(sprintsDir, file), "utf-8");
-      return /^status: active$/m.test(content);
-    })
-    .sort();
+  return findActiveSprintFiles(sprintsDir).map((filePath) => path.basename(filePath));
 }
 
 // Overlap is the one shared scopesOverlap predicate. A scopeless track in a
@@ -145,16 +142,18 @@ function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "
     );
   }
 
-  const scopelessAfterCreate = [
-    ...activeTracks
-      .filter((track) => sprintScopeKey(track.frontmatter).kind === "none")
-      .map((track) => track.file),
-    ...(sprintScopeKey(newFrontmatter).kind === "none" ? [newTrackFile] : []),
-  ];
-  if (activeTracks.length >= 1 && scopelessAfterCreate.length >= 1) {
+  const allTracks = [...activeTracks, { file: newTrackFile, frontmatter: newFrontmatter }];
+  const unknown = allTracks.filter((track) => {
+    const key = sprintScopeKey(track.frontmatter);
+    return key.kind === "none" || key.kind === "unknown" || key.unknown;
+  }).map((track) => track.file);
+  const crossAxis = allTracks.some((track) => sprintScopeKey(track.frontmatter).kind === "component")
+    && allTracks.some((track) => sprintScopeKey(track.frontmatter).kind === "scope");
+  if (activeTracks.length >= 1 && (unknown.length > 0 || crossAxis)) {
+    const namedFiles = unknown.length > 0 ? unknown : allTracks.map((track) => track.file);
     return [
-      `Active track(s) without component:/scope: (${scopelessAfterCreate.join(", ")}); `
-      + "cannot prove all active tracks are disjoint. Declare component: or scope: on every active track (backlog-doctor will warn).",
+      `Active tracks cannot prove disjoint: ${namedFiles.join(", ")}. `
+      + "Use one supported scope axis across tracks (backlog-doctor will warn).",
     ];
   }
   return [];
@@ -170,6 +169,9 @@ function createSprintFile({
 }) {
   if (component && Array.isArray(scope) && scope.length) {
     throw new Error("--component and --scope cannot be used together; declare one track axis.");
+  }
+  if (Array.isArray(scope) && scope.some((glob) => normalizeScopePrefix(glob) === null)) {
+    throw new Error("--scope accepts directory prefixes only: dir, dir/, dir/*, dir/**.");
   }
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;

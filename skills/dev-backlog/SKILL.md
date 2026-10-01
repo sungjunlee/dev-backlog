@@ -70,7 +70,7 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
 | `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
 | `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
-| `scope: ["glob"]` | Path-glob track scope when no component axis fits (one axis per track) | Optional; declared explicitly via `sprint-init.js --scope`, not inferred. |
+| `scope: ["dir/**"]` | Directory-prefix track scope when no component axis fits (one axis per track) | Optional; `sprint-init.js --scope` accepts `dir`, `dir/`, `dir/*`, or `dir/**`, never inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
 | `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
@@ -106,7 +106,7 @@ added to the active Plan.
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js` creates it first, migrating a legacy `backlog/` skill layout (sprints, config, triage) and leaving `backlog/tasks/`, `docs/`, `completed/` in place (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "glob[,glob]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js` creates it first, migrating a legacy `backlog/` skill layout (sprints, config, triage) and leaving `backlog/tasks/`, `docs/`, `completed/` in place (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work

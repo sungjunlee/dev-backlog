@@ -85,6 +85,9 @@ fi
 
 if [ -n "$TRACK" ]; then
   ACTIVE=$(resolve_track "$SPRINTS_DIR" "$TRACK")
+  RESOLVE_STATUS=$?
+  # 2 = ambiguous selector; resolve_track already named the candidates.
+  [ "$RESOLVE_STATUS" -eq 2 ] && exit 1
   if [ -z "$ACTIVE" ]; then
     echo "No active track matches '$TRACK'. Active tracks:"
     find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
@@ -94,8 +97,16 @@ if [ -n "$TRACK" ]; then
     exit 1
   fi
 else
-  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>/dev/null)
+  FIND_ERR=$(mktemp)
+  ACTIVE=$(find_active_sprint "$SPRINTS_DIR" 2>"$FIND_ERR")
   ACTIVE_STATUS=$?
+  if [ "$ACTIVE_STATUS" -eq 3 ]; then
+    cat "$FIND_ERR" >&2
+    rm -f "$FIND_ERR"
+    echo "Could not read the sprint files in $SPRINTS_DIR." >&2
+    exit 1
+  fi
+  rm -f "$FIND_ERR"
   if [ "$ACTIVE_STATUS" -eq 2 ]; then
     echo "Multiple active sprints found. Refusing to close an ambiguous sprint:"
     find_active_sprints "$SPRINTS_DIR" | while IFS= read -r sprint; do
@@ -118,6 +129,28 @@ echo "Closing sprint: $SPRINT_NAME ($CB_DONE/$CB_TOTAL done)"
 # Warn if unchecked items remain
 if [ "$CB_TODO" -gt 0 ] || [ "$CB_IN_FLIGHT" -gt 0 ]; then
   echo "Warning: $CB_TODO todo, $CB_IN_FLIGHT in-flight items remaining"
+fi
+
+# The status flip goes through the shared reader: every form it reads as
+# active is rewritten, and a file it cannot close stops here, before Step 0
+# touches GitHub. Usage: complete_sprint_file check|write FILE
+complete_sprint_file() {
+  node -e '
+    const fs = require("node:fs");
+    const { completedSprintContent } = require(process.argv[1]);
+    const next = completedSprintContent(fs.readFileSync(process.argv[3], "utf-8"));
+    if (next === null) process.exit(1);
+    if (process.argv[2] === "write") {
+      // Write beside the file, then rename, so a failed write never truncates it.
+      const tmp = `${process.argv[3]}.closing-${process.pid}`;
+      fs.writeFileSync(tmp, next);
+      fs.renameSync(tmp, process.argv[3]);
+    }
+  ' "$SCRIPT_DIR/sprint-state.js" "$1" "$2"
+}
+if ! complete_sprint_file check "$ACTIVE"; then
+  echo "Cannot set status: completed in $ACTIVE; edit its frontmatter by hand." >&2
+  exit 1
 fi
 
 # --- Step 0: Optional provider mutation runs BEFORE any local mutation ---
@@ -143,8 +176,33 @@ if $CLOSE_MILESTONE; then
     exit 1
   fi
 fi
+# The milestone title comes from the shared frontmatter parser (read once, used
+# by Step 0 and Step 4). An unquoted numeric or boolean title keeps its written
+# text; a missing or structured value is no milestone.
+if $CLOSE_MILESTONE; then
+  CLOSE_MILESTONE_NAME=$(node -e '
+    const fs = require("node:fs");
+    const { parseFrontmatter } = require(process.argv[1]);
+    const content = fs.readFileSync(process.argv[2], "utf-8");
+    const milestone = parseFrontmatter(content).milestone;
+    if (typeof milestone === "string") {
+      console.log(milestone.trim());
+    } else if (typeof milestone === "number" || typeof milestone === "boolean") {
+      // The root line is the one whose removal changes the parsed root value;
+      // a nested `milestone:` never qualifies.
+      const lines = content.split("\n");
+      for (let index = lines.length - 1; index >= 0; index -= 1) {
+        if (!/^[ \t]*milestone:/.test(lines[index])) continue;
+        const without = lines.filter((_, lineIndex) => lineIndex !== index).join("\n");
+        if (parseFrontmatter(without).milestone === milestone) continue;
+        // Unquoted (it parsed as a number or boolean), so a " #" starts a comment.
+        console.log(lines[index].replace(/^[ \t]*milestone:/, "").replace(/\s+#.*$/, "").trim());
+        break;
+      }
+    }
+  ' "$SCRIPT_DIR/sprint-state.js" "$ACTIVE")
+fi
 if $CLOSE_MILESTONE && ! $DRY_RUN; then
-  CLOSE_MILESTONE_NAME=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
   if [ -z "$CLOSE_MILESTONE_NAME" ]; then
     echo "No milestone: frontmatter in $ACTIVE; cannot --close-milestone."
     exit 1
@@ -166,8 +224,10 @@ DOCTOR_STATUS=$?
 if $DRY_RUN; then
   echo "[dry-run] Would set status: completed in $ACTIVE"
 else
-  # Replace status: active with status: completed
-  sed -i.bak "s/^status: active$/status: completed/" "$ACTIVE" && rm -f "$ACTIVE.bak"
+  if ! complete_sprint_file write "$ACTIVE"; then
+    echo "Could not set status: completed in $ACTIVE; edit its frontmatter by hand." >&2
+    exit 1
+  fi
   # Append progress entry
   echo "- $TODAY: Sprint closed. $CB_DONE/$CB_TOTAL tasks completed." >> "$ACTIVE"
   echo "Set status: completed in $ACTIVE"
@@ -185,7 +245,7 @@ fi
 
 # --- Step 4: Optionally close milestone ---
 if $CLOSE_MILESTONE; then
-  MILESTONE=$(grep '^milestone:' "$ACTIVE" | sed 's/^milestone: *//')
+  MILESTONE="$CLOSE_MILESTONE_NAME"
   if [ -n "$MILESTONE" ]; then
     if $DRY_RUN; then
       echo "[dry-run] Would close milestone: $MILESTONE"

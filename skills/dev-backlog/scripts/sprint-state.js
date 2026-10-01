@@ -160,15 +160,26 @@ function findActiveSprintFiles(sprintsDir, {
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
+  statSync = fs.statSync,
 } = {}) {
   if (!existsSync(sprintsDir)) return [];
 
   return readdirSync(sprintsDir)
     .filter((file) => file.endsWith(".md") && file !== "_context.md")
     .map((file) => path.join(sprintsDir, file))
+    // A directory or dangling link named *.md is not a sprint; other read
+    // errors (permissions) still throw.
+    .filter((filePath) => {
+      try {
+        return statSync(filePath).isFile();
+      } catch (error) {
+        if (error.code === "ENOENT") return false;
+        throw error;
+      }
+    })
     .filter((filePath) => {
       const content = readFileSync(filePath, "utf-8");
-      return /^status:\s*active\s*$/m.test(content);
+      return isActiveSprint(content);
     })
     .sort();
 }
@@ -177,6 +188,38 @@ function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) return {};
   return parseSimpleYaml(match[1]);
+}
+
+function isActiveSprint(content) {
+  const status = parseFrontmatter(content).status;
+  return typeof status === "string" && status.trim() === "active";
+}
+
+// The same file with the root frontmatter `status:` set to completed, or null
+// when no single line does that (including a duplicated root `status:`). Each `status:` line is tried in turn and kept
+// only if the parser then sees the root status completed and nothing else
+// changed, so a nested or block-text `status:` is never touched.
+function completedSprintContent(content) {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
+  if (!match) return null;
+  const rest = content.slice(match[0].length);
+  const withoutStatus = (fm) => JSON.stringify({ ...fm, status: undefined });
+  const before = withoutStatus(parseFrontmatter(content));
+  const lines = match[0].split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].match(/^([ \t]*)status:.*?(\s+#.*?)?(\r?)$/);
+    if (!line) continue;
+    const candidate = [...lines];
+    // Keep a trailing YAML comment the author wrote on the status line.
+    candidate[index] = `${line[1]}status: completed${line[2] || ""}${line[3]}`;
+    const next = candidate.join("\n") + rest;
+    const parsed = parseFrontmatter(next);
+    if (parsed.status !== "completed" || withoutStatus(parsed) !== before) continue;
+    // A second root `status: active` would survive in the file: stop instead.
+    const remaining = lines.filter((_, lineIndex) => lineIndex !== index).join("\n") + rest;
+    return isActiveSprint(remaining) ? null : next;
+  }
+  return null;
 }
 
 function extractSectionLines(content, section) {
@@ -225,15 +268,17 @@ function parseProgressEntries(progressLines) {
 function parsePlanItems(planLines) {
   const items = [];
   let batchHeading = null;
+  let batchIndex = null;
 
   for (const line of planLines) {
     if (/^### Batch/.test(line)) {
       batchHeading = line;
+      batchIndex = batchIndex === null ? 0 : batchIndex + 1;
       continue;
     }
 
     const item = parsePlanItem(line, batchHeading);
-    if (item) items.push(item);
+    if (item) items.push({ ...item, batch_index: batchIndex });
   }
 
   return items;
@@ -284,14 +329,25 @@ function findNextBatch(planItems) {
     return {
       heading: null,
       items: planItems.filter((item) => item.state === "todo"),
+      waiting_on: [],
+      actionable: true,
     };
   }
+
+  // Batches are identified by position, not heading text, so a repeated
+  // heading cannot merge two batches.
+  const batch = firstTodo.batch_index;
+  const waitingOn = planItems.filter((item) =>
+    item.state === "in_flight" && item.batch_index !== null && item.batch_index < batch
+  ).map((item) => item.ref);
 
   return {
     heading: firstTodo.batch_heading,
     items: planItems.filter(
-      (item) => item.state === "todo" && item.batch_heading === firstTodo.batch_heading
+      (item) => item.state === "todo" && item.batch_index === batch
     ),
+    waiting_on: waitingOn,
+    actionable: waitingOn.length === 0,
   };
 }
 
@@ -424,6 +480,7 @@ function readSprintState({
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
+  statSync = fs.statSync,
 } = {}) {
   const sprintsDir = path.join(backlogDir, "sprints");
   const authority = readTaskAuthority(backlogDir); // #476: read once per run
@@ -431,6 +488,7 @@ function readSprintState({
     existsSync,
     readdirSync,
     readFileSync,
+    statSync,
   });
 
   if (activeFiles.length === 0) return emptyState();
@@ -448,6 +506,11 @@ function readSprintState({
   if (track || component) {
     const matches = perSprints.filter((s) => matchesSelector(s, { track, component }));
     if (matches.length === 0) return emptyState();
+    if (matches.length > 1) {
+      const selector = track || component;
+      throw new Error(`Ambiguous active track '${selector}':\n`
+        + matches.map((s) => `  ${s.active_sprint.path}`).join("\n"));
+    }
     return singleState(matches[0]);
   }
 
@@ -519,8 +582,11 @@ function progressLine(counts) {
 function nextBatchLines(nextBatch) {
   const heading = nextBatch ? nextBatch.heading : null;
   const items = nextBatch ? nextBatch.items : [];
+  const waitingOn = nextBatch?.waiting_on || [];
   return [
-    heading ? `Next: ${heading}` : "Next items:",
+    waitingOn.length > 0
+      ? `Waiting: ${heading} (on ${waitingOn.join(", ")})`
+      : (heading ? `Next: ${heading}` : "Next items:"),
     ...items.map((item) => `  ${item.line}`),
   ];
 }
@@ -546,7 +612,11 @@ function nextTrackLines(perSprint) {
   const slug = sprintSlug(perSprint.active_sprint.path);
   const lines = [`${slug}: ${counts.done}/${counts.total} done${inFlight}`];
   const todo = perSprint.plan_items.find((item) => item.state === "todo");
-  if (todo) lines.push(`  Next: ${todo.line.replace(/^- \[ \] /, "")}`);
+  if (todo) {
+    const waitingOn = perSprint.next_batch?.waiting_on || [];
+    const label = waitingOn.length ? `Waiting on ${waitingOn.join(", ")}` : "Next";
+    lines.push(`  ${label}: ${todo.line.replace(/^- \[ \] /, "")}`);
+  }
   return lines;
 }
 
@@ -573,8 +643,15 @@ function statusSingleLines(perSprint) {
   const lines = [statusCountLine(perSprint, { unit: " tasks" })];
   const inFlight = itemLines(perSprint.plan_items, "in_flight", 3);
   if (inFlight.length > 0) lines.push("", "In flight:", ...inFlight);
-  const todo = itemLines(perSprint.plan_items, "todo", 3);
-  if (todo.length > 0) lines.push("", "Next up:", ...todo);
+  const waitingOn = perSprint.next_batch?.waiting_on || [];
+  if (waitingOn.length > 0) {
+    // Only the blocked batch waits; later batches are not listed under it.
+    const waiting = perSprint.next_batch.items.slice(0, 3).map((item) => `  ${item.line}`);
+    lines.push("", `Waiting on ${waitingOn.join(", ")}:`, ...waiting);
+  } else {
+    const todo = itemLines(perSprint.plan_items, "todo", 3);
+    if (todo.length > 0) lines.push("", "Next up:", ...todo);
+  }
   if (isReadyToClose(counts)) lines.push("", ">> All items done — ready to close sprint");
   return lines;
 }
@@ -681,6 +758,8 @@ module.exports = {
   parseArgs,
   findActiveSprintFiles,
   parseFrontmatter,
+  isActiveSprint,
+  completedSprintContent,
   extractSectionLines,
   hasSection,
   parseProgressEntries,

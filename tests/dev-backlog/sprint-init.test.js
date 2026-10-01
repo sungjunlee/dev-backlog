@@ -5,7 +5,10 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
+const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
+const { runDoctor } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
+const { readSprintState } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
 const {
   parseArgs,
   buildComponentFrontmatterLine,
@@ -147,6 +150,49 @@ describe("createSprintFile", () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("uses only trimmed frontmatter status across Node readers and the shell bridge (#496)", () => {
+    const backlogDir = path.join(tmpDir, ".dev-backlog");
+    const sprintsDir = path.join(backlogDir, "sprints");
+    fs.mkdirSync(sprintsDir, { recursive: true });
+    const bodyOnly = path.join(sprintsDir, "body-only.md");
+    const active = path.join(sprintsDir, "active.md");
+    fs.writeFileSync(bodyOnly, "---\nstatus: completed\n---\n\nstatus: active\n");
+    fs.writeFileSync(active, "---\nstatus: active \ncomponent: auth\n---\n");
+
+    assert.deepEqual(listActiveSprintFiles(sprintsDir), ["active.md"]);
+    assert.equal(readSprintState({ backlogDir }).active_sprint.path, active);
+    const doctor = runDoctor({ repoRoot: tmpDir });
+    // Doctor display paths are repo-relative and portable (forward slashes).
+    assert.deepEqual(doctor.checks[0].detail.active_files, [".dev-backlog/sprints/active.md"]);
+    const shell = spawnBashSync(["-c", 'source "$1"; find_active_sprints "$2"', "bash",
+      path.join(SKILL_SCRIPTS, "lib.sh"), sprintsDir], { encoding: "utf8" });
+    assert.equal(shell.status, 0);
+    // One file, whatever path spelling the Bash layer hands back on Windows.
+    assert.deepEqual(shell.stdout.trim().split(/\r?\n/).map((line) => path.basename(line.replace(/\\/g, "/"))), ["active.md"]);
+    assert.throws(() => createSprintFile({
+      topic: "new", milestone: "M", component: "auth", sprintsDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    }), /active\.md/);
+  });
+
+  it("refuses unsupported scope syntax and enforces a supported parent prefix (#496)", () => {
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
+    fs.mkdirSync(sprintsDir, { recursive: true });
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const invoke = (topic, scope) => spawnSync(process.execPath,
+      [cli, topic, "--scope", scope], { cwd: tmpDir, encoding: "utf8" });
+    const invalid = invoke("invalid", "src/**/*.ts");
+    assert.equal(invalid.status, 1);
+    assert.deepEqual(fs.readdirSync(sprintsDir), []);
+    fs.writeFileSync(path.join(sprintsDir, "parent.md"),
+      '---\nstatus: active\nscope: ["src/**"]\n---\n');
+    const blocked = invoke("nested", "src/auth/**");
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stdout + blocked.stderr, /parent\.md/);
+    fs.rmSync(path.join(sprintsDir, "parent.md"));
+    assert.equal(invoke("nested", "src/auth/**").status, 0);
   });
 
   it("writes sprint file and returns structured result", () => {
@@ -293,14 +339,14 @@ describe("createSprintFile", () => {
     }, /Active track overlaps on scope: 2026-04-current\.md/);
   });
 
-  it("refuses when a shared component: overlaps, regardless of scope globs (#292)", () => {
+  it("allows a scope track next to a component track with a cannot-prove-disjoint warning (#292, #496)", () => {
     fs.writeFileSync(
       path.join(tmpDir, "2026-04-current.md"),
       '---\nstatus: active\ncomponent: "auth-system"\n---\n',
     );
 
-    // A scopeless new sprint next to a component-scoped track cannot be proven
-    // to overlap — but two tracks on the SAME component axis can, via frontmatter.
+    // A scope track next to a component track is cross-axis: allowed, with a
+    // cannot-prove-disjoint warning.
     const disjoint = createSprintFile({
       topic: "billing",
       milestone: "Sprint W14",
@@ -308,7 +354,8 @@ describe("createSprintFile", () => {
       sprintsDir: tmpDir,
       today: new Date("2026-04-05T09:00:00Z"),
     });
-    assert.deepEqual(disjoint.warnings, []);
+    assert.equal(disjoint.warnings.length, 1);
+    assert.match(disjoint.warnings[0], /cannot prove disjoint/);
   });
 
   it("refuses equal components and allows distinct ones without a scopeless warning (#331)", () => {
