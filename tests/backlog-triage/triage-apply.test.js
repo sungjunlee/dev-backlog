@@ -740,6 +740,30 @@ describe("execute", () => {
           "- [x] Must reject",
         ],
       },
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "\t<pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "\t</pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "\t<!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ],
+      },
     ];
 
     for (const { anchorLine, lines } of reports) {
@@ -748,6 +772,19 @@ describe("execute", () => {
       assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
       assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[2]);
     }
+
+    const partialTabControl = executeWithEffectSpies([
+      "- Evidence",
+      "",
+      "\t  <pre>",
+      "  ## Apply Checklist",
+      '  <!-- triage:revisit #42 reason="accepted" -->',
+      "  - [x] Accept",
+    ]);
+    assert.equal(partialTabControl.result.exitCode, 0);
+    assert.deepEqual(partialTabControl.effects.provider, [
+      ["issue", "comment", "42", "-b", "triage: revisit — accepted"],
+    ]);
   });
 
   it("requires exact type-1 HTML closing tags before every effect", () => {
@@ -866,6 +903,30 @@ describe("execute", () => {
       assert.notEqual(result.exitCode, 0, underline);
       assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
       assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, underline);
+    }
+  });
+
+  it("ends the checklist at Setext headings after non-paragraph list items", () => {
+    for (const listItem of ["- ### Item", "- ***"]) {
+      for (const underline of ["===", "---"]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          listItem,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${listItem} / ${underline}`
+        );
+      }
     }
   });
 

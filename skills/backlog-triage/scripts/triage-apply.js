@@ -184,20 +184,42 @@ function listContainerView(line) {
   let continuationIndent = 0;
   let match;
   while ((match = content.match(LIST_ITEM_PATTERN))) {
-    const contentOffset = content.length - match[3].length;
-    continuationIndent += contentOffset;
+    const prefix = content.slice(0, content.length - match[3].length);
+    continuationIndent = columnAfter(prefix, continuationIndent);
     content = match[3];
   }
   return { content, continuationIndent };
 }
 
+function columnAfter(source, startColumn = 0) {
+  let column = startColumn;
+  for (const character of String(source || "")) {
+    column = character === "\t"
+      ? column + (4 - (column % 4))
+      : column + 1;
+  }
+  return column;
+}
+
+function leadingIndentColumns(line) {
+  const indentation = String(line || "").match(/^[ \t]*/)[0];
+  return columnAfter(indentation);
+}
+
 function stripContainerContinuation(line, continuationIndent) {
   const source = String(line || "");
   if (!continuationIndent) return source;
-  const indentation = source.match(/^[ \t]*/)[0];
-  return indentation.length >= continuationIndent
-    ? source.slice(continuationIndent)
-    : source;
+  let column = 0;
+  let index = 0;
+  while (index < source.length && /^[ \t]$/.test(source[index]) && column < continuationIndent) {
+    const nextColumn = columnAfter(source[index], column);
+    if (nextColumn > continuationIndent) {
+      return `${" ".repeat(nextColumn - continuationIndent)}${source.slice(index + 1)}`;
+    }
+    column = nextColumn;
+    index += 1;
+  }
+  return column >= continuationIndent ? source.slice(index) : source;
 }
 
 function continuedListContainerView(line, activeContinuationIndent) {
@@ -209,7 +231,7 @@ function continuedListContainerView(line, activeContinuationIndent) {
   if (source.trim() === "") {
     return { content: source, continuationIndent: 0, activeContinuationIndent };
   }
-  const indentation = source.match(/^[ \t]*/)[0].length;
+  const indentation = leadingIndentColumns(source);
   if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
     return {
       content: stripContainerContinuation(source, activeContinuationIndent),
@@ -376,10 +398,10 @@ function interruptsParagraph(line) {
   return isThematicBreak(source);
 }
 
-function listContentIndent(line) {
-  const source = String(line || "");
-  const match = source.match(LIST_ITEM_PATTERN);
-  return match ? source.length - match[3].length : undefined;
+function listItemOpensParagraph(line, literalLines, index) {
+  const container = listContainerView(line);
+  if (container.continuationIndent === 0 || literalLines.has(index)) return false;
+  return Boolean(container.content.trim()) && !interruptsParagraph(container.content);
 }
 
 function isSetextHeading(lines, index, literalLines) {
@@ -402,8 +424,11 @@ function isSetextHeading(lines, index, literalLines) {
     if (interruptsParagraph(lines[lineIndex])) return false;
   }
 
-  const containingListIndent = paragraphStart > 0 ? listContentIndent(lines[paragraphStart - 1]) : undefined;
-  if (containingListIndent !== undefined) return false;
+  const precedingIndex = paragraphStart - 1;
+  if (
+    precedingIndex >= 0
+    && listItemOpensParagraph(lines[precedingIndex], literalLines, precedingIndex)
+  ) return false;
   return true;
 }
 
