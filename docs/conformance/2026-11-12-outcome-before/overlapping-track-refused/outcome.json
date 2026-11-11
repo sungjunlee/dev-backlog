@@ -1,0 +1,52 @@
+{
+  "id": "overlapping-track-refused",
+  "title": "Refuse an overlapping active track without mutation",
+  "guarantees": [
+    "G3"
+  ],
+  "checks": [
+    {
+      "name": "overlap guard invoked",
+      "pass": true,
+      "observed": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-init.js",
+            "api",
+            "--scope",
+            "src/auth/api/**"
+          ],
+          "status": 1
+        }
+      ]
+    },
+    {
+      "name": "no second sprint created",
+      "pass": true,
+      "observed": [
+        "2026-11-auth.md"
+      ]
+    },
+    {
+      "name": "refusal leaves workspace unchanged",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "node",
+      "args": [
+        "skills/dev-backlog/scripts/sprint-init.js",
+        "api",
+        "--scope",
+        "src/auth/api/**"
+      ],
+      "status": 1
+    }
+  ],
+  "changes": []
+}

@@ -711,7 +711,8 @@ assert_equals "contract: Known Gotchas heading" \
 
 # Setup fresh environment for sprint-close tests
 rm -rf "$TEST_DIR/.dev-backlog"
-mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/tasks" "$TEST_DIR/.dev-backlog/completed"
+mkdir -p "$TEST_DIR/.dev-backlog/sprints" "$TEST_DIR/.dev-backlog/operator-data"
+echo "operator-owned: keep" >"$TEST_DIR/.dev-backlog/operator-data/keep.txt"
 
 cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md" <<'EOF'
 ---
@@ -736,30 +737,6 @@ Ship auth.
 
 ## Progress
 - 2026-03-22: Batch 1 done.
-EOF
-
-# Create matching task files
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-1 - db-schema.md" <<'EOF'
----
-id: BACK-1
-title: DB schema
-status: In Progress
----
-EOF
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-2 - oauth-flow.md" <<'EOF'
----
-id: BACK-2
-title: OAuth flow
-status: In Progress
----
-EOF
-# Task not in sprint — should NOT be moved
-cat >"$TEST_DIR/.dev-backlog/tasks/BACK-99 - unrelated.md" <<'EOF'
----
-id: BACK-99
-title: Unrelated
-status: To Do
----
 EOF
 
 cat >"$TEST_DIR/.dev-backlog/sprints/2026-03-other-active.md" <<'EOF'
@@ -790,7 +767,8 @@ assert_contains "close dry-run: doctor result appears" "$OUT" "[PASS] active_spr
 assert_not_contains "close dry-run: no reassess summary (#446)" "$OUT" "Reassess signal:"
 # Verify nothing actually changed
 assert_contains "close dry-run: file unchanged" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "active"
-assert_equals "close dry-run: task not moved" "$(ls "$TEST_DIR/.dev-backlog/tasks/" | wc -l | tr -d ' ')" "3"
+assert_equals "close dry-run: unrelated file unchanged" \
+	"$(cat "$TEST_DIR/.dev-backlog/operator-data/keep.txt")" "operator-owned: keep"
 
 # --- dry-run flag/order parsing tests ---
 set +e
@@ -837,8 +815,12 @@ assert_not_contains "close: no reassess summary (#446)" "$OUT" "Reassess signal:
 
 # Verify sprint file updated
 assert_contains "close: frontmatter updated" "$(grep '^status:' "$TEST_DIR/.dev-backlog/sprints/2026-03-auth.md")" "completed"
-
-# Verify tasks moved
+assert_equals "close: unrelated file unchanged" \
+	"$(cat "$TEST_DIR/.dev-backlog/operator-data/keep.txt")" "operator-owned: keep"
+assert_equals "close: creates no task mirror" \
+	"$(test -d "$TEST_DIR/.dev-backlog/tasks" && echo yes || echo no)" "no"
+assert_equals "close: creates no archive directory" \
+	"$(test -d "$TEST_DIR/.dev-backlog/completed" && echo yes || echo no)" "no"
 
 # --- mirrorless GitHub close (#346): no task file or archive directory required ---
 rm -rf "$TEST_DIR/.dev-backlog"
@@ -929,7 +911,7 @@ rm -f "$TEST_DIR/.dev-backlog/.tracker"
 # Build a genuinely spec-less project: run scripts with cwd inside it so spec
 # resolution finds nothing (scripts resolve their own path via SCRIPT_DIR).
 COLD_DIR="$TEST_DIR/cold-adopter"
-mkdir -p "$COLD_DIR/.dev-backlog/sprints" "$COLD_DIR/.dev-backlog/tasks" "$COLD_DIR/.dev-backlog/completed"
+mkdir -p "$COLD_DIR/.dev-backlog/sprints"
 cat >"$COLD_DIR/.dev-backlog/sprints/2026-01-cold.md" <<'EOF'
 ---
 milestone: cold fixture
@@ -972,7 +954,7 @@ if (bad.length !== 0) process.exit(1);
 # Use a fresh spec-less dir with an empty sprints/ so init isn't refused as a
 # second active sprint.
 COLD_INIT_DIR="$TEST_DIR/cold-init"
-mkdir -p "$COLD_INIT_DIR/.dev-backlog/sprints" "$COLD_INIT_DIR/.dev-backlog/tasks"
+mkdir -p "$COLD_INIT_DIR/.dev-backlog/sprints"
 git -C "$COLD_INIT_DIR" init -q
 install_isolated_gh "$COLD_INIT_DIR"
 set +e

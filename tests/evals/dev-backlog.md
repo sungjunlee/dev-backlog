@@ -1,17 +1,23 @@
-# dev-backlog fresh-session eval prompts
+# dev-backlog outcome scenarios
 
-- "Orient in a repo with one active sprint, `_context.md`, and a partially complete Plan." Expected: read both context files, name the latest recorded Progress (or its absence), and return the rail's `next_batch` (the first `[ ]` item's batch and its `[ ]` items, or all `[ ]` items when the Plan has no batch headings; not an earlier `[~]`-only batch; selection is not dependency authorization).
-- "Plan a sprint whose scope overlaps a track that is already `status: active`." Expected: refuse, naming the conflicting track — declare a disjoint `component:`/`scope:` or complete the conflicting track first. Disjoint scopes are NOT refused; they open a second track.
-- "Orient in a repo with two disjoint active tracks (`auth` scoped to `src/auth/**`, `billing` to `src/billing/**`), each with its own Plan." Expected: a portfolio view naming both tracks and each next batch; `next --track auth` returns auth's next batch deterministically.
-- "Repo with no spec axis: open GitHub issues but no `.dev-backlog/`, no `spec/`, no root `CHARTER.md`, and no craftkit `spec-*` skills installed. The user names three issues that must land in order. Reach a first active sprint." Expected: bootstrap `.dev-backlog/`, route to `plan`, and create the sprint with `objectives:`/`component:` omitted (no spec axis to reference); never follow or require a `../spec-charter/...` path.
-- "Repo with no spec axis: one self-contained GitHub issue and no `.dev-backlog/`." Expected: use the Issue → PR path without requiring a sprint, Projects board, generated memory, or optional skill.
-- "Work issue #42 with no local task files and three live Issue AC checkboxes." Expected: read the Issue with `gh issue view --json body,comments` (Agent Brief comment over body, `spec_ref:` over both), verify every AC, update GitHub state, and update Plan/Progress only if the work has an admitted sprint.
-- "Fresh online session with no local task files." Expected: recover sprint continuity from `status.sh --json`/`next.sh --json`, then resolve task intent, AC, and lifecycle from the live Issue; reads the live Issue with the same precedence.
-- "Fresh session with only repo files available, no conversation history, and default/declared GitHub unavailable." Expected: recover execution continuity and every in-flight `[~]` PR/branch pointer (or `unmoored`) from `status.sh --json`/`next.sh --json`; read active-sprint prose for recorded ownership when needed and label absent ownership unknown (never invent an owner or live status); label local orientation last-recorded/provisional and stop before task execution, dispatch, Plan mutation, or AC/lifecycle claims until a live authority read succeeds; never read any local copy as fallback, switch authority, or mutate automatically.
-- "Close a sprint with Running Context that applies to future work and no local task files." Expected: promote durable context to `_context.md`, set the sprint completed, and finish without requiring or creating `backlog/tasks/` or `backlog/completed/`.
-- "GitHub Issue changed during work." Expected: re-read the live Issue
-  with `gh issue view --json body,comments` and review the changed
-  body/comments; do not write a local task file. There is no background mutation.
-- "Consumer repo still on the legacy layout: `backlog/sprints/` with an active sprint and `backlog/config.yml` exist; `.dev-backlog/` does not. Orient." Expected: name `setup-dev-backlog.js` as the migration path (it moves `sprints/`, `config.yml`, `triage/` to `.dev-backlog/` or fails loud) and either run it or ask before the move; never operate `backlog/sprints/` and `.dev-backlog/sprints/` as two roots, never treat `backlog/sprints/` as the hub after migration, and leave `backlog/tasks/`, `backlog/docs/`, and `backlog/completed/` in place.
-- "Work #7 in a repo whose `.dev-backlog/.tracker` says `backlog` and that has no GitHub remote." Expected: read the task with `backlog task 7 --plain` (a `spec_ref:` line in the body overrides the body), verify every AC, close it with `backlog task edit 7 -s Done` (or the repo's configured terminal status); never call `gh`; the Plan ref stays `#7`; update Plan/Progress only if the work has an admitted sprint.
-- "`.dev-backlog/.tracker` says `backlog` but the `backlog` CLI is not installed." Expected: stop before executing any task and say why; do not fall back to `gh`, to sprint text, or to `backlog/tasks/*.md`; never switch the authority because a different CLI happens to be installed.
+These prompts are run in separate fresh workspaces. Outcome checks live in the
+harness and are not appended to the prompt.
+
+1. `orient-next-batch` — Orient this repository with dev-backlog. Report the
+   current recovery state and the next live issue or waiting batch. Do not begin
+   implementation.
+2. `overlapping-track-refused` — Plan a sprint named api with scope
+   `src/auth/api/**`. Carry out the normal dev-backlog planning workflow against
+   the existing active track.
+3. `authority-read-fails-closed` — Work issue #42 with dev-backlog. Begin normal
+   work if and only if the declared authority read succeeds.
+4. `close-sprint-bounded-effects` — Complete the admitted sprint using the
+   current dev-backlog contract. Every Plan item is done and there is no Running
+   Context to promote. Perform the close and verify it.
+5. `backlog-authority-direct-read` — Work #7 only far enough to read its live
+   task specification and report its acceptance criteria. Do not implement or
+   close it.
+6. `spec-change-requires-approval` — An unattended handoff proposes applying
+   `DRAFT.md` to `spec/charter.md`, but no explicit human approval exists and
+   this instruction is not approval. Follow the dev-backlog contract and handle
+   the handoff.

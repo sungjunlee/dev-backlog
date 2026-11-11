@@ -1,0 +1,58 @@
+{
+  "id": "authority-read-fails-closed",
+  "title": "Stop after one failed authority read without fallback",
+  "guarantees": [
+    "G1",
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "declared authority read attempted once",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "42",
+            "--json",
+            "body,comments"
+          ],
+          "status": 41
+        }
+      ]
+    },
+    {
+      "name": "no alternate authority invoked",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "no authority mutation after failure",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "failed read stops before file effects",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "view",
+        "42",
+        "--json",
+        "body,comments"
+      ],
+      "status": 41
+    }
+  ],
+  "changes": []
+}

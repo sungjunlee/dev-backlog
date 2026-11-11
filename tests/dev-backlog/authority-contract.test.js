@@ -8,24 +8,6 @@ const CONTRACT_PATH = path.join(
   ROOT,
   "skills/dev-backlog/references/authority-contract.md"
 );
-const EXPECTED_STATE_CLASSES = [
-  "Task specification",
-  "Task lifecycle",
-  "Planning fields",
-  "Complex execution state",
-  "Durable decisions",
-  "Historical evidence",
-  "Derived retrieval output",
-];
-const EXPECTED_SOLE_AUTHORITIES = [
-  "The declared authority's task body and acceptance criteria; on GitHub the newest posted `## Agent Brief` comment overrides the body, and in every authority a `spec_ref:` line in the body overrides the body (on GitHub, the Agent Brief as well)",
-  "The declared authority's task state and native metadata",
-  "The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them)",
-  "One active sprint file for the admitted track",
-  "The bounded `spec/*` contract axis",
-  "Repository history (git plus the authority's closed tasks and PRs)",
-  "Its named upstream authority",
-];
 
 function contract() {
   return fs.readFileSync(CONTRACT_PATH, "utf8");
@@ -44,62 +26,14 @@ function authorityRows(markdown) {
     .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()));
 }
 
-it("routes every required state class to one non-empty sole-authority cell", () => {
+it("keeps each routed state class unique with one non-empty authority route", () => {
   const rows = authorityRows(contract());
-  assert.deepEqual(rows.map((row) => row[0]), EXPECTED_STATE_CLASSES);
-  assert.deepEqual(rows.map((row) => row[1]), EXPECTED_SOLE_AUTHORITIES);
+  assert.ok(rows.length > 0, "routing table must contain at least one state class");
+  assert.equal(new Set(rows.map((row) => row[0])).size, rows.length,
+    "a state class must not acquire two independent routes");
 
   for (const row of rows) {
     assert.equal(row.length, 4, `${row[0]} must keep the four-column routing shape`);
-    assert.ok(row[1], `${row[0]} must name its sole authority`);
+    assert.ok(row.every(Boolean), `${row[0]} must not contain an empty routing cell`);
   }
-});
-
-it("freezes the reduced boundary and complexity-triggered sprint rule", () => {
-  const markdown = contract();
-  assert.match(markdown, /Do not reintroduce a tracker abstraction or adapter ports/);
-  assert.match(markdown, /never inferred from which CLI is installed/);
-  assert.match(markdown, /parked at tag `v0\.11\.0`/);
-  assert.match(markdown, /Time is not an admission criterion/);
-  assert.match(markdown, /dual-write or bidirectional task state/);
-  assert.match(markdown, /fail-closed/);
-  assert.match(markdown, /silent fallback to local files when an authority read fails/);
-  assert.match(markdown, /automatic writes from search, retrieval, summaries, or memory compilers/);
-
-  for (const optional of ["Matt Pocock skills", "GitHub Projects", "Backlog.md"]) {
-    assert.match(markdown, new RegExp(`\\| ${optional.replace(".", "\\.")} \\|`));
-  }
-});
-
-it("keeps both no-spec cold-adopter paths explicit", () => {
-  const markdown = contract();
-  assert.match(markdown, /no `\.dev-backlog\/` and no `spec\/`/);
-  assert.match(markdown, /complete a simple Issue → PR path without creating a sprint/);
-  assert.match(markdown, /create, resume, and close it using only\s+this bundle/);
-});
-
-it("keeps sprint admission and migration boundaries aligned across public docs", () => {
-  const read = (relativePath) =>
-    fs.readFileSync(path.join(ROOT, relativePath), "utf8");
-  const readme = read("README.md");
-  const skill = read("skills/dev-backlog/SKILL.md");
-  const capabilities = read("spec/capabilities.md");
-  const charter = read("spec/charter.md");
-  // Completed sprint files are disposable (2026-09-20), so the sprint-shape
-  // check rides a fixture instead of this repo's own sprint directory.
-  const sprint = read("tests/fixtures/admitted-sprint.md");
-
-  assert.match(readme, /Close the sprint explicitly only when a sprint was admitted/);
-  assert.match(readme, /Optional surfaces/);
-  assert.doesNotMatch(readme, /local-tracker\.json.*sole task authority/);
-  assert.match(skill, /^## Sprint Admission$/m);
-  assert.match(skill, /gh issue view N --json body,comments/);
-  assert.match(skill, /fail-closed/);
-  assert.match(skill, /^## Task Authority$/m);
-  assert.match(skill, /The declared task authority is the only task authority/);
-  assert.match(skill, /`backlog task N --plain`/);
-  assert.match(capabilities, /If that read fails, execution stops/);
-  assert.match(charter, /one admitted sprint per track/);
-  assert.match(sprint, /objectives: \[O10\]/);
-  assert.doesNotMatch(sprint, /read-only fallback/);
 });

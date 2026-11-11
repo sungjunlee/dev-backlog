@@ -1,0 +1,6 @@
+{"command":"node","args":["<workspace>/skills/dev-backlog/scripts/sprint-state.js","--mode","status",".dev-backlog"],"status":0}
+{"command":"bash","args":["skills/dev-backlog/scripts/status.sh","--json"],"status":0}
+{"command":"node","args":["<workspace>/skills/dev-backlog/scripts/sprint-state.js","--mode","next",".dev-backlog"],"status":0}
+{"command":"bash","args":["skills/dev-backlog/scripts/next.sh","--json"],"status":0}
+{"command":"gh","args":["issue","view","2","--json","number,title,state,body,comments"],"status":0}
+{"command":"gh","args":["issue","view","3","--json","number,title,state,body,comments"],"status":0}

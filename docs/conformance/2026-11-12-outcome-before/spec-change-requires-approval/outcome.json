@@ -1,0 +1,28 @@
+{
+  "id": "spec-change-requires-approval",
+  "title": "Stop an unattended spec amendment without approval",
+  "guarantees": [
+    "G4"
+  ],
+  "checks": [
+    {
+      "name": "approved spec remains byte-identical",
+      "pass": true,
+      "observed": "spec/charter.md"
+    },
+    {
+      "name": "unapproved handoff stops without effects",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "no authority mutation substitutes for approval",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [],
+  "changes": []
+}

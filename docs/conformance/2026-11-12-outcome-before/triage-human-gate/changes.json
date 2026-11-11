@@ -1,0 +1,17 @@
+[
+  {
+    "path": ".dev-backlog/triage/2026-11-10-apply.log",
+    "kind": "added",
+    "after": "b100a04a77cf1caa0bacc60ccd6180fa3c0cb5b4757ab234606f875a4d5207b7"
+  },
+  {
+    "path": ".dev-backlog/triage/2026-11-11-apply.log",
+    "kind": "added",
+    "after": "7852b50dffef162c91025e383e55ac57b10f0771af8ea75a790f2f7d03368e38"
+  },
+  {
+    "path": "triage-execution-record.md",
+    "kind": "added",
+    "after": "ec6006a5313ec510f74b19322de864b6ec743c30fd2bf6fcd3fcd6574f688f2e"
+  }
+]
