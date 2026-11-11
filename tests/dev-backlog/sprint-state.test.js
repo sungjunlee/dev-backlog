@@ -19,6 +19,12 @@ function writeFile(filePath, content) {
   fs.writeFileSync(filePath, content);
 }
 
+function childEnv() {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+}
+
 describe("readSprintState", () => {
   let tmpDir;
   let backlogDir;
@@ -75,34 +81,30 @@ Expose actor-readable execution state.
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
-    assert.equal(state.schema_version, 2);
-    assert.equal(state.active_sprint.path, sprintPath);
-    assert.equal(state.active_sprint.frontmatter.status, "active");
-    assert.deepEqual(state.active_sprint.frontmatter.objectives, ["O1", "O2"]);
-    assert.equal(state.active_sprint.frontmatter.component, "dev-backlog");
-    assert.equal(state.active_sprint.goal, "Expose actor-readable execution state.");
+    assert.equal(state.schema_version, 3);
+    assert.deepEqual(Object.keys(state), ["schema_version", "active_sprints"]);
+    const track = state.active_sprints[0];
+    assert.equal(track.path, sprintPath);
+    assert.equal(track.frontmatter.status, "active");
+    assert.deepEqual(track.frontmatter.objectives, ["O1", "O2"]);
+    assert.equal(track.frontmatter.component, "dev-backlog");
+    assert.equal(track.goal, "Expose actor-readable execution state.");
 
-    assert.equal(state.plan_items.length, 3);
-    assert.deepEqual(state.plan_items[1], {
-      line: "- [~] #211 Add JSON surfaces (~2hr) → PR #224 (reviewing)",
-      checkbox_state: "~",
-      state: "in_flight",
-      tracker: "github",
-      id: "211",
+    assert.equal(track.plan_items.length, 3);
+    assert.deepEqual(track.plan_items[1], {
       ref: "#211",
-      issue_number: 211,
+      state: "in_flight",
       title: "Add JSON surfaces (~2hr)",
-      batch_heading: "### Batch 2 - Active",
-      batch_index: 1,
-      pr: { number: 224, state: "reviewing" },
-      branch: null,
-      unmoored: false,
+      pointer: {
+        pr: { number: 224, state: "reviewing" },
+        branch: null,
+      },
     });
 
-    assert.equal(state.next_batch.heading, "### Batch 3 - Next");
-    assert.deepEqual(state.next_batch.items.map((item) => item.issue_number), [212]);
+    assert.equal(track.next_batch.heading, "### Batch 3 - Next");
+    assert.deepEqual(track.next_batch.items.map((item) => item.ref), ["#212"]);
     assert.deepEqual(
-      state.latest_progress.map((entry) => entry.line),
+      track.latest_progress.map((entry) => entry.line),
       [
         "- 2026-07-03 08:00: #210 merged.",
         "- 2026-07-02 11:00: context updated.",
@@ -111,17 +113,10 @@ Expose actor-readable execution state.
         "- 2026-07-01 09:00: #210 dispatched → PR #223",
       ]
     );
-    assert.deepEqual(state.in_flight.map((item) => ({
-      issue_number: item.issue_number,
-      age_days: item.age_days,
-      age_source: item.age_source,
-      age_basis_date: item.age_basis_date,
-    })), [{
-      issue_number: 211,
-      age_days: 2,
-      age_source: "progress",
-      age_basis_date: "2026-07-01",
-    }]);
+    assert.deepEqual(track.in_flight, [track.plan_items[1]]);
+    for (const removed of ["tracker", "age_days", "age_source", "age_basis_date"]) {
+      assert.equal(removed in track.in_flight[0], false, `${removed} is removed`);
+    }
   });
 
   it("returns a portfolio for multiple disjoint active tracks, ordered by started", () => {
@@ -135,11 +130,10 @@ Expose actor-readable execution state.
     );
 
     const state = readSprintState({ backlogDir });
-    assert.equal(state.schema_version, 2);
-    assert.equal(state.active_sprint, null);
+    assert.equal(state.schema_version, 3);
     assert.equal(state.active_sprints.length, 2);
     assert.deepEqual(
-      state.active_sprints.map((s) => s.active_sprint.frontmatter.component),
+      state.active_sprints.map((s) => s.frontmatter.component),
       ["billing", "auth"]
     );
   });
@@ -150,7 +144,7 @@ Expose actor-readable execution state.
 
     const state = readSprintState({ backlogDir });
     assert.equal(state.active_sprints.length, 2);
-    assert.equal(state.active_sprint, null);
+    assert.equal("active_sprint" in state, false);
   });
 
   it("skips a directory named *.md while finding active sprint files (#496, #498)", () => {
@@ -158,7 +152,7 @@ Expose actor-readable execution state.
     fs.mkdirSync(path.join(backlogDir, "sprints", "not-a-sprint.md"));
 
     const state = readSprintState({ backlogDir });
-    assert.equal(path.basename(state.active_sprint.path), "active.md");
+    assert.equal(path.basename(state.active_sprints[0].path), "active.md");
     assert.equal(state.active_sprints.length, 1);
   });
 
@@ -172,7 +166,7 @@ Expose actor-readable execution state.
     );
   });
 
-  it("resolves a single track by --component or --track slug", () => {
+  it("resolves a single track by --track component handle or slug", () => {
     writeFile(
       path.join(backlogDir, "sprints", "auth.md"),
       "---\nstatus: active\nstarted: 2026-07-02\ncomponent: \"auth\"\n---\n"
@@ -182,15 +176,15 @@ Expose actor-readable execution state.
       "---\nstatus: active\nstarted: 2026-07-01\ncomponent: \"billing\"\n---\n"
     );
 
-    const byComponent = readSprintState({ backlogDir, component: "auth" });
-    assert.equal(byComponent.active_sprint.frontmatter.component, "auth");
+    const byComponent = readSprintState({ backlogDir, track: "auth" });
+    assert.equal(byComponent.active_sprints[0].frontmatter.component, "auth");
     assert.equal(byComponent.active_sprints.length, 1);
 
     const byTrackSlug = readSprintState({ backlogDir, track: "billing" });
-    assert.equal(byTrackSlug.active_sprint.frontmatter.component, "billing");
+    assert.equal(byTrackSlug.active_sprints[0].frontmatter.component, "billing");
 
-    const noMatch = readSprintState({ backlogDir, component: "missing" });
-    assert.equal(noMatch.active_sprint, null);
+    const noMatch = readSprintState({ backlogDir, track: "missing" });
+    assert.equal("active_sprint" in noMatch, false);
     assert.deepEqual(noMatch.active_sprints, []);
   });
 
@@ -199,11 +193,10 @@ Expose actor-readable execution state.
     const componentMatch = path.join(backlogDir, "sprints", "other.md");
     writeFile(slugMatch, '---\nstatus: active\ncomponent: billing\n---\n');
     writeFile(componentMatch, '---\nstatus: active\ncomponent: auth\n---\n');
-    const result = spawnSync(process.execPath, [path.join(SKILL_SCRIPTS, "sprint-state.js"),
-      "--mode", "next", "--track", "auth", backlogDir], { encoding: "utf8" });
-    assert.equal(result.status, 1);
-    assert.ok(result.stderr.includes(slugMatch));
-    assert.ok(result.stderr.includes(componentMatch));
+    assert.throws(
+      () => readSprintState({ backlogDir, track: "auth" }),
+      (error) => error.message.includes(slugMatch) && error.message.includes(componentMatch),
+    );
   });
 
   it("keeps the GitHub wire identity and ignores refs outside the #N grammar", () => {
@@ -215,7 +208,6 @@ started: 2026-07-01
 ## Plan
 - [~] #1 Legacy task → PR #11 (reviewing)
 - [ ] #2 Next task
-- [ ] TASK-11.2 Not a plan ref since #445
 
 ## Progress
 - 2026-07-02: #11 is a different GitHub task.
@@ -227,21 +219,17 @@ started: 2026-07-01
       today: new Date("2026-07-04T00:00:00Z"),
     });
 
-    assert.equal(state.schema_version, 2);
-    assert.deepEqual(state.plan_items.map(({ tracker, id, ref, issue_number }) => ({
-      tracker, id, ref, issue_number,
-    })), [
-      { tracker: "github", id: "1", ref: "#1", issue_number: 1 },
-      { tracker: "github", id: "2", ref: "#2", issue_number: 2 },
-    ]);
-    assert.equal(state.plan_items[0].pr.number, 11);
-    assert.equal(state.in_flight[0].age_basis_date, "2026-07-03");
-    assert.deepEqual(state.next_batch.items.map((item) => item.ref), ["#2"]);
+    assert.equal(state.schema_version, 3);
+    const track = state.active_sprints[0];
+    assert.deepEqual(track.plan_items.map((item) => item.ref), ["#1", "#2"]);
+    assert.deepEqual(track.plan_items[0].pointer, {
+      pr: { number: 11, state: "reviewing" },
+      branch: null,
+    });
+    assert.deepEqual(track.next_batch.items.map((item) => item.ref), ["#2"]);
   });
 
-  // --- .dev-backlog/.tracker task authority (#476) ---
-
-  it("sets plan_items[].tracker and in_flight[].tracker from a declared .tracker file", () => {
+  it("does not read .tracker or publish a tracker field", () => {
     writeFile(path.join(backlogDir, "sprints", "authority.md"), `---
 status: active
 started: 2026-07-01
@@ -260,35 +248,36 @@ started: 2026-07-01
       today: new Date("2026-07-02T00:00:00Z"),
     });
 
-    assert.deepEqual(state.plan_items.map((item) => item.tracker), ["backlog", "backlog"]);
-    assert.deepEqual(state.in_flight.map((item) => item.tracker), ["backlog"]);
-    assert.equal(state.next_batch.items[0].tracker, "backlog");
+    const track = state.active_sprints[0];
+    assert.deepEqual(track.plan_items.map((item) => item.ref), ["#1", "#2"]);
+    assert.ok(track.plan_items.every((item) => !("tracker" in item)));
+    fs.writeFileSync(path.join(backlogDir, ".tracker"), "unknown-on-purpose\n");
+    assert.deepEqual(readSprintState({ backlogDir }), state);
   });
 
-  it("keeps tracker as github when .tracker is absent", () => {
-    writeFile(path.join(backlogDir, "sprints", "default.md"), `---
-status: active
----
+  it("fails closed on an invalid active Plan with source file and line", () => {
+    const sprintPath = path.join(backlogDir, "sprints", "invalid.md");
+    writeFile(sprintPath, [
+      "---", "status: active", "---", "", "## Plan",
+      "- [~] #1 Visible [branch:one]",
+      "  - [~] #2 Indented and invalid [branch:two]",
+      "", "### Batch 2", "- [ ] #3 Must not become actionable", "",
+    ].join("\n"));
 
-## Plan
-- [ ] #1 Todo
+    assert.throws(
+      () => readSprintState({ backlogDir }),
+      (error) => error.code === "INVALID_ACTIVE_PLAN"
+        && error.message.includes(`${sprintPath}:7`)
+        && /correct the source Plan/i.test(error.message),
+    );
 
-## Progress
-`);
-
-    const state = readSprintState({ backlogDir });
-    assert.deepEqual(state.plan_items.map((item) => item.tracker), ["github"]);
-  });
-
-  it("fails loud (stderr + exit 1) on an unknown .tracker value via the CLI", () => {
-    const { spawnSync } = require("child_process");
-    const BIN = path.resolve(__dirname, "../../skills/dev-backlog/scripts/sprint-state.js");
-    fs.mkdirSync(path.join(backlogDir, "sprints"), { recursive: true });
-    fs.writeFileSync(path.join(backlogDir, ".tracker"), "local\n");
-
-    const res = spawnSync(process.execPath, [BIN, backlogDir], { encoding: "utf8" });
-    assert.equal(res.status, 1);
-    assert.match(res.stderr, /Unknown task authority "local"/);
+    const result = spawnSync(process.execPath, [
+      path.join(SKILL_SCRIPTS, "sprint-state.js"), backlogDir,
+    ], { encoding: "utf8", env: childEnv() });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, new RegExp(`${sprintPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:7`));
+    assert.match(result.stderr, /correct the source Plan/i);
   });
 });
 
@@ -318,7 +307,7 @@ describe("parseSprintContent", () => {
     assert.deepEqual(extractSectionLines(content, "Progress"), ["- 2026-03-30: Done."]);
   });
 
-  it("defaults tracker to github and honors an explicit authority override (#476)", () => {
+  it("emits only the schema 3 plan-item fields", () => {
     const content = `---
 status: active
 ---
@@ -328,17 +317,14 @@ status: active
 
 ## Progress
 `;
-    const defaulted = parseSprintContent({ sprintPath: ".dev-backlog/sprints/a.md", content });
-    assert.equal(defaulted.plan_items[0].tracker, "github");
-    assert.equal(defaulted.in_flight[0].tracker, "github");
-
-    const overridden = parseSprintContent({
-      sprintPath: ".dev-backlog/sprints/a.md",
-      content,
-      authority: "gitlab",
+    const state = parseSprintContent({ sprintPath: ".dev-backlog/sprints/a.md", content });
+    assert.deepEqual(state.plan_items[0], {
+      ref: "#1",
+      state: "in_flight",
+      title: "In flight",
+      pointer: null,
     });
-    assert.equal(overridden.plan_items[0].tracker, "gitlab");
-    assert.equal(overridden.in_flight[0].tracker, "gitlab");
+    assert.deepEqual(Object.keys(state.plan_items[0]), ["ref", "state", "title", "pointer"]);
   });
 
   it("marks unmoored in-flight items without trace pointers", () => {
@@ -357,23 +343,17 @@ started: 2026-07-01
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
-    assert.equal(state.in_flight[0].issue_number, 7);
-    assert.equal(state.in_flight[0].pr, null);
-    assert.equal(state.in_flight[0].branch, null);
-    assert.equal(state.in_flight[0].unmoored, true);
-    assert.equal(state.in_flight[0].age_days, 2);
-    assert.equal(state.in_flight[0].age_source, "started");
+    assert.equal(state.in_flight[0].ref, "#7");
+    assert.equal(state.in_flight[0].pointer, null);
   });
 
-  it("ignores a legacy trailing [run:…] pointer and keeps the PR pointer and title (#485)", () => {
+  it("does not strip or recognize legacy trailing [run:…] text", () => {
     const item = parsePlanItem("- [~] #211 Work → PR #224 (reviewing) [run:old-relay-id]");
-    assert.deepEqual(item.pr, { number: 224, state: "reviewing" });
-    assert.equal(item.title, "Work");
-    assert.equal(item.unmoored, false);
-    assert.equal("run_id" in item, false);
+    assert.equal(item.pointer, null);
+    assert.equal(item.title, "Work → PR #224 (reviewing) [run:old-relay-id]");
     const bare = parsePlanItem("- [~] #212 Only a run pointer [run:old-relay-id]");
-    assert.equal(bare.unmoored, true);
-    assert.equal(bare.title, "Only a run pointer");
+    assert.equal(bare.pointer, null);
+    assert.equal(bare.title, "Only a run pointer [run:old-relay-id]");
   });
 
   it("treats missing sections as empty surfaces", () => {
@@ -383,86 +363,25 @@ started: 2026-07-01
       today: new Date("2026-07-03T00:00:00Z"),
     });
 
-    assert.equal(state.active_sprint.goal, "");
+    assert.equal(state.goal, "");
     assert.deepEqual(state.plan_items, []);
     assert.equal(state.next_batch, null);
     assert.deepEqual(state.latest_progress, []);
     assert.deepEqual(state.in_flight, []);
   });
 
-  it("uses progress date before started date, then null for in-flight age", () => {
-    const withStarted = parseSprintContent({
-      sprintPath: ".dev-backlog/sprints/age.md",
-      content: `---
-status: active
-started: 2026-06-30
----
-
-## Plan
-- [~] #1 Mentioned in progress
-- [~] #2 Falls back to started
-
-## Progress
-- 2026-07-01 12:00: #1 dispatched.
-- 2026-07-02 12:00: #1 still reviewing.
-`,
-      today: new Date("2026-07-04T00:00:00Z"),
-    });
-
-    assert.deepEqual(withStarted.in_flight.map((item) => ({
-      issue_number: item.issue_number,
-      age_days: item.age_days,
-      age_source: item.age_source,
-      age_basis_date: item.age_basis_date,
-    })), [
-      { issue_number: 1, age_days: 3, age_source: "progress", age_basis_date: "2026-07-01" },
-      { issue_number: 2, age_days: 4, age_source: "started", age_basis_date: "2026-06-30" },
-    ]);
-
-    const withoutDate = parseSprintContent({
-      sprintPath: ".dev-backlog/sprints/no-age.md",
-      content: `---
-status: active
----
-
-## Plan
-- [~] #3 No age basis
-
-## Progress
-- no date: #3 has no resolvable date.
-`,
-      today: new Date("2026-07-04T00:00:00Z"),
-    });
-
-    assert.equal(withoutDate.in_flight[0].age_days, null);
-    assert.equal(withoutDate.in_flight[0].age_source, null);
-    assert.equal(withoutDate.in_flight[0].age_basis_date, null);
-  });
-
-  it("matches Progress refs exactly, never on a numeric prefix", () => {
-    const state = parseSprintContent({
-      sprintPath: ".dev-backlog/sprints/age.md",
-      content: `---
-status: active
-started: 2026-06-30
----
-
-## Plan
-- [~] #1 Parent
-- [~] #11 Sibling
-
-## Progress
-- 2026-07-01: #111 is unrelated.
-- 2026-07-02: #11 started.
-- 2026-07-03: #1 started.
-`,
-      today: new Date("2026-07-04T00:00:00Z"),
-    });
-
-    assert.deepEqual(state.in_flight.map((item) => [item.ref, item.age_basis_date]), [
-      ["#1", "2026-07-03"],
-      ["#11", "2026-07-02"],
-    ]);
+  it("accepts flat, empty, and currently headed Plans", () => {
+    for (const plan of [
+      "- [ ] #1 Flat",
+      "",
+      "### Batch 1 — Current\n- [~] #2 Running [branch:work]",
+      "### Notes\n- [x] #3 Done",
+    ]) {
+      assert.doesNotThrow(() => parseSprintContent({
+        sprintPath: ".dev-backlog/sprints/valid.md",
+        content: `## Plan\n${plan}\n\n## Progress\n`,
+      }), plan);
+    }
   });
 });
 
@@ -580,11 +499,11 @@ started: 2026-07-01
     });
 
     assert.deepEqual(
-      state.in_flight.map((item) => [item.ref, item.pr, item.branch, item.unmoored]),
+      state.in_flight.map((item) => [item.ref, item.pointer]),
       [
-        ["#1", { number: 11, state: "open" }, null, false],
-        ["#2", null, "feat/two", false],
-        ["#3", null, null, true],
+        ["#1", { pr: { number: 11, state: "open" }, branch: null }],
+        ["#2", { pr: null, branch: "feat/two" }],
+        ["#3", null],
       ]
     );
   });
@@ -904,7 +823,6 @@ describe("parseArgs --format", () => {
       format: "text",
       backlogDir: "backlog with spaces",
       track: "auth",
-      component: null,
     };
     assert.deepEqual(parseArgs([
       "--mode", "next", "--format", "text", "--track", "auth", "backlog with spaces",
@@ -912,6 +830,11 @@ describe("parseArgs --format", () => {
     assert.deepEqual(parseArgs([
       "backlog with spaces", "--track=auth", "--format=text", "--mode=next",
     ]), expected);
+  });
+
+  it("rejects the removed --component selector", () => {
+    assert.match(parseArgs(["--component", "auth"]).error, /Unknown argument: --component/);
+    assert.match(parseArgs(["--component=auth"]).error, /Unknown argument: --component=auth/);
   });
 });
 
@@ -921,7 +844,11 @@ describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
   let root;
   beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "ss-cli-")); });
   afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
-  const run = (...args) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, encoding: "utf8" });
+  const run = (...args) => spawnSync(process.execPath, [BIN, ...args], {
+    cwd: root,
+    encoding: "utf8",
+    env: childEnv(),
+  });
 
   it("next: missing sprints dir prints the sprint-init hint and exits 1", () => {
     const res = run("--mode", "next", "--format", "text", "nope");

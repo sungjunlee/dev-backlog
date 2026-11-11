@@ -1,7 +1,5 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
@@ -10,8 +8,6 @@ const {
   parseSimpleYaml,
   parseIssueRef,
   parsePlanCheckbox,
-  containsIssueRef,
-  readTaskAuthority,
 } = require(path.join(SKILL_SCRIPTS, "lib.js"));
 
 // --- slugify ---
@@ -56,10 +52,10 @@ describe("slugify", () => {
 describe("parseIssueRef", () => {
   it("parses a complete GitHub issue ref", () => {
     assert.deepEqual(parseIssueRef("#1"), {
-      tracker: "github", id: "1", ref: "#1", issue_number: 1,
+      id: "1", ref: "#1", issue_number: 1,
     });
     assert.deepEqual(parseIssueRef("#42"), {
-      tracker: "github", id: "42", ref: "#42", issue_number: 42,
+      id: "42", ref: "#42", issue_number: 42,
     });
   });
 
@@ -77,7 +73,7 @@ describe("parsePlanCheckbox", () => {
   it("parses each marker with its ref and title", () => {
     assert.deepEqual(parsePlanCheckbox("- [~] #12 Child [branch:child]"), {
       checkboxState: "~",
-      identity: { tracker: "github", id: "12", ref: "#12", issue_number: 12 },
+      identity: { id: "12", ref: "#12", issue_number: 12 },
       title: "Child [branch:child]",
     });
     assert.equal(parsePlanCheckbox("- [x] #7").title, "");
@@ -94,25 +90,6 @@ describe("parsePlanCheckbox", () => {
     ]) {
       assert.equal(parsePlanCheckbox(line), null, line);
     }
-  });
-});
-
-describe("containsIssueRef", () => {
-  it("matches only an exact ref and never a prefix", () => {
-    const one = parseIssueRef("#1");
-    assert.equal(containsIssueRef("- 2026-07-01: #1 started", one), true);
-    assert.equal(containsIssueRef("- 2026-07-01: #11 started", one), false);
-    assert.equal(containsIssueRef("- 2026-07-01: note#1 started", one), false);
-    assert.equal(containsIssueRef("- 2026-07-01: review -> PR #1", one), false);
-  });
-
-  it("allows trailing punctuation but not identifier or decimal suffixes", () => {
-    const task = parseIssueRef("#42");
-    assert.equal(containsIssueRef("- 2026-07-01: completed #42.", task), true);
-    assert.equal(containsIssueRef("- 2026-07-01: completed (#42),", task), true);
-    assert.equal(containsIssueRef("- 2026-07-01: #42abc is not exact", task), false);
-    assert.equal(containsIssueRef("- 2026-07-01: #42_suffix is not exact", task), false);
-    assert.equal(containsIssueRef("- 2026-07-01: #42.1 is not an issue ref", task), false);
   });
 });
 
@@ -204,85 +181,5 @@ describe("scopesOverlap", () => {
     assert.equal(scopesOverlap({ component: "auth" }, { scope: ["src/auth/**"] }), false);
     assert.equal(scopesOverlap({}, {}), false);
     assert.equal(scopesOverlap({ component: "auth" }, {}), false);
-  });
-});
-
-// --- readTaskAuthority (#476) ---
-
-describe("readTaskAuthority", () => {
-  function root(t) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "task-authority-"));
-    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-    return dir;
-  }
-  function write(dir, content) {
-    fs.writeFileSync(path.join(dir, ".tracker"), content);
-  }
-
-  it("defaults to github when .tracker is absent", (t) => {
-    assert.equal(readTaskAuthority(root(t)), "github");
-  });
-
-  it("reads a declared github value", (t) => {
-    const dir = root(t);
-    write(dir, "github\n");
-    assert.equal(readTaskAuthority(dir), "github");
-  });
-
-  it("maps backlog and the legacy files spelling to backlog", (t) => {
-    const backlogDir = root(t);
-    write(backlogDir, "backlog\n");
-    assert.equal(readTaskAuthority(backlogDir), "backlog");
-
-    const filesDir = root(t);
-    write(filesDir, "files\n");
-    assert.equal(readTaskAuthority(filesDir), "backlog");
-  });
-
-  it("reads gitlab case-insensitively", (t) => {
-    const dir = root(t);
-    write(dir, "GITLAB\n");
-    assert.equal(readTaskAuthority(dir), "gitlab");
-  });
-
-  it("accepts a UTF-8 BOM, CRLF, and uppercase in the first line (#498)", (t) => {
-    const dir = root(t);
-    write(dir, "\uFEFFGitHub\r\nbacklog\r\n");
-    assert.equal(readTaskAuthority(dir), "github");
-  });
-
-  it("trims a trailing newline and surrounding whitespace on the first line", (t) => {
-    const dir = root(t);
-    write(dir, "  backlog  \n");
-    assert.equal(readTaskAuthority(dir), "backlog");
-  });
-
-  it("reads only the first line, ignoring anything after it", (t) => {
-    const dir = root(t);
-    write(dir, "github\nbacklog\n");
-    assert.equal(readTaskAuthority(dir), "github");
-  });
-
-  it("rejects inherited object keys such as __proto__ and constructor", (t) => {
-    for (const value of ["__proto__", "constructor", "tostring"]) {
-      const dir = root(t);
-      write(dir, `${value}\n`);
-      assert.throws(() => readTaskAuthority(dir), /Unknown task authority/);
-    }
-  });
-
-  it("names the path when .tracker is a directory", (t) => {
-    const dir = root(t);
-    fs.mkdirSync(path.join(dir, ".tracker"));
-    assert.throws(() => readTaskAuthority(dir), /Cannot read task authority: .*\.tracker is a directory\./);
-  });
-
-  it("throws on an unknown value, naming the value and the file", (t) => {
-    const dir = root(t);
-    write(dir, "local\n");
-    assert.throws(
-      () => readTaskAuthority(dir),
-      /Unknown task authority "local" in .*\.tracker; expected github, backlog \(or files\), or gitlab\./
-    );
   });
 });

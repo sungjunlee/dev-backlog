@@ -12,13 +12,7 @@ function repoDisplayPath(repoRoot, filePath, pathApi = path) {
   return filePath;
 }
 
-function configDisplayPath(backlogDir, filename = "config.yml", pathApi = path) {
-  const value = pathApi.join(backlogDir, filename);
-  return pathApi.isAbsolute(value) ? value : toPortablePath(value);
-}
-
 module.exports = {
-  configDisplayPath,
   repoDisplayPath,
   toPortablePath,
 };

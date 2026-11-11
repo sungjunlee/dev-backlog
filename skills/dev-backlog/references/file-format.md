@@ -64,13 +64,15 @@ task item.
 One line naming the task authority: `github` (the default when the file is
 absent), `backlog` (the Backlog.md CLI; `files` is accepted as the legacy
 spelling), or `gitlab`. Setup never writes it; a maintainer creates it by hand
-to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). Readers: the
-session and `sprint-state.js` (JSON `tracker` field). The bounded legacy
-migration neither reads nor displays the authority.
-Only the first line counts, trimmed and case-insensitive; an empty, unknown,
-unreadable, or directory `.tracker` fails loud — only an absent file means
-`github`. No adapter code: the `files` adapter and the frozen ports
-stay at tag `v0.11.0`.
+to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). The session
+reads it; among shipped scripts only `triage-apply --apply` reads it, solely to
+require GitHub before a write. `sprint-state.js` is authority-neutral and its
+schema-3 JSON has no `tracker` field. The bounded legacy migration neither reads
+nor displays the authority.
+For the session, only the first line counts, trimmed and case-insensitive; an
+empty, unknown, unreadable, or directory `.tracker` fails loud — only an absent
+file means `github`. No script keeps an authority allow-list. No adapter code:
+the `files` adapter and the frozen ports stay at tag `v0.11.0`.
 
 ## .dev-backlog/config.yml
 
@@ -156,8 +158,8 @@ skill-owned marker still sits under `backlog/`. It copies every declared name
 to a staging directory before publishing the complete `.dev-backlog/` recovery
 copy, then removes only those sources. A copy or publish failure leaves every
 original in place; a later removal failure leaves the complete destination copy
-from which any removed original can be recovered. It never reads `.tracker` or
-depends on the authority-name allow-list. The removed `--tracker` and
+from which any removed original can be recovered. It never reads `.tracker`.
+The removed `--tracker` and
 `--non-interactive` flags are errors.
 
 If `.dev-backlog/` already exists, migration skips (`destination-exists`) and

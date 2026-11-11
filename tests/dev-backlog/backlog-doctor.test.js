@@ -431,16 +431,35 @@ describe("runDoctor", () => {
   });
 
   it("fails when a Plan line cannot be parsed by the checkbox grammar", () => {
-    seedCleanRepo(repoRoot, sprint({ plan: "- [y] #1 Invalid state" }));
+    seedCleanRepo(repoRoot, sprint({
+      plan: [
+        "- [~] #1 Valid row [branch:one]",
+        "  - [~] #2 Indented and invalid [branch:two]",
+        "### Batch 2",
+        "- [ ] #3 Must not become actionable",
+      ].join("\n"),
+    }));
 
     const report = runDoctor({ repoRoot });
 
     assert.equal(check(report, "sprint_shape").status, "fail");
     assert.deepEqual(
       check(report, "sprint_shape").detail.unparseable_plan_lines.map((item) => item.line),
-      ["- [y] #1 Invalid state"],
+      ["  - [~] #2 Indented and invalid [branch:two]"],
     );
+    assert.match(check(report, "sprint_shape").detail.summary, /2026-07-test\.md:\d+/);
+    assert.match(check(report, "sprint_shape").detail.summary, /correct the source Plan/i);
+    assert.match(check(report, "in_flight_trace").detail.summary, /Invalid active Plan/);
     assert.equal(exitCodeFor(report), 1);
+  });
+
+  it("accepts empty, flat, and currently headed Plans", () => {
+    for (const plan of ["", "- [ ] #1 Flat", "### Batch 1 — Current\n- [ ] #1 Headed"]) {
+      seedCleanRepo(repoRoot, sprint({ plan }));
+      const report = runDoctor({ repoRoot });
+      assert.equal(check(report, "sprint_shape").status, "pass", plan);
+      fs.rmSync(path.join(repoRoot, ".dev-backlog"), { recursive: true, force: true });
+    }
   });
 
   it("warns on unmoored in-flight work without failing", () => {

@@ -273,7 +273,7 @@ describe("createSprintFile", () => {
     fs.writeFileSync(active, "---\nstatus: active \ncomponent: auth\n---\n");
 
     assert.deepEqual(listActiveSprintFiles(sprintsDir), ["active.md"]);
-    assert.equal(readSprintState({ backlogDir }).active_sprint.path, active);
+    assert.equal(readSprintState({ backlogDir }).active_sprints[0].path, active);
     const doctor = runDoctor({ repoRoot: tmpDir });
     // Doctor display paths are repo-relative and portable (forward slashes).
     assert.deepEqual(doctor.checks[0].detail.active_files, [".dev-backlog/sprints/active.md"]);

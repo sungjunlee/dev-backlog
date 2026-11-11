@@ -2,8 +2,8 @@
 /**
  * Emit actor-readable state from the active sprint file.
  *
- * The one sprint-markdown parser: --format json is the wire contract
- * (schema_version 2) is the fresh-session recovery rail; --format text is the
+ * The one sprint-markdown parser: --format json (schema_version 3) is the
+ * fresh-session recovery rail; --format text is the
  * human surface for next/status orientation.
  */
 
@@ -12,22 +12,17 @@ const path = require("path");
 const {
   parseSimpleYaml,
   scopesOverlap,
-  containsIssueRef,
-  parsePlanCheckbox, readTaskAuthority,
+  parsePlanCheckbox,
   DEFAULT_BACKLOG_DIR,
 } = require("./lib.js");
 
-// v2 (multi-track): adds `active_sprints[]`; `active_sprint` + the top-level
-// single-sprint fields are retained (sole element when exactly one is active,
-// null when a portfolio) so v1 consumers keep working. See PRD §5.2 / R5.
-const SCHEMA_VERSION = 2;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// v3 is only the portfolio: each active_sprints[] entry is one complete track.
+const SCHEMA_VERSION = 3;
 
-// Legacy `[run:…]` pointers (deprecated relay, 2026-09-19) are stripped and ignored.
-const LEGACY_RUN_RE = /\s*\[run:[^\]]+\]$/;
 const BRANCH_RE = /\[branch:([^\]\s]+)\]/;
 const PR_RE = /→ PR #(\d+) \((\w+)\)$/;
 const PROGRESS_DATE_RE = /^-\s+(\d{4}-\d{2}-\d{2})(?:\s+\d{2}:\d{2})?:/;
+const PLAN_ITEM_SOURCE = Symbol("planItemSource");
 
 const STATE_BY_MARKER = {
   " ": "todo",
@@ -37,7 +32,7 @@ const STATE_BY_MARKER = {
 
 function usage() {
   return "Usage: sprint-state.js [--mode status|next] [--format json|text]"
-    + " [--track slug | --component slug] [backlog-dir]";
+    + " [--track slug] [backlog-dir]";
 }
 
 function parseArgs(args) {
@@ -46,7 +41,6 @@ function parseArgs(args) {
     format: "json",
     backlogDir: DEFAULT_BACKLOG_DIR,
     track: null,
-    component: null,
   };
   let backlogDirSet = false;
 
@@ -80,7 +74,7 @@ function parseArgs(args) {
       continue;
     }
     let handled = false;
-    for (const [name, key] of [["track", "track"], ["component", "component"], ["format", "format"]]) {
+    for (const [name, key] of [["track", "track"], ["format", "format"]]) {
       const res = valueFlag(arg, i, name, key);
       if (res) {
         if (res.error) return { ...options, error: res.error };
@@ -108,51 +102,20 @@ function parseArgs(args) {
     return { ...options, error: `Invalid --format: ${options.format}. ${usage()}` };
   }
 
-  if (options.track && options.component) {
-    return { ...options, error: `Use only one of --track / --component. ${usage()}` };
-  }
-
   return options;
-}
-
-// Per-sprint fields shared by the single and portfolio shapes. Kept null/empty
-// at the top level of a portfolio (N>1) so v1 consumers that read
-// active_sprint/plan_items degrade to "no single active sprint".
-function emptyTopLevel() {
-  return {
-    active_sprint: null,
-    plan_items: [],
-    next_batch: null,
-    latest_progress: [],
-    in_flight: [],
-  };
 }
 
 function emptyState() {
   return {
     schema_version: SCHEMA_VERSION,
     active_sprints: [],
-    ...emptyTopLevel(),
   };
 }
 
-// One active track: retain the v1 top-level fields (back-compat) and also list
-// it under active_sprints[].
-function singleState(perSprint) {
+function stateForTracks(tracks) {
   return {
     schema_version: SCHEMA_VERSION,
-    active_sprints: [perSprint],
-    ...perSprint,
-  };
-}
-
-// N disjoint active tracks: the portfolio. Top-level singular fields are
-// null/empty; consumers read active_sprints[] or pass --track/--component.
-function portfolioState(perSprints) {
-  return {
-    schema_version: SCHEMA_VERSION,
-    active_sprints: perSprints,
-    ...emptyTopLevel(),
+    active_sprints: tracks,
   };
 }
 
@@ -195,13 +158,14 @@ function isActiveSprint(content) {
   return typeof status === "string" && status.trim() === "active";
 }
 
-function extractSectionLines(content, section) {
+function extractSectionLineRecords(content, section) {
   const lines = content.split(/\r?\n/);
   const sectionRe = new RegExp(`^## ${escapeRegExp(section)}[ \\t]*$`);
   const out = [];
   let found = false;
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     if (line.startsWith("## ")) {
       if (found) break;
       if (sectionRe.test(line)) {
@@ -209,12 +173,16 @@ function extractSectionLines(content, section) {
       }
       continue;
     }
-    if (found) out.push(line);
+    if (found) out.push({ line, line_number: index + 1 });
   }
 
-  while (out.length > 0 && out[0].trim() === "") out.shift();
-  while (out.length > 0 && out[out.length - 1].trim() === "") out.pop();
+  while (out.length > 0 && out[0].line.trim() === "") out.shift();
+  while (out.length > 0 && out[out.length - 1].line.trim() === "") out.pop();
   return out;
+}
+
+function extractSectionLines(content, section) {
+  return extractSectionLineRecords(content, section).map(({ line }) => line);
 }
 
 function hasSection(content, section) {
@@ -238,6 +206,30 @@ function parseProgressEntries(progressLines) {
     });
 }
 
+// The Plan contract is intentionally narrow: blank lines, current ###
+// headings, and the one checkbox grammar. Recovery and doctor share this rule.
+function findUnparseablePlanLines(content) {
+  return extractSectionLineRecords(content, "Plan")
+    .map((record, index) => ({ ...record, plan_line: index + 1 }))
+    .filter(({ line }) => line.trim() !== "")
+    .filter(({ line }) => !/^###\s+/.test(line))
+    .filter(({ line }) => parsePlanItem(line) === null);
+}
+
+function invalidPlanError(sprintPath, lines) {
+  const locations = lines
+    .map(({ line_number: lineNumber }) => `${sprintPath}:${lineNumber}`)
+    .join(", ");
+  const error = new Error(
+    `Invalid active Plan at ${locations}. `
+    + "Repair: correct the source Plan; do not continue from a partial or normalized projection."
+  );
+  error.code = "INVALID_ACTIVE_PLAN";
+  error.file = sprintPath;
+  error.plan_lines = lines;
+  return error;
+}
+
 function parsePlanItems(planLines) {
   const items = [];
   let batchHeading = null;
@@ -251,7 +243,10 @@ function parsePlanItems(planLines) {
     }
 
     const item = parsePlanItem(line, batchHeading);
-    if (item) items.push({ ...item, batch_index: batchIndex });
+    if (item) {
+      item[PLAN_ITEM_SOURCE].batch_index = batchIndex;
+      items.push(item);
+    }
   }
 
   return items;
@@ -263,7 +258,7 @@ function parsePlanItem(line, batchHeading = null) {
 
   const checkboxState = checkbox.checkboxState;
   const identity = checkbox.identity;
-  let title = checkbox.title.replace(LEGACY_RUN_RE, "").trim();
+  let title = checkbox.title.trim();
 
   const branchMatch = line.match(BRANCH_RE);
   const branch = branchMatch ? branchMatch[1] : null;
@@ -278,27 +273,23 @@ function parsePlanItem(line, batchHeading = null) {
 
   const state = STATE_BY_MARKER[checkboxState];
 
-  return {
-    line,
-    checkbox_state: checkboxState,
-    state,
-    tracker: identity.tracker,
-    id: identity.id,
+  const item = {
     ref: identity.ref,
-    issue_number: identity.issue_number,
+    state,
     title,
-    batch_heading: batchHeading,
-    pr,
-    branch,
-    unmoored: state === "in_flight" && !pr && !branch,
+    pointer: pr || branch ? { pr, branch } : null,
   };
+  Object.defineProperty(item, PLAN_ITEM_SOURCE, {
+    value: { line, checkbox_state: checkboxState, batch_heading: batchHeading, batch_index: null },
+  });
+  return item;
 }
 
 function findNextBatch(planItems) {
   const firstTodo = planItems.find((item) => item.state === "todo");
   if (!firstTodo) return null;
 
-  if (!firstTodo.batch_heading) {
+  if (!firstTodo[PLAN_ITEM_SOURCE].batch_heading) {
     return {
       heading: null,
       items: planItems.filter((item) => item.state === "todo"),
@@ -309,105 +300,46 @@ function findNextBatch(planItems) {
 
   // Batches are identified by position, not heading text, so a repeated
   // heading cannot merge two batches.
-  const batch = firstTodo.batch_index;
+  const batch = firstTodo[PLAN_ITEM_SOURCE].batch_index;
   const waitingOn = planItems.filter((item) =>
-    item.state === "in_flight" && item.batch_index !== null && item.batch_index < batch
+    item.state === "in_flight"
+    && item[PLAN_ITEM_SOURCE].batch_index !== null
+    && item[PLAN_ITEM_SOURCE].batch_index < batch
   ).map((item) => item.ref);
 
   return {
-    heading: firstTodo.batch_heading,
+    heading: firstTodo[PLAN_ITEM_SOURCE].batch_heading,
     items: planItems.filter(
-      (item) => item.state === "todo" && item.batch_index === batch
+      (item) => item.state === "todo" && item[PLAN_ITEM_SOURCE].batch_index === batch
     ),
     waiting_on: waitingOn,
     actionable: waitingOn.length === 0,
   };
 }
 
-function formatLocalDate(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function isDateString(value) {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function dateToUtcMs(dateString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return Date.UTC(year, month - 1, day);
-}
-
-function daysBetween(startDate, endDate) {
-  return Math.max(0, Math.floor((dateToUtcMs(endDate) - dateToUtcMs(startDate)) / MS_PER_DAY));
-}
-
-function computeAge(identityOrIssueNumber, progressEntries, startedDate, today) {
-  const identity = typeof identityOrIssueNumber === "number"
-    ? { tracker: "github", id: String(identityOrIssueNumber), ref: `#${identityOrIssueNumber}` }
-    : identityOrIssueNumber;
-  const progressDates = progressEntries
-    .filter((entry) => entry.date && containsIssueRef(entry.line, identity))
-    .map((entry) => entry.date)
-    .sort();
-
-  let basisDate = null;
-  let source = null;
-  if (progressDates.length > 0) {
-    basisDate = progressDates[0];
-    source = "progress";
-  } else if (isDateString(startedDate)) {
-    basisDate = startedDate;
-    source = "started";
-  }
-
-  if (!basisDate) {
-    return {
-      age_days: null,
-      age_source: null,
-      age_basis_date: null,
-    };
-  }
-
-  return {
-    age_days: daysBetween(basisDate, formatLocalDate(today)),
-    age_source: source,
-    age_basis_date: basisDate,
-  };
-}
-
 function parseSprintContent({
   sprintPath,
   content,
-  today = new Date(), authority = "github",
 }) {
+  const unparseable = findUnparseablePlanLines(content);
+  if (unparseable.length > 0) throw invalidPlanError(sprintPath, unparseable);
+
   const frontmatter = parseFrontmatter(content);
   const goal = extractSectionLines(content, "Goal").join("\n").trim();
   const planItems = parsePlanItems(extractSectionLines(content, "Plan"));
-  for (const item of planItems) item.tracker = authority; // #476: declared authority wins
   const progressEntries = parseProgressEntries(extractSectionLines(content, "Progress"));
   const nextBatch = findNextBatch(planItems);
-  const inFlight = planItems
-    .filter((item) => item.state === "in_flight")
-    .map((item) => ({
-      ...item,
-      ...computeAge(item, progressEntries, frontmatter.started, today),
-    }));
+  const inFlight = planItems.filter((item) => item.state === "in_flight");
 
-  // Per-sprint state (no schema_version — that lives on the top-level wrapper).
+  // Per-track state (schema_version lives on the top-level wrapper).
   return {
-    active_sprint: {
-      path: sprintPath,
-      frontmatter,
-      goal,
-    },
+    path: sprintPath,
+    frontmatter,
+    goal,
     plan_items: planItems,
     next_batch: nextBatch,
-    latest_progress: progressEntries.slice(-5).reverse(),
     in_flight: inFlight,
+    latest_progress: progressEntries.slice(-5).reverse(),
   };
 }
 
@@ -416,92 +348,110 @@ function sprintSlug(sprintPath) {
 }
 
 // Ascending by frontmatter `started:` (D4), filename as a stable tiebreaker.
-function comparePerSprint(a, b) {
-  const sa = a.active_sprint.frontmatter.started || "";
-  const sb = b.active_sprint.frontmatter.started || "";
+function compareTrackRecords(a, b) {
+  const sa = a.frontmatter.started || "";
+  const sb = b.frontmatter.started || "";
   if (sa !== sb) return sa < sb ? -1 : 1;
-  return a.active_sprint.path < b.active_sprint.path ? -1 : 1;
+  return a.path < b.path ? -1 : 1;
 }
 
-function matchesSelector(perSprint, { track, component }) {
-  const fm = perSprint.active_sprint.frontmatter || {};
+function matchesSelector(trackRecord, track) {
+  const fm = trackRecord.frontmatter || {};
   const fmComponent = typeof fm.component === "string" ? fm.component.trim() : "";
-  if (component) return fmComponent === component;
   // --track matches the sprint slug or its component handle.
-  return sprintSlug(perSprint.active_sprint.path) === track || fmComponent === track;
+  return sprintSlug(trackRecord.path) === track || fmComponent === track;
 }
 
-function firstOverlappingPair(perSprints) {
-  for (let i = 0; i < perSprints.length; i += 1) {
-    for (let j = i + 1; j < perSprints.length; j += 1) {
-      if (scopesOverlap(
-        perSprints[i].active_sprint.frontmatter,
-        perSprints[j].active_sprint.frontmatter
-      )) {
-        return [perSprints[i], perSprints[j]];
+function firstOverlappingPair(trackRecords) {
+  for (let i = 0; i < trackRecords.length; i += 1) {
+    for (let j = i + 1; j < trackRecords.length; j += 1) {
+      if (scopesOverlap(trackRecords[i].frontmatter, trackRecords[j].frontmatter)) {
+        return [trackRecords[i], trackRecords[j]];
       }
     }
   }
   return null;
 }
 
+// One shared active-track read for recovery and doctor: discovery, parse,
+// ordering, Plan validity capture, and overlap search all happen here.
+function readActiveTracks(sprintsDir, {
+  existsSync = fs.existsSync,
+  readdirSync = fs.readdirSync,
+  readFileSync = fs.readFileSync,
+  statSync = fs.statSync,
+} = {}) {
+  const tracks = findActiveSprintFiles(sprintsDir, {
+    existsSync,
+    readdirSync,
+    readFileSync,
+    statSync,
+  }).map((sprintPath) => {
+    const content = readFileSync(sprintPath, "utf-8");
+    const record = {
+      path: sprintPath,
+      slug: sprintSlug(sprintPath),
+      frontmatter: parseFrontmatter(content),
+      content,
+      track: null,
+      error: null,
+    };
+    try {
+      record.track = parseSprintContent({ sprintPath, content });
+    } catch (error) {
+      record.error = error;
+    }
+    return record;
+  }).sort(compareTrackRecords);
+  return { tracks, overlap: firstOverlappingPair(tracks) };
+}
+
 function readSprintState({
   backlogDir = DEFAULT_BACKLOG_DIR,
-  today = new Date(),
   track = null,
-  component = null,
   existsSync = fs.existsSync,
   readdirSync = fs.readdirSync,
   readFileSync = fs.readFileSync,
   statSync = fs.statSync,
 } = {}) {
   const sprintsDir = path.join(backlogDir, "sprints");
-  const authority = readTaskAuthority(backlogDir); // #476: read once per run
-  const activeFiles = findActiveSprintFiles(sprintsDir, {
+  const portfolio = readActiveTracks(sprintsDir, {
     existsSync,
     readdirSync,
     readFileSync,
     statSync,
   });
+  const records = portfolio.tracks;
 
-  if (activeFiles.length === 0) return emptyState();
+  if (records.length === 0) return emptyState();
 
-  const perSprints = activeFiles
-    .map((sprintPath) => parseSprintContent({
-      sprintPath,
-      content: readFileSync(sprintPath, "utf-8"),
-      today,
-      authority,
-    }))
-    .sort(comparePerSprint);
+  const invalid = records.find((record) => record.error);
+  if (invalid) throw invalid.error;
 
-  // Explicit track/component selector: resolve to that one track deterministically.
-  if (track || component) {
-    const matches = perSprints.filter((s) => matchesSelector(s, { track, component }));
+  // Explicit track selector: resolve slug or component handle deterministically.
+  if (track) {
+    const matches = records.filter((record) => matchesSelector(record, track));
     if (matches.length === 0) return emptyState();
     if (matches.length > 1) {
-      const selector = track || component;
-      throw new Error(`Ambiguous active track '${selector}':\n`
-        + matches.map((s) => `  ${s.active_sprint.path}`).join("\n"));
+      throw new Error(`Ambiguous active track '${track}':\n`
+        + matches.map((record) => `  ${record.path}`).join("\n"));
     }
-    return singleState(matches[0]);
+    return stateForTracks([matches[0].track]);
   }
 
-  if (perSprints.length === 1) return singleState(perSprints[0]);
-
   // N active tracks: a portfolio when scopes are disjoint; fail loud on overlap.
-  const overlap = firstOverlappingPair(perSprints);
+  const overlap = portfolio.overlap;
   if (overlap) {
     const [a, b] = overlap;
     const error = new Error(
-      `Active tracks overlap on scope:\n  ${a.active_sprint.path}\n  ${b.active_sprint.path}\n`
+      `Active tracks overlap on scope:\n  ${a.path}\n  ${b.path}\n`
       + "Give them disjoint component:/scope: or close one before continuing."
     );
     error.code = "OVERLAPPING_TRACKS";
-    error.files = [a.active_sprint.path, b.active_sprint.path];
+    error.files = [a.path, b.path];
     throw error;
   }
-  return portfolioState(perSprints);
+  return stateForTracks(records.map((record) => record.track));
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +484,7 @@ function itemLines(planItems, state, limit = Infinity) {
   return planItems
     .filter((item) => item.state === state)
     .slice(0, limit)
-    .map((item) => `  ${item.line}`);
+    .map((item) => `  ${item[PLAN_ITEM_SOURCE].line}`);
 }
 
 function goalLines(goal) {
@@ -559,14 +509,14 @@ function nextBatchLines(nextBatch) {
     waitingOn.length > 0
       ? `Waiting: ${heading} (on ${waitingOn.join(", ")})`
       : (heading ? `Next: ${heading}` : "Next items:"),
-    ...items.map((item) => `  ${item.line}`),
+    ...items.map((item) => `  ${item[PLAN_ITEM_SOURCE].line}`),
   ];
 }
 
 function nextSingleLines(perSprint) {
   const counts = countStates(perSprint.plan_items);
-  const lines = [`=== Sprint: ${sprintSlug(perSprint.active_sprint.path)} ===`, ""];
-  const goal = goalLines(perSprint.active_sprint.goal);
+  const lines = [`=== Sprint: ${sprintSlug(perSprint.path)} ===`, ""];
+  const goal = goalLines(perSprint.goal);
   if (goal.length > 0) lines.push(`Goal: ${goal[0]}`, ...goal.slice(1), "");
   lines.push(progressLine(counts), "");
   if (isReadyToClose(counts)) return [...lines, "All items checked! Ready to close sprint."];
@@ -581,13 +531,13 @@ function nextSingleLines(perSprint) {
 function nextTrackLines(perSprint) {
   const counts = countStates(perSprint.plan_items);
   const inFlight = counts.in_flight > 0 ? `, ${counts.in_flight} in-flight` : "";
-  const slug = sprintSlug(perSprint.active_sprint.path);
+  const slug = sprintSlug(perSprint.path);
   const lines = [`${slug}: ${counts.done}/${counts.total} done${inFlight}`];
   const todo = perSprint.plan_items.find((item) => item.state === "todo");
   if (todo) {
     const waitingOn = perSprint.next_batch?.waiting_on || [];
     const label = waitingOn.length ? `Waiting on ${waitingOn.join(", ")}` : "Next";
-    lines.push(`  ${label}: ${todo.line.replace(/^- \[ \] /, "")}`);
+    lines.push(`  ${label}: ${todo[PLAN_ITEM_SOURCE].line.replace(/^- \[ \] /, "")}`);
   }
   return lines;
 }
@@ -605,7 +555,7 @@ function nextPortfolioLines(perSprints) {
 function statusCountLine(perSprint, { indent = "", unit = "" } = {}) {
   const counts = countStates(perSprint.plan_items);
   const inFlight = counts.in_flight > 0 ? ` — ${counts.in_flight} in-flight` : "";
-  const slug = sprintSlug(perSprint.active_sprint.path);
+  const slug = sprintSlug(perSprint.path);
   return `${indent}${slug}: ${counts.done}/${counts.total}${unit}`
     + ` (${percentDone(counts)}%)${inFlight}`;
 }
@@ -618,7 +568,8 @@ function statusSingleLines(perSprint) {
   const waitingOn = perSprint.next_batch?.waiting_on || [];
   if (waitingOn.length > 0) {
     // Only the blocked batch waits; later batches are not listed under it.
-    const waiting = perSprint.next_batch.items.slice(0, 3).map((item) => `  ${item.line}`);
+    const waiting = perSprint.next_batch.items.slice(0, 3)
+      .map((item) => `  ${item[PLAN_ITEM_SOURCE].line}`);
     lines.push("", `Waiting on ${waitingOn.join(", ")}:`, ...waiting);
   } else {
     const todo = itemLines(perSprint.plan_items, "todo", 3);
@@ -655,8 +606,8 @@ function nextReport(options, sprintsDir, selector) {
     if (selector) return noTrackReport(sprintsDir, selector);
     return { lines: ["No active sprint found.", NO_SPRINT_HINT], code: 0 };
   }
-  const lines = state.active_sprint
-    ? nextSingleLines(state)
+  const lines = state.active_sprints.length === 1
+    ? nextSingleLines(state.active_sprints[0])
     : nextPortfolioLines(state.active_sprints);
   return { lines, code: 0 };
 }
@@ -671,8 +622,8 @@ function statusReport(options, sprintsDir, selector) {
     const empty = selector ? `(no active track matches '${selector}')` : "(no active sprint)";
     return { lines: [header, empty], code: 0 };
   }
-  const body = state.active_sprint
-    ? statusSingleLines(state)
+  const body = state.active_sprints.length === 1
+    ? statusSingleLines(state.active_sprints[0])
     : statusPortfolioLines(state.active_sprints);
   return { lines: [header, ...body], code: 0 };
 }
@@ -680,7 +631,7 @@ function statusReport(options, sprintsDir, selector) {
 // { lines, code } so the caller owns printing and the exit status.
 function textReport(options) {
   const sprintsDir = path.join(options.backlogDir || DEFAULT_BACKLOG_DIR, "sprints");
-  const selector = options.track || options.component || null;
+  const selector = options.track || null;
   return options.mode === "next"
     ? nextReport(options, sprintsDir, selector)
     : statusReport(options, sprintsDir, selector);
@@ -714,7 +665,6 @@ function main() {
     const state = readSprintState({
       backlogDir: parsed.backlogDir,
       track: parsed.track,
-      component: parsed.component,
     });
     console.log(JSON.stringify(state, null, 2));
   } catch (error) {
@@ -734,11 +684,12 @@ module.exports = {
   extractSectionLines,
   hasSection,
   parseProgressEntries,
+  findUnparseablePlanLines,
   parsePlanItem,
   parsePlanItems,
   findNextBatch,
-  computeAge,
   parseSprintContent,
+  readActiveTracks,
   readSprintState,
   textReport,
 };
