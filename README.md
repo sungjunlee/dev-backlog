@@ -69,12 +69,17 @@ Duration, estimate, and milestone membership alone do not require one.
 
 ```bash
 # from the project you manage, not from this repo
-node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
-  --non-interactive
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system"
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-state.js \
   --mode next --format text
 ```
+
+`sprint-init.js` creates `.dev-backlog/sprints/` in a fresh repository. Only a
+repository that still has the pre-`.dev-backlog/` skill layout needs the
+bounded compatibility command: back up the tree, inspect the declared moves in
+[file-format.md](skills/dev-backlog/references/file-format.md), then explicitly
+run `setup-dev-backlog.js --migrate-legacy`. Routine commands never move
+leftover `backlog/` content.
 
 Close an admitted sprint with a deliberate edit: change its frontmatter
 `status: active` to `status: completed` and append one Progress line. Verify the

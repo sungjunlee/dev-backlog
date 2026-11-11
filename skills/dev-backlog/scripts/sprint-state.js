@@ -648,7 +648,7 @@ function noTrackReport(sprintsDir, selector) {
 
 function nextReport(options, sprintsDir, selector) {
   if (!fs.existsSync(sprintsDir)) {
-    return { lines: [`No ${sprintsDir} directory. Run setup-dev-backlog.js first.`], code: 1 };
+    return { lines: [`No ${sprintsDir} directory. Create a sprint with sprint-init.js first.`], code: 1 };
   }
   const state = readSprintState(options);
   if (state.active_sprints.length === 0) {

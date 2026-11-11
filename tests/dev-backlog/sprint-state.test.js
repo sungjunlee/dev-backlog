@@ -852,7 +852,7 @@ Still flying.
 
     assert.deepEqual(textReport({ mode: "next", backlogDir }), {
       code: 1,
-      lines: [`No ${sprintsDir} directory. Run setup-dev-backlog.js first.`],
+      lines: [`No ${sprintsDir} directory. Create a sprint with sprint-init.js first.`],
     });
     assert.deepEqual(textReport({ mode: "status", backlogDir }), {
       code: 0,
@@ -923,10 +923,10 @@ describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
   afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
   const run = (...args) => spawnSync(process.execPath, [BIN, ...args], { cwd: root, encoding: "utf8" });
 
-  it("next: missing sprints dir prints the setup hint and exits 1", () => {
+  it("next: missing sprints dir prints the sprint-init hint and exits 1", () => {
     const res = run("--mode", "next", "--format", "text", "nope");
     assert.equal(res.status, 1);
-    const expected = `No ${path.join("nope", "sprints")} directory. Run setup-dev-backlog.js first.\n`;
+    const expected = `No ${path.join("nope", "sprints")} directory. Create a sprint with sprint-init.js first.\n`;
     assert.equal(res.stdout, expected);
   });
 

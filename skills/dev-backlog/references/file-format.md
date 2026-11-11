@@ -65,8 +65,8 @@ One line naming the task authority: `github` (the default when the file is
 absent), `backlog` (the Backlog.md CLI; `files` is accepted as the legacy
 spelling), or `gitlab`. Setup never writes it; a maintainer creates it by hand
 to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). Readers: the
-session, `sprint-state.js` (JSON `tracker` field), and `setup-dev-backlog.js`
-(result line).
+session and `sprint-state.js` (JSON `tracker` field). The bounded legacy
+migration neither reads nor displays the authority.
 Only the first line counts, trimmed and case-insensitive; an empty, unknown,
 unreadable, or directory `.tracker` fails loud — only an absent file means
 `github`. No adapter code: the `files` adapter and the frozen ports
@@ -74,10 +74,11 @@ stay at tag `v0.11.0`.
 
 ## .dev-backlog/config.yml
 
-`config.yml` is not read by this skill. Setup never creates, rewrites, or
-removes fields from it; an existing file (Backlog.md's, or a leftover of an
-earlier release) is preserved byte-for-byte. `backlog-triage` reads its own
-`.dev-backlog/triage-config.yml`.
+`config.yml` is not parsed by this skill. Routine commands never create,
+rewrite, or remove fields from it; an existing file (Backlog.md's, or a
+leftover of an earlier release) is preserved byte-for-byte. The explicitly
+authorized legacy migration may relocate the whole file as described below.
+`backlog-triage` reads its own `.dev-backlog/triage-config.yml`.
 
 ## Task specification
 
@@ -138,14 +139,31 @@ git mv backlog/triage-config.yml .dev-backlog/triage-config.yml  # if present
 `config.yml`: move it only when it is this skill's leftover file. If it is a
 Backlog.md config or the ownership is ambiguous, leave it under `backlog/`.
 
-### Setup auto-migrate
+### Explicit compatibility command
 
-`setup-dev-backlog.js` copies then removes those same skill-owned names when
-`.dev-backlog/` is absent and at least one skill-owned name still sits under
-`backlog/`. That path is not `git mv`, takes no backup, and is not atomic.
-If `.dev-backlog/` already exists, auto-migrate skips (`destination-exists`)
-and does not retry: leftover skill names stay under `backlog/`. They are not a
-second active root.
+Routine commands never inspect or move `backlog/`. `sprint-init.js`
+creates `.dev-backlog/sprints/` directly on a fresh repository. After a backup
+and review of the declared names above, authorize the retained one-time path
+explicitly:
+
+```bash
+node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
+  --migrate-legacy
+```
+
+The command runs only when `.dev-backlog/` is absent and at least one
+skill-owned marker still sits under `backlog/`. It copies every declared name
+to a staging directory before publishing the complete `.dev-backlog/` recovery
+copy, then removes only those sources. A copy or publish failure leaves every
+original in place; a later removal failure leaves the complete destination copy
+from which any removed original can be recovered. It never reads `.tracker` or
+depends on the authority-name allow-list. The removed `--tracker` and
+`--non-interactive` flags are errors.
+
+If `.dev-backlog/` already exists, migration skips (`destination-exists`) and
+does not retry: leftover skill names stay byte-identical under `backlog/`. They
+are not a second active root. Routine commands likewise leave existing sprint
+files, `_context.md`, and leftover `backlog/` content byte-identical.
 
 A lone `backlog/config.yml` with no `sprints/`, `triage/`, or
 `triage-config.yml` is left in place (Backlog.md or ambiguous). `config.yml`
@@ -153,3 +171,20 @@ is migrated only when one of those skill markers is present; a leftover
 `backlog/.tracker` is parked and stays where it is.
 
 This is one-way: do not copy execution files back into `backlog/`.
+
+### Compatibility window
+
+An anonymized 2026-11-12 check covered 26 maintained-consumer default
+branches under aliases consumer-F through consumer-AE (zero unknown).
+Historical aliases consumer-A through consumer-E were not part of this check.
+
+| Legacy layout | Present aliases | Present | Absent | Unknown |
+| --- | --- | ---: | ---: | ---: |
+| `backlog/sprints/` | consumer-F, consumer-G, consumer-H, consumer-I, consumer-J, consumer-K, consumer-L, consumer-M, consumer-N, consumer-O, consumer-P, consumer-Q, consumer-R | 13 | 13 | 0 |
+| `backlog/triage/` | consumer-G, consumer-N | 2 | 24 | 0 |
+
+For each row, every unlisted alias in consumer-F through consumer-AE is
+absent; none of the 26 is unknown.
+Because both layouts still exist, the explicit compatibility command remains.
+Delete the migration implementation and command only after a later anonymized
+check finds **0 present and 0 unknown for both layouts**.

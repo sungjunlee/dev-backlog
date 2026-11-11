@@ -106,7 +106,7 @@ added to the active Plan.
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: when `.dev-backlog/` is missing, `setup-dev-backlog.js` creates it first, migrating a legacy `backlog/` skill layout (sprints, config, triage) and leaving `backlog/tasks/`, `docs/`, `completed/` in place (`references/file-format.md`). `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and refuses an overlapping track. You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and missing execution directories on a fresh repository, refuses unsafe directory paths or an overlapping track, and never moves leftover `backlog/` content. A legacy skill layout moves only through the explicitly authorized `setup-dev-backlog.js --migrate-legacy` compatibility command (`references/file-format.md`). You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
@@ -151,7 +151,7 @@ Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/`
 
 Core scripts:
 
-- `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
+- `scripts/setup-dev-backlog.js --migrate-legacy` — explicit one-time migration of a legacy skill layout; not fresh setup.
 - `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
 - `scripts/sprint-state.js` — next/status JSON recovery state and text rendering; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/backlog-doctor.js` — aggregate health checks; `--json` is the machine surface.

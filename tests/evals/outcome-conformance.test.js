@@ -117,6 +117,32 @@ describe("read-only and bounded graders", () => {
     }
   });
 
+  it("grades fresh planning through sprint-init and rejects legacy setup", () => {
+    const sprintPath = ".dev-backlog/sprints/2026-11-fresh.md";
+    const context = tmpContext({
+      [sprintPath]: [
+        "---", "status: active", "scope: [\"src/fresh/**\"]", "---", "",
+        "# fresh", "", "## Goal", "", "## Plan", "", "## Running Context", "", "## Progress", "",
+      ].join("\n"),
+    }, [
+      { command: "node", args: ["skills/dev-backlog/scripts/sprint-init.js", "fresh", "--scope", "src/fresh/**"], status: 0 },
+    ]);
+    try {
+      let outcome = gradeScenario(scenario("fresh-repository-plan"), context);
+      assert.equal(outcome.pass, true);
+      context.invocations.push({
+        command: "node",
+        args: ["skills/dev-backlog/scripts/setup-dev-backlog.js", "--migrate-legacy"],
+        status: 0,
+      });
+      outcome = gradeScenario(scenario("fresh-repository-plan"), context);
+      assert.equal(outcome.checks.find((item) => item.name.includes("does not invoke legacy migration")).pass, false);
+      assert.equal(outcome.pass, false);
+    } finally {
+      fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
   it("fails a Backlog direct read when a Backlog edit is recorded", () => {
     const context = tmpContext({ ".dev-backlog/.tracker": "backlog\n" }, [
       { command: "backlog", args: ["task", "7", "--plain"], status: 0 },

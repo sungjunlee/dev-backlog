@@ -16,6 +16,25 @@ const {
   createSprintFile,
 } = require(path.join(SKILL_SCRIPTS, "sprint-init.js"));
 
+function snapshot(directory) {
+  const result = {};
+  function walk(current, relative = "") {
+    if (!fs.existsSync(current)) return;
+    for (const name of fs.readdirSync(current).sort()) {
+      const full = path.join(current, name);
+      const key = path.join(relative, name);
+      const stat = fs.lstatSync(full);
+      result[key] = {
+        type: stat.isDirectory() ? "directory" : stat.isSymbolicLink() ? "symlink" : "file",
+        bytes: stat.isFile() ? fs.readFileSync(full, "base64") : null,
+      };
+      if (stat.isDirectory()) walk(full, key);
+    }
+  }
+  walk(directory);
+  return result;
+}
+
 describe("parseArgs", () => {
   it("parses topic and milestone", () => {
     const parsed = parseArgs(["auth-system", "--milestone", "Sprint W13"]);
@@ -149,6 +168,99 @@ describe("createSprintFile", () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates the sprint and execution directories in a fresh repository (#499)", () => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const run = spawnSync(process.execPath, [cli, "fresh-plan", "--scope", "src/fresh/**"], {
+      cwd: tmpDir,
+      encoding: "utf8",
+    });
+
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
+    const names = fs.readdirSync(sprintsDir);
+    assert.equal(names.length, 1);
+    assert.match(names[0], /^\d{4}-\d{2}-fresh-plan\.md$/);
+    assert.match(fs.readFileSync(path.join(sprintsDir, names[0]), "utf8"), /^scope: \["src\/fresh\/\*\*"\]$/m);
+  });
+
+  it("refuses irregular execution-root and sprints paths before any write (#499)", () => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const cases = [
+      {
+        arrange() { fs.writeFileSync(path.join(tmpDir, ".dev-backlog"), "root bytes\n"); },
+        message: /unsafe execution root path/,
+      },
+      {
+        arrange() {
+          fs.rmSync(path.join(tmpDir, ".dev-backlog"), { force: true });
+          fs.mkdirSync(path.join(tmpDir, ".dev-backlog"));
+          fs.writeFileSync(path.join(tmpDir, ".dev-backlog", "sprints"), "sprints bytes\n");
+        },
+        message: /unsafe sprints path/,
+      },
+    ];
+
+    for (const testCase of cases) {
+      testCase.arrange();
+      const before = snapshot(tmpDir);
+      const run = spawnSync(process.execPath, [cli, "unsafe"], { cwd: tmpDir, encoding: "utf8" });
+      assert.equal(run.status, 1);
+      assert.match(run.stdout + run.stderr, testCase.message);
+      assert.deepEqual(snapshot(tmpDir), before);
+    }
+  });
+
+  it("refuses symlinked execution-root and sprints paths before any write (#499)", (t) => {
+    const cli = path.join(SKILL_SCRIPTS, "sprint-init.js");
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "sprint-init-outside-"));
+    t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+    try {
+      fs.symlinkSync(outside, path.join(tmpDir, ".dev-backlog"), "dir");
+    } catch (error) {
+      if (process.platform === "win32" && error.code === "EPERM") {
+        t.skip("Windows symlink privilege unavailable");
+        return;
+      }
+      throw error;
+    }
+    let before = snapshot(tmpDir);
+    let run = spawnSync(process.execPath, [cli, "unsafe-root"], { cwd: tmpDir, encoding: "utf8" });
+    assert.equal(run.status, 1);
+    assert.match(run.stdout + run.stderr, /unsafe execution root path/);
+    assert.deepEqual(snapshot(tmpDir), before);
+
+    fs.unlinkSync(path.join(tmpDir, ".dev-backlog"));
+    fs.mkdirSync(path.join(tmpDir, ".dev-backlog"));
+    fs.symlinkSync(outside, path.join(tmpDir, ".dev-backlog", "sprints"), "dir");
+    before = snapshot(tmpDir);
+    run = spawnSync(process.execPath, [cli, "unsafe-sprints"], { cwd: tmpDir, encoding: "utf8" });
+    assert.equal(run.status, 1);
+    assert.match(run.stdout + run.stderr, /unsafe sprints path/);
+    assert.deepEqual(snapshot(tmpDir), before);
+  });
+
+  it("adds a sprint without changing existing sprint, context, or leftover backlog bytes (#499)", () => {
+    const sprintsDir = path.join(tmpDir, ".dev-backlog", "sprints");
+    fs.mkdirSync(sprintsDir, { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "backlog", "sprints"), { recursive: true });
+    const existing = path.join(sprintsDir, "2026-01-existing.md");
+    const context = path.join(sprintsDir, "_context.md");
+    const leftover = path.join(tmpDir, "backlog", "sprints", "leftover.md");
+    fs.writeFileSync(existing, Buffer.from([0x2d, 0x2d, 0x2d, 0x0d, 0x0a, 0xff]));
+    fs.writeFileSync(context, "context\r\n");
+    fs.writeFileSync(leftover, "leftover\r\n");
+    const before = [existing, context, leftover].map((file) => fs.readFileSync(file));
+
+    createSprintFile({
+      topic: "new",
+      milestone: "M",
+      sprintsDir,
+      today: new Date("2026-04-05T09:00:00Z"),
+    });
+
+    assert.deepEqual([existing, context, leftover].map((file) => fs.readFileSync(file)), before);
   });
 
   it("uses only trimmed frontmatter status across every Node reader (#496, #498)", () => {

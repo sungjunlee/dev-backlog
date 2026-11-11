@@ -200,6 +200,32 @@ const SCENARIOS = [
     },
   },
   {
+    id: "fresh-repository-plan",
+    title: "Create a sprint directly in a fresh repository",
+    skill: "dev-backlog",
+    guarantees: ["G5"],
+    prompt: "Plan a sprint named fresh with scope `src/fresh/**` in this fresh repository. Create only the sprint skeleton; do not add issues.",
+    fixture() {},
+    grade(context) {
+      const initCalls = scriptCalls(context, "sprint-init.js");
+      const setupCalls = scriptCalls(context, "setup-dev-backlog.js");
+      const sprintsDir = path.join(context.root, ".dev-backlog/sprints");
+      const sprintFiles = fs.existsSync(sprintsDir)
+        ? fs.readdirSync(sprintsDir).filter((name) => name.endsWith(".md"))
+        : [];
+      const sprintPath = sprintFiles.length === 1 ? path.join(sprintsDir, sprintFiles[0]) : null;
+      const sprint = sprintPath ? fs.readFileSync(sprintPath, "utf8") : "";
+      return [
+        check("sprint-init creates the fresh execution root", initCalls.some((call) => call.status === 0), initCalls),
+        check("fresh planning does not invoke legacy migration", setupCalls.length === 0, setupCalls),
+        check("one sprint skeleton is created", sprintFiles.length === 1 && /^\d{4}-\d{2}-fresh\.md$/.test(sprintFiles[0]), sprintFiles),
+        check("requested scope and empty Plan are preserved", /^scope: \["src\/fresh\/\*\*"\]$/m.test(sprint) && /## Plan\r?\n\r?\n/.test(sprint), sprint),
+        check("legacy backlog is not created", !fs.existsSync(path.join(context.root, "backlog")), changedPaths(context)),
+        check("no authority operations occurred", unexpectedAuthorityCalls(context, () => false).length === 0, unexpectedAuthorityCalls(context, () => false)),
+      ];
+    },
+  },
+  {
     id: "authority-read-fails-closed",
     title: "Stop after one failed authority read without fallback",
     skill: "dev-backlog",
@@ -388,7 +414,7 @@ const GUARANTEES = [
   { id: "G2", text: "authority mutations are deliberate; triage apply is accepted-only and GitHub-only", tests: ["triage-human-gate", "triage-apply-github-only"] },
   { id: "G3", text: "active tracks never overlap silently", tests: ["overlapping-track-refused"] },
   { id: "G4", text: "spec changes require explicit human approval", tests: ["spec-change-requires-approval"] },
-  { id: "G5", text: "no adapter, background sync, or replacement lifecycle engine", tests: ["authority-read-fails-closed", "backlog-authority-direct-read", "close-sprint-bounded-effects"] },
+  { id: "G5", text: "no adapter, background sync, or replacement lifecycle engine", tests: ["authority-read-fails-closed", "backlog-authority-direct-read", "close-sprint-bounded-effects", "fresh-repository-plan"] },
 ];
 
 function snapshotTree(root) {
@@ -427,7 +453,7 @@ function normalizeInvocation(invocation, root) {
 }
 
 function relevantInvocations(invocations) {
-  const scripts = new Set(["sprint-state.js", "sprint-init.js", "triage-apply.js"]);
+  const scripts = new Set(["sprint-state.js", "sprint-init.js", "setup-dev-backlog.js", "triage-apply.js"]);
   return invocations.filter((invocation) =>
     ["gh", "backlog"].includes(invocation.command) ||
     invocation.args.some((arg) => scripts.has(path.basename(String(arg).replaceAll("\\", "/"))))
