@@ -64,7 +64,7 @@ describe("deliberate session sprint close (#498)", () => {
 
     const state = readSprintState({ backlogDir });
     assert.deepEqual(state.active_sprints, []);
-    assert.equal(state.active_sprint, null);
+    assert.equal("active_sprint" in state, false);
 
     const status = spawnSync(process.execPath, [
       STATE_BIN, "--mode", "status", "--format", "text", backlogDir,

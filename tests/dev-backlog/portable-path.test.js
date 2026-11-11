@@ -4,7 +4,6 @@ const path = require("node:path");
 
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const {
-  configDisplayPath,
   repoDisplayPath,
   toPortablePath,
 } = require(path.join(SKILL_SCRIPTS, "portable-path.js"));
@@ -20,13 +19,5 @@ describe("portable path boundaries", () => {
       ".dev-backlog/config.yml"
     );
     assert.equal(repoDisplayPath("C:\\repo", "D:\\outside.yml", path.win32), "D:\\outside.yml");
-  });
-
-  it("normalizes default relative config paths and preserves absolute config paths", () => {
-    assert.equal(configDisplayPath(".dev-backlog"), ".dev-backlog/config.yml");
-    assert.equal(
-      configDisplayPath("C:\\repo\\.dev-backlog", "config.yml", path.win32),
-      "C:\\repo\\.dev-backlog\\config.yml"
-    );
   });
 });

@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("node:child_process");
-const { GH_EXEC_DEFAULTS, readTaskAuthority } = require("../../dev-backlog/scripts/lib.js");
+const { GH_EXEC_DEFAULTS } = require("../../dev-backlog/scripts/lib.js");
 const { ANCHOR_PATTERN, parseAnchor } = require("./anchor.js");
 
 const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
@@ -18,6 +18,31 @@ const SUPPORTED_VERBS = new Set([
   "assign-milestone",
 ]);
 const UNKNOWN_PRIORITY_PLACEHOLDER = "priority:<existing-if-any>";
+
+// The triage writer is intentionally the only shipped script that reads the
+// session's authority line. It has one decision: absent/github may apply;
+// every other present value fails before GitHub or the apply log.
+function assertGitHubAuthority(backlogDir) {
+  const trackerPath = path.join(backlogDir, ".tracker");
+  let line;
+  try {
+    line = fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
+  } catch (error) {
+    if (error.code === "EISDIR") {
+      throw new Error(`Cannot read task authority: ${trackerPath} is a directory.`);
+    }
+    if (error.code !== "ENOENT") throw error;
+    let dangling = false;
+    try { dangling = fs.lstatSync(trackerPath).isSymbolicLink(); } catch { /* absent */ }
+    if (fs.existsSync(trackerPath) || dangling) {
+      throw new Error(`Cannot read task authority: ${trackerPath} is unreadable.`);
+    }
+    return;
+  }
+  if (line !== "github") {
+    throw new Error(`task authority is ${JSON.stringify(line)}; triage apply requires github.`);
+  }
+}
 
 function usage() {
   return "Usage: triage-apply.js <report.md> [--apply] [--yes] [--json]";
@@ -847,10 +872,7 @@ function execute(argv = process.argv.slice(2), deps = {}) {
 
   if (options.apply) {
     try {
-      const authority = readTaskAuthority(path.resolve(cwd, DEFAULT_BACKLOG_DIR));
-      if (authority !== "github") {
-        throw new Error(`task authority is ${JSON.stringify(authority)}; triage apply requires github.`);
-      }
+      assertGitHubAuthority(path.resolve(cwd, DEFAULT_BACKLOG_DIR));
     } catch (error) {
       return { exitCode: 1, error: `Cannot apply triage actions: ${error.message}` };
     }
@@ -1014,6 +1036,7 @@ module.exports = {
   CHECKBOX_PATTERN,
   SUPPORTED_VERBS,
   UNKNOWN_PRIORITY_PLACEHOLDER,
+  assertGitHubAuthority,
   usage,
   parseArgs,
   normalizeArgs,

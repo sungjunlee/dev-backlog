@@ -1,35 +1,6 @@
 /** Shared library for dev-backlog Node scripts. */
 
-const fs = require("node:fs");
-const path = require("node:path");
 const { DEFAULT_BACKLOG_DIR } = require("./execution-root.js");
-const TASK_AUTHORITIES = { github: "github", backlog: "backlog", files: "backlog", gitlab: "gitlab" };
-/** First line of `<backlogDir>/.tracker`, or null when the file is absent (#476). */
-function readTrackerLine(trackerPath) {
-  try {
-    return fs.readFileSync(trackerPath, "utf-8").split("\n")[0].trim().toLowerCase();
-  } catch (error) {
-    if (error.code === "EISDIR") throw new Error(`Cannot read task authority: ${trackerPath} is a directory.`);
-    if (error.code !== "ENOENT") throw error;
-    if (fs.existsSync(trackerPath) || isSymlink(trackerPath)) throw new Error(`Cannot read task authority: ${trackerPath} is unreadable.`);
-    return null;
-  }
-}
-
-function isSymlink(targetPath) {
-  try { return fs.lstatSync(targetPath).isSymbolicLink(); } catch { return false; }
-}
-
-/** `.tracker` one line; absent -> "github"; `files` is the legacy spelling of `backlog`. */
-function readTaskAuthority(backlogDir) {
-  const trackerPath = path.join(backlogDir, ".tracker");
-  const line = readTrackerLine(trackerPath);
-  if (line === null) return "github";
-  if (!Object.hasOwn(TASK_AUTHORITIES, line)) {
-    throw new Error(`Unknown task authority "${line}" in ${trackerPath}; expected github, backlog (or files), or gitlab.`);
-  }
-  return TASK_AUTHORITIES[line];
-}
 
 const GH_EXEC_DEFAULTS = Object.freeze({
   encoding: "utf-8",
@@ -44,7 +15,7 @@ function parseIssueRef(text) {
   const match = typeof text === "string" ? text.match(ISSUE_REF_RE) : null;
   if (!match) return null;
   const id = match[1];
-  return { tracker: "github", id, ref: `#${id}`, issue_number: Number(id) };
+  return { id, ref: `#${id}`, issue_number: Number(id) };
 }
 
 /** One Plan line -> `{ checkboxState, identity, title }`, or null. */
@@ -54,24 +25,6 @@ function parsePlanCheckbox(line) {
   const identity = parseIssueRef(match[2]);
   if (!identity) return null;
   return { checkboxState: match[1], identity, title: (match[3] || "").trim() };
-}
-
-/**
- * Exact `#N` mention in free text. `#11` never matches `#1`, `#42.1` is not
- * `#42`, and provider metadata (`PR #42`) is not a task ref.
- */
-function containsIssueRef(text, identity) {
-  if (typeof text !== "string" || !identity || !identity.ref) return false;
-  const matcher = new RegExp(
-    `(^|[^A-Za-z0-9_#])(${identity.ref})(?![A-Za-z0-9_]|\\.\\d)`,
-    "g"
-  );
-  for (const match of text.matchAll(matcher)) {
-    const refStart = match.index + match[1].length;
-    if (/PR\s$/.test(text.slice(Math.max(0, refStart - 3), refStart))) continue;
-    return true;
-  }
-  return false;
 }
 
 function slugify(text) {
@@ -280,8 +233,6 @@ module.exports = {
   ISSUE_REF_RE,
   parseIssueRef,
   parsePlanCheckbox,
-  containsIssueRef,
-  readTaskAuthority,
   DEFAULT_BACKLOG_DIR,
   GH_EXEC_DEFAULTS,
 };

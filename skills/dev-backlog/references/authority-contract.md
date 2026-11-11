@@ -85,9 +85,9 @@ The core product excludes:
 
 Do not reintroduce a tracker abstraction or adapter ports: the authority is a
 one-line selection the session reads, the `files` adapter is parked at tag
-`v0.11.0`, and a new authority is a documented table row plus its entry in the scripts'
-allow-list, and needs a measured consumer (the GitLab row is the stated
-exception; see the charter Non-Goals). Do not add bidirectional compatibility machinery, task-mirror
+`v0.11.0`, and a new authority is a documented table row that needs a measured
+consumer (the GitLab row is the stated exception; see the charter Non-Goals).
+Do not add bidirectional compatibility machinery, task-mirror
 lifecycle features, or a committed memory/compiler layer without new measured
 adoption evidence and an explicit authority-contract amendment.
 

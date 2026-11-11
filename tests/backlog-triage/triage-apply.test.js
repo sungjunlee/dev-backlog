@@ -633,5 +633,8 @@ describe("execute", () => {
     fs.writeFileSync(tracker, "github\nignored second line\n");
     assert.equal(execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh }).exitCode, 0);
     assert.equal(calls.length, 1);
+    fs.writeFileSync(tracker, "\uFEFFGitHub\r\nbacklog\r\n");
+    assert.equal(execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh }).exitCode, 0);
+    assert.equal(calls.length, 1);
   });
 });
