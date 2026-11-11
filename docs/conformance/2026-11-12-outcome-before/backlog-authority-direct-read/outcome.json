@@ -30,6 +30,11 @@
       "name": "direct read is effect-free",
       "pass": true,
       "observed": []
+    },
+    {
+      "name": "no Backlog or GitHub mutation on a direct read",
+      "pass": true,
+      "observed": []
     }
   ],
   "pass": true,

@@ -9,7 +9,7 @@ were read before implementation; no PR was open at the start of the run.
 
 ## Method
 
-`outcome-conformance.js` created seven clean Git workspaces, copied the current
+`outcome-conformance.js` created isolated Git workspaces, copied the current
 local skills, installed controlled `gh` and `backlog` executables, and launched
 one fresh Codex session per scenario. It graded recorded argv/exit status,
 before/after file hashes, and whether required stops prevented later effects.
@@ -18,8 +18,7 @@ outcome checks or an `Expected:` answer.
 
 Runner: Codex CLI `0.153.4`, model `gpt-6-astra`, low reasoning, workspace-write
 sandbox. Only the controlled bin path, standard system-bin paths, and recorder
-variables were exposed to child shells. The retained seven-scenario matrix ran
-once. Earlier single-scenario setup probes found and corrected an incompatible
+variables were exposed to child shells. The retained matrix is eight scenarios: the original seven plus `authority-source-precedence` for task-source precedence (issue body vs newest Agent Brief vs `spec_ref:`). Child shells receive an explicit environment (no parent `NODE_OPTIONS`, `BASH_ENV`, or GitHub tokens). Read-only graders reject authority writes, and close grading checks that only status and Progress content change. Earlier single-scenario setup probes found and corrected an incompatible
 CLI flag, missing fixture Git metadata, and sanitized child PATH; they are not
 conformance samples and are not retained.
 
@@ -42,6 +41,7 @@ node tests/evals/outcome-conformance.js \
 | `close-sprint-bounded-effects` | PASS | current close rail exits 0; status verification exits 0 | only the target sprint changes; status and final Progress recorded; operator file unchanged |
 | `triage-human-gate` | PASS | accepted and unchecked applies exit 0; invalid apply exits 1; only accepted #21 comment reaches `gh` | accepted and pending audit logs added; no invalid-report log; the session also saved its execution record, captured in the signature |
 | `backlog-authority-direct-read` | PASS | exactly `backlog task 7 --plain` exits 0 | no `gh` call and no file change |
+| `authority-source-precedence` | PASS | controlled `gh issue view 42 --json body,comments` exits 0 | `SPEC.md` created from `spec_ref:`; `BODY.md` and `BRIEF.md` were not created |
 | `spec-change-requires-approval` | PASS | no authority mutation | approved spec stays byte-identical; unattended handoff stops without effects |
 
 Machine-readable checks, full invocation lists, and SHA-256 change sets are in
@@ -51,7 +51,7 @@ Machine-readable checks, full invocation lists, and SHA-256 change sets are in
 
 | Epic guarantee | Named outcome evidence |
 | --- | --- |
-| G1 — one declared authority; failed reads stop with no fallback or inference | `orient-next-batch`; `authority-read-fails-closed`; `backlog-authority-direct-read` |
+| G1 — one declared authority; failed reads stop with no fallback or inference | `orient-next-batch`; `authority-read-fails-closed`; `backlog-authority-direct-read`; `authority-source-precedence` |
 | G2 — deliberate mutations; accepted-only, GitHub-only `triage-apply` | `triage-human-gate`; Node test `outcome triage-apply-github-only` |
 | G3 — active tracks never overlap silently | `overlapping-track-refused` |
 | G4 — `spec/*` changes require explicit human approval | `spec-change-requires-approval` |
@@ -63,7 +63,7 @@ scenario or named script-level outcome test.
 ## Expected behavior changes
 
 A comparison run treats any changed checked result, relevant invocation, or
-file-change set as `REGRESSION`. An intentional change updates its explicit
+file-change path/kind/hash as `REGRESSION`. An intentional change updates its explicit
 scenario checks and supplies an issue-linked marker such as
 `--expect-change close-sprint-bounded-effects=#498`. The marker can classify a
 passing delta as `EXPECTED_CHANGE`; it cannot hide a failing check, and an
@@ -73,7 +73,7 @@ not a reason to rewrite this before evidence.
 ## Validation
 
 - Full Node command: `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js`
-- Node result: 218 tests, 217 passed, 1 optional live integration skipped,
+- Node result: 224 tests, 223 passed, 1 optional live integration skipped,
   0 failed (exit 0).
 - Smoke command: `bash tests/smoke/smoke-test.sh`
 - Smoke result: 170 passed, 0 failed (exit 0).

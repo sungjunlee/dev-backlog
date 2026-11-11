@@ -29,6 +29,11 @@
       "observed": "- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed."
     },
     {
+      "name": "only status and Progress content changed",
+      "pass": true,
+      "observed": "---\nstatus: completed\nstarted: 2026-11-01\n---\n\n# Close fixture\n\n## Goal\nFinish.\n\n## Plan\n- [x] #20 Done\n\n## Running Context\n\n## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed.\n"
+    },
+    {
       "name": "only the sprint file changed",
       "pass": true,
       "observed": [

@@ -7,6 +7,27 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "../..");
 
+function parseObjectiveIds(text) {
+  const ids = [];
+  const pattern = /O(\d+)(?:\s*[–-]\s*O(\d+))?/g;
+  let match;
+  while ((match = pattern.exec(String(text))) !== null) {
+    const start = Number(match[1]);
+    const end = match[2] === undefined ? start : Number(match[2]);
+    const lo = Math.min(start, end);
+    const hi = Math.max(start, end);
+    for (let n = lo; n <= hi; n += 1) ids.push(`O${n}`);
+  }
+  return ids;
+}
+
+it("expands retired objective ranges and requires the declaration", () => {
+  assert.deepEqual(parseObjectiveIds("Retired IDs (never reuse): O3, O5–O9"),
+    ["O3", "O5", "O6", "O7", "O8", "O9"]);
+  assert.deepEqual(parseObjectiveIds("O5-O7"), ["O5", "O6", "O7"]);
+  assert.deepEqual(parseObjectiveIds(""), []);
+});
+
 it("keeps living charter objective IDs unique and disjoint from retired IDs", () => {
   const charter = fs.readFileSync(path.join(ROOT, "spec/charter.md"), "utf8");
   const objectivesSection = charter.split(/^## Objectives\b/m)[1]?.split(/^## /m)[0];
@@ -14,12 +35,20 @@ it("keeps living charter objective IDs unique and disjoint from retired IDs", ()
 
   const living = [...objectivesSection.matchAll(/^- (O\d+)\s+[—-]/gm)].map((match) => match[1]);
   const retiredLine = objectivesSection.split(/\r?\n/).find((line) => /Retired IDs/i.test(line));
-  const retired = retiredLine?.match(/O\d+/g) || [];
+  assert.ok(retiredLine, "charter must declare retired objective IDs");
+  const retired = parseObjectiveIds(retiredLine);
   assert.ok(living.length > 0, "charter must declare at least one living objective");
+  assert.ok(retired.length > 0, "retired ID declaration must name at least one ID or range");
   assert.equal(new Set(living).size, living.length, "living objective IDs must be unique");
   assert.equal(new Set(retired).size, retired.length, "retired objective IDs must be unique");
   assert.deepEqual(living.filter((id) => retired.includes(id)), [],
     "a retired objective ID must never be reused as living");
+
+  const synthetic = `${objectivesSection}\n- O6 — Reintroduced interior ID, must fail disjointness`;
+  const livingWithReuse = [...synthetic.matchAll(/^- (O\d+)\s+[—-]/gm)].map((match) => match[1]);
+  assert.ok(livingWithReuse.includes("O6") && parseObjectiveIds(retiredLine).includes("O6"));
+  assert.ok(livingWithReuse.filter((id) => retired.includes(id)).includes("O6"),
+    "an interior retired ID such as O6 must be detected as a reuse");
 });
 
 it("keeps every living dev-backlog reference reachable without pinning its inventory", () => {

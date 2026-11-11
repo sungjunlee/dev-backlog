@@ -37,6 +37,9 @@ if (command === "gh") {
     finish(41, "", "gh: controlled authority read failure\\n");
   }
   if (isView) {
+    if (process.env.CONFORMANCE_GH_VIEW_FILE) {
+      finish(0, fs.readFileSync(process.env.CONFORMANCE_GH_VIEW_FILE, "utf8"));
+    }
     const number = Number(args[2]) || 42;
     finish(0, JSON.stringify({
       number,
@@ -62,33 +65,44 @@ if (command === "backlog") {
 finish(93, "", "unhandled controlled command: " + command + "\\n");
 `;
 
-function installConformanceCliFixture(root, { ghMode = "ok" } = {}) {
-  const harnessDir = path.join(root, ".harness");
-  const binDir = path.join(harnessDir, "bin");
-  const logPath = path.join(harnessDir, "invocations.jsonl");
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(logPath, "");
-  for (const command of ["node", "bash", "gh", "backlog"]) {
-    const commandPath = path.join(binDir, command);
-    fs.writeFileSync(commandPath, DRIVER);
-    fs.chmodSync(commandPath, 0o755);
+const RUNNER_ENV_ALLOWLIST = [
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "SHELL",
+  "USERPROFILE",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "SYSTEMROOT",
+  "CODEX_HOME",
+  "XDG_RUNTIME_DIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+];
+
+function buildRunnerEnv(binDir, shellEnv) {
+  const env = {};
+  for (const key of RUNNER_ENV_ALLOWLIST) {
+    if (process.env[key]) env[key] = process.env[key];
   }
-  const shellEnv = {
-    PATH: `${binDir}${path.delimiter}/usr/local/bin${path.delimiter}/usr/bin${path.delimiter}/bin`,
-    CONFORMANCE_INVOCATION_LOG: logPath,
-    CONFORMANCE_REAL_NODE: process.execPath,
-    CONFORMANCE_REAL_BASH: "/usr/bin/bash",
-    CONFORMANCE_GH_MODE: ghMode,
-  };
-  const env = {
-    ...process.env,
-    ...shellEnv,
-    // Codex itself must still be resolvable; the child sandbox uses shellEnv.PATH.
-    PATH: `${binDir}${path.delimiter}${process.env.PATH || ""}`,
-  };
+  Object.assign(env, shellEnv);
+  // Codex itself must still be resolvable; the child sandbox uses shellEnv.PATH.
+  env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
   for (const key of [
+    "NODE_OPTIONS",
+    "BASH_ENV",
+    "ENV",
     "GH_TOKEN",
     "GITHUB_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
     "GH_ENTERPRISE_TOKEN",
     "GH_REPO",
     "GH_HOST",
@@ -101,6 +115,33 @@ function installConformanceCliFixture(root, { ghMode = "ok" } = {}) {
   ]) {
     delete env[key];
   }
+  return env;
+}
+
+function installConformanceCliFixture(root, { ghMode = "ok", ghView = null } = {}) {
+  const harnessDir = path.join(root, ".harness");
+  const binDir = path.join(harnessDir, "bin");
+  const logPath = path.join(harnessDir, "invocations.jsonl");
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(logPath, "");
+  for (const command of ["node", "bash", "gh", "backlog"]) {
+    const commandPath = path.join(binDir, command);
+    fs.writeFileSync(commandPath, DRIVER);
+    fs.chmodSync(commandPath, 0o755);
+  }
+  const viewPath = path.join(harnessDir, "gh-view.json");
+  if (ghView) {
+    fs.writeFileSync(viewPath, JSON.stringify(ghView));
+  }
+  const shellEnv = {
+    PATH: `${binDir}${path.delimiter}/usr/local/bin${path.delimiter}/usr/bin${path.delimiter}/bin`,
+    CONFORMANCE_INVOCATION_LOG: logPath,
+    CONFORMANCE_REAL_NODE: process.execPath,
+    CONFORMANCE_REAL_BASH: "/usr/bin/bash",
+    CONFORMANCE_GH_MODE: ghMode,
+  };
+  if (ghView) shellEnv.CONFORMANCE_GH_VIEW_FILE = viewPath;
+  const env = buildRunnerEnv(binDir, shellEnv);
   return {
     logPath,
     env,
@@ -115,4 +156,4 @@ function installConformanceCliFixture(root, { ghMode = "ok" } = {}) {
   };
 }
 
-module.exports = { installConformanceCliFixture };
+module.exports = { installConformanceCliFixture, buildRunnerEnv, RUNNER_ENV_ALLOWLIST };

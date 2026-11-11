@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T16:08:45.787Z",
+  "generated_at": "2026-11-11T16:28:10.525Z",
   "runner": "codex exec",
   "model": "gpt-6-astra",
   "reasoning": "low",
@@ -12,7 +12,8 @@
       "tests": [
         "orient-next-batch",
         "authority-read-fails-closed",
-        "backlog-authority-direct-read"
+        "backlog-authority-direct-read",
+        "authority-source-precedence"
       ]
     },
     {
@@ -109,6 +110,11 @@
           "name": "orientation is read-only",
           "pass": true,
           "observed": []
+        },
+        {
+          "name": "no authority mutation on a read-only orientation",
+          "pass": true,
+          "observed": []
         }
       ],
       "pass": true,
@@ -167,6 +173,10 @@
           },
           {
             "name": "orientation is read-only",
+            "pass": true
+          },
+          {
+            "name": "no authority mutation on a read-only orientation",
             "pass": true
           }
         ],
@@ -419,6 +429,11 @@
           "observed": "- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed."
         },
         {
+          "name": "only status and Progress content changed",
+          "pass": true,
+          "observed": "---\nstatus: completed\nstarted: 2026-11-01\n---\n\n# Close fixture\n\n## Goal\nFinish.\n\n## Plan\n- [x] #20 Done\n\n## Running Context\n\n## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed.\n"
+        },
+        {
           "name": "only the sprint file changed",
           "pass": true,
           "observed": [
@@ -474,6 +489,10 @@
             "pass": true
           },
           {
+            "name": "only status and Progress content changed",
+            "pass": true
+          },
+          {
             "name": "only the sprint file changed",
             "pass": true
           },
@@ -502,7 +521,9 @@
         "changes": [
           {
             "path": ".dev-backlog/sprints/2026-11-close.md",
-            "kind": "modified"
+            "kind": "modified",
+            "before": "da00a0b74103984af0d39ee7d6593f2648f35db10886e7fbc243f3097bbcdd0a",
+            "after": "f4c6c95f6390ef05f4e9fcfbfd50b9412024b9e962156bbef66162e9ab02abd6"
           }
         ]
       }
@@ -723,15 +744,18 @@
         "changes": [
           {
             "path": ".dev-backlog/triage/2026-11-10-apply.log",
-            "kind": "added"
+            "kind": "added",
+            "after": "b100a04a77cf1caa0bacc60ccd6180fa3c0cb5b4757ab234606f875a4d5207b7"
           },
           {
             "path": ".dev-backlog/triage/2026-11-11-apply.log",
-            "kind": "added"
+            "kind": "added",
+            "after": "7852b50dffef162c91025e383e55ac57b10f0771af8ea75a790f2f7d03368e38"
           },
           {
             "path": "triage-execution-record.md",
-            "kind": "added"
+            "kind": "added",
+            "after": "ec6006a5313ec510f74b19322de864b6ec743c30fd2bf6fcd3fcd6574f688f2e"
           }
         ]
       }
@@ -768,6 +792,11 @@
           "name": "direct read is effect-free",
           "pass": true,
           "observed": []
+        },
+        {
+          "name": "no Backlog or GitHub mutation on a direct read",
+          "pass": true,
+          "observed": []
         }
       ],
       "pass": true,
@@ -798,6 +827,10 @@
           {
             "name": "direct read is effect-free",
             "pass": true
+          },
+          {
+            "name": "no Backlog or GitHub mutation on a direct read",
+            "pass": true
           }
         ],
         "invocations": [
@@ -812,6 +845,110 @@
           }
         ],
         "changes": []
+      }
+    },
+    {
+      "id": "authority-source-precedence",
+      "title": "Follow spec_ref over Agent Brief and issue body",
+      "guarantees": [
+        "G1"
+      ],
+      "checks": [
+        {
+          "name": "declared authority was read",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "42",
+                "--json",
+                "body,comments"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "spec_ref instructions were followed",
+          "pass": true,
+          "observed": "SPEC.md"
+        },
+        {
+          "name": "stale issue body was not followed",
+          "pass": true,
+          "observed": "BODY.md"
+        },
+        {
+          "name": "Agent Brief lost to spec_ref",
+          "pass": true,
+          "observed": "BRIEF.md"
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "42",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [
+        {
+          "path": "SPEC.md",
+          "kind": "added",
+          "after": "066f2a65e0bd9017a96257efc373963e2c1af739b5ac2a9db73119380a6a05a5"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "declared authority was read",
+            "pass": true
+          },
+          {
+            "name": "spec_ref instructions were followed",
+            "pass": true
+          },
+          {
+            "name": "stale issue body was not followed",
+            "pass": true
+          },
+          {
+            "name": "Agent Brief lost to spec_ref",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "view",
+              "42",
+              "--json",
+              "body,comments"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": [
+          {
+            "path": "SPEC.md",
+            "kind": "added",
+            "after": "066f2a65e0bd9017a96257efc373963e2c1af739b5ac2a9db73119380a6a05a5"
+          }
+        ]
       }
     },
     {

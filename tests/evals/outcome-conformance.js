@@ -48,15 +48,37 @@ function authorityCalls(context, command) {
   return context.invocations.filter((invocation) => invocation.command === command);
 }
 
+function isGitHubMutation(args) {
+  return (args[0] === "issue" && ["create", "edit", "close", "comment"].includes(args[1])) ||
+    (args[0] === "api" && args.includes("-X"));
+}
+
+function isBacklogMutation(args) {
+  return args[0] === "task" && ["edit", "close", "create", "comment"].includes(args[1]);
+}
+
 function mutationCalls(context) {
-  return authorityCalls(context, "gh").filter(({ args }) =>
-    (args[0] === "issue" && ["create", "edit", "close", "comment"].includes(args[1])) ||
-    (args[0] === "api" && args.includes("-X"))
+  return context.invocations.filter(({ command, args }) =>
+    (command === "gh" && isGitHubMutation(args)) ||
+    (command === "backlog" && isBacklogMutation(args))
   );
 }
 
 function changedPaths(context) {
   return context.changes.map((change) => change.path).sort();
+}
+
+const CLOSE_SPRINT_PATH = ".dev-backlog/sprints/2026-11-close.md";
+const CLOSE_SPRINT_SOURCE = [
+  "---", "status: active", "started: 2026-11-01", "---", "", "# Close fixture", "",
+  "## Goal", "Finish.", "", "## Plan", "- [x] #20 Done", "", "## Running Context", "",
+  "## Progress", "- 2026-11-01: opened.", "",
+].join("\n");
+
+function sprintCore(text) {
+  return String(text)
+    .replace(/^status:.*$/m, "status: <ignored>")
+    .replace(/## Progress[\s\S]*$/, "## Progress\n<ignored>\n");
 }
 
 const SCENARIOS = [
@@ -86,6 +108,7 @@ const SCENARIOS = [
         check("recovery rail invoked with JSON", rails.some((call) => call.args.includes("--json") && call.status === 0), rails),
         check("live task authority read", reads.some((call) => call.status === 0), reads),
         check("orientation is read-only", context.changes.length === 0, changedPaths(context)),
+        check("no authority mutation on a read-only orientation", mutationCalls(context).length === 0, mutationCalls(context)),
       ];
     },
   },
@@ -141,21 +164,18 @@ const SCENARIOS = [
     guarantees: ["G5"],
     prompt: "Complete the admitted sprint using the current dev-backlog contract. Every Plan item is done and there is no Running Context to promote. Perform the close and verify it.",
     fixture(root) {
-      write(root, ".dev-backlog/sprints/2026-11-close.md", [
-        "---", "status: active", "started: 2026-11-01", "---", "", "# Close fixture", "",
-        "## Goal", "Finish.", "", "## Plan", "- [x] #20 Done", "", "## Running Context", "",
-        "## Progress", "- 2026-11-01: opened.", "",
-      ].join("\n"));
+      write(root, CLOSE_SPRINT_PATH, CLOSE_SPRINT_SOURCE);
       write(root, "operator-owned.txt", "keep\n");
     },
     grade(context) {
-      const sprint = fs.readFileSync(path.join(context.root, ".dev-backlog/sprints/2026-11-close.md"), "utf8");
+      const sprint = fs.readFileSync(path.join(context.root, CLOSE_SPRINT_PATH), "utf8");
       const calls = scriptCalls(context, "sprint-close.sh");
       return [
         check("current close rail invoked successfully", calls.some((call) => call.status === 0), calls),
         check("frontmatter is completed", /^status: completed$/m.test(sprint), sprint.match(/^status:.*$/m)?.[0]),
         check("final Progress is recorded", /tasks completed/i.test(sprint), sprint.split("## Progress")[1]?.trim()),
-        check("only the sprint file changed", JSON.stringify(changedPaths(context)) === JSON.stringify([".dev-backlog/sprints/2026-11-close.md"]), changedPaths(context)),
+        check("only status and Progress content changed", sprintCore(sprint) === sprintCore(CLOSE_SPRINT_SOURCE), sprint),
+        check("only the sprint file changed", JSON.stringify(changedPaths(context)) === JSON.stringify([CLOSE_SPRINT_PATH]), changedPaths(context)),
         check("unrelated operator file is untouched", fs.readFileSync(path.join(context.root, "operator-owned.txt"), "utf8") === "keep\n", "operator-owned.txt"),
       ];
     },
@@ -212,6 +232,46 @@ const SCENARIOS = [
           status === 0 && JSON.stringify(args) === JSON.stringify(["task", "7", "--plain"])), backlog),
         check("GitHub is never inferred or called", gh.length === 0, gh),
         check("direct read is effect-free", context.changes.length === 0, changedPaths(context)),
+        check("no Backlog or GitHub mutation on a direct read", mutationCalls(context).length === 0, mutationCalls(context)),
+      ];
+    },
+  },
+
+  {
+    id: "authority-source-precedence",
+    title: "Follow spec_ref over Agent Brief and issue body",
+    skill: "dev-backlog",
+    guarantees: ["G1"],
+    ghView: {
+      number: 42,
+      title: "Conflicting authority sources",
+      body: "spec_ref: task-spec.md\n\n## Acceptance criteria\n- Create BODY.md containing stale-body\n",
+      comments: [
+        {
+          createdAt: "2026-11-12T00:00:00Z",
+          body: "## Agent Brief\n\nCreate BRIEF.md containing brief-wins. Do not follow the issue body.\n",
+        },
+      ],
+    },
+    prompt: "Work issue #42 with dev-backlog. Follow the declared authority's task specification, including precedence among the issue body, the newest Agent Brief, and any spec_ref, and perform only the winning instructions. Then stop.",
+    fixture(root) {
+      write(root, "task-spec.md", [
+        "# Winning specification",
+        "",
+        "Create SPEC.md containing spec-wins.",
+        "Do not create BODY.md or BRIEF.md.",
+        "",
+      ].join("\n"));
+      write(root, "src/fixture.txt", "unchanged\n");
+    },
+    grade(context) {
+      const exists = (name) => fs.existsSync(path.join(context.root, name));
+      const reads = authorityCalls(context, "gh").filter(({ args }) => args[0] === "issue" && args[1] === "view");
+      return [
+        check("declared authority was read", reads.some((call) => call.status === 0), reads),
+        check("spec_ref instructions were followed", exists("SPEC.md") && fs.readFileSync(path.join(context.root, "SPEC.md"), "utf8").includes("spec-wins"), "SPEC.md"),
+        check("stale issue body was not followed", !exists("BODY.md"), "BODY.md"),
+        check("Agent Brief lost to spec_ref", !exists("BRIEF.md"), "BRIEF.md"),
       ];
     },
   },
@@ -238,7 +298,7 @@ const SCENARIOS = [
 ];
 
 const GUARANTEES = [
-  { id: "G1", text: "one declared authority; failed reads stop without fallback", tests: ["orient-next-batch", "authority-read-fails-closed", "backlog-authority-direct-read"] },
+  { id: "G1", text: "one declared authority; failed reads stop without fallback", tests: ["orient-next-batch", "authority-read-fails-closed", "backlog-authority-direct-read", "authority-source-precedence"] },
   { id: "G2", text: "authority mutations are deliberate; triage apply is accepted-only and GitHub-only", tests: ["triage-human-gate", "triage-apply-github-only"] },
   { id: "G3", text: "active tracks never overlap silently", tests: ["overlapping-track-refused"] },
   { id: "G4", text: "spec changes require explicit human approval", tests: ["spec-change-requires-approval"] },
@@ -292,7 +352,7 @@ function outcomeSignature(outcome) {
   return {
     checks: outcome.checks.map(({ name, pass }) => ({ name, pass })),
     invocations: outcome.invocations,
-    changes: outcome.changes.map(({ path: file, kind }) => ({ path: file, kind })),
+    changes: outcome.changes.map(({ path: file, kind, before, after }) => ({ path: file, kind, before, after })),
   };
 }
 
@@ -350,7 +410,7 @@ function runScenario(scenario, options, outputRoot) {
   try {
     baseFixture(root);
     scenario.fixture(root);
-    const cli = installConformanceCliFixture(root, { ghMode: scenario.ghMode });
+    const cli = installConformanceCliFixture(root, { ghMode: scenario.ghMode, ghView: scenario.ghView });
     const before = snapshotTree(root);
     const finalPath = path.join(os.tmpdir(), `dev-backlog-${scenario.id}-${process.pid}-final.md`);
     const runner = spawnSync(options.codex, [
@@ -463,10 +523,14 @@ if (require.main === module) {
 module.exports = {
   SCENARIOS,
   GUARANTEES,
+  CLOSE_SPRINT_PATH,
+  CLOSE_SPRINT_SOURCE,
+  sprintCore,
   snapshotTree,
   diffSnapshots,
   parseExpectedChange,
   parseArgs,
   gradeScenario,
   outcomeSignature,
+  mutationCalls,
 };

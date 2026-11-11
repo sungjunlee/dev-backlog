@@ -59,6 +59,11 @@
       "name": "orientation is read-only",
       "pass": true,
       "observed": []
+    },
+    {
+      "name": "no authority mutation on a read-only orientation",
+      "pass": true,
+      "observed": []
     }
   ],
   "pass": true,

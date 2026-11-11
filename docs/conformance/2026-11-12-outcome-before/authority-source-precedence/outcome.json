@@ -1,0 +1,63 @@
+{
+  "id": "authority-source-precedence",
+  "title": "Follow spec_ref over Agent Brief and issue body",
+  "guarantees": [
+    "G1"
+  ],
+  "checks": [
+    {
+      "name": "declared authority was read",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "42",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "spec_ref instructions were followed",
+      "pass": true,
+      "observed": "SPEC.md"
+    },
+    {
+      "name": "stale issue body was not followed",
+      "pass": true,
+      "observed": "BODY.md"
+    },
+    {
+      "name": "Agent Brief lost to spec_ref",
+      "pass": true,
+      "observed": "BRIEF.md"
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "view",
+        "42",
+        "--json",
+        "body,comments"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": [
+    {
+      "path": "SPEC.md",
+      "kind": "added",
+      "after": "066f2a65e0bd9017a96257efc373963e2c1af739b5ac2a9db73119380a6a05a5"
+    }
+  ]
+}
