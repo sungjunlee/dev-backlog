@@ -34,6 +34,11 @@
       "observed": []
     },
     {
+      "name": "only the failed authority read occurred",
+      "pass": true,
+      "observed": []
+    },
+    {
       "name": "failed read stops before file effects",
       "pass": true,
       "observed": []

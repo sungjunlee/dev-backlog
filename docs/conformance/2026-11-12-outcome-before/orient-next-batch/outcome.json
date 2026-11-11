@@ -64,6 +64,11 @@
       "name": "no authority mutation on a read-only orientation",
       "pass": true,
       "observed": []
+    },
+    {
+      "name": "only permitted authority reads occurred",
+      "pass": true,
+      "observed": []
     }
   ],
   "pass": true,

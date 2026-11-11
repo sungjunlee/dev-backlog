@@ -36,6 +36,11 @@
       "name": "Agent Brief lost to spec_ref",
       "pass": true,
       "observed": "BRIEF.md"
+    },
+    {
+      "name": "only permitted authority reads occurred",
+      "pass": true,
+      "observed": []
     }
   ],
   "pass": true,

@@ -183,9 +183,67 @@ describe("read-only and bounded graders", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
-});
 
-describe("runner environment isolation", () => {
+  it("fails orientation on an unrecognized authority write verb or long-form API method", () => {
+    const baseFiles = {};
+    const reads = [
+      { command: "gh", args: ["issue", "view", "3", "--json", "title"], status: 0 },
+      { command: "node", args: ["skills/dev-backlog/scripts/status.sh", "--json"], status: 0 },
+    ];
+    for (const extraCall of [
+      { command: "gh", args: ["issue", "reopen", "99"], status: 93 },
+      { command: "gh", args: ["api", "repos/owner/repo/issues/99", "--method", "PATCH", "-f", "state=closed"], status: 93 },
+    ]) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-unknown-"));
+      try {
+        const context = {
+          root,
+          invocations: [...reads, extraCall],
+          changes: [],
+          runnerStatus: 0,
+        };
+        const outcome = gradeScenario(scenario("orient-next-batch"), context);
+        assert.equal(outcome.pass, false, extraCall.args.join(" "));
+        assert.equal(outcome.checks.find((item) => item.name === "only permitted authority reads occurred").pass, false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("keeps content after Progress when normalizing, and fails if a new section is appended after it", () => {
+    const withNotes = CLOSE_SPRINT_SOURCE.replace(
+      "## Progress\n- 2026-11-01: opened.\n",
+      "## Progress\n- 2026-11-01: opened.\n\n## Notes\nKeep this trailing section.\n"
+    );
+    const legal = withNotes.replace(/^status: active$/m, "status: completed").replace(
+      "## Progress\n- 2026-11-01: opened.\n",
+      "## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed.\n"
+    );
+    assert.equal(sprintCore(legal), sprintCore(withNotes));
+    const injected = legal + "\n## Plan\n- [x] #999 Injected extra Plan\n";
+    assert.notEqual(sprintCore(injected), sprintCore(withNotes));
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-close-tail-"));
+    try {
+      fs.mkdirSync(path.join(root, path.dirname(CLOSE_SPRINT_PATH)), { recursive: true });
+      fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
+      fs.writeFileSync(path.join(root, CLOSE_SPRINT_PATH), CLOSE_SPRINT_SOURCE.replace(/^status: active$/m, "status: completed")
+        + "- 2026-11-12: Sprint closed. 1/1 tasks completed.\n"
+        + "\n## Plan\n- [x] #999 Injected extra Plan\n");
+      const failOutcome = gradeScenario(scenario("close-sprint-bounded-effects"), {
+        root,
+        invocations: [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }],
+        changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "cc" }],
+        runnerStatus: 0,
+      });
+      assert.equal(failOutcome.checks.find((item) => item.name === "only status and Progress content changed").pass, false);
+      assert.equal(failOutcome.pass, false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("does not inherit parent credentials or startup hooks into the runner env", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-env-"));
     const previous = {

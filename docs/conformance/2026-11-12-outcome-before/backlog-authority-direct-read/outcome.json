@@ -35,6 +35,11 @@
       "name": "no Backlog or GitHub mutation on a direct read",
       "pass": true,
       "observed": []
+    },
+    {
+      "name": "only the declared Backlog read occurred",
+      "pass": true,
+      "observed": []
     }
   ],
   "pass": true,

@@ -64,6 +64,20 @@ function mutationCalls(context) {
   );
 }
 
+function isGitHubIssueView(args) {
+  return args[0] === "issue" && args[1] === "view";
+}
+
+function isBacklogPlainRead(args) {
+  return args[0] === "task" && args.includes("--plain");
+}
+
+function unexpectedAuthorityCalls(context, isAllowed) {
+  return context.invocations.filter(({ command, args }) =>
+    (command === "gh" || command === "backlog") && !isAllowed({ command, args })
+  );
+}
+
 function changedPaths(context) {
   return context.changes.map((change) => change.path).sort();
 }
@@ -75,10 +89,26 @@ const CLOSE_SPRINT_SOURCE = [
   "## Progress", "- 2026-11-01: opened.", "",
 ].join("\n");
 
+function replaceMarkdownSection(text, heading, replacement) {
+  const lines = String(text).split("\n");
+  const start = lines.findIndex((line) => new RegExp(`^## ${heading}\\s*$`).test(line));
+  if (start < 0) return String(text);
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^## /.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return [...lines.slice(0, start), `## ${heading}`, replacement, ...lines.slice(end)].join("\n");
+}
+
 function sprintCore(text) {
-  return String(text)
-    .replace(/^status:.*$/m, "status: <ignored>")
-    .replace(/## Progress[\s\S]*$/, "## Progress\n<ignored>\n");
+  return replaceMarkdownSection(
+    String(text).replace(/^status:.*$/m, "status: <ignored>"),
+    "Progress",
+    "<ignored>"
+  );
 }
 
 const SCENARIOS = [
@@ -109,6 +139,7 @@ const SCENARIOS = [
         check("live task authority read", reads.some((call) => call.status === 0), reads),
         check("orientation is read-only", context.changes.length === 0, changedPaths(context)),
         check("no authority mutation on a read-only orientation", mutationCalls(context).length === 0, mutationCalls(context)),
+        check("only permitted authority reads occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args))),
       ];
     },
   },
@@ -132,6 +163,7 @@ const SCENARIOS = [
         check("overlap guard invoked", calls.some((call) => call.status !== 0), calls),
         check("no second sprint created", sprintFiles.length === 1 && sprintFiles[0] === "2026-11-auth.md", sprintFiles),
         check("refusal leaves workspace unchanged", context.changes.length === 0, changedPaths(context)),
+        check("no authority operations occurred", unexpectedAuthorityCalls(context, () => false).length === 0, unexpectedAuthorityCalls(context, () => false)),
       ];
     },
   },
@@ -153,6 +185,7 @@ const SCENARIOS = [
         check("declared authority read attempted once", reads.length === 1 && reads[0].status !== 0, reads),
         check("no alternate authority invoked", authorityCalls(context, "backlog").length === 0, authorityCalls(context, "backlog")),
         check("no authority mutation after failure", mutationCalls(context).length === 0, mutationCalls(context)),
+        check("only the failed authority read occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args))),
         check("failed read stops before file effects", context.changes.length === 0, changedPaths(context)),
       ];
     },
@@ -233,6 +266,7 @@ const SCENARIOS = [
         check("GitHub is never inferred or called", gh.length === 0, gh),
         check("direct read is effect-free", context.changes.length === 0, changedPaths(context)),
         check("no Backlog or GitHub mutation on a direct read", mutationCalls(context).length === 0, mutationCalls(context)),
+        check("only the declared Backlog read occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args))),
       ];
     },
   },
@@ -272,6 +306,7 @@ const SCENARIOS = [
         check("spec_ref instructions were followed", exists("SPEC.md") && fs.readFileSync(path.join(context.root, "SPEC.md"), "utf8").includes("spec-wins"), "SPEC.md"),
         check("stale issue body was not followed", !exists("BODY.md"), "BODY.md"),
         check("Agent Brief lost to spec_ref", !exists("BRIEF.md"), "BRIEF.md"),
+        check("only permitted authority reads occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args))),
       ];
     },
   },
@@ -292,6 +327,7 @@ const SCENARIOS = [
           "spec/charter.md"),
         check("unapproved handoff stops without effects", context.changes.length === 0, changedPaths(context)),
         check("no authority mutation substitutes for approval", mutationCalls(context).length === 0, mutationCalls(context)),
+        check("no authority operations occurred", unexpectedAuthorityCalls(context, () => false).length === 0, unexpectedAuthorityCalls(context, () => false)),
       ];
     },
   },
@@ -533,4 +569,6 @@ module.exports = {
   gradeScenario,
   outcomeSignature,
   mutationCalls,
+  unexpectedAuthorityCalls,
+  replaceMarkdownSection,
 };
