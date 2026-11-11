@@ -5,7 +5,6 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const { checkSprintShape } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
 const { runDoctor } = require(path.join(SKILL_SCRIPTS, "backlog-doctor.js"));
 const { readSprintState } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
@@ -152,7 +151,7 @@ describe("createSprintFile", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("uses only trimmed frontmatter status across Node readers and the shell bridge (#496)", () => {
+  it("uses only trimmed frontmatter status across every Node reader (#496, #498)", () => {
     const backlogDir = path.join(tmpDir, ".dev-backlog");
     const sprintsDir = path.join(backlogDir, "sprints");
     fs.mkdirSync(sprintsDir, { recursive: true });
@@ -166,11 +165,6 @@ describe("createSprintFile", () => {
     const doctor = runDoctor({ repoRoot: tmpDir });
     // Doctor display paths are repo-relative and portable (forward slashes).
     assert.deepEqual(doctor.checks[0].detail.active_files, [".dev-backlog/sprints/active.md"]);
-    const shell = spawnBashSync(["-c", 'source "$1"; find_active_sprints "$2"', "bash",
-      path.join(SKILL_SCRIPTS, "lib.sh"), sprintsDir], { encoding: "utf8" });
-    assert.equal(shell.status, 0);
-    // One file, whatever path spelling the Bash layer hands back on Windows.
-    assert.deepEqual(shell.stdout.trim().split(/\r?\n/).map((line) => path.basename(line.replace(/\\/g, "/"))), ["active.md"]);
     assert.throws(() => createSprintFile({
       topic: "new", milestone: "M", component: "auth", sprintsDir,
       today: new Date("2026-04-05T09:00:00Z"),

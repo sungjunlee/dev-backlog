@@ -50,7 +50,7 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 | `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
 | `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
 
-A `spec_ref:` line in the body naming a file or URL overrides the body in every authority, and on GitHub the Agent Brief comment as well. `backlog-triage` and `sprint-close.sh --close-milestone` are GitHub-only.
+A `spec_ref:` line in the body naming a file or URL overrides the body in every authority, and on GitHub the Agent Brief comment as well. `backlog-triage` is GitHub-only.
 
 ## Sprint Admission
 
@@ -92,7 +92,7 @@ everything else yourself.
 ### Orient
 
 Goal: know where execution stands and what comes next.
-Rail: `status.sh` / `next.sh` (`--json`; `--track <slug>` for one track of a portfolio) for `latest_progress`, `next_batch`, and `in_flight`. `_context.md` and the active sprint file are the readable picture.
+Rail: `node scripts/sprint-state.js --mode status [--format text] [--track slug]` and `node scripts/sprint-state.js --mode next [--format text] [--track slug]` expose `latest_progress`, `next_batch`, and `in_flight`; JSON is the default recovery surface and `--format text` is the readable view. `_context.md` and the active sprint file are the durable picture.
 Done when, before acting, you report all of: the next live Issue; the latest recorded Progress entry or its absence (`latest_progress` empty); the rail's `next_batch` (the first `[ ]` item's batch, or every `[ ]` item when the Plan has no batch headings — never an earlier `[~]`-only batch); and every in-flight PR/branch pointer or `unmoored` (`in_flight`). Naming `next_batch` is selection only: `[ ]` is not `[~]` work, and selection is not dependency authorization.
 Recovery: name every in-flight PR/branch pointer (or `unmoored`) from the JSON rail and any ownership recorded in the active sprint (unknown if absent); when the declared authority is unavailable, treat local orientation as last-recorded/provisional (the next live Issue stays unknown) and stop before dispatch, Plan mutation, execution, or AC/lifecycle claims.
 
@@ -120,14 +120,14 @@ admitted, sprint progress.
 ### Complete
 
 Goal: nothing stale left behind.
-Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry (`sprint-close.sh` only warns about them).
-Rail, per sprint: `sprint-close.sh` runs `backlog-doctor.js`, flips `status: completed`, appends the final Progress entry, and prints the doctor verdicts; after it succeeds, promote project-level Running Context to `_context.md`, which is the only thing worth keeping — the completed sprint file is disposable and may be deleted at any time.
+Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry.
+Rail, per sprint: report remaining `[ ]` / `[~]` counts and the disposition of each remaining item. If the requested scope also includes the sprint milestone, first resolve its exact repository and milestone number, then run `gh api --method PATCH "repos/OWNER/REPO/milestones/NUMBER" -f state=closed`; on failure, stop with the local sprint still active. A standalone sprint close makes no milestone call. Then edit only the root frontmatter `status: active` to `status: completed` and append one final Progress line (`N/M tasks completed`). Read the target frontmatter and final Progress directly, then run `node scripts/sprint-state.js --mode status [--format text]` or `node scripts/backlog-doctor.js` to confirm no active file was left behind. Promote project-level Running Context to `_context.md`; the completed sprint file is disposable.
 Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
 
 ### Next
 
 Goal: the next actionable batch, or the next live Issue when no sprint is active.
-Rail: `next.sh` (`--track <slug>`).
+Rail: `node scripts/sprint-state.js --mode next --format text [--track slug]`.
 Done when the next actionable batch or sprint-planning need is named.
 
 ### Quick Fix / Unplanned Work
@@ -153,8 +153,7 @@ Core scripts:
 
 - `scripts/setup-dev-backlog.js` — bootstrap `.dev-backlog/`.
 - `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
-- `scripts/next.sh` / `scripts/status.sh` — next actionable batch and sprint state; portfolio view for N disjoint tracks, `--track <slug>` for one.
-- `scripts/sprint-close.sh` — close the active sprint (`--track <slug>` when multiple tracks are active); prints the pre-close doctor summary.
+- `scripts/sprint-state.js` — next/status JSON recovery state and text rendering; portfolio view for N disjoint tracks, `--track <slug>` for one.
 - `scripts/backlog-doctor.js` — aggregate health checks; `--json` is the machine surface.
 
 ## References

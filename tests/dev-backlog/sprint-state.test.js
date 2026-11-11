@@ -5,12 +5,12 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const {
   readSprintState,
   parsePlanItem,
   parseSprintContent,
   parseArgs,
+  extractSectionLines,
   textReport,
 } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
 
@@ -153,6 +153,15 @@ Expose actor-readable execution state.
     assert.equal(state.active_sprint, null);
   });
 
+  it("skips a directory named *.md while finding active sprint files (#496, #498)", () => {
+    writeFile(path.join(backlogDir, "sprints", "active.md"), "---\nstatus: active\n---\n");
+    fs.mkdirSync(path.join(backlogDir, "sprints", "not-a-sprint.md"));
+
+    const state = readSprintState({ backlogDir });
+    assert.equal(path.basename(state.active_sprint.path), "active.md");
+    assert.equal(state.active_sprints.length, 1);
+  });
+
   it("throws OVERLAPPING_TRACKS when two active tracks share scope", () => {
     writeFile(path.join(backlogDir, "sprints", "a.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
     writeFile(path.join(backlogDir, "sprints", "b.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
@@ -195,12 +204,6 @@ Expose actor-readable execution state.
     assert.equal(result.status, 1);
     assert.ok(result.stderr.includes(slugMatch));
     assert.ok(result.stderr.includes(componentMatch));
-    const shell = spawnBashSync(["-c", 'source "$1"; resolve_track "$2" "$3"', "bash",
-      path.join(SKILL_SCRIPTS, "lib.sh"), path.join(backlogDir, "sprints"), "auth"],
-    { encoding: "utf8" });
-    assert.notEqual(shell.status, 0);
-    assert.ok(shell.stderr.includes(slugMatch));
-    assert.ok(shell.stderr.includes(componentMatch));
   });
 
   it("keeps the GitHub wire identity and ignores refs outside the #N grammar", () => {
@@ -290,6 +293,31 @@ status: active
 });
 
 describe("parseSprintContent", () => {
+  it("extracts first, empty, missing, trailing-space, and final sections (#498 smoke port)", () => {
+    const content = [
+      "## Goal  ",
+      "Test the parsing.",
+      "",
+      "## Plan",
+      "- [ ] #1 Item A",
+      "",
+      "## Running Context",
+      "- Decision A",
+      "",
+      "## Empty",
+      "",
+      "## Progress",
+      "- 2026-03-30: Done.",
+    ].join("\n");
+
+    assert.deepEqual(extractSectionLines(content, "Goal"), ["Test the parsing."]);
+    assert.deepEqual(extractSectionLines(content, "Plan"), ["- [ ] #1 Item A"]);
+    assert.deepEqual(extractSectionLines(content, "Running Context"), ["- Decision A"]);
+    assert.deepEqual(extractSectionLines(content, "Empty"), []);
+    assert.deepEqual(extractSectionLines(content, "Missing"), []);
+    assert.deepEqual(extractSectionLines(content, "Progress"), ["- 2026-03-30: Done."]);
+  });
+
   it("defaults tracker to github and honors an explicit authority override (#476)", () => {
     const content = `---
 status: active
@@ -620,6 +648,34 @@ describe("textReport", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+
+  it("gives an in-flight-only sprint no next batch and does not announce close readiness (#498 smoke port)", () => {
+    const state = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/in-flight-only.md",
+      content: `---
+status: active
+started: 2026-07-01
+---
+
+## Goal
+Keep going.
+
+## Plan
+- [~] #1 With a PR → PR #11 (open)
+- [~] #2 With a branch [branch:feat/two]
+
+## Progress
+- 2026-07-02: both dispatched.
+`,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+    assert.equal(state.in_flight.length, 2);
+    assert.equal(state.next_batch, null);
+    assert.equal(state.plan_items.filter((item) => item.state === "todo").length, 0);
+    assert.equal(state.plan_items.filter((item) => item.state === "in_flight").length, 2);
+  });
+
+
   it("renders the next stanza for a single track with batches and in-flight items", () => {
     writeFile(path.join(backlogDir, "sprints", "2026-09-text.md"), BATCHED_SPRINT);
 
@@ -675,6 +731,36 @@ describe("textReport", () => {
       .includes(">> All items done — ready to close sprint"));
   });
 
+
+  it("reports two in-flight items, zero remaining, and no close-ready line for an in-flight-only sprint (#498 smoke port)", () => {
+    writeFile(path.join(backlogDir, "sprints", "2026-09-inflight.md"), `---
+status: active
+started: 2026-09-01
+---
+
+## Goal
+Still flying.
+
+## Plan
+- [~] #1 First → PR #11 (open)
+- [~] #2 Second [branch:feat/two]
+
+## Progress
+- 2026-09-01: both dispatched.
+`);
+    const next = textReport({ mode: "next", backlogDir });
+    const status = textReport({ mode: "status", backlogDir });
+    const nextText = next.lines.join("\n");
+    const statusText = status.lines.join("\n");
+    assert.equal(next.code, 0);
+    assert.match(nextText, /2 in-flight/);
+    assert.match(nextText, /0 remaining/);
+    assert.doesNotMatch(nextText, /All items checked/);
+    assert.doesNotMatch(statusText, /All items done — ready to close sprint/);
+    assert.doesNotMatch(nextText, /Next:/);
+  });
+
+
   it("renders a portfolio stanza for N disjoint tracks", () => {
     writeFile(
       path.join(backlogDir, "sprints", "2026-09-auth.md"),
@@ -694,7 +780,7 @@ describe("textReport", () => {
         "  Next: #2 Auth next",
         "2026-09-billing: 1/1 done",
         "",
-        "Use 'next.sh --track <slug>' for a single track.",
+        "Use 'node scripts/sprint-state.js --mode next --format text --track <slug>' for a single track.",
       ],
     });
     assert.deepEqual(textReport({ mode: "status", backlogDir }).lines, [
@@ -811,6 +897,22 @@ describe("parseArgs --format", () => {
     assert.match(parsed.error, /^Invalid --format: yaml\./);
     assert.match(parsed.error, /Usage: sprint-state\.js .*--format json\|text/);
   });
+
+  it("accepts mode, format, and track flags before or after a backlog path (#498)", () => {
+    const expected = {
+      mode: "next",
+      format: "text",
+      backlogDir: "backlog with spaces",
+      track: "auth",
+      component: null,
+    };
+    assert.deepEqual(parseArgs([
+      "--mode", "next", "--format", "text", "--track", "auth", "backlog with spaces",
+    ]), expected);
+    assert.deepEqual(parseArgs([
+      "backlog with spaces", "--track=auth", "--format=text", "--mode=next",
+    ]), expected);
+  });
 });
 
 describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
@@ -842,5 +944,17 @@ describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
     const res = run("--mode", "next", "--format", "yaml");
     assert.equal(res.status, 1);
     assert.match(res.stderr, /Invalid --format: yaml/);
+  });
+
+  it("reads a backlog path containing spaces with flags after the path (#498)", () => {
+    const backlogDir = path.join(root, "backlog with spaces");
+    writeFile(path.join(backlogDir, "sprints", "active.md"), [
+      "---", "status: active", "---", "", "## Goal", "Path-safe reader.", "",
+      "## Plan", "- [ ] #1 Next", "", "## Running Context", "", "## Progress", "",
+    ].join("\n"));
+    const res = run(backlogDir, "--mode", "next", "--format", "text");
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(res.stdout, /Path-safe reader/);
+    assert.match(res.stdout, /#1 Next/);
   });
 });

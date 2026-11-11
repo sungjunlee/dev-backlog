@@ -1,0 +1,7 @@
+Recovery state: the active controlled sprint has one recorded done item, one in-flight item, and one waiting item.
+
+- **Current live recovery issue:** #2, “Controlled task 2,” on branch `controlled/two`. No PR recorded. Running Context records owner `fixture`.
+- **Next waiting batch:** Batch 3 — #3, “Controlled task 3.” The rail marks it **not actionable**, waiting on #2.
+- **Latest recorded progress:** “2026-11-02: Batch 1 complete.”
+
+GitHub is the default task authority; live reads of #2 and #3 succeeded. No implementation began, and no state was changed.

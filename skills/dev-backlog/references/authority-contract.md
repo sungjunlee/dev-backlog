@@ -75,9 +75,9 @@ The core product excludes:
 - a second task-spec or lifecycle authority in the same repo;
 - retry loops or fallback data sources around the authority CLI: a failed call
   exits non-zero with the CLI's stderr surfaced, exactly once, and the operator
-  fixes access and re-runs. The only scripted authority calls are
-  `sprint-close.sh --close-milestone` (closes the GitHub milestone before any
-  local mutation, so a failure leaves the sprint active) and `triage-apply
+  fixes access and re-runs. Milestone closing is a native authority call the
+  session makes before a requested local sprint close, so a failure leaves the
+  sprint active. The only scripted authority calls are from `triage-apply
   --apply` (a close is comment-then-close, a priority change looks the labels up
   first); nothing retries automatically, and after a lost response verify the
   target's state before re-running any non-idempotent write — create, comment,

@@ -6,7 +6,7 @@ changes the baseline.
 
 ## Run
 
-From the repository root, run all seven controlled scenarios with one command:
+From the repository root, run all eight controlled scenarios with one command:
 
 ```bash
 node tests/evals/outcome-conformance.js \
@@ -56,6 +56,7 @@ Example for the planned close-runtime retirement:
 ```bash
 node tests/evals/outcome-conformance.js \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
+  --expect-change orient-next-batch=#498 \
   --expect-change close-sprint-bounded-effects=#498 \
   --output /tmp/dev-backlog-outcome-after
 ```

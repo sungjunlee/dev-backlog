@@ -48,9 +48,28 @@ function authorityCalls(context, command) {
   return context.invocations.filter((invocation) => invocation.command === command);
 }
 
+function flagValue(args, name) {
+  const long = `--${name}`;
+  const index = args.indexOf(long);
+  if (index >= 0) return args[index + 1] ?? null;
+  const prefix = `${long}=`;
+  const matched = args.find((arg) => arg.startsWith(prefix));
+  return matched ? matched.slice(prefix.length) : null;
+}
+
+function ghApiMethod(args) {
+  if (args[0] !== "api") return null;
+  const dashX = args.indexOf("-X");
+  if (dashX >= 0) return String(args[dashX + 1] || "").toUpperCase();
+  const short = args.find((arg) => /^-[Xx].+/.test(arg) && arg !== "-X");
+  if (short) return short.slice(2).toUpperCase();
+  const method = flagValue(args, "method");
+  return method ? String(method).toUpperCase() : null;
+}
+
 function isGitHubMutation(args) {
-  return (args[0] === "issue" && ["create", "edit", "close", "comment"].includes(args[1])) ||
-    (args[0] === "api" && args.includes("-X"));
+  return (args[0] === "issue" && ["create", "edit", "close", "comment", "reopen"].includes(args[1])) ||
+    (args[0] === "api" && ["POST", "PUT", "PATCH", "DELETE"].includes(ghApiMethod(args)));
 }
 
 function isBacklogMutation(args) {
@@ -90,7 +109,7 @@ function changedPaths(context) {
 const CLOSE_SPRINT_PATH = ".dev-backlog/sprints/2026-11-close.md";
 const CLOSE_SPRINT_SOURCE = [
   "---", "status: active", "started: 2026-11-01", "---", "", "# Close fixture", "",
-  "## Goal", "Finish.", "", "## Plan", "- [x] #20 Done", "", "## Running Context", "",
+  "## Goal", "Finish.", "status: active", "", "## Plan", "- [x] #20 Done", "", "## Running Context", "",
   "## Progress", "- 2026-11-01: opened.", "",
 ].join("\n");
 
@@ -138,12 +157,17 @@ const SCENARIOS = [
       ].join("\n"));
     },
     grade(context) {
-      const rails = [...scriptCalls(context, "status.sh"), ...scriptCalls(context, "next.sh")];
+      const rails = scriptCalls(context, "sprint-state.js").filter((call) => {
+        const mode = flagValue(call.args, "mode");
+        const format = flagValue(call.args, "format");
+        const json = format == null || format === "json";
+        return ["status", "next"].includes(mode) && json && call.status === 0;
+      });
       const reads = authorityCalls(context, "gh").filter(({ args }) =>
         args[0] === "issue" && args[1] === "view" && args.includes("--json")
       );
       return [
-        check("recovery rail invoked with JSON", rails.some((call) => call.args.includes("--json") && call.status === 0), rails),
+        check("Node recovery rail invoked", rails.length > 0, rails),
         check("live task authority read", reads.some((call) => call.status === 0), reads),
         check("orientation is read-only", context.changes.length === 0, changedPaths(context)),
         check("no authority mutation on a read-only orientation", mutationCalls(context).length === 0, mutationCalls(context)),
@@ -210,14 +234,32 @@ const SCENARIOS = [
     },
     grade(context) {
       const sprint = fs.readFileSync(path.join(context.root, CLOSE_SPRINT_PATH), "utf8");
-      const calls = scriptCalls(context, "sprint-close.sh");
+      const calls = scriptCalls(context, "sprint-state.js").filter((call) => {
+        const modeIndex = call.args.indexOf("--mode");
+        return modeIndex >= 0 && call.args[modeIndex + 1] === "status";
+      });
+      const verification = spawnSync(process.execPath, [
+        path.join(REPO_ROOT, "skills/dev-backlog/scripts/sprint-state.js"),
+        "--mode", "status", path.join(context.root, ".dev-backlog"),
+      ], { cwd: context.root, encoding: "utf8" });
+      let activeSprints = null;
+      try {
+        activeSprints = JSON.parse(verification.stdout).active_sprints;
+      } catch {
+        activeSprints = null;
+      }
+      const frontmatter = sprint.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] || "";
+      const progress = sprint.split(/^## Progress\s*$/m)[1] || "";
       return [
-        check("current close rail invoked successfully", calls.some((call) => call.status === 0), calls),
-        check("frontmatter is completed", /^status: completed$/m.test(sprint), sprint.match(/^status:.*$/m)?.[0]),
-        check("final Progress is recorded", /tasks completed/i.test(sprint), sprint.split("## Progress")[1]?.trim()),
+        check("Node status reader invoked successfully", calls.some((call) => call.status === 0), calls),
+        check("frontmatter is completed", /^status: completed$/m.test(frontmatter), frontmatter.match(/^status:.*$/m)?.[0]),
+        check("reader reports no active sprint", verification.status === 0 && Array.isArray(activeSprints) && activeSprints.length === 0, verification.stderr || verification.stdout),
+        check("body status line is untouched", (sprint.match(/^status: active$/gm) || []).length === 1, sprint.match(/^status: active$/gm)),
+        check("one final Progress line is recorded", (progress.match(/^.*tasks completed.*$/gim) || []).length === 1, progress.trim()),
         check("only status and Progress content changed", sprintCore(sprint) === sprintCore(CLOSE_SPRINT_SOURCE), sprint),
         check("only the sprint file changed", JSON.stringify(changedPaths(context)) === JSON.stringify([CLOSE_SPRINT_PATH]), changedPaths(context)),
         check("unrelated operator file is untouched", fs.readFileSync(path.join(context.root, "operator-owned.txt"), "utf8") === "keep\n", "operator-owned.txt"),
+        check("standalone local close makes no authority mutation", mutationCalls(context).length === 0, mutationCalls(context)),
       ];
     },
   },
@@ -385,7 +427,7 @@ function normalizeInvocation(invocation, root) {
 }
 
 function relevantInvocations(invocations) {
-  const scripts = new Set(["status.sh", "next.sh", "sprint-init.js", "sprint-close.sh", "triage-apply.js"]);
+  const scripts = new Set(["sprint-state.js", "sprint-init.js", "triage-apply.js"]);
   return invocations.filter((invocation) =>
     ["gh", "backlog"].includes(invocation.command) ||
     invocation.args.some((arg) => scripts.has(path.basename(String(arg).replaceAll("\\", "/"))))

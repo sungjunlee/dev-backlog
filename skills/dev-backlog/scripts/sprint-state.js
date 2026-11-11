@@ -3,8 +3,8 @@
  * Emit actor-readable state from the active sprint file.
  *
  * The one sprint-markdown parser: --format json is the wire contract
- * (schema_version 2) is the fresh-session recovery rail (`--json`), --format text is the human surface
- * next.sh / status.sh exec into. The shell scripts only plumb arguments.
+ * (schema_version 2) is the fresh-session recovery rail; --format text is the
+ * human surface for next/status orientation.
  */
 
 const fs = require("fs");
@@ -193,33 +193,6 @@ function parseFrontmatter(content) {
 function isActiveSprint(content) {
   const status = parseFrontmatter(content).status;
   return typeof status === "string" && status.trim() === "active";
-}
-
-// The same file with the root frontmatter `status:` set to completed, or null
-// when no single line does that (including a duplicated root `status:`). Each `status:` line is tried in turn and kept
-// only if the parser then sees the root status completed and nothing else
-// changed, so a nested or block-text `status:` is never touched.
-function completedSprintContent(content) {
-  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
-  if (!match) return null;
-  const rest = content.slice(match[0].length);
-  const withoutStatus = (fm) => JSON.stringify({ ...fm, status: undefined });
-  const before = withoutStatus(parseFrontmatter(content));
-  const lines = match[0].split("\n");
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].match(/^([ \t]*)status:.*?(\s+#.*?)?(\r?)$/);
-    if (!line) continue;
-    const candidate = [...lines];
-    // Keep a trailing YAML comment the author wrote on the status line.
-    candidate[index] = `${line[1]}status: completed${line[2] || ""}${line[3]}`;
-    const next = candidate.join("\n") + rest;
-    const parsed = parseFrontmatter(next);
-    if (parsed.status !== "completed" || withoutStatus(parsed) !== before) continue;
-    // A second root `status: active` would survive in the file: stop instead.
-    const remaining = lines.filter((_, lineIndex) => lineIndex !== index).join("\n") + rest;
-    return isActiveSprint(remaining) ? null : next;
-  }
-  return null;
 }
 
 function extractSectionLines(content, section) {
@@ -532,9 +505,8 @@ function readSprintState({
 }
 
 // ---------------------------------------------------------------------------
-// Text rendering. The shape next.sh / status.sh printed in bash before #468,
-// on JSON semantics (Plan-only counts, started-ordered portfolio, fail-loud
-// overlap, trimmed trailing blanks). The shell scripts exec `--format text`.
+// Text rendering on JSON semantics (Plan-only counts, started-ordered
+// portfolio, fail-loud overlap, trimmed trailing blanks).
 // ---------------------------------------------------------------------------
 
 const NO_SPRINT_HINT = "List open tasks in the task authority.";
@@ -626,7 +598,7 @@ function nextPortfolioLines(perSprints) {
     "",
     ...perSprints.flatMap((perSprint) => nextTrackLines(perSprint)),
     "",
-    "Use 'next.sh --track <slug>' for a single track.",
+    "Use 'node scripts/sprint-state.js --mode next --format text --track <slug>' for a single track.",
   ];
 }
 
@@ -759,7 +731,6 @@ module.exports = {
   findActiveSprintFiles,
   parseFrontmatter,
   isActiveSprint,
-  completedSprintContent,
   extractSectionLines,
   hasSection,
   parseProgressEntries,

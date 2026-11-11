@@ -1,0 +1,107 @@
+{
+  "id": "close-sprint-bounded-effects",
+  "title": "Close a sprint by changing only status and Progress",
+  "guarantees": [
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "Node status reader invoked successfully",
+      "pass": true,
+      "observed": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "frontmatter is completed",
+      "pass": true,
+      "observed": "status: completed"
+    },
+    {
+      "name": "reader reports no active sprint",
+      "pass": true,
+      "observed": "{\n  \"schema_version\": 2,\n  \"active_sprints\": [],\n  \"active_sprint\": null,\n  \"plan_items\": [],\n  \"next_batch\": null,\n  \"latest_progress\": [],\n  \"in_flight\": []\n}\n"
+    },
+    {
+      "name": "body status line is untouched",
+      "pass": true,
+      "observed": [
+        "status: active"
+      ]
+    },
+    {
+      "name": "one final Progress line is recorded",
+      "pass": true,
+      "observed": "- 2026-11-01: opened.\n- 2026-11-12: Sprint completed; 1/1 tasks completed."
+    },
+    {
+      "name": "only status and Progress content changed",
+      "pass": true,
+      "observed": "---\nstatus: completed\nstarted: 2026-11-01\n---\n\n# Close fixture\n\n## Goal\nFinish.\nstatus: active\n\n## Plan\n- [x] #20 Done\n\n## Running Context\n\n## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint completed; 1/1 tasks completed.\n"
+    },
+    {
+      "name": "only the sprint file changed",
+      "pass": true,
+      "observed": [
+        ".dev-backlog/sprints/2026-11-close.md"
+      ]
+    },
+    {
+      "name": "unrelated operator file is untouched",
+      "pass": true,
+      "observed": "operator-owned.txt"
+    },
+    {
+      "name": "standalone local close makes no authority mutation",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "node",
+      "args": [
+        "skills/dev-backlog/scripts/sprint-state.js",
+        "--mode",
+        "status"
+      ],
+      "status": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "skills/dev-backlog/scripts/sprint-state.js",
+        "--mode",
+        "status"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": [
+    {
+      "path": ".dev-backlog/sprints/2026-11-close.md",
+      "kind": "modified",
+      "before": "aa5425a8c395bdd02cdbc774256be200e7e7e352674ca76ccf95cfa6324b112c",
+      "after": "2b6a4e8a36d1a4eec1255b970b3f550e595412bf6dfe45d8294e65c58b10ca44"
+    }
+  ]
+}

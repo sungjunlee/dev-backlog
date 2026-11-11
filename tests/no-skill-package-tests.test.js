@@ -29,8 +29,7 @@ function isTestDouble(name) {
   return (
     name.startsWith("fake-") ||
     name.endsWith("-fixture.js") ||
-    (name.endsWith(".cjs") && name.includes("preload")) ||
-    name === "smoke-test.sh"
+    (name.endsWith(".cjs") && name.includes("preload"))
   );
 }
 
@@ -42,8 +41,15 @@ describe("skill package surface", () => {
     assert.deepEqual(found, []);
   });
 
-  it("contains no test doubles, fixtures, or smoke test under skills/", () => {
+  it("contains no test doubles or fixtures under skills/", () => {
     const found = collectMatchingFiles(SKILLS_DIR, isTestDouble)
+      .map(relativePosix)
+      .sort();
+    assert.deepEqual(found, []);
+  });
+
+  it("ships no shell files under skills/ (#498)", () => {
+    const found = collectMatchingFiles(SKILLS_DIR, (name) => name.endsWith(".sh"))
       .map(relativePosix)
       .sort();
     assert.deepEqual(found, []);
