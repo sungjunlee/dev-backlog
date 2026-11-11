@@ -11,7 +11,7 @@
 
 ## Conventions
 
-- `setup-dev-backlog.js` re-runs only add missing directories: user-authored sprint files and any legacy `config.yml` are preserved byte-for-byte, and a symlinked or irregular root, config, or `sprints/` is refused before any mkdir.
+- `sprint-init.js` creates missing execution directories and refuses a symlinked or irregular `.dev-backlog/` or `sprints/` before any write. `setup-dev-backlog.js --migrate-legacy` is only the explicitly authorized, bounded legacy-layout migration; routine commands preserve existing sprint, context, and leftover `backlog/` bytes.
 - Commit the active sprint file to main when opening it; a sprint that is untracked or only on a working branch is invisible to delegate worktrees branched from main, which may then seed a duplicate active sprint.
 - `sprint-state.js --mode next|status` and `backlog-doctor.js` are the machine path — extend them instead of adding a second markdown parser. With relay deprecated the JSON has no external consumer; it stays as the fresh-session recovery rail; `--format text` is the readable view.
 - SKILL.md is goal / rail / Done-when per mode: state a rule once, name the script that enforces it, keep hard constraints only for shared or irreversible state. Re-add prose only after a conformance run shows a repeated mistake, never for an anticipated risk. Eval prompts live in `tests/evals/`, never in SKILL.md — an in-file prompt section is a self-contaminating answer key.

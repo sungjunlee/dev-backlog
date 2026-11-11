@@ -6,7 +6,7 @@ changes the baseline.
 
 ## Run
 
-From the repository root, run all eight controlled scenarios with one command:
+From the repository root, run all nine controlled scenarios with one command:
 
 ```bash
 node tests/evals/outcome-conformance.js \
@@ -51,13 +51,14 @@ default. For an intentional behavior change:
 2. cite the authorizing issue with `--expect-change scenario-id=#N`; and
 3. retain the before/after evidence in the new report.
 
-Example for the planned close-runtime retirement:
+Example for the runtime changes covered by #498 and #499:
 
 ```bash
 node tests/evals/outcome-conformance.js \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
   --expect-change orient-next-batch=#498 \
   --expect-change close-sprint-bounded-effects=#498 \
+  --expect-change fresh-repository-plan=#499 \
   --output /tmp/dev-backlog-outcome-after
 ```
 

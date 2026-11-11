@@ -5,7 +5,6 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { TRACKER_FLAG_NOTICE } = require(path.join(SKILL_SCRIPTS, "setup-dev-backlog.js"));
 
 const SCRIPT = path.join(SKILL_SCRIPTS, "setup-dev-backlog.js");
 
@@ -42,111 +41,63 @@ function snapshot(root) {
   return files;
 }
 
-function writeConfig(root, raw) {
-  const backlogDir = path.join(root, ".dev-backlog");
-  fs.mkdirSync(backlogDir, { recursive: true });
-  const configPath = path.join(backlogDir, "config.yml");
-  fs.writeFileSync(configPath, raw);
-  return configPath;
-}
-
-describe("GitHub-only setup real process integration", () => {
-  it("creates a fresh execution root and nothing else", (t) => {
+describe("bounded legacy migration real process integration", () => {
+  it("refuses to run without explicit migration authorization", (t) => {
     const root = makeRoot(t);
-    const result = runCli(root, ["--non-interactive", "--json"]);
-    assert.equal(result.status, 0, result.stderr);
-    const parsed = JSON.parse(result.stdout);
-    assert.deepEqual(parsed, {
-      action: "setup-dev-backlog",
-      createdDirectories: ["sprints"],
-    });
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/config.yml")), false);
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
-  });
-
-  it("accepts --tracker, ignores it, and says so on stderr (#445)", (t) => {
-    const root = makeRoot(t);
-    const result = runCli(root, ["--tracker", "files", "--non-interactive", "--json"]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr.trim(), TRACKER_FLAG_NOTICE);
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/.tracker")), false);
-  });
-
-  it("names the declared task authority on the human result line (#476)", (t) => {
-    const root = makeRoot(t);
-    const withoutTracker = runCli(root, ["--non-interactive"]);
-    assert.equal(withoutTracker.status, 0, withoutTracker.stderr);
-    assert.match(
-      withoutTracker.stdout,
-      /Task authority: github \(default; \.dev-backlog\/\.tracker not present\)/
-    );
-
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "backlog\n");
-    const withTracker = runCli(root, ["--non-interactive"]);
-    assert.equal(withTracker.status, 0, withTracker.stderr);
-    assert.match(withTracker.stdout, /Task authority: backlog \(\.dev-backlog\/\.tracker\)/);
-  });
-
-  it("leaves complex config bytes untouched and never reads a tracker key", (t) => {
-    const root = makeRoot(t);
-    const raw = [
-      '"note:with:colons": &copy !text |-2',
-      "    tracker: local",
-      "single: 'first line",
-      "  tracker: local",
-      "  last line'",
-      "tracker: local # parked and ignored",
-      "tail: preserved",
-    ].join("\r\n");
-    const configPath = writeConfig(root, raw);
-    // A valid declared authority (#476); the embedded "tracker: local" strings
-    // above are config.yml content, never parsed as YAML keys either way.
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "github\n");
-    const result = runCli(root, ["--non-interactive", "--json"]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.readFileSync(configPath, "utf8"), raw);
-    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog/.tracker"), "utf8"), "github\n");
-  });
-
-  it("fails loud on an unknown declared .tracker value (#476)", (t) => {
-    const root = makeRoot(t);
-    fs.mkdirSync(path.join(root, ".dev-backlog"), { recursive: true });
-    fs.writeFileSync(path.join(root, ".dev-backlog/.tracker"), "local\n");
-    const result = runCli(root, ["--non-interactive", "--json"]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /Unknown task authority "local"/);
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), false);
-  });
-
-  it("repairs partial structure and reruns byte-idempotently", (t) => {
-    const root = makeRoot(t);
-    fs.mkdirSync(path.join(root, ".dev-backlog"));
-    const first = runCli(root, ["--non-interactive"]);
-    assert.equal(first.status, 0, first.stderr);
-    assert.equal(fs.existsSync(path.join(root, ".dev-backlog/sprints")), true);
-    const repaired = snapshot(path.join(root, ".dev-backlog"));
-    const second = runCli(root, ["--non-interactive"]);
-    assert.equal(second.status, 0, second.stderr);
-    assert.deepEqual(snapshot(path.join(root, ".dev-backlog")), repaired);
-  });
-
-  it("rejects an unsafe config path before mutation", (t) => {
-    const root = makeRoot(t);
-    fs.mkdirSync(path.join(root, ".dev-backlog"));
-    try {
-      fs.symlinkSync(path.join(root, "missing"), path.join(root, ".dev-backlog/config.yml"));
-    } catch (error) {
-      if (process.platform === "win32" && error.code === "EPERM") {
-        t.skip("Windows symlink privilege is unavailable");
-        return;
-      }
-      throw error;
-    }
     const before = snapshot(root);
-    const result = runCli(root, ["--non-interactive"]);
+    const result = runCli(root, []);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /unsafe config path/);
+    assert.match(result.stderr, /Refusing migration without --migrate-legacy/);
+    assert.deepEqual(snapshot(root), before);
+  });
+
+  it("rejects removed flags before touching the tree", (t) => {
+    const root = makeRoot(t);
+    for (const args of [["--tracker", "files"], ["--tracker=files"], ["--non-interactive"]]) {
+      const before = snapshot(root);
+      const result = runCli(root, args);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Removed argument: --(?:tracker|non-interactive)/);
+      assert.deepEqual(snapshot(root), before);
+    }
+  });
+
+  it("does not create an execution root when no legacy layout exists", (t) => {
+    const root = makeRoot(t);
+    const result = runCli(root, ["--migrate-legacy", "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), {
+      action: "migrate-legacy-layout",
+      migrated: false,
+      reason: "no-legacy-skill-files",
+    });
+    assert.deepEqual(fs.readdirSync(root), []);
+  });
+
+  it("migrates only declared paths and does not read the parked tracker", (t) => {
+    const root = makeRoot(t);
+    fs.mkdirSync(path.join(root, "backlog", "sprints"), { recursive: true });
+    fs.mkdirSync(path.join(root, "backlog", "tasks"));
+    fs.writeFileSync(path.join(root, "backlog", "sprints", "keep.md"), "keep\r\n");
+    fs.writeFileSync(path.join(root, "backlog", "tasks", "one.md"), "operator\n");
+    fs.writeFileSync(path.join(root, "backlog", ".tracker"), "unknown-on-purpose\n");
+    const result = runCli(root, ["--migrate-legacy", "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).migrated, true);
+    assert.equal(fs.readFileSync(path.join(root, ".dev-backlog", "sprints", "keep.md"), "utf8"), "keep\r\n");
+    assert.equal(fs.readFileSync(path.join(root, "backlog", "tasks", "one.md"), "utf8"), "operator\n");
+    assert.equal(fs.readFileSync(path.join(root, "backlog", ".tracker"), "utf8"), "unknown-on-purpose\n");
+  });
+
+  it("leaves legacy content byte-identical when .dev-backlog already exists", (t) => {
+    const root = makeRoot(t);
+    fs.mkdirSync(path.join(root, ".dev-backlog"));
+    fs.mkdirSync(path.join(root, "backlog", "sprints"), { recursive: true });
+    fs.writeFileSync(path.join(root, "backlog", "sprints", "keep.md"), "leftover\n");
+    const before = snapshot(root);
+    const result = runCli(root, ["--migrate-legacy", "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).reason, "destination-exists");
     assert.deepEqual(snapshot(root), before);
   });
 

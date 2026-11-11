@@ -159,6 +159,31 @@ function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "
   return [];
 }
 
+function lstatIfPresent(targetPath, fsApi = fs) {
+  try {
+    return fsApi.lstatSync(targetPath);
+  } catch (error) {
+    if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return null;
+    throw error;
+  }
+}
+
+// A fresh repository may have neither path. Any existing execution root or
+// sprints path must be a real directory before mkdir/write can run.
+function validateSprintDestination(sprintsDir, fsApi = fs) {
+  const executionRoot = path.dirname(sprintsDir);
+  for (const [targetPath, label] of [
+    [executionRoot, "execution root"],
+    [sprintsDir, "sprints"],
+  ]) {
+    const stat = lstatIfPresent(targetPath, fsApi);
+    if (!stat) continue;
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw new Error(`Refusing unsafe ${label} path: ${targetPath} must be a real directory.`);
+    }
+  }
+}
+
 function createSprintFile({
   topic, milestone, component, scope,
   sprintsDir = defaultSprintsDir(),
@@ -173,6 +198,7 @@ function createSprintFile({
   if (Array.isArray(scope) && scope.some((glob) => normalizeScopePrefix(glob) === null)) {
     throw new Error("--scope accepts directory prefixes only: dir, dir/, dir/*, dir/**.");
   }
+  validateSprintDestination(sprintsDir);
 
   const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const started = today.toISOString().slice(0, 10);
@@ -240,6 +266,7 @@ module.exports = {
   buildSprintContent,
   listActiveSprintFiles,
   checkTrackDisjointness,
+  validateSprintDestination,
   createSprintFile,
   printResult,
 };
