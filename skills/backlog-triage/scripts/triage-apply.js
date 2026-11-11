@@ -21,7 +21,7 @@ const HTML_BLOCK_TAGS = [
 ].join("|");
 const HTML_BLOCK_TAG_PATTERN = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t />]|$)`, "i");
 const COMPLETE_HTML_TAG_PATTERN = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
-const LIST_ITEM_PATTERN = /^( {0,3})(?:[-+*]|\d{1,9}[.)])([ \t]+)(.*)$/;
+const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])([ \t]+)(.*)$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -184,9 +184,18 @@ function listContainerView(line) {
   let continuationIndent = 0;
   let match;
   while ((match = content.match(LIST_ITEM_PATTERN))) {
-    const prefix = content.slice(0, content.length - match[3].length);
-    continuationIndent = columnAfter(prefix, continuationIndent);
-    content = match[3];
+    const markerEnd = columnAfter(`${match[1]}${match[2]}`, continuationIndent);
+    const paddingEnd = columnAfter(match[3], markerEnd);
+    const paddingColumns = paddingEnd - markerEnd;
+    // More than four columns after a marker means one column of list padding;
+    // the rest belongs to the child block and may make it indented code.
+    if (paddingColumns > 4) {
+      continuationIndent = markerEnd + 1;
+      content = `${" ".repeat(paddingColumns - 1)}${match[4]}`;
+      break;
+    }
+    continuationIndent = paddingEnd;
+    content = match[4];
   }
   return { content, continuationIndent };
 }
@@ -208,18 +217,12 @@ function leadingIndentColumns(line) {
 
 function stripContainerContinuation(line, continuationIndent) {
   const source = String(line || "");
-  if (!continuationIndent) return source;
-  let column = 0;
-  let index = 0;
-  while (index < source.length && /^[ \t]$/.test(source[index]) && column < continuationIndent) {
-    const nextColumn = columnAfter(source[index], column);
-    if (nextColumn > continuationIndent) {
-      return `${" ".repeat(nextColumn - continuationIndent)}${source.slice(index + 1)}`;
-    }
-    column = nextColumn;
-    index += 1;
-  }
-  return column >= continuationIndent ? source.slice(index) : source;
+  const indentation = source.match(/^[ \t]*/)[0];
+  // Expand every tab at its original column before removing the container so
+  // a tab that begins exactly at the boundary keeps its residual columns.
+  const indentationColumns = columnAfter(indentation);
+  if (indentationColumns < continuationIndent) return source;
+  return `${" ".repeat(indentationColumns - continuationIndent)}${source.slice(indentation.length)}`;
 }
 
 function continuedListContainerView(line, activeContinuationIndent) {

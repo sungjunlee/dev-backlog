@@ -764,6 +764,30 @@ describe("execute", () => {
           "- [x] Must reject",
         ],
       },
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "  \t<pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "  \t</pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "  \t<!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+        ],
+      },
     ];
 
     for (const { anchorLine, lines } of reports) {
@@ -907,7 +931,7 @@ describe("execute", () => {
   });
 
   it("ends the checklist at Setext headings after non-paragraph list items", () => {
-    for (const listItem of ["- ### Item", "- ***"]) {
+    for (const listItem of ["- ### Item", "- ***", "-     code", "-\t\tcode"]) {
       for (const underline of ["===", "---"]) {
         const { result, effects } = executeWithEffectSpies([
           "## Apply Checklist",
