@@ -602,7 +602,7 @@ describe("execute", () => {
     assert.equal(fs.readFileSync(resolveLogPath("2026-04-18", repoRoot), "utf-8").trim().split("\n").length, 2);
   });
 
-  it("guards the task authority before GitHub and apply log writes", () => {
+  it("outcome triage-apply-github-only: stops before GitHub and apply-log writes", () => {
     fs.writeFileSync(reportPath, acceptedReport('<!-- triage:assign-milestone #42 milestone="A" -->'));
     const tracker = path.join(repoRoot, ".dev-backlog", ".tracker");
     const calls = [];

@@ -1,0 +1,117 @@
+{
+  "id": "orient-next-batch",
+  "title": "Orient through the recovery rail and live authority",
+  "guarantees": [
+    "G1"
+  ],
+  "checks": [
+    {
+      "name": "recovery rail invoked with JSON",
+      "pass": true,
+      "observed": [
+        {
+          "command": "bash",
+          "args": [
+            "skills/dev-backlog/scripts/status.sh",
+            "--json"
+          ],
+          "status": 0
+        },
+        {
+          "command": "bash",
+          "args": [
+            "skills/dev-backlog/scripts/next.sh",
+            "--json"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "live task authority read",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "2",
+            "--json",
+            "number,title,state,body,comments"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "3",
+            "--json",
+            "number,title,state,body,comments"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "orientation is read-only",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "no authority mutation on a read-only orientation",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "only permitted authority reads occurred",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "bash",
+      "args": [
+        "skills/dev-backlog/scripts/status.sh",
+        "--json"
+      ],
+      "status": 0
+    },
+    {
+      "command": "bash",
+      "args": [
+        "skills/dev-backlog/scripts/next.sh",
+        "--json"
+      ],
+      "status": 0
+    },
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "view",
+        "2",
+        "--json",
+        "number,title,state,body,comments"
+      ],
+      "status": 0
+    },
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "view",
+        "3",
+        "--json",
+        "number,title,state,body,comments"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": []
+}

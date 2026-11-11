@@ -6,6 +6,10 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ## [Unreleased]
 
+### Added
+
+- Outcome-based conformance harness and a seven-scenario before-baseline; prose-literal and reference-count pins are replaced by structural and observable assertions. Refs [#497](https://github.com/sungjunlee/dev-backlog/issues/497).
+
 ### Changed
 
 - Completed sprint files are disposable (maintainer decision 2026-09-20): the "immutable history / permanent record" wording is withdrawn in `spec/capabilities.md` (decision row), `spec/system-map.md`, SKILL.md, and `_context.md`; the repo's own 36 completed sprint files are deleted (git history keeps them); `status: completed` is still never flipped back. BREAKING for nothing in code.

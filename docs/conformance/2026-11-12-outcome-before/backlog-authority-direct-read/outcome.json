@@ -1,0 +1,59 @@
+{
+  "id": "backlog-authority-direct-read",
+  "title": "Read Backlog.md authority directly without GitHub",
+  "guarantees": [
+    "G1",
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "declared Backlog.md read verb invoked",
+      "pass": true,
+      "observed": [
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "7",
+            "--plain"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "GitHub is never inferred or called",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "direct read is effect-free",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "no Backlog or GitHub mutation on a direct read",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "only the declared Backlog read occurred",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "backlog",
+      "args": [
+        "task",
+        "7",
+        "--plain"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": []
+}

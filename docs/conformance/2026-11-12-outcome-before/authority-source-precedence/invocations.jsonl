@@ -1,0 +1,1 @@
+{"command":"gh","args":["issue","view","42","--json","body,comments"],"status":0}

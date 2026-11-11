@@ -1,15 +1,20 @@
-# Eval Prompts
+# Outcome Conformance Scenarios
 
-Fresh-session recovery prompts for each skill. Each prompt names a scenario
-a session might wake into with no prior conversation history, and the
-"Expected:" text after it is the outcome a conforming session must reach.
+Fresh-session scenarios exercise a controlled workspace, not a model's ability
+to recite contract prose. `outcome-conformance.js` creates one clean workspace
+per scenario, installs fake authority CLIs, runs a fresh Codex session, and
+grades only observable evidence:
 
-These are test fixtures, not execution contract — they used to live as an
-`## Eval Prompts` section inside each `SKILL.md`, where every session paid
-their token cost whether or not it needed them. They now live here instead,
-consumed by the #367 conformance cadence rather than read on every session.
+- recorded authority and rail invocations with exit statuses;
+- files added, removed, or changed from the before snapshot; and
+- whether a required stop prevented later invocations and file effects.
 
-- `dev-backlog.md` — prompts for the `dev-backlog` skill.
-- `backlog-triage.md` — prompts for the `backlog-triage` skill.
+The final answer is retained for audit but is not an input to the grade. The
+scenario prompt never includes the grader checks or an `Expected:` answer.
 
-Scenario history is in git; the current `dev-backlog.md` has thirteen scenarios (12–13 cover a non-GitHub task authority since v0.15.0).
+- `dev-backlog.md` indexes the six dev-backlog scenarios.
+- `backlog-triage.md` indexes the triage human-gate scenario.
+- `outcome-conformance.test.js` tests the deterministic recorder, guarantee
+  map, and expected-change marker without launching a model.
+
+Run and retention instructions live in `docs/conformance/README.md`.
