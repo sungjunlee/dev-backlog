@@ -21,7 +21,7 @@ const HTML_BLOCK_TAGS = [
 ].join("|");
 const HTML_BLOCK_TAG_PATTERN = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t />]|$)`, "i");
 const COMPLETE_HTML_TAG_PATTERN = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
-const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])([ \t]+)(.*)$/;
+const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)(.*))?$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -185,17 +185,26 @@ function listContainerView(line) {
   let match;
   while ((match = content.match(LIST_ITEM_PATTERN))) {
     const markerEnd = columnAfter(`${match[1]}${match[2]}`, continuationIndent);
-    const paddingEnd = columnAfter(match[3], markerEnd);
+    const padding = match[3] || "";
+    const child = match[4] || "";
+    // A marker-only or whitespace-only first line has the minimum one-column
+    // list padding, regardless of how much trailing whitespace it carries.
+    if (!child.trim()) {
+      continuationIndent = markerEnd + 1;
+      content = "";
+      break;
+    }
+    const paddingEnd = columnAfter(padding, markerEnd);
     const paddingColumns = paddingEnd - markerEnd;
     // More than four columns after a marker means one column of list padding;
     // the rest belongs to the child block and may make it indented code.
     if (paddingColumns > 4) {
       continuationIndent = markerEnd + 1;
-      content = `${" ".repeat(paddingColumns - 1)}${match[4]}`;
+      content = `${" ".repeat(paddingColumns - 1)}${child}`;
       break;
     }
     continuationIndent = paddingEnd;
-    content = match[4];
+    content = child;
   }
   return { content, continuationIndent };
 }
@@ -229,10 +238,10 @@ function continuedListContainerView(line, activeContinuationIndent) {
   const source = String(line || "");
   const direct = listContainerView(source);
   if (direct.continuationIndent > 0) {
-    return { ...direct, activeContinuationIndent: direct.continuationIndent };
+    return { ...direct, activeContinuationIndent: direct.continuationIndent, startsListItem: true };
   }
   if (source.trim() === "") {
-    return { content: source, continuationIndent: 0, activeContinuationIndent };
+    return { content: source, continuationIndent: 0, activeContinuationIndent, startsListItem: false };
   }
   const indentation = leadingIndentColumns(source);
   if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
@@ -240,17 +249,19 @@ function continuedListContainerView(line, activeContinuationIndent) {
       content: stripContainerContinuation(source, activeContinuationIndent),
       continuationIndent: activeContinuationIndent,
       activeContinuationIndent,
+      startsListItem: false,
     };
   }
-  return { content: source, continuationIndent: 0, activeContinuationIndent: 0 };
+  return { content: source, continuationIndent: 0, activeContinuationIndent: 0, startsListItem: false };
 }
 
-function markdownLiteralLines(lines) {
-  const literal = new Set();
+function markdownBlockState(lines) {
+  const literalLines = new Set();
+  const listParagraphLines = new Set();
   let start = 0;
   if (lines[0] === "---") {
     const end = lines.indexOf("---", 1);
-    for (let index = 0; index <= end; index += 1) literal.add(index);
+    for (let index = 0; index <= end; index += 1) literalLines.add(index);
     start = end + 1;
   }
 
@@ -260,12 +271,38 @@ function markdownLiteralLines(lines) {
   let indentedCode;
   let activeContinuationIndent = 0;
   let paragraphOpen = false;
+  let paragraphContinuationIndent = 0;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
-    const container = continuedListContainerView(line, activeContinuationIndent);
+    let container = continuedListContainerView(line, activeContinuationIndent);
+    // A marker that cannot interrupt an open paragraph stays paragraph text
+    // instead of manufacturing a new list container.
+    if (container.startsListItem && paragraphOpen && !interruptsParagraph(line)) {
+      container = {
+        content: line,
+        continuationIndent: 0,
+        activeContinuationIndent: paragraphContinuationIndent,
+        startsListItem: false,
+      };
+    }
+    if (container.startsListItem) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+    }
+    const lazyParagraphIndent = (
+      !container.startsListItem
+      && container.continuationIndent === 0
+      && paragraphOpen
+      && paragraphContinuationIndent > 0
+      && line.trim() !== ""
+      && !interruptsParagraph(line)
+    ) ? paragraphContinuationIndent : 0;
+    if (lazyParagraphIndent > 0) {
+      container.activeContinuationIndent = lazyParagraphIndent;
+    }
     activeContinuationIndent = container.activeContinuationIndent;
     if (commentBlock) {
-      literal.add(index);
+      literalLines.add(index);
       const contextLine = stripContainerContinuation(line, commentBlock.continuationIndent);
       commentBlock.depth += (contextLine.match(/<!--/g) || []).length;
       commentBlock.depth -= (contextLine.match(/-->/g) || []).length;
@@ -277,17 +314,17 @@ function markdownLiteralLines(lines) {
       const contextLine = stripContainerContinuation(line, htmlBlock.continuationIndent);
       if (htmlBlock.end === "blank") {
         if (contextLine.trim() === "") htmlBlock = undefined;
-        else literal.add(index);
+        else literalLines.add(index);
         if (htmlBlock) continue;
       } else {
-        literal.add(index);
+        literalLines.add(index);
         if (htmlBlock.end.test(contextLine)) htmlBlock = undefined;
         continue;
       }
     }
 
     if (fence) {
-      literal.add(index);
+      literalLines.add(index);
       const contextLine = stripContainerContinuation(line, fence.continuationIndent);
       const closing = contextLine.match(/^ {0,3}(`+|~+)[ \t]*$/);
       if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
@@ -299,8 +336,9 @@ function markdownLiteralLines(lines) {
     if (indentedCode) {
       const contextLine = stripContainerContinuation(line, indentedCode.continuationIndent);
       if (contextLine.trim() === "" || /^(?: {4}| {0,3}\t)/.test(contextLine)) {
-        literal.add(index);
+        literalLines.add(index);
         paragraphOpen = false;
+        paragraphContinuationIndent = 0;
         continue;
       }
       indentedCode = undefined;
@@ -310,33 +348,37 @@ function markdownLiteralLines(lines) {
     // as a complete standalone line outside every other literal context.
     if (parseAnchor(line)) {
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
 
     const contextLine = container.content;
     if (contextLine.trim() === "") {
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
     const opening = contextLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (opening) {
-      literal.add(index);
+      literalLines.add(index);
       fence = {
         character: opening[1][0],
         length: opening[1].length,
         continuationIndent: container.continuationIndent,
       };
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
 
     if (/^ {0,3}<!--/.test(contextLine)) {
-      literal.add(index);
+      literalLines.add(index);
       const depth = (contextLine.match(/<!--/g) || []).length - (contextLine.match(/-->/g) || []).length;
       if (depth > 0) {
         commentBlock = { depth, continuationIndent: container.continuationIndent };
       }
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
 
@@ -357,30 +399,41 @@ function markdownLiteralLines(lines) {
       break;
     }
     if (rawHtml) {
-      literal.add(index);
+      literalLines.add(index);
       if (!rawHtml.end.test(contextLine)) {
         htmlBlock = { ...rawHtml, continuationIndent: container.continuationIndent };
       }
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
 
     if (HTML_BLOCK_TAG_PATTERN.test(contextLine) || COMPLETE_HTML_TAG_PATTERN.test(contextLine)) {
-      literal.add(index);
+      literalLines.add(index);
       htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
       paragraphOpen = false;
+      paragraphContinuationIndent = 0;
       continue;
     }
 
     if (/^(?: {4}| {0,3}\t)/.test(contextLine) && !paragraphOpen) {
-      literal.add(index);
+      literalLines.add(index);
       indentedCode = { continuationIndent: container.continuationIndent };
+      paragraphContinuationIndent = 0;
       continue;
     }
 
     paragraphOpen = !interruptsParagraph(contextLine);
+    paragraphContinuationIndent = paragraphOpen
+      ? container.continuationIndent || lazyParagraphIndent
+      : 0;
+    if (paragraphContinuationIndent > 0) listParagraphLines.add(index);
   }
-  return literal;
+  return { literalLines, listParagraphLines };
+}
+
+function markdownLiteralLines(lines) {
+  return markdownBlockState(lines).literalLines;
 }
 
 function isApplyChecklistHeading(line) {
@@ -401,16 +454,11 @@ function interruptsParagraph(line) {
   return isThematicBreak(source);
 }
 
-function listItemOpensParagraph(line, literalLines, index) {
-  const container = listContainerView(line);
-  if (container.continuationIndent === 0 || literalLines.has(index)) return false;
-  return Boolean(container.content.trim()) && !interruptsParagraph(container.content);
-}
-
-function isSetextHeading(lines, index, literalLines) {
+function isSetextHeading(lines, index, literalLines, listParagraphLines = new Set()) {
   if (index < 0 || index + 1 >= lines.length) return false;
   if (literalLines.has(index) || literalLines.has(index + 1)) return false;
   if (!/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) return false;
+  if (listParagraphLines.has(index)) return false;
 
   let paragraphStart = index;
   while (paragraphStart > 0) {
@@ -427,11 +475,6 @@ function isSetextHeading(lines, index, literalLines) {
     if (interruptsParagraph(lines[lineIndex])) return false;
   }
 
-  const precedingIndex = paragraphStart - 1;
-  if (
-    precedingIndex >= 0
-    && listItemOpensParagraph(lines[precedingIndex], literalLines, precedingIndex)
-  ) return false;
   return true;
 }
 
@@ -439,7 +482,7 @@ function parseReport(text) {
   const source = String(text || "");
   const lines = source.split(/\r?\n/);
   const frontmatter = parseFrontmatter(source);
-  const literalLines = markdownLiteralLines(lines);
+  const { literalLines, listParagraphLines } = markdownBlockState(lines);
   const anchors = [];
   const parsed = {
     anchors: 0,
@@ -474,7 +517,7 @@ function parseReport(text) {
       checklistEnd = index;
       break;
     }
-    if (isSetextHeading(lines, index, literalLines)) {
+    if (isSetextHeading(lines, index, literalLines, listParagraphLines)) {
       checklistEnd = index;
       break;
     }

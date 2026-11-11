@@ -811,6 +811,43 @@ describe("execute", () => {
     ]);
   });
 
+  it("rejects HTML opened after an empty list-item first line before every effect", () => {
+    const reports = [];
+    for (const firstLine of ["-", "-    "]) {
+      reports.push(
+        {
+          anchorLine: 4,
+          lines: [
+            firstLine,
+            "    <pre>",
+            "  ## Apply Checklist",
+            '  <!-- triage:revisit #42 reason="outside" -->',
+            "  - [x] Must reject",
+            "    </pre>",
+          ],
+        },
+        {
+          anchorLine: 5,
+          lines: [
+            firstLine,
+            "    <!--",
+            "  ## Apply Checklist",
+            "  -->",
+            '  <!-- triage:revisit #42 reason="outside" -->',
+            "  - [x] Must reject",
+          ],
+        }
+      );
+    }
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, JSON.stringify(lines[0]));
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, JSON.stringify(lines[0]));
+    }
+  });
+
   it("requires exact type-1 HTML closing tags before every effect", () => {
     for (const closer of ["</pre >", "</pre\t>"]) {
       for (const listContained of [false, true]) {
@@ -951,6 +988,53 @@ describe("execute", () => {
           `${listItem} / ${underline}`
         );
       }
+    }
+  });
+
+  it("scopes an interrupting list item's indented code independently of an outer paragraph", () => {
+    for (const listItem of ["-     code", "-\t\tcode"]) {
+      for (const underline of ["---", "==="]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          "Some evidence",
+          listItem,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${listItem} / ${underline}`
+        );
+      }
+    }
+  });
+
+  it("keeps a later list-contained paragraph and its lazy continuation inside the checklist", () => {
+    for (const listItem of ["-     code", "- ### Item"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        listItem,
+        "  More evidence",
+        "continued",
+        "---",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ]);
+
+      assert.equal(result.exitCode, 0, listItem);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, listItem);
     }
   });
 
