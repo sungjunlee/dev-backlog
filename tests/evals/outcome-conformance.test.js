@@ -211,13 +211,17 @@ describe("read-only and bounded graders", () => {
     }
   });
 
-  it("fails a direct Backlog read when an unrecognized operation includes --plain", () => {
+  it("fails a direct Backlog read on unrecognized operations or undeclared extra arguments", () => {
     const reads = [
       { command: "backlog", args: ["task", "7", "--plain"], status: 0 },
     ];
     for (const extraCall of [
       { command: "backlog", args: ["task", "archive", "7", "--plain"], status: 93 },
       { command: "backlog", args: ["task", "archive", "7", "--plain"], status: 0 },
+      { command: "backlog", args: ["task", "7", "--unexpected", "--plain"], status: 93 },
+      { command: "backlog", args: ["task", "7", "--unexpected", "--plain"], status: 0 },
+      { command: "backlog", args: ["task", "7", "move", "--plain"], status: 93 },
+      { command: "backlog", args: ["task", "7", "move", "--plain"], status: 0 },
     ]) {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-backlog-plain-"));
       try {

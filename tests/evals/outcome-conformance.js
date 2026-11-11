@@ -68,17 +68,13 @@ function isGitHubIssueView(args) {
   return args[0] === "issue" && args[1] === "view";
 }
 
-function isBacklogWriteVerb(token) {
-  return ["archive", "edit", "close", "create", "comment", "reopen", "delete"].includes(token);
-}
-
 function isBacklogPlainRead(args, taskId) {
-  const expectedId = taskId == null ? args[1] : String(taskId);
-  return args[0] === "task" &&
+  return Array.isArray(args) &&
+    args.length === 3 &&
+    args[0] === "task" &&
     /^\d+$/.test(String(args[1])) &&
-    args[1] === expectedId &&
-    args.includes("--plain") &&
-    !args.some((token) => isBacklogWriteVerb(token));
+    (taskId == null || args[1] === String(taskId)) &&
+    args[2] === "--plain";
 }
 
 function unexpectedAuthorityCalls(context, isAllowed) {
