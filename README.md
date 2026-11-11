@@ -72,11 +72,15 @@ Duration, estimate, and milestone membership alone do not require one.
 node /path/to/dev-backlog/skills/dev-backlog/scripts/setup-dev-backlog.js \
   --non-interactive
 node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-init.js "auth-system"
-bash /path/to/dev-backlog/skills/dev-backlog/scripts/next.sh
-bash /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-close.sh
+node /path/to/dev-backlog/skills/dev-backlog/scripts/sprint-state.js \
+  --mode next --format text
 ```
 
-Close the sprint explicitly only when a sprint was admitted.
+Close an admitted sprint with a deliberate edit: change its frontmatter
+`status: active` to `status: completed` and append one Progress line. Verify the
+result with `sprint-state.js --mode status --format text`; if the requested
+scope also closes a GitHub milestone, make that native `gh api` PATCH first so
+a remote failure leaves the local sprint active.
 
 A sprint file is one Goal, an ordered Plan (`[ ]` / `[~]` / `[x]`), Running
 Context, and Progress. Full section semantics live in
@@ -119,7 +123,6 @@ Projects) are priced in the [authority contract](skills/dev-backlog/references/a
 
 ```bash
 node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js
-bash tests/smoke/smoke-test.sh
 npx --yes skills add . -l
 ```
 

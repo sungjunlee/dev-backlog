@@ -1,5 +1,0 @@
-Task #7’s live specification, read via `backlog task 7 --plain`, has one acceptance criterion:
-
-- [ ] Preserve the Backlog.md fixture.
-
-No implementation or closure was performed.

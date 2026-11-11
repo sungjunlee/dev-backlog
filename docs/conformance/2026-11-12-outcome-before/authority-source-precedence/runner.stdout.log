@@ -1,1 +1,0 @@
-The body’s `spec_ref: task-spec.md` overrides both the issue body and Agent Brief. Created `SPEC.md` containing `spec-wins` and verified that neither `BODY.md` nor `BRIEF.md` exists. Stopped.

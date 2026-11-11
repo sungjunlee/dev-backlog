@@ -245,6 +245,12 @@ describe("readTaskAuthority", () => {
     assert.equal(readTaskAuthority(dir), "gitlab");
   });
 
+  it("accepts a UTF-8 BOM, CRLF, and uppercase in the first line (#498)", (t) => {
+    const dir = root(t);
+    write(dir, "\uFEFFGitHub\r\nbacklog\r\n");
+    assert.equal(readTaskAuthority(dir), "github");
+  });
+
   it("trims a trailing newline and surrounding whitespace on the first line", (t) => {
     const dir = root(t);
     write(dir, "  backlog  \n");

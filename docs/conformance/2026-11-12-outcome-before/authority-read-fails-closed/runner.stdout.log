@@ -1,3 +1,0 @@
-The declared authority read failed: `gh issue view 42 --json body,comments` exited with code 41: `gh: controlled authority read failure`.
-
-Normal work did not begin. No files, acceptance criteria, or lifecycle state were changed. Authority access must be fixed before rerunning.

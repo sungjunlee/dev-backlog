@@ -19,9 +19,6 @@ jobs:
       - name: Node tests
         run: node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js
 
-      - name: Bash smoke tests
-        run: bash tests/smoke/smoke-test.sh
-
   windows-test:
     runs-on: windows-latest
     steps:
@@ -36,7 +33,3 @@ jobs:
         run: |
           $tests = Get-ChildItem tests -Recurse -Filter *.test.js | ForEach-Object FullName
           node --test --test-concurrency=1 $tests
-
-      - name: Bash smoke tests
-        shell: bash
-        run: bash tests/smoke/smoke-test.sh

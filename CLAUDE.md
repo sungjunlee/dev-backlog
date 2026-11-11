@@ -19,7 +19,7 @@ skills/
   dev-backlog/
     SKILL.md               ← Agent execution contract (keep under 250 lines)
     references/            ← Detailed specs (on-demand)
-    scripts/               ← Deterministic helpers (node + bash)
+    scripts/               ← Deterministic helpers (Node.js)
 ```
 
 The `spec-charter` and `spec-grill` authoring skills live in
@@ -69,9 +69,8 @@ amendments are human-gated — propose, apply only on explicit approval.
   aliases (mapping lives outside this repo) and never link to private repos
 - Keep README focused on the human quick start; keep `SKILL.md` under 250
   lines as the agent execution contract
-- Verify with `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js` and
-  `bash tests/smoke/smoke-test.sh`; the test suite includes a
-  doc-drift check over script mentions
+- Verify with `node --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js`;
+  the test suite includes a doc-drift check over script mentions
 - `docs/` holds only the current conformance run; git history is the record
   for everything else — do not re-read removed or historical docs as live
   contracts

@@ -4,66 +4,78 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { resolveBashExecutable, toBashArgs } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 
 const SCRIPTS_DIR = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { isActiveSprint, completedSprintContent } = require(path.join(SCRIPTS_DIR, "sprint-state.js"));
+const STATE_BIN = path.join(SCRIPTS_DIR, "sprint-state.js");
+const { parseFrontmatter, readSprintState } = require(STATE_BIN);
+const { runDoctor } = require(path.join(SCRIPTS_DIR, "backlog-doctor.js"));
 
-function closeSprint(t, statusLine, { extraDir, args = [] } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sprint-close-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const sprintPath = path.join(root, ".dev-backlog", "sprints", "2026-09-close.md");
-  fs.mkdirSync(path.dirname(sprintPath), { recursive: true });
-  if (extraDir) fs.mkdirSync(path.join(path.dirname(sprintPath), extraDir));
-  fs.writeFileSync(sprintPath, [
-    "---", statusLine, "---", "", "## Goal", "Done.", "", "## Plan", "- [x] #1 One", "",
-    "## Running Context", "", "## Progress", "- 2026-09-29: started",
-  ].join("\n") + "\n");
-  const result = spawnSync(resolveBashExecutable(), toBashArgs([path.join(SCRIPTS_DIR, "sprint-close.sh"), ...args]), {
-    cwd: root,
-    encoding: "utf8",
-  });
-  return { result, content: fs.readFileSync(sprintPath, "utf-8") };
-}
+const ACTIVE_SPRINT = [
+  "---",
+  "status: active",
+  "started: 2026-11-01",
+  "---",
+  "",
+  "# Close fixture",
+  "",
+  "## Goal",
+  "Finish without rewriting body content.",
+  "status: active",
+  "",
+  "## Plan",
+  "- [x] #20 Done",
+  "",
+  "## Running Context",
+  "",
+  "## Progress",
+  "- 2026-11-01: opened.",
+  "",
+].join("\n");
 
-describe("sprint-close status flip (#496)", () => {
-  for (const statusLine of ["status: active", "status: active ", 'status: "active"', " status: active"]) {
-    it(`closes a sprint whose frontmatter reads ${JSON.stringify(statusLine)}`, (t) => {
-      const { result, content } = closeSprint(t, statusLine);
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(isActiveSprint(content), false);
-      assert.match(content, /^[ \t]*status: completed$/m);
-    });
-  }
+describe("deliberate session sprint close (#498)", () => {
+  it("validates a frontmatter-only status edit and one Progress line through Node", (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-close-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const backlogDir = path.join(root, ".dev-backlog");
+    const sprintPath = path.join(backlogDir, "sprints", "2026-11-close.md");
+    const operatorPath = path.join(root, "operator-owned.txt");
+    fs.mkdirSync(path.dirname(sprintPath), { recursive: true });
+    fs.writeFileSync(sprintPath, ACTIVE_SPRINT);
+    fs.writeFileSync(operatorPath, "keep\n");
 
-  it("changes only the root status, never a nested or block-text status", () => {
-    const content = [
-      "---", "status: active", "deployment:", "  status: active", "notes: |", "  status: active", "---", "body",
-    ].join("\n");
-    const next = completedSprintContent(content);
-    assert.equal(isActiveSprint(next), false);
-    assert.equal(next.split("\n").filter((line) => line === "  status: active").length, 2);
-    assert.equal(completedSprintContent("---\nstatus: active\nmilestone: M\nstatus: active\n---\n"), null);
-    assert.match(completedSprintContent("---\nstatus: active # managed by hand\n---\n"), /^status: completed # managed by hand$/m);
-  });
+    assert.equal(readSprintState({ backlogDir }).active_sprints.length, 1);
 
-  for (const [frontmatter, title] of [
-    ["status: active\nmilestone: 1.20", "1.20"],
-    [" status: active\n milestone: Sprint X", "Sprint X"],
-    ['status: active\nmilestone: "2026"', "2026"],
-    ["status: active\nmilestone: 2026\ndeployment:\n  milestone: 123", "2026"],
-    ["status: active\nmilestone: 1.20 # quarterly", "1.20"],
-  ]) {
-    it(`reads the milestone title ${title} through the shared parser for --close-milestone`, (t) => {
-      const { result } = closeSprint(t, frontmatter, { args: ["--close-milestone", "--dry-run"] });
-      assert.equal(result.status, 0, result.stderr);
-      assert.ok(result.stdout.split("\n").some((line) => line.includes("milestone") && line.endsWith(` ${title}`)));
-    });
-  }
+    // Simulate the two deliberate edits made by a session. This is test setup,
+    // not a product close helper or lifecycle engine.
+    const completed = ACTIVE_SPRINT
+      .replace(/^status: active$/m, "status: completed")
+      .replace(
+        "## Progress\n- 2026-11-01: opened.\n",
+        "## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint closed. 1/1 tasks completed.\n",
+      );
+    fs.writeFileSync(sprintPath, completed);
 
-  it("skips a directory named *.md instead of reporting no active sprint", (t) => {
-    const { result, content } = closeSprint(t, "status: active", { extraDir: "not-a-sprint.md" });
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(isActiveSprint(content), false);
+    const after = fs.readFileSync(sprintPath, "utf8");
+    assert.equal(parseFrontmatter(after).status, "completed");
+    assert.deepEqual(after.match(/^status: active$/gm), ["status: active"]);
+    assert.equal((after.match(/Sprint closed\. 1\/1 tasks completed\./g) || []).length, 1);
+    assert.equal(fs.readFileSync(operatorPath, "utf8"), "keep\n");
+    assert.deepEqual(fs.readdirSync(root).sort(), [".dev-backlog", "operator-owned.txt"]);
+
+    const state = readSprintState({ backlogDir });
+    assert.deepEqual(state.active_sprints, []);
+    assert.equal(state.active_sprint, null);
+
+    const status = spawnSync(process.execPath, [
+      STATE_BIN, "--mode", "status", "--format", "text", backlogDir,
+    ], { cwd: root, encoding: "utf8" });
+    assert.equal(status.status, 0, status.stderr);
+    assert.equal(status.stdout, "=== Active Sprint ===\n(no active sprint)\n");
+
+    const doctor = runDoctor({ repoRoot: root });
+    const activeCheck = doctor.checks.find((check) => check.name === "active_sprint");
+    assert.equal(activeCheck.status, "warn");
+    assert.deepEqual(activeCheck.detail.active_files, []);
+    assert.match(activeCheck.detail.summary, /No active sprint found/);
   });
 });

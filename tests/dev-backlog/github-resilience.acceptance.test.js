@@ -7,9 +7,8 @@
  *   - leave GitHub state untouched (fake gh never saves state on failure),
  *   - make exactly one failing gh call (no automatic retry).
  *
- * Since #445 the only scripted GitHub calls left are `sprint-close.sh
- * --close-milestone` and `triage-apply --apply`; `sprint-init.js` no longer
- * touches the provider at all.
+ * Since #498 `triage-apply --apply` is the only scripted GitHub writer;
+ * `sprint-init.js` and the sprint-state reader never touch the provider.
  */
 
 const { describe, it } = require("node:test");
@@ -21,13 +20,10 @@ const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
 const TEST_FAKES = path.resolve(__dirname, "../fakes");
 const TRIAGE_SCRIPTS = path.resolve(__dirname, "../../skills/backlog-triage/scripts");
-const { resolveBashExecutable, toBashArgs } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const { writeGhFixture } = require(path.join(TEST_FAKES, "fake-gh-fixture.js"));
 
 const SCRIPTS_DIR = SKILL_SCRIPTS;
 const SPRINT_INIT_PATH = path.join(SCRIPTS_DIR, "sprint-init.js");
-const SPRINT_CLOSE_PATH = path.join(SCRIPTS_DIR, "sprint-close.sh");
-const PATCH_ARGV = ["api", "-X", "PATCH", "repos/{owner}/{repo}/milestones/7", "-f", "state=closed"];
 
 function makeRoot(t, prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -36,9 +32,7 @@ function makeRoot(t, prefix) {
 }
 
 function run(command, args, { cwd, env = process.env } = {}) {
-  const executable = command === "bash" ? resolveBashExecutable({ env }) : command;
-  const commandArgs = command === "bash" ? toBashArgs(args) : args;
-  return spawnSync(executable, commandArgs, { cwd, env, encoding: "utf8" });
+  return spawnSync(command, args, { cwd, env, encoding: "utf8" });
 }
 
 function prepareFixture(t, { failMode } = {}) {
@@ -51,11 +45,6 @@ function prepareFixture(t, { failMode } = {}) {
   return {
     root, cwd: root, backlogDir,
     env, calls: gh.calls, state: gh.state,
-    sprintFile: (name, lines) => {
-      const sprintPath = path.join(backlogDir, "sprints", name);
-      fs.writeFileSync(sprintPath, lines.join("\n") + "\n");
-      return sprintPath;
-    },
   };
 }
 
@@ -96,83 +85,5 @@ describe("triage-apply fails loud under provider failure", () => {
     assert.equal(calls.length, 1, "exactly one gh call, no silent retry");
     assert.deepEqual(calls[0], ["issue", "comment", "42", "-b", "stale cleanup"]);
     assert.equal(JSON.stringify(fixture.state()), stateBefore, "GitHub state must be unchanged");
-  });
-});
-
-describe("fail-loud GitHub resilience: sprint close --close-milestone", () => {
-  const ACTIVE_SPRINT = [
-    "---", "milestone: Cycle Milestone", "status: active", "started: 2026-07-31", "---", "",
-    "# Resilience cycle", "", "## Plan", "", "- [x] #42 Cycle task", "",
-    "## Running Context", "", "## Progress", "",
-  ];
-
-  it("unknown milestone: fails loud and leaves the sprint active with no PATCH", (t) => {
-    const fixture = prepareFixture(t, {});
-    const sprintPath = fixture.sprintFile("2026-07-cycle.md", [
-      "---", "milestone: DoesNotExist", "status: active", "started: 2026-07-31", "---", "",
-      "# Resilience cycle", "", "## Plan", "", "## Running Context", "", "## Progress", "",
-    ]);
-
-    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
-    assert.notEqual(result.status, 0, `expected failure, got stdout:\n${result.stdout}`);
-    assert.match(`${result.stdout}${result.stderr}`, /milestone not found: DoesNotExist/);
-    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: active$/m,
-      "local sprint must stay active when the milestone does not exist");
-    const patchCalls = fixture.calls().filter((argv) =>
-      JSON.stringify(argv) === JSON.stringify(PATCH_ARGV));
-    assert.equal(patchCalls.length, 0, "no PATCH for a nonexistent milestone");
-    assert.equal(fixture.state().milestoneClosed, false);
-  });
-
-  it("refuses to mark the sprint completed when the milestone PATCH fails", (t) => {
-    const fixture = prepareFixture(t, { failMode: "partial-outage" });
-    const sprintPath = fixture.sprintFile("2026-07-cycle.md", ACTIVE_SPRINT);
-
-    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
-    assert.notEqual(result.status, 0, `sprint close must fail loud:\n${result.stdout}`);
-    assert.match(`${result.stdout}${result.stderr}`, /GitHub unavailable|could not be closed/);
-    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: active$/m,
-      "local sprint must stay active while the GitHub milestone stays open");
-    assert.equal(fixture.state().milestoneClosed, false);
-    const patchCalls = fixture.calls().filter((argv) =>
-      JSON.stringify(argv) === JSON.stringify(PATCH_ARGV));
-    assert.equal(patchCalls.length, 1, "exactly one failing PATCH, no silent retry");
-  });
-
-  it("rate-limit: the milestone lookup itself fails loud with no local mutation", (t) => {
-    const fixture = prepareFixture(t, { failMode: "rate-limit" });
-    const sprintPath = fixture.sprintFile("2026-07-cycle.md", ACTIVE_SPRINT);
-
-    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
-    assert.notEqual(result.status, 0, `sprint close must fail loud:\n${result.stdout}`);
-    assert.match(`${result.stdout}${result.stderr}`, /API rate limit exceeded|could not be closed/);
-    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: active$/m);
-    assert.equal(fixture.calls().length, 1, "exactly one gh call, no silent retry");
-    assert.equal(fixture.state().milestoneClosed, false);
-  });
-
-  it("positive control: with gh healthy the close completes and closes the milestone", (t) => {
-    const fixture = prepareFixture(t, {});
-    const sprintPath = fixture.sprintFile("2026-07-cycle.md", ACTIVE_SPRINT);
-
-    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
-    assert.equal(result.status, 0, `sprint close should succeed:\n${result.stdout}\n${result.stderr}`);
-    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: completed$/m);
-    assert.equal(fixture.state().milestoneClosed, true);
-  });
-
-  it("already-closed milestone succeeds with no PATCH", (t) => {
-    const fixture = prepareFixture(t, {});
-    fs.writeFileSync(path.join(fixture.root, "gh-state.json"), JSON.stringify({
-      nextIssue: 43, issues: [], milestoneClosed: true,
-    }));
-    const sprintPath = fixture.sprintFile("2026-07-cycle.md", ACTIVE_SPRINT);
-
-    const result = run("bash", [SPRINT_CLOSE_PATH, fixture.backlogDir, "--close-milestone"], fixture);
-    assert.equal(result.status, 0, `already-closed should succeed:\n${result.stdout}\n${result.stderr}`);
-    assert.match(fs.readFileSync(sprintPath, "utf8"), /^status: completed$/m);
-    const patchCalls = fixture.calls().filter((argv) =>
-      JSON.stringify(argv) === JSON.stringify(PATCH_ARGV));
-    assert.equal(patchCalls.length, 0, "already closed must not PATCH");
   });
 });

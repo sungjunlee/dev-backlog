@@ -1,7 +1,0 @@
-Processed in order with `--apply --yes`:
-
-- `accepted.md`: applied revisit comment to #21.
-- `unchecked.md`: skipped unchecked close of #22.
-- `invalid.md`: stopped with exit code 1; line 5 targets invalid issue #0.
-
-Saved the observed results in [triage-execution-record.md](<workspace>/triage-execution-record.md).

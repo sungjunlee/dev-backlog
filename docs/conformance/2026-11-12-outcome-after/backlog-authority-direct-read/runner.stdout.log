@@ -1,0 +1,6 @@
+Read #7’s live specification using `backlog task 7 --plain`.
+
+Acceptance criterion:
+- [ ] Preserve the Backlog.md fixture.
+
+No implementation or status changes were made.

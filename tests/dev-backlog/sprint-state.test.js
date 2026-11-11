@@ -5,12 +5,12 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("node:child_process");
 const SKILL_SCRIPTS = path.resolve(__dirname, "../../skills/dev-backlog/scripts");
-const { spawnBashSync } = require(path.resolve(__dirname, "../tools/bash-runtime.js"));
 const {
   readSprintState,
   parsePlanItem,
   parseSprintContent,
   parseArgs,
+  extractSectionLines,
   textReport,
 } = require(path.join(SKILL_SCRIPTS, "sprint-state.js"));
 
@@ -153,6 +153,15 @@ Expose actor-readable execution state.
     assert.equal(state.active_sprint, null);
   });
 
+  it("skips a directory named *.md while finding active sprint files (#496, #498)", () => {
+    writeFile(path.join(backlogDir, "sprints", "active.md"), "---\nstatus: active\n---\n");
+    fs.mkdirSync(path.join(backlogDir, "sprints", "not-a-sprint.md"));
+
+    const state = readSprintState({ backlogDir });
+    assert.equal(path.basename(state.active_sprint.path), "active.md");
+    assert.equal(state.active_sprints.length, 1);
+  });
+
   it("throws OVERLAPPING_TRACKS when two active tracks share scope", () => {
     writeFile(path.join(backlogDir, "sprints", "a.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
     writeFile(path.join(backlogDir, "sprints", "b.md"), "---\nstatus: active\ncomponent: \"auth\"\n---\n");
@@ -195,12 +204,6 @@ Expose actor-readable execution state.
     assert.equal(result.status, 1);
     assert.ok(result.stderr.includes(slugMatch));
     assert.ok(result.stderr.includes(componentMatch));
-    const shell = spawnBashSync(["-c", 'source "$1"; resolve_track "$2" "$3"', "bash",
-      path.join(SKILL_SCRIPTS, "lib.sh"), path.join(backlogDir, "sprints"), "auth"],
-    { encoding: "utf8" });
-    assert.notEqual(shell.status, 0);
-    assert.ok(shell.stderr.includes(slugMatch));
-    assert.ok(shell.stderr.includes(componentMatch));
   });
 
   it("keeps the GitHub wire identity and ignores refs outside the #N grammar", () => {
@@ -290,6 +293,31 @@ status: active
 });
 
 describe("parseSprintContent", () => {
+  it("extracts first, empty, missing, trailing-space, and final sections (#498 smoke port)", () => {
+    const content = [
+      "## Goal  ",
+      "Test the parsing.",
+      "",
+      "## Plan",
+      "- [ ] #1 Item A",
+      "",
+      "## Running Context",
+      "- Decision A",
+      "",
+      "## Empty",
+      "",
+      "## Progress",
+      "- 2026-03-30: Done.",
+    ].join("\n");
+
+    assert.deepEqual(extractSectionLines(content, "Goal"), ["Test the parsing."]);
+    assert.deepEqual(extractSectionLines(content, "Plan"), ["- [ ] #1 Item A"]);
+    assert.deepEqual(extractSectionLines(content, "Running Context"), ["- Decision A"]);
+    assert.deepEqual(extractSectionLines(content, "Empty"), []);
+    assert.deepEqual(extractSectionLines(content, "Missing"), []);
+    assert.deepEqual(extractSectionLines(content, "Progress"), ["- 2026-03-30: Done."]);
+  });
+
   it("defaults tracker to github and honors an explicit authority override (#476)", () => {
     const content = `---
 status: active
@@ -694,7 +722,7 @@ describe("textReport", () => {
         "  Next: #2 Auth next",
         "2026-09-billing: 1/1 done",
         "",
-        "Use 'next.sh --track <slug>' for a single track.",
+        "Use 'node scripts/sprint-state.js --mode next --format text --track <slug>' for a single track.",
       ],
     });
     assert.deepEqual(textReport({ mode: "status", backlogDir }).lines, [
@@ -811,6 +839,22 @@ describe("parseArgs --format", () => {
     assert.match(parsed.error, /^Invalid --format: yaml\./);
     assert.match(parsed.error, /Usage: sprint-state\.js .*--format json\|text/);
   });
+
+  it("accepts mode, format, and track flags before or after a backlog path (#498)", () => {
+    const expected = {
+      mode: "next",
+      format: "text",
+      backlogDir: "backlog with spaces",
+      track: "auth",
+      component: null,
+    };
+    assert.deepEqual(parseArgs([
+      "--mode", "next", "--format", "text", "--track", "auth", "backlog with spaces",
+    ]), expected);
+    assert.deepEqual(parseArgs([
+      "backlog with spaces", "--track=auth", "--format=text", "--mode=next",
+    ]), expected);
+  });
 });
 
 describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
@@ -842,5 +886,17 @@ describe("sprint-state.js --format text CLI (stdout + exit code)", () => {
     const res = run("--mode", "next", "--format", "yaml");
     assert.equal(res.status, 1);
     assert.match(res.stderr, /Invalid --format: yaml/);
+  });
+
+  it("reads a backlog path containing spaces with flags after the path (#498)", () => {
+    const backlogDir = path.join(root, "backlog with spaces");
+    writeFile(path.join(backlogDir, "sprints", "active.md"), [
+      "---", "status: active", "---", "", "## Goal", "Path-safe reader.", "",
+      "## Plan", "- [ ] #1 Next", "", "## Running Context", "", "## Progress", "",
+    ].join("\n"));
+    const res = run(backlogDir, "--mode", "next", "--format", "text");
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(res.stdout, /Path-safe reader/);
+    assert.match(res.stdout, /#1 Next/);
   });
 });

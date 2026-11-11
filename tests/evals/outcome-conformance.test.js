@@ -105,7 +105,7 @@ describe("read-only and bounded graders", () => {
   it("fails orientation when a GitHub write occurs without local file changes", () => {
     const context = tmpContext({}, [
       { command: "gh", args: ["issue", "view", "3", "--json", "title"], status: 0 },
-      { command: "node", args: ["skills/dev-backlog/scripts/status.sh", "--json"], status: 0 },
+      { command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 },
       { command: "gh", args: ["issue", "close", "99"], status: 0 },
     ]);
     try {
@@ -147,7 +147,7 @@ describe("read-only and bounded graders", () => {
       fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
       const context = {
         root,
-        invocations: [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }],
+        invocations: [{ command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 }],
         changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "bb" }],
         runnerStatus: 0,
       };
@@ -170,7 +170,7 @@ describe("read-only and bounded graders", () => {
       fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
       const context = {
         root,
-        invocations: [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }],
+        invocations: [{ command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 }],
         changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "bb" }],
         runnerStatus: 0,
       };
@@ -188,7 +188,7 @@ describe("read-only and bounded graders", () => {
     const baseFiles = {};
     const reads = [
       { command: "gh", args: ["issue", "view", "3", "--json", "title"], status: 0 },
-      { command: "node", args: ["skills/dev-backlog/scripts/status.sh", "--json"], status: 0 },
+      { command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 },
     ];
     for (const extraCall of [
       { command: "gh", args: ["issue", "reopen", "99"], status: 93 },
@@ -261,7 +261,7 @@ describe("read-only and bounded graders", () => {
       fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
       const closePrefix = CLOSE_SPRINT_SOURCE.replace(/^status: active$/m, "status: completed")
         + "- 2026-11-12: Sprint closed. 1/1 tasks completed.\n";
-      const invocations = [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }];
+      const invocations = [{ command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 }];
       for (const suffix of [
         "\n## Plan\n- [x] #999 Injected extra Plan\n",
         "\n# Plan\n- [x] #999 Injected extra Plan\n",
