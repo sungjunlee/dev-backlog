@@ -68,8 +68,17 @@ function isGitHubIssueView(args) {
   return args[0] === "issue" && args[1] === "view";
 }
 
-function isBacklogPlainRead(args) {
-  return args[0] === "task" && args.includes("--plain");
+function isBacklogWriteVerb(token) {
+  return ["archive", "edit", "close", "create", "comment", "reopen", "delete"].includes(token);
+}
+
+function isBacklogPlainRead(args, taskId) {
+  const expectedId = taskId == null ? args[1] : String(taskId);
+  return args[0] === "task" &&
+    /^\d+$/.test(String(args[1])) &&
+    args[1] === expectedId &&
+    args.includes("--plain") &&
+    !args.some((token) => isBacklogWriteVerb(token));
 }
 
 function unexpectedAuthorityCalls(context, isAllowed) {
@@ -93,9 +102,12 @@ function replaceMarkdownSection(text, heading, replacement) {
   const lines = String(text).split("\n");
   const start = lines.findIndex((line) => new RegExp(`^## ${heading}\\s*$`).test(line));
   if (start < 0) return String(text);
+  const level = /^(#{1,6}) /.exec(lines[start]);
+  const startLevel = level ? level[1].length : 2;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i += 1) {
-    if (/^## /.test(lines[i])) {
+    const next = /^(#{1,6}) /.exec(lines[i]);
+    if (next && next[1].length <= startLevel) {
       end = i;
       break;
     }
@@ -266,7 +278,7 @@ const SCENARIOS = [
         check("GitHub is never inferred or called", gh.length === 0, gh),
         check("direct read is effect-free", context.changes.length === 0, changedPaths(context)),
         check("no Backlog or GitHub mutation on a direct read", mutationCalls(context).length === 0, mutationCalls(context)),
-        check("only the declared Backlog read occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args))),
+        check("only the declared Backlog read occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args, "7")).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args, "7"))),
       ];
     },
   },

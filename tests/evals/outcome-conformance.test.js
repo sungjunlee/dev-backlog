@@ -211,6 +211,31 @@ describe("read-only and bounded graders", () => {
     }
   });
 
+  it("fails a direct Backlog read when an unrecognized operation includes --plain", () => {
+    const reads = [
+      { command: "backlog", args: ["task", "7", "--plain"], status: 0 },
+    ];
+    for (const extraCall of [
+      { command: "backlog", args: ["task", "archive", "7", "--plain"], status: 93 },
+      { command: "backlog", args: ["task", "archive", "7", "--plain"], status: 0 },
+    ]) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-backlog-plain-"));
+      try {
+        const context = {
+          root,
+          invocations: [...reads, extraCall],
+          changes: [],
+          runnerStatus: 0,
+        };
+        const outcome = gradeScenario(scenario("backlog-authority-direct-read"), context);
+        assert.equal(outcome.pass, false, extraCall.args.join(" "));
+        assert.equal(outcome.checks.find((item) => item.name === "only the declared Backlog read occurred").pass, false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("keeps content after Progress when normalizing, and fails if a new section is appended after it", () => {
     const withNotes = CLOSE_SPRINT_SOURCE.replace(
       "## Progress\n- 2026-11-01: opened.\n",
@@ -223,22 +248,30 @@ describe("read-only and bounded graders", () => {
     assert.equal(sprintCore(legal), sprintCore(withNotes));
     const injected = legal + "\n## Plan\n- [x] #999 Injected extra Plan\n";
     assert.notEqual(sprintCore(injected), sprintCore(withNotes));
+    const injectedH1 = legal + "\n# Plan\n- [x] #999 Injected extra Plan\n";
+    assert.notEqual(sprintCore(injectedH1), sprintCore(withNotes));
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-close-tail-"));
     try {
       fs.mkdirSync(path.join(root, path.dirname(CLOSE_SPRINT_PATH)), { recursive: true });
       fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
-      fs.writeFileSync(path.join(root, CLOSE_SPRINT_PATH), CLOSE_SPRINT_SOURCE.replace(/^status: active$/m, "status: completed")
-        + "- 2026-11-12: Sprint closed. 1/1 tasks completed.\n"
-        + "\n## Plan\n- [x] #999 Injected extra Plan\n");
-      const failOutcome = gradeScenario(scenario("close-sprint-bounded-effects"), {
-        root,
-        invocations: [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }],
-        changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "cc" }],
-        runnerStatus: 0,
-      });
-      assert.equal(failOutcome.checks.find((item) => item.name === "only status and Progress content changed").pass, false);
-      assert.equal(failOutcome.pass, false);
+      const closePrefix = CLOSE_SPRINT_SOURCE.replace(/^status: active$/m, "status: completed")
+        + "- 2026-11-12: Sprint closed. 1/1 tasks completed.\n";
+      const invocations = [{ command: "bash", args: ["skills/dev-backlog/scripts/sprint-close.sh"], status: 0 }];
+      for (const suffix of [
+        "\n## Plan\n- [x] #999 Injected extra Plan\n",
+        "\n# Plan\n- [x] #999 Injected extra Plan\n",
+      ]) {
+        fs.writeFileSync(path.join(root, CLOSE_SPRINT_PATH), closePrefix + suffix);
+        const failOutcome = gradeScenario(scenario("close-sprint-bounded-effects"), {
+          root,
+          invocations,
+          changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "cc" }],
+          runnerStatus: 0,
+        });
+        assert.equal(failOutcome.checks.find((item) => item.name === "only status and Progress content changed").pass, false, suffix);
+        assert.equal(failOutcome.pass, false, suffix);
+      }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
