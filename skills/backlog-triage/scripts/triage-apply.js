@@ -9,7 +9,8 @@ const { ANCHOR_PATTERN, parseAnchor } = require("./anchor.js");
 const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
 
 const DEFAULT_TRIAGE_DIR = defaultTriageDir();
-const CHECKBOX_PATTERN = /^\s*-\s+\[([ xX])\]\s+/;
+const APPLY_CHECKLIST_HEADING = "## Apply Checklist";
+const CHECKBOX_PATTERN = /^ {0,3}-\s+\[([ xX])\]\s+/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -167,14 +168,45 @@ function parseFrontmatter(text) {
   return frontmatter;
 }
 
-function parseReport(text) {
-  const source = String(text || "");
-  if (source.includes("<!-- AC:BEGIN -->")) {
-    throw new Error("Malformed report: triage reports must not contain dev-backlog AC markers.");
+function markdownLiteralLines(lines) {
+  const literal = new Set();
+  let start = 0;
+  if (lines[0] === "---") {
+    const end = lines.indexOf("---", 1);
+    for (let index = 0; index <= end; index += 1) literal.add(index);
+    start = end + 1;
   }
 
+  let fence;
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (fence) {
+      literal.add(index);
+      const closing = line.match(/^ {0,3}(`+|~+)[ \t]*$/);
+      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
+        fence = undefined;
+      }
+      continue;
+    }
+
+    const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (opening) {
+      literal.add(index);
+      fence = { character: opening[1][0], length: opening[1].length };
+    }
+  }
+  return literal;
+}
+
+function isApplyChecklistHeading(line) {
+  return /^ {0,3}## Apply Checklist[ \t]*$/.test(String(line || ""));
+}
+
+function parseReport(text) {
+  const source = String(text || "");
   const lines = source.split(/\r?\n/);
   const frontmatter = parseFrontmatter(source);
+  const literalLines = markdownLiteralLines(lines);
   const anchors = [];
   const parsed = {
     anchors: 0,
@@ -183,7 +215,42 @@ function parseReport(text) {
     unknown_verb: 0,
   };
 
+  const checklistHeadings = [];
+  const anchorLines = [];
   for (let index = 0; index < lines.length; index += 1) {
+    if (!literalLines.has(index) && isApplyChecklistHeading(lines[index])) checklistHeadings.push(index);
+    if (parseAnchor(lines[index])) anchorLines.push(index);
+  }
+
+  if (checklistHeadings.length !== 1) {
+    if (checklistHeadings.length === 0 && anchorLines.length > 0) {
+      throw new Error(outsideChecklistMessage(anchorLines.map((index) => index + 1)));
+    }
+    const locations = checklistHeadings.length > 0
+      ? ` on lines ${checklistHeadings.map((index) => index + 1).join(", ")}`
+      : "";
+    throw new Error(
+      `Malformed report: expected exactly one ${APPLY_CHECKLIST_HEADING} heading; found ${checklistHeadings.length}${locations}.`
+    );
+  }
+
+  const checklistStart = checklistHeadings[0] + 1;
+  let checklistEnd = lines.length;
+  for (let index = checklistStart; index < lines.length; index += 1) {
+    if (!literalLines.has(index) && /^ {0,3}#{1,2}\s+/.test(lines[index])) {
+      checklistEnd = index;
+      break;
+    }
+  }
+  const outsideLines = anchorLines
+    .filter((index) => literalLines.has(index) || index < checklistStart || index >= checklistEnd)
+    .map((index) => index + 1);
+  if (outsideLines.length > 0) {
+    throw new Error(outsideChecklistMessage(outsideLines));
+  }
+
+  for (let index = checklistStart; index < checklistEnd; index += 1) {
+    if (literalLines.has(index)) continue;
     const anchor = parseAnchor(lines[index]);
     if (!anchor) continue;
 
@@ -228,7 +295,28 @@ function parseReport(text) {
     }
   }
 
+  const occurrencesByKey = new Map();
+  for (const anchor of anchors) {
+    if (!occurrencesByKey.has(anchor.key)) occurrencesByKey.set(anchor.key, []);
+    occurrencesByKey.get(anchor.key).push(anchor.anchorLine);
+  }
+  const duplicates = [...occurrencesByKey.values()].filter((lineNumbers) => lineNumbers.length > 1);
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Ambiguous report: each proposal must appear once in ${APPLY_CHECKLIST_HEADING}; `
+      + duplicates.map((lineNumbers) => `duplicate action on lines ${lineNumbers.join(", ")}`).join("; ")
+      + ". Keep one anchor for each action and explicitly recheck its approval."
+    );
+  }
+
   return { frontmatter, anchors, parsed };
+}
+
+function outsideChecklistMessage(lineNumbers) {
+  const noun = lineNumbers.length === 1 ? "anchor" : "anchors";
+  const verb = lineNumbers.length === 1 ? "is" : "are";
+  return `Malformed report: triage ${noun} on line${lineNumbers.length === 1 ? "" : "s"} ${lineNumbers.join(", ")} ${verb} outside ${APPLY_CHECKLIST_HEADING}. `
+    + `Consolidate actions in ${APPLY_CHECKLIST_HEADING}, remove every outside anchor, and explicitly recheck approvals; unchecking an outside anchor is not sufficient.`;
 }
 
 function dedupActions(anchors) {
@@ -564,6 +652,15 @@ function appendLogLine(logPath, entry, appendFile = fs.appendFileSync, mkdir = f
   appendFile(logPath, `${JSON.stringify(entry)}\n`);
 }
 
+function preflightApplyLog(logPath, appendFile = fs.appendFileSync, mkdir = fs.mkdirSync) {
+  try {
+    mkdir(path.dirname(logPath), { recursive: true });
+    appendFile(logPath, "");
+  } catch (error) {
+    throw new Error(`Apply log is not appendable at ${logPath}: ${error.message}`);
+  }
+}
+
 function buildLogEntry(action, result, ghArgv, timestamp, extra = {}) {
   const entry = {
     timestamp,
@@ -644,6 +741,23 @@ function recordLog(logPath, action, result, ghArgv, deps, extra = {}) {
   return entry;
 }
 
+function tryRecordLog(logPath, action, result, ghArgv, deps, extra = {}) {
+  try {
+    return { ok: true, entry: recordLog(logPath, action, result, ghArgv, deps, extra) };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function logAppendFailure(logPath, error) {
+  return `Failed to append apply log at ${logPath}: ${error.message}. No further commands were attempted.`;
+}
+
+function uncertainEffectFailure(logPath, argv, error) {
+  return `Apply log append failed after GitHub reported success for ${formatGhCommand(argv)}: ${error.message}. `
+    + `The effect may have completed but was not durably logged at ${logPath}. Verify remote state before manual recovery; do not blindly rerun this report.`;
+}
+
 function applyAcceptedAction(action, context) {
   const actionKey = action.key || buildActionKey(action);
   const appliedCommands = context.appliedCommandsByAction.get(actionKey) || new Set();
@@ -651,7 +765,10 @@ function applyAcceptedAction(action, context) {
 
   if (action.verb === "set-priority") {
     if (appliedCommands.size > 0) {
-      const alreadyEntry = recordLog(context.logPath, action, "already-applied", [], context.deps);
+      const recorded = tryRecordLog(context.logPath, action, "already-applied", [], context.deps);
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: true,
         action: {
@@ -660,7 +777,7 @@ function applyAcceptedAction(action, context) {
           args: action.args,
           gh_argv: [],
           result: "already-applied",
-          log: alreadyEntry,
+          log: recorded.entry,
         },
       };
     }
@@ -668,12 +785,18 @@ function applyAcceptedAction(action, context) {
     const viewArgv = ["issue", "view", String(action.issueNumber), "--json", "labels"];
     const viewResult = context.deps.runGh(viewArgv);
     if (viewResult.status !== 0) {
-      const errorEntry = recordLog(context.logPath, action, "error", [viewArgv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [viewArgv], context.deps, {
         stderr_tail: viewResult.stderr,
       });
+      if (!recorded.ok) {
+        return {
+          ok: false,
+          message: `${logAppendFailure(context.logPath, recorded.error)} GitHub also failed: ${trimStderr(viewResult.stderr)}`,
+        };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
       };
     }
 
@@ -681,18 +804,24 @@ function applyAcceptedAction(action, context) {
     try {
       labels = parseGhLabels(viewResult.stdout);
     } catch (error) {
-      const errorEntry = recordLog(context.logPath, action, "error", [viewArgv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [viewArgv], context.deps, {
         stderr_tail: error.message,
       });
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
       };
     }
 
     plannedCommands = toGhCommands(action, { currentPriorityLabels: labels });
     if (plannedCommands.length === 0) {
-      const alreadyEntry = recordLog(context.logPath, action, "already-applied", [], context.deps);
+      const recorded = tryRecordLog(context.logPath, action, "already-applied", [], context.deps);
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: true,
         action: {
@@ -701,7 +830,7 @@ function applyAcceptedAction(action, context) {
           args: action.args,
           gh_argv: [],
           result: "already-applied",
-          log: alreadyEntry,
+          log: recorded.entry,
         },
       };
     }
@@ -714,7 +843,10 @@ function applyAcceptedAction(action, context) {
   );
 
   if (missingCommands.length === 0) {
-    const alreadyEntry = recordLog(context.logPath, action, "already-applied", plannedCommands, context.deps);
+    const recorded = tryRecordLog(context.logPath, action, "already-applied", plannedCommands, context.deps);
+    if (!recorded.ok) {
+      return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+    }
     return {
       ok: true,
       action: {
@@ -723,7 +855,7 @@ function applyAcceptedAction(action, context) {
         args: action.args,
         gh_argv: plannedCommands,
         result: "already-applied",
-        log: alreadyEntry,
+        log: recorded.entry,
       },
     };
   }
@@ -732,12 +864,26 @@ function applyAcceptedAction(action, context) {
   for (const argv of missingCommands) {
     const result = context.deps.runGh(argv);
     if (result.status !== 0) {
-      const errorEntry = recordLog(context.logPath, action, "error", [argv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [argv], context.deps, {
         stderr_tail: result.stderr,
       });
+      if (!recorded.ok) {
+        return {
+          ok: false,
+          message: `${logAppendFailure(context.logPath, recorded.error)} GitHub also failed: ${trimStderr(result.stderr)}`,
+          action: {
+            verb: action.verb,
+            issueNumber: action.issueNumber,
+            args: action.args,
+            gh_argv: plannedCommands,
+            executed_gh_argv: executedCommands,
+            result: "error",
+          },
+        };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
         action: {
           verb: action.verb,
           issueNumber: action.issueNumber,
@@ -749,7 +895,22 @@ function applyAcceptedAction(action, context) {
       };
     }
 
-    recordLog(context.logPath, action, "applied", [argv], context.deps);
+    const recorded = tryRecordLog(context.logPath, action, "applied", [argv], context.deps);
+    if (!recorded.ok) {
+      return {
+        ok: false,
+        message: uncertainEffectFailure(context.logPath, argv, recorded.error),
+        action: {
+          verb: action.verb,
+          issueNumber: action.issueNumber,
+          args: action.args,
+          gh_argv: plannedCommands,
+          executed_gh_argv: executedCommands,
+          attempted_gh_argv: argv,
+          result: "error",
+        },
+      };
+    }
     executedCommands.push(argv);
     if (!context.appliedCommandsByAction.has(actionKey)) {
       context.appliedCommandsByAction.set(actionKey, new Set());
@@ -916,10 +1077,15 @@ function execute(argv = process.argv.slice(2), deps = {}) {
     try {
       const logState = readApplyLog(logPath, deps.readFile || fs.readFileSync);
       appliedCommandsByAction = logState.appliedCommandsByAction;
+      preflightApplyLog(
+        logPath,
+        deps.appendFile || fs.appendFileSync,
+        deps.mkdir || fs.mkdirSync
+      );
     } catch (error) {
       return {
         exitCode: 1,
-        error: error.message,
+        error: `Cannot apply triage actions: ${error.message}`,
       };
     }
   }
@@ -942,7 +1108,10 @@ function execute(argv = process.argv.slice(2), deps = {}) {
         result: "skipped-pending",
       });
       if (options.apply) {
-        recordLog(logPath, action, "skipped-pending", toGhCommands(action), effectDeps);
+        const recorded = tryRecordLog(logPath, action, "skipped-pending", toGhCommands(action), effectDeps);
+        if (!recorded.ok) {
+          return { ...result, exitCode: 1, error: logAppendFailure(logPath, recorded.error) };
+        }
       }
       continue;
     }
@@ -955,7 +1124,10 @@ function execute(argv = process.argv.slice(2), deps = {}) {
         result: "skipped-unknown-verb",
       });
       if (options.apply) {
-        recordLog(logPath, action, "skipped-unknown-verb", [], effectDeps);
+        const recorded = tryRecordLog(logPath, action, "skipped-unknown-verb", [], effectDeps);
+        if (!recorded.ok) {
+          return { ...result, exitCode: 1, error: logAppendFailure(logPath, recorded.error) };
+        }
       }
       continue;
     }
@@ -983,6 +1155,7 @@ function execute(argv = process.argv.slice(2), deps = {}) {
       }
       result.error = [
         `Failed to apply triage:${action.verb} #${action.issueNumber}.`,
+        applied.message || null,
         applied.error?.stderr_tail || null,
       ].filter(Boolean).join(" ");
       return {
@@ -1036,6 +1209,7 @@ module.exports = {
   CHECKBOX_PATTERN,
   SUPPORTED_VERBS,
   UNKNOWN_PRIORITY_PLACEHOLDER,
+  APPLY_CHECKLIST_HEADING,
   assertGitHubAuthority,
   usage,
   parseArgs,
@@ -1043,7 +1217,10 @@ module.exports = {
   stableSerialize,
   buildActionKey,
   parseFrontmatter,
+  markdownLiteralLines,
+  isApplyChecklistHeading,
   parseReport,
+  outsideChecklistMessage,
   dedupActions,
   validateAcceptedActions,
   formatRevisitComment,
@@ -1057,12 +1234,16 @@ module.exports = {
   extractCommandArrays,
   readApplyLog,
   appendLogLine,
+  preflightApplyLog,
   buildLogEntry,
   resolveReportDate,
   resolveLogPath,
   readLineSync,
   confirmApply,
   ensureApplyAllowed,
+  tryRecordLog,
+  logAppendFailure,
+  uncertainEffectFailure,
   applyAcceptedAction,
   summarizeResults,
   renderText,

@@ -31,33 +31,26 @@ function makeReport() {
     "# Backlog Triage - 2026-04-18",
     "",
     "## Obsolete Candidates",
+    "Issue #104 is stale, and #103 duplicates #101.",
+    "",
+    "## Priority Proposals",
+    "Issue #101 is part of the active auth cluster; #102 fits Sprint W17.",
+    "",
+    "## Apply Checklist",
     "<!-- triage:close #104 reason=\"stale cleanup\" -->",
     "- [x] Close #104 - stale cleanup",
     "",
     "<!-- triage:future-action #999 reason=\"wait for roadmap\" -->",
     "- [x] Future action #999 - wait for roadmap",
     "",
-    "## Priority Proposals",
-    "<!-- triage:set-priority #101 reason=\" theme auth hot \" value=high -->",
-    "- [ ] Set priority:high on #101 - theme auth hot",
-    "",
-    "## Milestone Suggestions",
-    "<!-- triage:assign-milestone #102 name=\"Sprint W17\" cluster=auth -->",
-    "",
-    "- [x] Assign Sprint W17 to #102",
-    "",
-    "## Apply Checklist",
-    "<!-- triage:close #104 reason=\"stale cleanup\" -->",
-    "- [ ] Close #104 - stale cleanup _(from Obsolete Candidates)_",
-    "",
     "<!-- triage:set-priority #101 value=high reason=\"theme auth hot\" -->",
-    "- [x] Set priority:high on #101 - theme auth hot _(from Priority Proposals)_",
+    "- [x] Set priority:high on #101 - theme auth hot",
     "",
     "<!-- triage:assign-milestone #102 cluster=auth name=\"Sprint W17\" -->",
-    "- [ ] Assign Sprint W17 to #102 _(from Milestone Suggestions)_",
+    "- [x] Assign Sprint W17 to #102",
     "",
     "<!-- triage:close-duplicate #103 target=#101 reason=\"duplicate candidate converged\" -->",
-    "- [x] Close duplicate #103 into #101 _(from Obsolete Candidates)_",
+    "- [x] Close duplicate #103 into #101",
     "",
   ].join("\n");
 }
@@ -67,6 +60,7 @@ function acceptedReport(...anchors) {
     "---",
     "generated: 2026-04-18",
     "---",
+    "## Apply Checklist",
     ...anchors.flatMap((anchor) => [anchor, "- [x] Accept", ""]),
   ].join("\n");
 }
@@ -90,9 +84,9 @@ describe("parseReport", () => {
   it("parses anchors, enforces paired checkboxes, and counts unknown verbs", () => {
     const parsed = parseReport(makeReport());
 
-    assert.equal(parsed.parsed.anchors, 8);
+    assert.equal(parsed.parsed.anchors, 5);
     assert.equal(parsed.parsed.checked, 5);
-    assert.equal(parsed.parsed.unchecked, 3);
+    assert.equal(parsed.parsed.unchecked, 0);
     assert.equal(parsed.parsed.unknown_verb, 1);
     assert.equal(parsed.frontmatter.generated, "2026-04-18");
 
@@ -107,16 +101,114 @@ describe("parseReport", () => {
           "---",
           "generated: 2026-04-18",
           "---",
+          "## Apply Checklist",
           "<!-- triage:close #42 reason=\"broken\" -->",
           "not a checkbox",
         ].join("\n")),
       /must be followed by a checkbox/i
     );
   });
+
+  it("rejects checked or unchecked anchors outside the sole checklist with migration guidance", () => {
+    for (const checkbox of ["x", " "]) {
+      assert.throws(
+        () => parseReport([
+          "## Evidence",
+          '<!-- triage:close #42 reason="old copy" -->',
+          `- [${checkbox}] Old copy`,
+          "## Apply Checklist",
+          '<!-- triage:close #42 reason="old copy" -->',
+          "- [x] Accept",
+        ].join("\n")),
+        (error) => {
+          assert.match(error.message, /line 2.*outside ## Apply Checklist/);
+          assert.match(error.message, /consolidate actions/i);
+          assert.match(error.message, /explicitly recheck approvals/i);
+          assert.match(error.message, /unchecking.*not sufficient/i);
+          return true;
+        }
+      );
+    }
+  });
+
+  it("requires exactly one checklist heading and rejects duplicate proposals within it", () => {
+    assert.throws(() => parseReport("# Evidence only\n"), /exactly one ## Apply Checklist.*found 0/i);
+    assert.throws(
+      () => parseReport("## Apply Checklist\n## Apply Checklist\n"),
+      /exactly one ## Apply Checklist.*lines 1, 2/i
+    );
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "- [x] Accept",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "- [ ] Leave pending",
+      ].join("\n")),
+      /each proposal must appear once.*lines 2, 4.*explicitly recheck/i
+    );
+  });
+
+  it("does not enforce the retired dev-backlog AC-marker protocol", () => {
+    const report = parseReport([
+      "<!-- AC:BEGIN -->",
+      "evidence text",
+      "<!-- AC:END -->",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="owner needed" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    assert.equal(report.parsed.anchors, 1);
+  });
+
+  it("never treats frontmatter, code examples, or indented lookalikes as approvals", () => {
+    const fakeHeadings = [
+      [
+        "---", "generated: 2026-04-18", "## Apply Checklist", "---",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+      [
+        "```markdown", "## Apply Checklist", "```",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+      [
+        "    ## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+    ];
+    for (const lines of fakeHeadings) {
+      assert.throws(() => parseReport(lines.join("\n")), /anchor on line .*outside ## Apply Checklist/i);
+    }
+
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        "```markdown",
+        '<!-- triage:revisit #42 reason="example only" -->',
+        "- [x] Example",
+        "```",
+      ].join("\n")),
+      /anchor on line 3.*outside ## Apply Checklist/i
+    );
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "    - [x] Indented code, not approval",
+      ].join("\n")),
+      /must be followed by a checkbox/i
+    );
+    const embedded = parseReport([
+      "## Apply Checklist",
+      '- <!-- triage:revisit #42 reason="example only" -->',
+      "- [x] Example",
+    ].join("\n"));
+    assert.equal(embedded.parsed.anchors, 0);
+  });
 });
 
 describe("dedupActions", () => {
-  it("dedups by normalized args and accepts a checked box in any location", () => {
+  it("keeps one normalized action for each checklist proposal", () => {
     const parsed = parseReport(makeReport());
     const deduped = dedupActions(parsed.anchors);
 
@@ -124,7 +216,7 @@ describe("dedupActions", () => {
 
     const closeAction = deduped.find((action) => action.verb === "close");
     assert.equal(closeAction.checked, true);
-    assert.equal(closeAction.occurrences.length, 2);
+    assert.equal(closeAction.occurrences.length, 1);
 
     const milestoneAction = deduped.find((action) => action.verb === "assign-milestone");
     assert.equal(milestoneAction.checked, true);
@@ -371,6 +463,7 @@ describe("execute", () => {
         "---",
         "generated: 2026-04-18",
         "---",
+        "## Apply Checklist",
         "<!-- triage:close-duplicate #103 target=#101 reason=\"duplicate candidate converged\" -->",
         "- [x] Close duplicate #103 into #101",
         "",
@@ -432,36 +525,105 @@ describe("execute", () => {
     assert.deepEqual(second.actions.map((action) => action.result), ["already-applied", "already-applied"]);
   });
 
-  it("applies a report whose source anchors and checklist copies are all checked exactly once", () => {
-    fs.writeFileSync(reportPath, makeReport().replace(/- \[ \]/g, "- [x]"));
+  it("applies exactly one action from the one approval surface", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:revisit #104 reason="needs owner" -->'
+    ));
     const calls = [];
     const runGh = (argv) => {
       calls.push(argv);
-      return { status: 0, stdout: argv[1] === "view" ? '{"labels":[]}' : "", stderr: "" };
+      return { status: 0, stdout: "", stderr: "" };
     };
     const result = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
 
     assert.equal(result.exitCode, 0);
-    const writes = calls.filter((argv) => argv[1] !== "view").map((argv) => argv.slice(0, 3).join(" "));
-    assert.deepEqual(writes.sort(), [
-      "issue close 103",
-      "issue close 104",
-      "issue comment 103",
-      "issue comment 104",
-      "issue edit 101",
-      "issue edit 102",
-    ]);
+    assert.deepEqual(calls, [["issue", "comment", "104", "-b", "triage: revisit — needs owner"]]);
   });
 
-  it("treats the legacy milestone alias as the canonical key within a report and across reruns", () => {
+  it("rejects an outside anchor before any GitHub call or log write", () => {
+    fs.writeFileSync(reportPath, [
+      "---", "generated: 2026-04-18", "---",
+      "## Evidence",
+      '<!-- triage:revisit #104 reason="old copy" -->',
+      "- [ ] Old unchecked copy",
+      "## Apply Checklist",
+      '<!-- triage:revisit #104 reason="old copy" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    fs.writeFileSync(logPath, "preserve history exactly\n");
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: () => assert.fail("GitHub invoked"),
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /line 5.*outside ## Apply Checklist/);
+    assert.equal(fs.readFileSync(logPath, "utf8"), "preserve history exactly\n");
+  });
+
+  it("preflights the actual apply-log append path before provider effects", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:revisit #104 reason="needs owner" -->'
+    ));
+    const calls = [];
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      appendFile: () => {
+        const error = new Error("permission denied");
+        error.code = "EACCES";
+        throw error;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /apply log is not appendable/i);
+    assert.match(result.error, /permission denied/);
+    assert.deepEqual(calls, []);
+  });
+
+  it("stops and reports an uncertain effect when append fails after provider success", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:close #104 reason="stale cleanup" -->'
+    ));
+    const calls = [];
+    let appendCount = 0;
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      appendFile: (target, content) => {
+        appendCount += 1;
+        if (appendCount === 1) return fs.appendFileSync(target, content);
+        const error = new Error("injected ledger failure");
+        error.code = "EIO";
+        throw error;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.deepEqual(calls, [["issue", "comment", "104", "-b", "stale cleanup"]]);
+    assert.match(result.error, /gh issue comment 104 -b 'stale cleanup'/);
+    assert.match(result.error, /effect may have completed/i);
+    assert.match(result.error, /verify remote state before manual recovery/i);
+    assert.match(result.error, /do not blindly rerun/i);
+    assert.equal(fs.readFileSync(resolveLogPath("2026-04-18", repoRoot), "utf8"), "");
+  });
+
+  it("treats the legacy milestone alias as the canonical key across migrated reruns", () => {
     const calls = [];
     const runGh = (argv) => {
       calls.push(argv);
       return { status: 0, stdout: "", stderr: "" };
     };
     fs.writeFileSync(reportPath, acceptedReport(
-      '<!-- triage:assign-milestone #102 name="Sprint W17" -->',
-      '<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'
+      '<!-- triage:assign-milestone #102 name="Sprint W17" -->'
     ));
     const first = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
     fs.writeFileSync(reportPath, acceptedReport('<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'));
@@ -502,7 +664,7 @@ describe("execute", () => {
       });
       assert.equal(result.status, 1, anchor);
       assert.match(result.stderr, expected, anchor);
-      assert.match(result.stderr, /line 4/, anchor);
+      assert.match(result.stderr, /line 5/, anchor);
       assert.equal(fixture.calls().length, 0, anchor);
       assert.equal(fs.existsSync(logPath), false, anchor);
     }
@@ -532,14 +694,14 @@ describe("execute", () => {
         env: fixture.env,
       });
       assert.equal(result.status, 1);
-      for (const line of [10, 16, 22, 25, 28, 31, 34]) assert.match(result.stderr, new RegExp(`line ${line}:`));
+      for (const line of [11, 17, 23, 26, 29, 32, 35]) assert.match(result.stderr, new RegExp(`line ${line}:`));
       assert.match(result.stderr, /conflicting priority/);
       assert.match(result.stderr, /conflicting milestone/);
       assert.match(result.stderr, /conflicting duplicate target/);
       assert.match(result.stderr, /reason is required/);
-      assert.match(result.stderr, /line 28: .*issue number must be a positive safe integer/);
-      assert.match(result.stderr, /line 31: .*milestone must not contain a NUL character/);
-      assert.match(result.stderr, /line 34: .*reason must be at most 16000 bytes/);
+      assert.match(result.stderr, /line 29: .*issue number must be a positive safe integer/);
+      assert.match(result.stderr, /line 32: .*milestone must not contain a NUL character/);
+      assert.match(result.stderr, /line 35: .*reason must be at most 16000 bytes/);
       assert.equal(fixture.calls().length, 0);
       assert.equal(fs.readFileSync(logPath, "utf-8"), "existing log\n");
     }
@@ -562,7 +724,7 @@ describe("execute", () => {
           env: fixture.env,
         });
         assert.equal(result.status, 1, second);
-        assert.match(result.stderr, /line 7: .*more than one accepted closing action for #42; line 4 already closes it/, second);
+        assert.match(result.stderr, /line 8: .*more than one accepted closing action for #42; line 5 already closes it/, second);
         assert.equal(fixture.calls().length, 0, second);
         assert.equal(fs.existsSync(logPath), false, second);
       }
@@ -571,8 +733,8 @@ describe("execute", () => {
 
   it("rejects a repeated same-value assignment that differs in other arguments, including the legacy alias", () => {
     const pairs = [
-      ['<!-- triage:assign-milestone #42 milestone="A" reason="one" -->', '<!-- triage:assign-milestone #42 name="A" reason="two" -->', /milestone "A" is already assigned on line 4/],
-      ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 4/],
+      ['<!-- triage:assign-milestone #42 milestone="A" reason="one" -->', '<!-- triage:assign-milestone #42 name="A" reason="two" -->', /milestone "A" is already assigned on line 5/],
+      ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 5/],
     ];
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -584,7 +746,7 @@ describe("execute", () => {
         env: fixture.env,
       });
       assert.equal(result.status, 1, second);
-      assert.match(result.stderr, new RegExp(`line 7: .*${expected.source}`), second);
+      assert.match(result.stderr, new RegExp(`line 8: .*${expected.source}`), second);
       assert.equal(fixture.calls().length, 0, second);
       assert.equal(fs.existsSync(logPath), false, second);
     }
@@ -593,6 +755,7 @@ describe("execute", () => {
   it("leaves unchecked invalid anchors inert and unknown verbs skipped", () => {
     fs.writeFileSync(reportPath, [
       "---", "generated: 2026-04-18", "---",
+      "## Apply Checklist",
       '<!-- triage:set-priority #42 value=urgent -->', "- [ ] Leave pending", "",
       '<!-- triage:future-action #42 -->', "- [x] Accept unknown", "",
     ].join("\n"));
