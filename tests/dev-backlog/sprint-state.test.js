@@ -648,6 +648,34 @@ describe("textReport", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+
+  it("gives an in-flight-only sprint no next batch and does not announce close readiness (#498 smoke port)", () => {
+    const state = parseSprintContent({
+      sprintPath: ".dev-backlog/sprints/in-flight-only.md",
+      content: `---
+status: active
+started: 2026-07-01
+---
+
+## Goal
+Keep going.
+
+## Plan
+- [~] #1 With a PR → PR #11 (open)
+- [~] #2 With a branch [branch:feat/two]
+
+## Progress
+- 2026-07-02: both dispatched.
+`,
+      today: new Date("2026-07-03T00:00:00Z"),
+    });
+    assert.equal(state.in_flight.length, 2);
+    assert.equal(state.next_batch, null);
+    assert.equal(state.plan_items.filter((item) => item.state === "todo").length, 0);
+    assert.equal(state.plan_items.filter((item) => item.state === "in_flight").length, 2);
+  });
+
+
   it("renders the next stanza for a single track with batches and in-flight items", () => {
     writeFile(path.join(backlogDir, "sprints", "2026-09-text.md"), BATCHED_SPRINT);
 
@@ -702,6 +730,36 @@ describe("textReport", () => {
     assert.ok(textReport({ mode: "status", backlogDir }).lines
       .includes(">> All items done — ready to close sprint"));
   });
+
+
+  it("reports two in-flight items, zero remaining, and no close-ready line for an in-flight-only sprint (#498 smoke port)", () => {
+    writeFile(path.join(backlogDir, "sprints", "2026-09-inflight.md"), `---
+status: active
+started: 2026-09-01
+---
+
+## Goal
+Still flying.
+
+## Plan
+- [~] #1 First → PR #11 (open)
+- [~] #2 Second [branch:feat/two]
+
+## Progress
+- 2026-09-01: both dispatched.
+`);
+    const next = textReport({ mode: "next", backlogDir });
+    const status = textReport({ mode: "status", backlogDir });
+    const nextText = next.lines.join("\n");
+    const statusText = status.lines.join("\n");
+    assert.equal(next.code, 0);
+    assert.match(nextText, /2 in-flight/);
+    assert.match(nextText, /0 remaining/);
+    assert.doesNotMatch(nextText, /All items checked/);
+    assert.doesNotMatch(statusText, /All items done — ready to close sprint/);
+    assert.doesNotMatch(nextText, /Next:/);
+  });
+
 
   it("renders a portfolio stanza for N disjoint tracks", () => {
     writeFile(

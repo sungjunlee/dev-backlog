@@ -48,9 +48,28 @@ function authorityCalls(context, command) {
   return context.invocations.filter((invocation) => invocation.command === command);
 }
 
+function flagValue(args, name) {
+  const long = `--${name}`;
+  const index = args.indexOf(long);
+  if (index >= 0) return args[index + 1] ?? null;
+  const prefix = `${long}=`;
+  const matched = args.find((arg) => arg.startsWith(prefix));
+  return matched ? matched.slice(prefix.length) : null;
+}
+
+function ghApiMethod(args) {
+  if (args[0] !== "api") return null;
+  const dashX = args.indexOf("-X");
+  if (dashX >= 0) return String(args[dashX + 1] || "").toUpperCase();
+  const short = args.find((arg) => /^-[Xx].+/.test(arg) && arg !== "-X");
+  if (short) return short.slice(2).toUpperCase();
+  const method = flagValue(args, "method");
+  return method ? String(method).toUpperCase() : null;
+}
+
 function isGitHubMutation(args) {
-  return (args[0] === "issue" && ["create", "edit", "close", "comment"].includes(args[1])) ||
-    (args[0] === "api" && args.includes("-X"));
+  return (args[0] === "issue" && ["create", "edit", "close", "comment", "reopen"].includes(args[1])) ||
+    (args[0] === "api" && ["POST", "PUT", "PATCH", "DELETE"].includes(ghApiMethod(args)));
 }
 
 function isBacklogMutation(args) {
@@ -139,9 +158,10 @@ const SCENARIOS = [
     },
     grade(context) {
       const rails = scriptCalls(context, "sprint-state.js").filter((call) => {
-        const modeIndex = call.args.indexOf("--mode");
-        const mode = modeIndex >= 0 ? call.args[modeIndex + 1] : null;
-        return ["status", "next"].includes(mode) && call.status === 0;
+        const mode = flagValue(call.args, "mode");
+        const format = flagValue(call.args, "format");
+        const json = format == null || format === "json";
+        return ["status", "next"].includes(mode) && json && call.status === 0;
       });
       const reads = authorityCalls(context, "gh").filter(({ args }) =>
         args[0] === "issue" && args[1] === "view" && args.includes("--json")

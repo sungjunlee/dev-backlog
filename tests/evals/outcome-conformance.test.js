@@ -281,6 +281,49 @@ describe("read-only and bounded graders", () => {
     }
   });
 
+  it("fails a standalone close that issues the native milestone PATCH", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-close-patch-"));
+    try {
+      fs.mkdirSync(path.join(root, path.dirname(CLOSE_SPRINT_PATH)), { recursive: true });
+      fs.writeFileSync(path.join(root, "operator-owned.txt"), "keep\n");
+      const closed = CLOSE_SPRINT_SOURCE.replace(/^status: active$/m, "status: completed")
+        + "- 2026-11-12: Sprint closed. 1/1 tasks completed.\n";
+      fs.writeFileSync(path.join(root, CLOSE_SPRINT_PATH), closed);
+      const outcome = gradeScenario(scenario("close-sprint-bounded-effects"), {
+        root,
+        invocations: [
+          { command: "gh", args: ["api", "--method", "PATCH", "repos/OWNER/REPO/milestones/1", "-f", "state=closed"], status: 0 },
+          { command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status"], status: 0 },
+        ],
+        changes: [{ path: CLOSE_SPRINT_PATH, kind: "modified", before: "aa", after: "bb" }],
+        runnerStatus: 0,
+      });
+      assert.equal(outcome.checks.find((item) => item.name === "standalone local close makes no authority mutation").pass, false);
+      assert.equal(outcome.pass, false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails orientation when the Node recovery rail is only invoked in text mode", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-orient-text-"));
+    try {
+      const outcome = gradeScenario(scenario("orient-next-batch"), {
+        root,
+        invocations: [
+          { command: "node", args: ["skills/dev-backlog/scripts/sprint-state.js", "--mode", "status", "--format", "text"], status: 0 },
+          { command: "gh", args: ["issue", "view", "3", "--json", "body,comments"], status: 0 },
+        ],
+        changes: [],
+        runnerStatus: 0,
+      });
+      assert.equal(outcome.checks.find((item) => item.name === "Node recovery rail invoked").pass, false);
+      assert.equal(outcome.pass, false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("does not inherit parent credentials or startup hooks into the runner env", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-env-"));
     const previous = {
