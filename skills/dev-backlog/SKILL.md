@@ -141,6 +141,7 @@ Done when the work has explicit task scope and any admitted work is on the Plan.
 These stay explicit because they guard shared or irreversible state:
 
 - Every authority mutation is deliberate, explicit, and separately authorized by the selected mode or task; a read or implementation request alone does not authorize one. There is no background sync.
+- Surface a failed authority CLI call once (non-zero exit and the CLI's stderr) and stop; do not retry automatically and do not fall back to another data source. After a lost response, verify the target's live state before repeating a non-idempotent write (create, comment, or close).
 - Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.
 
 ## Script Resolution
