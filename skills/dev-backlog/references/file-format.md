@@ -174,15 +174,17 @@ This is one-way: do not copy execution files back into `backlog/`.
 
 ### Compatibility window
 
-An anonymized 2026-11-12 check covered maintained-consumer aliases A–Z (26
-default branches; zero unknown):
+An anonymized 2026-11-12 check covered 26 maintained-consumer default
+branches under aliases consumer-F through consumer-AE (zero unknown).
+Historical aliases consumer-A through consumer-E were not part of this check.
 
 | Legacy layout | Present aliases | Present | Absent | Unknown |
 | --- | --- | ---: | ---: | ---: |
 | `backlog/sprints/` | consumer-F, consumer-G, consumer-H, consumer-I, consumer-J, consumer-K, consumer-L, consumer-M, consumer-N, consumer-O, consumer-P, consumer-Q, consumer-R | 13 | 13 | 0 |
 | `backlog/triage/` | consumer-G, consumer-N | 2 | 24 | 0 |
 
-For each row, every unlisted alias in A–Z is absent; none is unknown.
+For each row, every unlisted alias in consumer-F through consumer-AE is
+absent; none of the 26 is unknown.
 Because both layouts still exist, the explicit compatibility command remains.
 Delete the migration implementation and command only after a later anonymized
 check finds **0 present and 0 unknown for both layouts**.
