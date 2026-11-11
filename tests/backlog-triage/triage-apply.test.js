@@ -253,6 +253,17 @@ describe("parseReport", () => {
       "- [x] Accept",
     ].join("\n"));
     assert.equal(thematicBreak.anchors.length, 2);
+
+    const thematicBreakAfterContinuation = parseReport([
+      "## Apply Checklist",
+      '<!-- triage:revisit #41 reason="first" -->',
+      "- [x] Accept",
+      "  checkbox continuation",
+      "---",
+      '<!-- triage:revisit #42 reason="second" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    assert.equal(thematicBreakAfterContinuation.anchors.length, 2);
   });
 });
 
@@ -644,6 +655,43 @@ describe("execute", () => {
     }
   });
 
+  it("rejects list-contained HTML approvals before provider or preflight log effects", () => {
+    const reports = [
+      [
+        "- <pre>",
+        "  ## Apply Checklist",
+        '  <!-- triage:revisit #42 reason="hidden" -->',
+        "  - [x] Must reject",
+        "  </pre>",
+      ],
+      [
+        "- <!--",
+        "  ## Apply Checklist",
+        "  -->",
+        '  <!-- triage:revisit #42 reason="hidden" -->',
+        "  - [x] Must reject",
+      ],
+    ];
+
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const providerCalls = [];
+      let appendCalls = 0;
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          providerCalls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        appendFile: () => { appendCalls += 1; },
+      });
+
+      assert.notEqual(result.exitCode, 0, lines[0]);
+      assert.deepEqual(providerCalls, [], lines[0]);
+      assert.equal(appendCalls, 0, `${lines[0]} must reject before apply-log preflight`);
+    }
+  });
+
   it("rejects anchors after a Setext section boundary before effects", () => {
     fs.writeFileSync(reportPath, [
       "---", "generated: 2026-04-18", "---",
@@ -669,6 +717,42 @@ describe("execute", () => {
     assert.match(result.error, /anchor on line 9.*outside ## Apply Checklist/i);
     assert.deepEqual(calls, []);
     assert.equal(fs.existsSync(logPath), false);
+  });
+
+  it("rejects anchors after multiline Setext H1/H2 boundaries before effects", () => {
+    const reports = [];
+    for (const continuation of ["    continued", "2. More evidence"]) {
+      for (const underline of ["===", "---"]) {
+        reports.push([
+          "## Apply Checklist",
+          "",
+          "Evidence",
+          continuation,
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+      }
+    }
+
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const providerCalls = [];
+      let appendCalls = 0;
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          providerCalls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        appendFile: () => { appendCalls += 1; },
+      });
+
+      assert.notEqual(result.exitCode, 0, `${lines[3]} / ${lines[4]}`);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(providerCalls, [], `${lines[3]} / ${lines[4]}`);
+      assert.equal(appendCalls, 0, `${lines[3]} / ${lines[4]} must reject before apply-log preflight`);
+    }
   });
 
   it("preflights the actual apply-log append path before provider effects", () => {

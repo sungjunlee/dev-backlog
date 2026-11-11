@@ -21,6 +21,7 @@ const HTML_BLOCK_TAGS = [
 ].join("|");
 const HTML_BLOCK_TAG_PATTERN = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t />]|$)`, "i");
 const COMPLETE_HTML_TAG_PATTERN = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
+const LIST_ITEM_PATTERN = /^( {0,3})(?:[-+*]|\d{1,9}[.)])([ \t]+)(.*)$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -178,6 +179,27 @@ function parseFrontmatter(text) {
   return frontmatter;
 }
 
+function listContainerView(line) {
+  let content = String(line || "");
+  let continuationIndent = 0;
+  let match;
+  while ((match = content.match(LIST_ITEM_PATTERN))) {
+    const contentOffset = content.length - match[3].length;
+    continuationIndent += contentOffset;
+    content = match[3];
+  }
+  return { content, continuationIndent };
+}
+
+function stripContainerContinuation(line, continuationIndent) {
+  const source = String(line || "");
+  if (!continuationIndent) return source;
+  const indentation = source.match(/^[ \t]*/)[0];
+  return indentation.length >= continuationIndent
+    ? source.slice(continuationIndent)
+    : source;
+}
+
 function markdownLiteralLines(lines) {
   const literal = new Set();
   let start = 0;
@@ -189,32 +211,35 @@ function markdownLiteralLines(lines) {
 
   let fence;
   let htmlBlock;
-  let commentDepth = 0;
+  let commentBlock;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
-    if (commentDepth > 0) {
+    if (commentBlock) {
       literal.add(index);
-      commentDepth += (line.match(/<!--/g) || []).length;
-      commentDepth -= (line.match(/-->/g) || []).length;
-      if (commentDepth <= 0) commentDepth = 0;
+      const contextLine = stripContainerContinuation(line, commentBlock.continuationIndent);
+      commentBlock.depth += (contextLine.match(/<!--/g) || []).length;
+      commentBlock.depth -= (contextLine.match(/-->/g) || []).length;
+      if (commentBlock.depth <= 0) commentBlock = undefined;
       continue;
     }
 
     if (htmlBlock) {
+      const contextLine = stripContainerContinuation(line, htmlBlock.continuationIndent);
       if (htmlBlock.end === "blank") {
-        if (line.trim() === "") htmlBlock = undefined;
+        if (contextLine.trim() === "") htmlBlock = undefined;
         else literal.add(index);
         if (htmlBlock) continue;
       } else {
         literal.add(index);
-        if (htmlBlock.end.test(line)) htmlBlock = undefined;
+        if (htmlBlock.end.test(contextLine)) htmlBlock = undefined;
         continue;
       }
     }
 
     if (fence) {
       literal.add(index);
-      const closing = line.match(/^ {0,3}(`+|~+)[ \t]*$/);
+      const contextLine = stripContainerContinuation(line, fence.continuationIndent);
+      const closing = contextLine.match(/^ {0,3}(`+|~+)[ \t]*$/);
       if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
         fence = undefined;
       }
@@ -225,17 +250,25 @@ function markdownLiteralLines(lines) {
     // as a complete standalone line outside every other literal context.
     if (parseAnchor(line)) continue;
 
-    const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    const container = listContainerView(line);
+    const contextLine = container.content;
+    const opening = contextLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (opening) {
       literal.add(index);
-      fence = { character: opening[1][0], length: opening[1].length };
+      fence = {
+        character: opening[1][0],
+        length: opening[1].length,
+        continuationIndent: container.continuationIndent,
+      };
       continue;
     }
 
-    if (/^ {0,3}<!--/.test(line)) {
+    if (/^ {0,3}<!--/.test(contextLine)) {
       literal.add(index);
-      commentDepth = (line.match(/<!--/g) || []).length - (line.match(/-->/g) || []).length;
-      if (commentDepth < 0) commentDepth = 0;
+      const depth = (contextLine.match(/<!--/g) || []).length - (contextLine.match(/-->/g) || []).length;
+      if (depth > 0) {
+        commentBlock = { depth, continuationIndent: container.continuationIndent };
+      }
       continue;
     }
 
@@ -247,7 +280,7 @@ function markdownLiteralLines(lines) {
     ];
     let rawHtml;
     for (const candidate of rawHtmlStarts) {
-      const match = line.match(candidate.start);
+      const match = contextLine.match(candidate.start);
       if (!match) continue;
       const end = match.groups?.tag
         ? new RegExp(`</${match.groups.tag}\\s*>`, "i")
@@ -257,13 +290,15 @@ function markdownLiteralLines(lines) {
     }
     if (rawHtml) {
       literal.add(index);
-      if (!rawHtml.end.test(line)) htmlBlock = rawHtml;
+      if (!rawHtml.end.test(contextLine)) {
+        htmlBlock = { ...rawHtml, continuationIndent: container.continuationIndent };
+      }
       continue;
     }
 
-    if (HTML_BLOCK_TAG_PATTERN.test(line) || COMPLETE_HTML_TAG_PATTERN.test(line)) {
+    if (HTML_BLOCK_TAG_PATTERN.test(contextLine) || COMPLETE_HTML_TAG_PATTERN.test(contextLine)) {
       literal.add(index);
-      htmlBlock = { end: "blank" };
+      htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
     }
   }
   return literal;
@@ -273,14 +308,50 @@ function isApplyChecklistHeading(line) {
   return /^ {0,3}## Apply Checklist[ \t]*$/.test(String(line || ""));
 }
 
+function isThematicBreak(line) {
+  return /^ {0,3}(?:([-*_])[ \t]*)\1(?:[ \t]*\1)+[ \t]*$/.test(String(line || ""));
+}
+
+function interruptsParagraph(line) {
+  const source = String(line || "");
+  if (parseAnchor(source)) return true;
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|`{3,}|~{3,})/.test(source)) return true;
+  if (/^ {0,3}[-+*][ \t]+/.test(source)) return true;
+  const ordered = source.match(/^ {0,3}(\d{1,9})[.)][ \t]+/);
+  if (ordered && Number(ordered[1]) === 1) return true;
+  return isThematicBreak(source);
+}
+
+function listContentIndent(line) {
+  const source = String(line || "");
+  const match = source.match(LIST_ITEM_PATTERN);
+  return match ? source.length - match[3].length : undefined;
+}
+
 function isSetextHeading(lines, index, literalLines) {
   if (index < 0 || index + 1 >= lines.length) return false;
   if (literalLines.has(index) || literalLines.has(index + 1)) return false;
-  const text = lines[index];
-  if (!text.trim() || /^ {4}/.test(text)) return false;
-  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d+[.)])[ \t]+)/.test(text)) return false;
-  if (/^ {0,3}(?:[-*_][ \t]*){3,}$/.test(text)) return false;
-  return /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1]);
+  if (!/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) return false;
+
+  let paragraphStart = index;
+  while (paragraphStart > 0) {
+    const previous = paragraphStart - 1;
+    if (literalLines.has(previous) || !lines[previous].trim() || interruptsParagraph(lines[previous])) break;
+    paragraphStart = previous;
+  }
+
+  const firstLine = lines[paragraphStart];
+  if (!firstLine.trim() || /^ {4}/.test(firstLine)) return false;
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d{1,9}[.)])[ \t]+)/.test(firstLine)) return false;
+  if (isThematicBreak(firstLine)) return false;
+  for (let lineIndex = paragraphStart + 1; lineIndex <= index; lineIndex += 1) {
+    if (interruptsParagraph(lines[lineIndex])) return false;
+  }
+
+  const containingListIndent = paragraphStart > 0 ? listContentIndent(lines[paragraphStart - 1]) : undefined;
+  const firstLineIndent = firstLine.match(/^ */)[0].length;
+  if (containingListIndent !== undefined && firstLineIndent >= containingListIndent) return false;
+  return true;
 }
 
 function parseReport(text) {
