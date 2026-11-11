@@ -1,0 +1,3 @@
+The scope guard refused sprint `api`: `src/auth/api/**` overlaps the active [Auth track](.dev-backlog/sprints/2026-11-auth.md), scoped to `src/auth/**`.
+
+The [dev-backlog skill](skills/dev-backlog/SKILL.md) requires: “if it refuses the sprint, stop without an authority call.” No issues were queried and no sprint was created. Planning requires a disjoint scope or closing the conflicting track first.

@@ -24,9 +24,9 @@ README covers install and human quick start. This file is the agent execution co
 | "next", "다음 작업" | `next` |
 | "complete", "close sprint" | `complete` |
 
-Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory backlog review before sprint planning. Degradation when they are absent is specified in `references/spec-fallback.md`.
+Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory GitHub Issue review.
 
-The state ownership, fail-closed authority read, and optional-integration boundary are single-sourced in [`references/authority-contract.md`](references/authority-contract.md).
+State ownership and optional-integration boundaries are mapped in [`references/authority-contract.md`](references/authority-contract.md).
 
 ## Core Contracts
 
@@ -36,13 +36,12 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 .dev-backlog/sprints/_context.md <- cross-sprint project context
 ```
 
-- The declared task authority is canonical; a failed authority read is fail-closed (`## Task Authority`).
 - Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
 - The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file while it runs; once completed that file is disposable — the record is the Issue, the epic, and the PR.
 
 ## Task Authority
 
-`.dev-backlog/.tracker` names it in one line; absent means `github`. Plan refs are `#N` = task N in that authority. Never infer the authority from which CLI happens to be installed. A failed authority read stops execution — never fall back to sprint text or a local copy.
+`.dev-backlog/.tracker` names the authority in one line; absent means `github`. Plan refs are `#N` = task N in that authority. Never infer the authority from which CLI happens to be installed. A failed authority read stops execution — never fall back to sprint text or a local copy.
 
 | `.tracker` | Read the specification | Create | Close |
 | --- | --- | --- | --- |
@@ -50,15 +49,15 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 | `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
 | `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
 
-A `spec_ref:` line in the body naming a file or URL overrides the body in every authority, and on GitHub the Agent Brief comment as well. `backlog-triage` is GitHub-only.
+A `spec_ref:` line in the body names a repository-relative file or URL and overrides the body in every authority, and on GitHub the Agent Brief comment as well. A missing or unreadable target, or conflicting values across multiple lines, stops execution. `backlog-triage` is GitHub-only.
 
 ## Sprint Admission
 
 The default path is sprint-free Issue → implementation → PR → Issue closure.
 Create a sprint only when execution complexity requires continuity beyond one
 Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
-cross-Issue/session context, or concurrent track coordination. Duration,
-estimate, and milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
+cross-Issue/session context, or concurrent track coordination. Duration and
+milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
 specification and lifecycle stay on the Issue.
 
 ## Sprint File Contract
@@ -72,7 +71,7 @@ Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>
 | `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
 | `scope: ["dir/**"]` | Directory-prefix track scope when no component axis fits (one axis per track) | Optional; `sprint-init.js --scope` accepts `dir`, `dir/`, `dir/*`, or `dir/**`, never inferred. |
 | `## Goal` | Sprint-level success statement | One sentence describing done state. |
-| `## Plan` | Ordered batches with normalized task refs and estimates | Every planned task has a checkbox and a complete `#N` ref. |
+| `## Plan` | Ordered batches with normalized task refs | Every planned task has a checkbox and a complete `#N` ref. |
 | `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
 | `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
 
@@ -106,14 +105,15 @@ added to the active Plan.
 ### Plan
 
 Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
-Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and missing execution directories on a fresh repository, refuses unsafe directory paths or an overlapping track, and never moves leftover `backlog/` content. A legacy skill layout moves only through the explicitly authorized `setup-dev-backlog.js --migrate-legacy` compatibility command (`references/file-format.md`). You write the Goal, ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch), and estimates.
+Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and missing execution directories on a fresh repository, refuses unsafe directory paths or an overlapping track, and never moves leftover `backlog/` content. A legacy skill layout moves only through the explicitly authorized compatibility procedure in `references/file-format.md`. You write the Goal and ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch).
+Boundary: run the scope guard before reading tasks; if it refuses the sprint, stop without an authority call.
 Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
 
 ### Work
 
 Goal: verified work reflected on the Issue.
-Rail: the Read verb of the Task Authority table is the specification (Agent Brief and `spec_ref:` precedence as noted there). Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
-Boundary: if the authority read fails, diagnose it; do not execute the task or change AC/lifecycle until a live read succeeds.
+Rail: the Read verb of the Task Authority table resolves the specification. Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Boundary: the Task Authority stop applies before task execution or any AC/lifecycle change.
 Done when verified work is reflected in the Issue's AC/lifecycle and, when
 admitted, sprint progress.
 
@@ -130,20 +130,19 @@ Goal: the next actionable batch, or the next live Issue when no sprint is active
 Rail: `node scripts/sprint-state.js --mode next --format text [--track slug]`.
 Done when the next actionable batch or sprint-planning need is named.
 
-### Quick Fix / Unplanned Work
+### Corrections / Unplanned Work
 
-Goal: a discovered fix or extra task is an Issue, not a silent sprint rewrite.
-Rail: sprint-free work is Issue → PR with no sprint edit. Mid-sprint discovery becomes an Issue; admitted work joins the active Plan or a later batch, with a Progress note.
-Done when the Issue exists and, if admitted, is on the Plan.
+Goal: keep independent new work explicit without splitting corrections already inside the current task's scope.
+Rail: complete an in-scope correction under the current task. Give independent work its own task scope; if admitted to the sprint, add its `#N` ref to the active Plan or a later batch and record the change in Progress.
+Done when the work has explicit task scope and any admitted work is on the Plan.
 
 ## Hard Constraints
 
 These stay explicit because they guard shared or irreversible state:
 
-- The declared task authority is the only task authority; a failed authority read stops execution — never fall back to sprint text or any local copy.
-- Every authority mutation is deliberate and explicit; there is no background sync.
-- `status: completed` is never flipped back (reopening means a new sprint); completed sprint files are disposable and may be deleted at any time — keep only `_context.md`.
-- Unattended sessions never `amend` `spec/*`.
+- Every authority mutation is deliberate, explicit, and separately authorized by the selected mode or task; a read or implementation request alone does not authorize one. There is no background sync.
+- Surface a failed authority CLI call once (non-zero exit and the CLI's stderr) and stop; do not retry automatically and do not fall back to another data source. After a lost response, verify the target's live state before repeating a non-idempotent write (create, comment, or close).
+- Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.
 
 ## Script Resolution
 
@@ -159,6 +158,4 @@ Core scripts:
 ## References
 
 - `references/file-format.md` — sprint file shape, `.dev-backlog/` layout, and the `.tracker` line.
-- `references/spec-fallback.md` — spec-axis degradation contract (in-bundle): charter resolution and triage behavior when spec files are thin or absent.
-- `references/authority-contract.md` — sole-owner state routing, sprint admission, product exclusions, and optional ecosystem boundaries.
-- `tests/evals/dev-backlog.md` — fresh-session eval prompts (consumed by the #367 conformance cadence; not execution contract; source checkout).
+- `references/authority-contract.md` — state ownership, file ownership, and optional ecosystem boundaries.

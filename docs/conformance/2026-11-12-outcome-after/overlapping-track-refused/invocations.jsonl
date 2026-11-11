@@ -1,2 +1,0 @@
-{"command":"node","args":["skills/dev-backlog/scripts/sprint-state.js","--mode","status"],"status":0}
-{"command":"node","args":["skills/dev-backlog/scripts/sprint-init.js","api","--scope","src/auth/api/**"],"status":1}

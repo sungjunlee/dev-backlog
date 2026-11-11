@@ -1,0 +1,571 @@
+OpenAI Codex v0.153.4
+--------
+workdir: <workspace>
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a1cbe9-5db3-7162-9987-769482c31a2a
+--------
+user
+Plan a sprint named fresh with scope `src/fresh/**` in this fresh repository. Create only the sprint skeleton; do not add issues.
+
+codex
+I’ll read the local workflow instructions, then create the `fresh` sprint skeleton with scope `src/fresh/**` and no issues.
+
+exec
+/bin/bash -lc "pwd; rg --files -g '"'! .harness'"' -g '"'!.harness/**'"' -g 'AGENTS.md' -g 'SKILL.md' -g '*'" in <workspace>
+ succeeded in 0ms:
+<workspace>
+skills/dev-backlog/SKILL.md
+skills/dev-backlog/references/file-format.md
+skills/dev-backlog/references/authority-contract.md
+skills/dev-backlog/scripts/backlog-doctor.js
+skills/dev-backlog/scripts/portable-path.js
+skills/dev-backlog/scripts/setup-dev-backlog.js
+skills/dev-backlog/scripts/sprint-init.js
+skills/dev-backlog/scripts/sprint-state.js
+skills/dev-backlog/scripts/lib.js
+skills/dev-backlog/scripts/execution-root.js
+skills/backlog-triage/SKILL.md
+.git/info/exclude
+skills/backlog-triage/references/apply.md
+.git/HEAD
+.git/hooks/pre-rebase.sample
+skills/backlog-triage/scripts/.gitkeep
+.git/hooks/update.sample
+skills/backlog-triage/scripts/triage-apply.js
+.git/hooks/fsmonitor-watchman.sample
+skills/backlog-triage/scripts/anchor.js
+.git/hooks/pre-merge-commit.sample
+.git/hooks/sendemail-validate.sample
+.git/hooks/applypatch-msg.sample
+.git/hooks/pre-receive.sample
+.git/hooks/post-update.sample
+.git/hooks/pre-push.sample
+.git/hooks/pre-commit.sample
+.git/hooks/push-to-checkout.sample
+.git/hooks/commit-msg.sample
+.git/hooks/prepare-commit-msg.sample
+.git/hooks/pre-applypatch.sample
+.git/description
+AGENTS.md
+.git/config
+.harness/invocations.jsonl
+.harness/bin/backlog
+.harness/bin/gh
+.harness/bin/bash
+.harness/bin/node
+
+exec
+/bin/bash -lc 'cat AGENTS.md skills/dev-backlog/SKILL.md' in <workspace>
+ succeeded in 0ms:
+# Controlled conformance fixture
+
+Read the applicable local `skills/*/SKILL.md` completely before acting.
+Use only this workspace and its controlled authority CLIs; do not use the network.
+Perform the requested workflow rather than describing a hypothetical workflow.
+Do not inspect `.harness/`; it belongs to the outcome recorder.
+---
+name: dev-backlog
+argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
+description: Manage Issue-backed sprint execution (GitHub Issues by default; Backlog.md or GitLab via one `.tracker` line). Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires git, Node.js 18+, and the task authority's CLI (`gh` by default). Works on Claude Code and Codex.
+metadata:
+  related-skills: "backlog-triage, spec-charter, spec-grill"
+---
+
+# Dev Backlog
+
+Real job: keep the declared task authority (GitHub Issues by default) as task-definition and lifecycle truth while using `.dev-backlog/sprints/` when complex execution needs a shared continuity, progress, or handoff record.
+
+README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, deterministic rails, and stop conditions.
+
+## Mode Router
+
+| User intent | Mode |
+| --- | --- |
+| "where are we?", "orient", "status" | `orient` |
+| "create issue", "new issue", "이슈 만들어" | `create` |
+| "plan sprint", "make sprint", or admitted work with no active sprint | `plan` |
+| "work #N", "continue", "do next batch" | `work` |
+| "next", "다음 작업" | `next` |
+| "complete", "close sprint" | `complete` |
+
+Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory GitHub Issue review.
+
+State ownership and optional-integration boundaries are mapped in [`references/authority-contract.md`](references/authority-contract.md).
+
+## Core Contracts
+
+```
+Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical task definition and lifecycle
+.dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
+.dev-backlog/sprints/_context.md <- cross-sprint project context
+```
+
+- Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
+- The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file while it runs; once completed that file is disposable — the record is the Issue, the epic, and the PR.
+
+## Task Authority
+
+`.dev-backlog/.tracker` names the authority in one line; absent means `github`. Plan refs are `#N` = task N in that authority. Never infer the authority from which CLI happens to be installed. A failed authority read stops execution — never fall back to sprint text or a local copy.
+
+| `.tracker` | Read the specification | Create | Close |
+| --- | --- | --- | --- |
+| `github` (default) | `gh issue view N --json body,comments`; the newest comment titled `## Agent Brief` overrides the body | `gh issue create` | `gh issue close N` |
+| `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
+| `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
+
+A `spec_ref:` line in the body names a repository-relative file or URL and overrides the body in every authority, and on GitHub the Agent Brief comment as well. A missing or unreadable target, or conflicting values across multiple lines, stops execution. `backlog-triage` is GitHub-only.
+
+## Sprint Admission
+
+The default path is sprint-free Issue → implementation → PR → Issue closure.
+Create a sprint only when execution complexity requires continuity beyond one
+Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
+cross-Issue/session context, or concurrent track coordination. Duration and
+milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
+specification and lifecycle stay on the Issue.
+
+## Sprint File Contract
+
+Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>.md` carries:
+
+| Section / field | Purpose | Completion check |
+| --- | --- | --- |
+| `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
+| `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
+| `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
+| `scope: ["dir/**"]` | Directory-prefix track scope when no component axis fits (one axis per track) | Optional; `sprint-init.js --scope` accepts `dir`, `dir/`, `dir/*`, or `dir/**`, never inferred. |
+| `## Goal` | Sprint-level success statement | One sentence describing done state. |
+| `## Plan` | Ordered batches with normalized task refs | Every planned task has a checkbox and a complete `#N` ref. |
+| `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
+| `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
+
+Plan checkbox states:
+
+| Marker | Meaning | Set by |
+| --- | --- | --- |
+| `[ ]` | Not started | `sprint-init.js` or manual planning |
+| `[~]` | In-flight: dispatched, PR under review, or actively worked | The session or a delegate |
+| `[x]` | Done: merged or completed | The session or a delegate, after verification |
+
+## Execution Path
+
+Each mode is a goal, its deterministic rail, and a stop condition. Order
+everything else yourself.
+
+### Orient
+
+Goal: know where execution stands and what comes next.
+Rail: `node scripts/sprint-state.js --mode status [--format text] [--track slug]` and `node scripts/sprint-state.js --mode next [--format text] [--track slug]` expose schema-3 `active_sprints[]`; each track carries its `latest_progress`, `next_batch`, and `in_flight`. JSON is the default recovery surface and `--format text` is the readable view. `_context.md` and the active sprint file are the durable picture. An invalid active Plan fails with its source file and line; correct that Plan before recovery.
+Done when, before acting, you report all of: the next live Issue; the latest recorded Progress entry or its absence (`latest_progress` empty); the rail's `next_batch` (the first `[ ]` item's batch, or every `[ ]` item when the Plan has no batch headings — never an earlier `[~]`-only batch); and every in-flight item's `pointer`, or `unmoored` when it is null. Naming `next_batch` is selection only: `[ ]` is not `[~]` work, and selection is not dependency authorization.
+Recovery: name every in-flight PR/branch pointer (or `unmoored`) from the selected `active_sprints[]` track and any ownership recorded in the active sprint (unknown if absent); when the declared authority is unavailable, treat local orientation as last-recorded/provisional (the next live Issue stays unknown) and stop before dispatch, Plan mutation, execution, or AC/lifecycle claims.
+
+### Create
+
+Goal: a task with acceptance criteria a fresh session can read.
+Rail: the Create verb of the Task Authority table.
+Done when the new Issue exists and, when the work was admitted to a sprint, is
+added to the active Plan.
+
+### Plan
+
+Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
+Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and missing execution directories on a fresh repository, refuses unsafe directory paths or an overlapping track, and never moves leftover `backlog/` content. A legacy skill layout moves only through the explicitly authorized compatibility procedure in `references/file-format.md`. You write the Goal and ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch).
+Boundary: run the scope guard before reading tasks; if it refuses the sprint, stop without an authority call.
+Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
+
+### Work
+
+Goal: verified work reflected on the Issue.
+Rail: the Read verb of the Task Authority table resolves the specification. Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Boundary: the Task Authority stop applies before task execution or any AC/lifecycle change.
+Done when verified work is reflected in the Issue's AC/lifecycle and, when
+admitted, sprint progress.
+
+### Complete
+
+Goal: nothing stale left behind.
+Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry.
+Rail, per sprint: report remaining `[ ]` / `[~]` counts and the disposition of each remaining item. If the requested scope also includes the sprint milestone, first resolve its exact repository and milestone number, then run `gh api --method PATCH "repos/OWNER/REPO/milestones/NUMBER" -f state=closed`; on failure, stop with the local sprint still active. A standalone sprint close makes no milestone call. Then edit only the root frontmatter `status: active` to `status: completed` and append one final Progress line (`N/M tasks completed`). Read the target frontmatter and final Progress directly, then run `node scripts/sprint-state.js --mode status [--format text]` or `node scripts/backlog-doctor.js` to confirm no active file was left behind. Promote project-level Running Context to `_context.md`; the completed sprint file is disposable.
+Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
+
+### Next
+
+Goal: the next actionable batch, or the next live Issue when no sprint is active.
+Rail: `node scripts/sprint-state.js --mode next --format text [--track slug]`.
+Done when the next actionable batch or sprint-planning need is named.
+
+### Corrections / Unplanned Work
+
+Goal: keep independent new work explicit without splitting corrections already inside the current task's scope.
+Rail: complete an in-scope correction under the current task. Give independent work its own task scope; if admitted to the sprint, add its `#N` ref to the active Plan or a later batch and record the change in Progress.
+Done when the work has explicit task scope and any admitted work is on the Plan.
+
+## Hard Constraints
+
+These stay explicit because they guard shared or irreversible state:
+
+- Every authority mutation is deliberate, explicit, and separately authorized by the selected mode or task; a read or implementation request alone does not authorize one. There is no background sync.
+- Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.
+
+## Script Resolution
+
+Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/` directory beside this `SKILL.md`), not from the target project, and run them from the target project root. Each script prints its own usage.
+
+Core scripts:
+
+- `scripts/setup-dev-backlog.js --migrate-legacy` — explicit one-time migration of a legacy skill layout; not fresh setup.
+- `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
+- `scripts/sprint-state.js` — next/status JSON recovery state and text rendering; portfolio view for N disjoint tracks, `--track <slug>` for one.
+- `scripts/backlog-doctor.js` — aggregate health checks; `--json` is the machine surface.
+
+## References
+
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` layout, and the `.tracker` line.
+- `references/authority-contract.md` — state ownership, file ownership, and optional ecosystem boundaries.
+
+exec
+/bin/bash -lc 'if [ -d .dev-backlog ]; then rg --files --hidden .dev-backlog; fi
+cat skills/dev-backlog/scripts/sprint-init.js' in <workspace>
+ succeeded in 0ms:
+#!/usr/bin/env node
+/**
+ * Generate an empty sprint file skeleton. Filename: YYYY-MM-<topic>.md
+ *
+ * Usage: ./scripts/sprint-init.js "auth-system"
+ *        ./scripts/sprint-init.js "auth-system" --milestone "Sprint W13"
+ *        ./scripts/sprint-init.js "auth-system" --component "sprint-execution"
+ *        ./scripts/sprint-init.js "auth-system" --scope "src/auth/**"
+ *
+ * Milestone defaults to topic. Plan is empty (#445). Overlap uses shared
+ * scopesOverlap (#292). Nothing reads spec/; `--component` is a free string
+ * (#426); `objectives:` is never emitted.
+ */
+
+const fs = require("fs");
+const path = require("path");
+const { slugify, sprintScopeKey, scopesOverlap, normalizeScopePrefix } = require("./lib");
+const { defaultSprintsDir } = require("./execution-root.js");
+const { parseFrontmatter, findActiveSprintFiles } = require("./sprint-state.js");
+
+const USAGE = 'Usage: sprint-init.js "topic" [--milestone "Milestone Name"] [--component "slug" | --scope "dir/**[,dir/**]"]';
+
+function parseTrackAxis(args) {
+  const componentIdx = args.indexOf("--component");
+  const scopeIdx = args.indexOf("--scope");
+  const component = componentIdx === -1 ? undefined : args[componentIdx + 1];
+  const rawScope = scopeIdx === -1 ? undefined : args[scopeIdx + 1];
+  if (componentIdx !== -1 && (!component || component.startsWith("--"))) {
+    return { error: `Missing value for --component. ${USAGE}` };
+  }
+  if (scopeIdx !== -1 && (!rawScope || rawScope.startsWith("--"))) {
+    return { error: `Missing value for --scope. ${USAGE}` };
+  }
+  if (componentIdx !== -1 && scopeIdx !== -1) {
+    return { error: "--component and --scope cannot be used together; declare one track axis." };
+  }
+  if (componentIdx !== -1) return { component };
+  if (scopeIdx !== -1) {
+    const scope = rawScope.split(",").map((glob) => glob.trim()).filter(Boolean);
+    if (scope.length === 0 || scope.some((glob) => normalizeScopePrefix(glob) === null)) {
+      return { error: "--scope accepts directory prefixes only: dir, dir/, dir/*, dir/**." };
+    }
+    return { scope };
+  }
+  return {};
+}
+
+function parseArgs(args) {
+  if (!args.length) return { error: USAGE };
+  const topic = args[0];
+  if (topic.startsWith("--")) return { error: USAGE };
+
+  const KNOWN_FLAGS = ["--milestone", "--component", "--scope"];
+  for (let i = 1; i < args.length; i += 1) {
+    if (args[i].startsWith("--") && !KNOWN_FLAGS.includes(args[i])) {
+      return { error: `Unknown argument: ${args[i]}. ${USAGE}` };
+    }
+    if (KNOWN_FLAGS.includes(args[i])) i += 1;
+  }
+
+  // Explicit only (D2): the track axis is never inferred from touched paths.
+  const trackAxis = parseTrackAxis(args);
+  if (trackAxis.error) return trackAxis;
+
+  let milestone = topic;
+  const msIdx = args.indexOf("--milestone");
+  if (msIdx !== -1) {
+    if (!args[msIdx + 1] || args[msIdx + 1].startsWith("--")) {
+      return { error: `Missing value for --milestone. ${USAGE}` };
+    }
+    milestone = args[msIdx + 1];
+  }
+  return { topic, milestone, ...trackAxis };
+}
+
+// component: only when --component is given (#426). Reject tokens that cannot
+// round-trip through frontmatter (whitespace, quotes, newlines).
+const COMPONENT_RE = /^[^\s"]+$/;
+function buildComponentFrontmatterLine(component) {
+  if (!component) return "";
+  if (!COMPONENT_RE.test(component)) {
+    throw new Error(`--component must be a single token without whitespace or quotes; got ${JSON.stringify(component)}`);
+  }
+  return `component: "${component}"\n`;
+}
+
+// scope: emitted only when --scope is given (D2); absent scope is never an error.
+function buildScopeFrontmatterLine(scope) {
+  if (!Array.isArray(scope) || scope.length === 0) return "";
+  return `scope: [${scope.map((glob) => `"${glob}"`).join(", ")}]\n`;
+}
+
+function buildSprintContent({ milestone, started, due, topic, component, scope }) {
+  const componentLine = buildComponentFrontmatterLine(component);
+  const scopeLine = buildScopeFrontmatterLine(scope);
+
+  return `---
+milestone: ${milestone}
+status: active
+started: ${started}
+due: ${due}
+${scopeLine}${componentLine}---
+
+# ${topic}
+
+## Goal
+[One sentence: what's true when this sprint is done]
+
+## Plan
+
+
+## Running Context
+[Decisions and discoveries that carry across tasks in this sprint]
+
+## Progress
+[Timestamped log — update at end of each session/batch]
+  `;
+}
+
+function listActiveSprintFiles(sprintsDir) {
+  return findActiveSprintFiles(sprintsDir).map((filePath) => path.basename(filePath));
+}
+
+// Overlap is the one shared scopesOverlap predicate. A scopeless track in a
+// multi-track portfolio cannot be proven disjoint — warn-and-allow.
+function checkTrackDisjointness({ sprintsDir, component, scope, newTrackFile = "new sprint" }) {
+  const activeTracks = listActiveSprintFiles(sprintsDir).map((file) => ({
+    file,
+    frontmatter: parseFrontmatter(fs.readFileSync(path.join(sprintsDir, file), "utf-8")),
+  }));
+  const newFrontmatter = component
+    ? { component }
+    : (Array.isArray(scope) && scope.length ? { scope } : {});
+
+  const conflict = activeTracks.find(
+    (track) => scopesOverlap(newFrontmatter, track.frontmatter)
+  );
+  if (conflict) {
+    throw new Error(
+      `Active track overlaps on scope: ${conflict.file}. `
+      + "Give the new sprint a disjoint component:/scope: or close the conflicting track first."
+    );
+  }
+
+  const allTracks = [...activeTracks, { file: newTrackFile, frontmatter: newFrontmatter }];
+  const unknown = allTracks.filter((track) => {
+    const key = sprintScopeKey(track.frontmatter);
+    return key.kind === "none" || key.kind === "unknown" || key.unknown;
+  }).map((track) => track.file);
+  const crossAxis = allTracks.some((track) => sprintScopeKey(track.frontmatter).kind === "component")
+    && allTracks.some((track) => sprintScopeKey(track.frontmatter).kind === "scope");
+  if (activeTracks.length >= 1 && (unknown.length > 0 || crossAxis)) {
+    const namedFiles = unknown.length > 0 ? unknown : allTracks.map((track) => track.file);
+    return [
+      `Active tracks cannot prove disjoint: ${namedFiles.join(", ")}. `
+      + "Use one supported scope axis across tracks (backlog-doctor will warn).",
+    ];
+  }
+  return [];
+}
+
+function lstatIfPresent(targetPath, fsApi = fs) {
+  try {
+    return fsApi.lstatSync(targetPath);
+  } catch (error) {
+    if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return null;
+    throw error;
+  }
+}
+
+// A fresh repository may have neither path. Any existing execution root or
+// sprints path must be a real directory before mkdir/write can run.
+function validateSprintDestination(sprintsDir, fsApi = fs) {
+  const executionRoot = path.dirname(sprintsDir);
+  for (const [targetPath, label] of [
+    [executionRoot, "execution root"],
+    [sprintsDir, "sprints"],
+  ]) {
+    const stat = lstatIfPresent(targetPath, fsApi);
+    if (!stat) continue;
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw new Error(`Refusing unsafe ${label} path: ${targetPath} must be a real directory.`);
+    }
+  }
+}
+
+function createSprintFile({
+  topic, milestone, component, scope,
+  sprintsDir = defaultSprintsDir(),
+  today = new Date(),
+  fileExists = fs.existsSync,
+  mkdir = (dir) => fs.mkdirSync(dir, { recursive: true }),
+  writeFile = fs.writeFileSync,
+}) {
+  if (component && Array.isArray(scope) && scope.length) {
+    throw new Error("--component and --scope cannot be used together; declare one track axis.");
+  }
+  if (Array.isArray(scope) && scope.some((glob) => normalizeScopePrefix(glob) === null)) {
+    throw new Error("--scope accepts directory prefixes only: dir, dir/, dir/*, dir/**.");
+  }
+  validateSprintDestination(sprintsDir);
+
+  const datePrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const started = today.toISOString().slice(0, 10);
+  const topicSlug = slugify(topic) || "sprint";
+  const sprintFile = path.join(sprintsDir, `${datePrefix}-${topicSlug}.md`);
+  if (fileExists(sprintFile)) {
+    throw new Error(`Sprint file already exists: ${sprintFile}`);
+  }
+
+  const warnings = checkTrackDisjointness({
+    sprintsDir, component, scope, newTrackFile: path.basename(sprintFile),
+  });
+
+  // `due:` is human-owned (#445): sprint-init never reads GitHub.
+  const due = "TBD";
+  const content = buildSprintContent({ milestone, started, due, topic, component, scope });
+  mkdir(sprintsDir);
+  writeFile(sprintFile, content);
+
+  return {
+    action: "sprint-init",
+    topic,
+    milestone,
+    sprintFile,
+    started,
+    due,
+    existingFile: false,
+    created: true,
+    ...(component ? { component } : {}),
+    warnings,
+    content,
+  };
+}
+
+function printResult(result) {
+  for (const warning of result.warnings || []) {
+    console.log(`Warning: ${warning}`);
+  }
+  console.log("The Plan is empty: add `- [ ] #N Title` items for the work this track carries.");
+  console.log(`Created: ${result.sprintFile}\n`);
+  console.log(result.content);
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const parsed = parseArgs(args);
+  if (parsed.error) {
+    console.log(parsed.error);
+    process.exit(1);
+  }
+  try {
+    printResult(createSprintFile(parsed));
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) main();
+
+module.exports = {
+  parseArgs,
+  buildComponentFrontmatterLine,
+  buildScopeFrontmatterLine,
+  buildSprintContent,
+  listActiveSprintFiles,
+  checkTrackDisjointness,
+  validateSprintDestination,
+  createSprintFile,
+  printResult,
+};
+
+codex
+I’m using the local `dev-backlog` skill. Its initializer creates the requested skeleton with an empty Plan.
+
+exec
+/bin/bash -lc "node skills/dev-backlog/scripts/sprint-init.js fresh --scope 'src/fresh/**'" in <workspace>
+ succeeded in 0ms:
+The Plan is empty: add `- [ ] #N Title` items for the work this track carries.
+Created: .dev-backlog/sprints/2026-11-fresh.md
+
+---
+milestone: fresh
+status: active
+started: 2026-11-11
+due: TBD
+scope: ["src/fresh/**"]
+---
+
+# fresh
+
+## Goal
+[One sentence: what's true when this sprint is done]
+
+## Plan
+
+
+## Running Context
+[Decisions and discoveries that carry across tasks in this sprint]
+
+## Progress
+[Timestamped log — update at end of each session/batch]
+
+
+exec
+/bin/bash -lc 'cat .dev-backlog/sprints/2026-11-fresh.md' in <workspace>
+ succeeded in 0ms:
+---
+milestone: fresh
+status: active
+started: 2026-11-11
+due: TBD
+scope: ["src/fresh/**"]
+---
+
+# fresh
+
+## Goal
+[One sentence: what's true when this sprint is done]
+
+## Plan
+
+
+## Running Context
+[Decisions and discoveries that carry across tasks in this sprint]
+
+## Progress
+[Timestamped log — update at end of each session/batch]
+
+codex
+Created [fresh sprint skeleton](<workspace>/.dev-backlog/sprints/2026-11-fresh.md) with scope `src/fresh/**`.
+
+The Plan is empty. No issues were added.
+tokens used
+10,449
