@@ -11,6 +11,16 @@ const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scr
 const DEFAULT_TRIAGE_DIR = defaultTriageDir();
 const APPLY_CHECKLIST_HEADING = "## Apply Checklist";
 const CHECKBOX_PATTERN = /^ {0,3}-\s+\[([ xX])\]\s+/;
+const HTML_BLOCK_TAGS = [
+  "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col",
+  "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+  "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hr",
+  "html", "iframe", "legend", "li", "link", "main", "menu", "menuitem", "nav", "noframes", "ol",
+  "optgroup", "option", "p", "param", "search", "section", "summary", "table", "tbody", "td", "tfoot",
+  "th", "thead", "title", "tr", "track", "ul",
+].join("|");
+const HTML_BLOCK_TAG_PATTERN = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t />]|$)`, "i");
+const COMPLETE_HTML_TAG_PATTERN = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -178,8 +188,30 @@ function markdownLiteralLines(lines) {
   }
 
   let fence;
+  let htmlBlock;
+  let commentDepth = 0;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
+    if (commentDepth > 0) {
+      literal.add(index);
+      commentDepth += (line.match(/<!--/g) || []).length;
+      commentDepth -= (line.match(/-->/g) || []).length;
+      if (commentDepth <= 0) commentDepth = 0;
+      continue;
+    }
+
+    if (htmlBlock) {
+      if (htmlBlock.end === "blank") {
+        if (line.trim() === "") htmlBlock = undefined;
+        else literal.add(index);
+        if (htmlBlock) continue;
+      } else {
+        literal.add(index);
+        if (htmlBlock.end.test(line)) htmlBlock = undefined;
+        continue;
+      }
+    }
+
     if (fence) {
       literal.add(index);
       const closing = line.match(/^ {0,3}(`+|~+)[ \t]*$/);
@@ -189,10 +221,49 @@ function markdownLiteralLines(lines) {
       continue;
     }
 
+    // A triage anchor is intentionally an HTML comment. It is executable only
+    // as a complete standalone line outside every other literal context.
+    if (parseAnchor(line)) continue;
+
     const opening = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (opening) {
       literal.add(index);
       fence = { character: opening[1][0], length: opening[1].length };
+      continue;
+    }
+
+    if (/^ {0,3}<!--/.test(line)) {
+      literal.add(index);
+      commentDepth = (line.match(/<!--/g) || []).length - (line.match(/-->/g) || []).length;
+      if (commentDepth < 0) commentDepth = 0;
+      continue;
+    }
+
+    const rawHtmlStarts = [
+      { start: /^ {0,3}<(?<tag>pre|script|style|textarea)(?=[\t />]|$)/i, end: undefined },
+      { start: /^ {0,3}<\?/, end: /\?>/ },
+      { start: /^ {0,3}<!\[CDATA\[/, end: /\]\]>/ },
+      { start: /^ {0,3}<![A-Z]/, end: />/ },
+    ];
+    let rawHtml;
+    for (const candidate of rawHtmlStarts) {
+      const match = line.match(candidate.start);
+      if (!match) continue;
+      const end = match.groups?.tag
+        ? new RegExp(`</${match.groups.tag}\\s*>`, "i")
+        : candidate.end;
+      rawHtml = { end };
+      break;
+    }
+    if (rawHtml) {
+      literal.add(index);
+      if (!rawHtml.end.test(line)) htmlBlock = rawHtml;
+      continue;
+    }
+
+    if (HTML_BLOCK_TAG_PATTERN.test(line) || COMPLETE_HTML_TAG_PATTERN.test(line)) {
+      literal.add(index);
+      htmlBlock = { end: "blank" };
     }
   }
   return literal;
@@ -200,6 +271,16 @@ function markdownLiteralLines(lines) {
 
 function isApplyChecklistHeading(line) {
   return /^ {0,3}## Apply Checklist[ \t]*$/.test(String(line || ""));
+}
+
+function isSetextHeading(lines, index, literalLines) {
+  if (index < 0 || index + 1 >= lines.length) return false;
+  if (literalLines.has(index) || literalLines.has(index + 1)) return false;
+  const text = lines[index];
+  if (!text.trim() || /^ {4}/.test(text)) return false;
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d+[.)])[ \t]+)/.test(text)) return false;
+  if (/^ {0,3}(?:[-*_][ \t]*){3,}$/.test(text)) return false;
+  return /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1]);
 }
 
 function parseReport(text) {
@@ -237,7 +318,11 @@ function parseReport(text) {
   const checklistStart = checklistHeadings[0] + 1;
   let checklistEnd = lines.length;
   for (let index = checklistStart; index < lines.length; index += 1) {
-    if (!literalLines.has(index) && /^ {0,3}#{1,2}\s+/.test(lines[index])) {
+    if (!literalLines.has(index) && /^ {0,3}#{1,2}(?:\s+|$)/.test(lines[index])) {
+      checklistEnd = index;
+      break;
+    }
+    if (isSetextHeading(lines, index, literalLines)) {
       checklistEnd = index;
       break;
     }
@@ -1219,6 +1304,7 @@ module.exports = {
   parseFrontmatter,
   markdownLiteralLines,
   isApplyChecklistHeading,
+  isSetextHeading,
   parseReport,
   outsideChecklistMessage,
   dedupActions,

@@ -321,13 +321,33 @@ const SCENARIOS = [
     },
     grade(context) {
       const applies = scriptCalls(context, "triage-apply.js").filter((call) => call.args.includes("--apply"));
+      const expectedReports = new Map([
+        ["accepted.md", "success"],
+        ["unchecked.md", "success"],
+        ["outside.md", "failure"],
+        ["invalid.md", "failure"],
+      ]);
+      const observedReports = applies.map((call) => {
+        const reportArg = call.args.find((arg) => String(arg).endsWith(".md"));
+        return { report: reportArg ? path.basename(reportArg) : null, status: call.status };
+      });
+      const runsByReport = new Map([...expectedReports.keys()].map((report) => [
+        report,
+        observedReports.filter((observed) => observed.report === report),
+      ]));
       const writes = mutationCalls(context);
       const paths = changedPaths(context);
       return [
-        check("all four reports exercised", applies.length === 4, applies),
-        check("valid and unchecked reports succeed while outside and invalid reports stop",
-          applies.filter((call) => call.status === 0).length === 2 && applies.filter((call) => call.status !== 0).length === 2,
-          applies.map(({ args, status }) => ({ report: args.find((arg) => arg.endsWith(".md")), status }))),
+        check("each named report exercised exactly once",
+          applies.length === expectedReports.size && [...runsByReport.values()].every((runs) => runs.length === 1),
+          observedReports),
+        check("each named report has its expected status",
+          [...expectedReports].every(([report, expected]) => {
+            const runs = runsByReport.get(report);
+            if (runs.length !== 1) return false;
+            return expected === "success" ? runs[0].status === 0 : runs[0].status !== 0;
+          }),
+          observedReports),
         check("only the checked valid action mutates GitHub",
           writes.length === 1 && writes[0].args[1] === "comment" && writes[0].args[2] === "21", writes),
         check("outside and invalid reports create no apply logs",
@@ -656,6 +676,7 @@ module.exports = {
   parseArgs,
   gradeScenario,
   outcomeSignature,
+  applyComparison,
   mutationCalls,
   unexpectedAuthorityCalls,
   replaceMarkdownSection,

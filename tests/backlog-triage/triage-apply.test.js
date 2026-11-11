@@ -205,6 +205,55 @@ describe("parseReport", () => {
     ].join("\n"));
     assert.equal(embedded.parsed.anchors, 0);
   });
+
+  it("never treats HTML comments or raw HTML blocks as approval context", () => {
+    const anchor = '<!-- triage:revisit #42 reason="example only" -->';
+    const literalReports = [
+      ["<!--", "## Apply Checklist", "-->", anchor, "- [x] Example"],
+      ["<!-- ## Apply Checklist -->", anchor, "- [x] Example"],
+      ...["pre", "script", "style", "textarea", "div"].map((tag) => [
+        `<${tag}>`, "## Apply Checklist", anchor, "- [x] Example", `</${tag}>`,
+      ]),
+    ];
+    for (const lines of literalReports) {
+      assert.throws(
+        () => parseReport(lines.join("\n")),
+        /anchor on line .*outside ## Apply Checklist/i,
+        lines[0]
+      );
+    }
+
+    const parsed = parseReport(["## Apply Checklist", anchor, "- [x] Accept"].join("\n"));
+    assert.equal(parsed.anchors.length, 1, "a standalone triage anchor comment remains executable");
+  });
+
+  it("ends the checklist at Setext H1/H2 headings without mistaking thematic breaks for headings", () => {
+    for (const underline of ["========", "--------"]) {
+      assert.throws(
+        () => parseReport([
+          "## Apply Checklist",
+          '<!-- triage:revisit #41 reason="inside" -->',
+          "- [x] Accept",
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ].join("\n")),
+        /anchor on line 6.*outside ## Apply Checklist/i
+      );
+    }
+
+    const thematicBreak = parseReport([
+      "## Apply Checklist",
+      '<!-- triage:revisit #41 reason="first" -->',
+      "- [x] Accept",
+      "",
+      "---",
+      '<!-- triage:revisit #42 reason="second" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    assert.equal(thematicBreak.anchors.length, 2);
+  });
 });
 
 describe("dedupActions", () => {
@@ -560,6 +609,66 @@ describe("execute", () => {
     assert.equal(result.exitCode, 1);
     assert.match(result.error, /line 5.*outside ## Apply Checklist/);
     assert.equal(fs.readFileSync(logPath, "utf8"), "preserve history exactly\n");
+  });
+
+  it("rejects HTML-hidden approvals before any GitHub call or log write", () => {
+    const reports = [
+      [
+        "---", "generated: 2026-04-18", "---",
+        "<!--", "## Apply Checklist", "-->",
+        '<!-- triage:revisit #104 reason="comment wrapped" -->',
+        "- [x] Accept",
+      ],
+      [
+        "---", "generated: 2026-04-18", "---",
+        "<pre>", "## Apply Checklist",
+        '<!-- triage:revisit #104 reason="pre wrapped" -->',
+        "- [x] Accept", "</pre>",
+      ],
+    ];
+    const calls = [];
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          calls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      });
+      assert.equal(result.exitCode, 1);
+      assert.match(result.error, /outside ## Apply Checklist/i);
+      assert.deepEqual(calls, []);
+      assert.equal(fs.existsSync(logPath), false);
+    }
+  });
+
+  it("rejects anchors after a Setext section boundary before effects", () => {
+    fs.writeFileSync(reportPath, [
+      "---", "generated: 2026-04-18", "---",
+      "## Apply Checklist",
+      '<!-- triage:revisit #103 reason="inside" -->',
+      "- [x] Accept",
+      "Evidence",
+      "--------",
+      '<!-- triage:revisit #104 reason="outside" -->',
+      "- [x] Must reject",
+    ].join("\n"));
+    const calls = [];
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /anchor on line 9.*outside ## Apply Checklist/i);
+    assert.deepEqual(calls, []);
+    assert.equal(fs.existsSync(logPath), false);
   });
 
   it("preflights the actual apply-log append path before provider effects", () => {

@@ -15,6 +15,7 @@ const {
   parseArgs,
   gradeScenario,
   outcomeSignature,
+  applyComparison,
   mutationCalls,
 } = require("./outcome-conformance.js");
 const { installConformanceCliFixture } = require("../fakes/conformance-cli-fixture.js");
@@ -154,6 +155,47 @@ describe("read-only and bounded graders", () => {
       assert.equal(outcome.checks.find((item) => item.name.includes("no Backlog or GitHub mutation")).pass, false);
     } finally {
       fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps omitted or duplicated triage reports failed through comparison", () => {
+    const comparisonRoot = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-triage-compare-"));
+    const baselinePath = path.join(comparisonRoot, "baseline.json");
+    fs.writeFileSync(baselinePath, JSON.stringify({ scenarios: [] }));
+    const applyCall = (report, status) => ({
+      command: "node",
+      args: ["skills/backlog-triage/scripts/triage-apply.js", report, "--apply", "--yes"],
+      status,
+    });
+    const variants = [
+      [applyCall("accepted.md", 0), applyCall("unchecked.md", 0), applyCall("invalid.md", 1), applyCall("invalid.md", 1)],
+      [applyCall("accepted.md", 0), applyCall("unchecked.md", 0), applyCall("outside.md", 1), applyCall("outside.md", 1)],
+    ];
+
+    try {
+      for (const invocations of variants) {
+        const context = tmpContext({}, [
+          ...invocations,
+          { command: "gh", args: ["issue", "comment", "21", "-b", "triage: revisit — needs owner"], status: 0 },
+        ]);
+        try {
+          const outcome = gradeScenario(scenario("triage-human-gate"), context);
+          assert.equal(outcome.pass, false);
+          assert.equal(outcome.checks.find((item) => item.name === "each named report exercised exactly once").pass, false);
+          assert.equal(applyComparison([outcome], {
+            compare: baselinePath,
+            expectedChanges: new Map(),
+          })[0].status, "FAIL");
+          assert.throws(() => applyComparison([outcome], {
+            compare: baselinePath,
+            expectedChanges: new Map([["triage-human-gate", "#502"]]),
+          }), /Unused --expect-change marker: triage-human-gate/);
+        } finally {
+          fs.rmSync(context.root, { recursive: true, force: true });
+        }
+      }
+    } finally {
+      fs.rmSync(comparisonRoot, { recursive: true, force: true });
     }
   });
 
