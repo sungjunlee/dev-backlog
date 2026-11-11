@@ -27,13 +27,13 @@ Users can log in and access protected API endpoints.
 
 ## Plan
 ### Batch 1 - DB + seed
-- [x] #38 DB schema setup (~15min)
+- [x] #38 DB schema setup
 
 ### Batch 2 - Core auth
-- [~] #42 OAuth2 flow (~2hr) → PR #87 (reviewing)
+- [~] #42 OAuth2 flow → PR #87 (reviewing)
 
 ### Batch 3 - Hardening
-- [ ] #43 Rate limiting (~30min)
+- [ ] #43 Rate limiting
 
 ## Running Context
 - argon2 for hashing
@@ -42,18 +42,11 @@ Users can log in and access protected API endpoints.
 - 2026-03-22 AM: Batch 1 done.
 ```
 
-`objectives:` and `component:` are **optional and unchecked** (charter rev 18):
-
-| Field | Optional? | Semantics |
-| --- | --- | --- |
-| `objectives:` | yes | Human-authored charter Objective IDs. Never generated, never resolved against `spec/charter.md`. |
-| `component:` | yes | Free track-scope string, compared only by `scopesOverlap`. By convention a `## Capability:` heading, but nothing checks that. |
-
-`sprint-init.js` reads no `spec/` file. It emits `component:` only when
-`--component` was given and `scope:` only when `--scope` was given; it never
-emits `objectives:`. An older sprint that still carries `objectives: []` /
-`component: ""` stays valid. Full semantics:
-[`spec-fallback.md`](spec-fallback.md).
+Frontmatter field and section semantics live in the [SKILL.md Sprint File
+Contract](../SKILL.md#sprint-file-contract). `sprint-init.js` reads no `spec/`
+file: it emits `component:` or `scope:` only from the matching flag and never
+emits `objectives:`. Older `objectives: []` / `component: ""` values stay
+valid.
 
 Order Plan items into parallel-safe batches. An empty `## Plan` is valid until
 issues are selected; every nonblank, non-heading Plan line must parse as a
@@ -61,18 +54,15 @@ task item.
 
 ## .dev-backlog/.tracker
 
-One line naming the task authority: `github` (the default when the file is
-absent), `backlog` (the Backlog.md CLI; `files` is accepted as the legacy
-spelling), or `gitlab`. Setup never writes it; a maintainer creates it by hand
-to opt out of GitHub (`printf 'backlog\n' > .dev-backlog/.tracker`). The session
-reads it; among shipped scripts only `triage-apply --apply` reads it, solely to
-require GitHub before a write. `sprint-state.js` is authority-neutral and its
-schema-3 JSON has no `tracker` field. The bounded legacy migration neither reads
-nor displays the authority.
-For the session, only the first line counts, trimmed and case-insensitive; an
-empty, unknown, unreadable, or directory `.tracker` fails loud — only an absent
-file means `github`. No script keeps an authority allow-list. No adapter code:
-the `files` adapter and the frozen ports stay at tag `v0.11.0`.
+The first line names a row in the [SKILL.md Task Authority
+table](../SKILL.md#task-authority), trimmed and case-insensitive. Setup never
+writes it; a maintainer creates it by hand to opt out of GitHub
+(`printf 'backlog\n' > .dev-backlog/.tracker`). Among shipped scripts only
+`triage-apply --apply` reads it, solely to require GitHub before a write;
+`sprint-state.js` is authority-neutral and its schema-3 JSON has no `tracker`
+field. The bounded legacy migration neither reads nor displays the authority.
+An empty, unknown, unreadable, or directory `.tracker` fails loud — only an
+absent file means `github`.
 
 ## .dev-backlog/config.yml
 
@@ -81,33 +71,6 @@ rewrite, or remove fields from it; an existing file (Backlog.md's, or a
 leftover of an earlier release) is preserved byte-for-byte. The explicitly
 authorized legacy migration may relocate the whole file as described below.
 `backlog-triage` reads its own `.dev-backlog/triage-config.yml`.
-
-## Task specification
-
-Work and completion read the live task with the authority's Read verb
-(`gh issue view N --json body,comments` by default; see the SKILL.md Task
-Authority table): on GitHub the newest comment titled `## Agent Brief`
-overrides the body, and in every authority a `spec_ref:` line in the body
-naming a file or URL overrides the body (on GitHub, the Agent Brief as well).
-To select a document explicitly, put exactly one such line in the task body:
-
-```markdown
-spec_ref: docs/oauth-rollout.md
-```
-
-A file path is repository-relative; a URL is read as-is. A `spec_ref` that is
-missing, unreadable, or duplicated with a conflicting value fails closed: stop
-and repair, without falling back to another document. Optional AC markers:
-
-```markdown
-## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [ ] Condition 1
-- [x] Condition 2
-<!-- AC:END -->
-```
-
-Without the markers, acceptance criteria still work as plain checkboxes.
 
 ## Migration from `backlog/` (one-way)
 

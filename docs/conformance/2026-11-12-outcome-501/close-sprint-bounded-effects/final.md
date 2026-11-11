@@ -1,0 +1,1 @@
+Closed and verified the sprint: root status is `completed`, and final Progress records **1/1 tasks completed**. There are 0 pending or in-flight items, no context to promote, and the status rail confirms no active sprints remain.

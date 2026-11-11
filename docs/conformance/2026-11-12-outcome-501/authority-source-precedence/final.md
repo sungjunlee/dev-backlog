@@ -1,0 +1,1 @@
+Created `SPEC.md` containing `spec-wins`, following `spec_ref`, which overrides the issue body and newest Agent Brief. Verified that `BODY.md` and `BRIEF.md` were not created. Stopped.

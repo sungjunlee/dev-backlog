@@ -11,8 +11,8 @@ No new server. No hidden state. No automatic memory writes. No required local ta
 This repo is a personal toolkit.
 
 Human quick start is this file. The agent execution contract is
-[skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md); routing is
-[skills/dev-backlog/references/authority-contract.md](skills/dev-backlog/references/authority-contract.md).
+[skills/dev-backlog/SKILL.md](skills/dev-backlog/SKILL.md); state ownership is
+mapped in [authority-contract.md](skills/dev-backlog/references/authority-contract.md).
 
 ## Install
 
@@ -55,8 +55,8 @@ Read intent and AC from the live Issue (`backlog task 42 --plain` / `glab issue 
 gh issue view 42 --json body,comments
 ```
 
-The newest comment titled `## Agent Brief` overrides the body, and a `spec_ref:` line in
-the body naming a file or URL overrides both.
+The [Task Authority contract](skills/dev-backlog/SKILL.md#task-authority)
+defines source precedence and fail-closed reads.
 
 Sibling skill [`backlog-triage`](skills/backlog-triage/SKILL.md) grooms the
 open-issue pile (GitHub only). It is not part of the default loop.
@@ -65,7 +65,7 @@ open-issue pile (GitHub only). It is not part of the default loop.
 
 Open a sprint only for ordered multi-Issue work, delegated or parallel handoff,
 cross-Issue or cross-session context, or concurrent-track coordination.
-Duration, estimate, and milestone membership alone do not require one.
+Duration and milestone membership alone do not require one.
 
 ```bash
 # from the project you manage, not from this repo
@@ -113,9 +113,9 @@ Users can log in and access protected API endpoints.
 - 2026-03-22: #42 in review.
 ```
 
-Optional surfaces
-(spec axis via [craftkit](https://github.com/sungjunlee/craftkit), GitHub
-Projects) are priced in the [authority contract](skills/dev-backlog/references/authority-contract.md).
+The [authority contract](skills/dev-backlog/references/authority-contract.md)
+maps optional surfaces such as the spec axis and GitHub Projects without making
+them part of the core loop.
 
 ## Docs
 

@@ -1,3 +1,0 @@
-{"command":"node","args":["skills/dev-backlog/scripts/sprint-state.js","--mode","status"],"status":0}
-{"command":"gh","args":["issue","view","2","--json","number,title,state,body,comments"],"status":0}
-{"command":"gh","args":["issue","view","3","--json","number,title,state,body,comments"],"status":0}

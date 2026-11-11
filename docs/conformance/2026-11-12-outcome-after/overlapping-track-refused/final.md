@@ -1,3 +1,0 @@
-The planning initializer refused to create `api`: `src/auth/api/**` overlaps the active `auth` track’s `src/auth/**`.
-
-No sprint was created or changed. The [dev-backlog skill](skills/dev-backlog/SKILL.md) requires the initializer to “refuse an overlapping track.” To proceed, use a disjoint scope or complete the existing track first.

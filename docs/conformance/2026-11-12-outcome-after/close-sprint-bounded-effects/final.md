@@ -1,1 +1,0 @@
-Sprint closed and verified: root status is `completed`, and the final Progress entry records **1/1 tasks completed**. The status check confirms no active sprint remains. No Running Context needed promotion.
