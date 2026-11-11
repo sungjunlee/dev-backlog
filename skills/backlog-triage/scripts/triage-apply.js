@@ -200,6 +200,26 @@ function stripContainerContinuation(line, continuationIndent) {
     : source;
 }
 
+function continuedListContainerView(line, activeContinuationIndent) {
+  const source = String(line || "");
+  const direct = listContainerView(source);
+  if (direct.continuationIndent > 0) {
+    return { ...direct, activeContinuationIndent: direct.continuationIndent };
+  }
+  if (source.trim() === "") {
+    return { content: source, continuationIndent: 0, activeContinuationIndent };
+  }
+  const indentation = source.match(/^[ \t]*/)[0].length;
+  if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
+    return {
+      content: stripContainerContinuation(source, activeContinuationIndent),
+      continuationIndent: activeContinuationIndent,
+      activeContinuationIndent,
+    };
+  }
+  return { content: source, continuationIndent: 0, activeContinuationIndent: 0 };
+}
+
 function markdownLiteralLines(lines) {
   const literal = new Set();
   let start = 0;
@@ -212,8 +232,13 @@ function markdownLiteralLines(lines) {
   let fence;
   let htmlBlock;
   let commentBlock;
+  let indentedCode;
+  let activeContinuationIndent = 0;
+  let paragraphOpen = false;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
+    const container = continuedListContainerView(line, activeContinuationIndent);
+    activeContinuationIndent = container.activeContinuationIndent;
     if (commentBlock) {
       literal.add(index);
       const contextLine = stripContainerContinuation(line, commentBlock.continuationIndent);
@@ -246,12 +271,28 @@ function markdownLiteralLines(lines) {
       continue;
     }
 
+    if (indentedCode) {
+      const contextLine = stripContainerContinuation(line, indentedCode.continuationIndent);
+      if (contextLine.trim() === "" || /^(?: {4}| {0,3}\t)/.test(contextLine)) {
+        literal.add(index);
+        paragraphOpen = false;
+        continue;
+      }
+      indentedCode = undefined;
+    }
+
     // A triage anchor is intentionally an HTML comment. It is executable only
     // as a complete standalone line outside every other literal context.
-    if (parseAnchor(line)) continue;
+    if (parseAnchor(line)) {
+      paragraphOpen = false;
+      continue;
+    }
 
-    const container = listContainerView(line);
     const contextLine = container.content;
+    if (contextLine.trim() === "") {
+      paragraphOpen = false;
+      continue;
+    }
     const opening = contextLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     if (opening) {
       literal.add(index);
@@ -260,6 +301,7 @@ function markdownLiteralLines(lines) {
         length: opening[1].length,
         continuationIndent: container.continuationIndent,
       };
+      paragraphOpen = false;
       continue;
     }
 
@@ -269,6 +311,7 @@ function markdownLiteralLines(lines) {
       if (depth > 0) {
         commentBlock = { depth, continuationIndent: container.continuationIndent };
       }
+      paragraphOpen = false;
       continue;
     }
 
@@ -283,7 +326,7 @@ function markdownLiteralLines(lines) {
       const match = contextLine.match(candidate.start);
       if (!match) continue;
       const end = match.groups?.tag
-        ? new RegExp(`</${match.groups.tag}\\s*>`, "i")
+        ? /<\/(?:pre|script|style|textarea)>/i
         : candidate.end;
       rawHtml = { end };
       break;
@@ -293,13 +336,24 @@ function markdownLiteralLines(lines) {
       if (!rawHtml.end.test(contextLine)) {
         htmlBlock = { ...rawHtml, continuationIndent: container.continuationIndent };
       }
+      paragraphOpen = false;
       continue;
     }
 
     if (HTML_BLOCK_TAG_PATTERN.test(contextLine) || COMPLETE_HTML_TAG_PATTERN.test(contextLine)) {
       literal.add(index);
       htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
+      paragraphOpen = false;
+      continue;
     }
+
+    if (/^(?: {4}| {0,3}\t)/.test(contextLine) && !paragraphOpen) {
+      literal.add(index);
+      indentedCode = { continuationIndent: container.continuationIndent };
+      continue;
+    }
+
+    paragraphOpen = !interruptsParagraph(contextLine);
   }
   return literal;
 }
@@ -349,8 +403,7 @@ function isSetextHeading(lines, index, literalLines) {
   }
 
   const containingListIndent = paragraphStart > 0 ? listContentIndent(lines[paragraphStart - 1]) : undefined;
-  const firstLineIndent = firstLine.match(/^ */)[0].length;
-  if (containingListIndent !== undefined && firstLineIndent >= containingListIndent) return false;
+  if (containingListIndent !== undefined) return false;
   return true;
 }
 

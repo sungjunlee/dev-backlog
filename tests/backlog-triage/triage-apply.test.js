@@ -234,12 +234,13 @@ describe("parseReport", () => {
           "## Apply Checklist",
           '<!-- triage:revisit #41 reason="inside" -->',
           "- [x] Accept",
+          "",
           "Evidence",
           underline,
           '<!-- triage:revisit #42 reason="outside" -->',
           "- [x] Must reject",
         ].join("\n")),
-        /anchor on line 6.*outside ## Apply Checklist/i
+        /anchor on line 7.*outside ## Apply Checklist/i
       );
     }
 
@@ -254,16 +255,22 @@ describe("parseReport", () => {
     ].join("\n"));
     assert.equal(thematicBreak.anchors.length, 2);
 
-    const thematicBreakAfterContinuation = parseReport([
-      "## Apply Checklist",
-      '<!-- triage:revisit #41 reason="first" -->',
-      "- [x] Accept",
-      "  checkbox continuation",
-      "---",
-      '<!-- triage:revisit #42 reason="second" -->',
-      "- [x] Accept",
-    ].join("\n"));
-    assert.equal(thematicBreakAfterContinuation.anchors.length, 2);
+    for (const indentation of ["", " ", "  "]) {
+      const thematicBreakAfterContinuation = parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #41 reason="first" -->',
+        "- [x] Accept",
+        `${indentation}checkbox continuation`,
+        "---",
+        '<!-- triage:revisit #42 reason="second" -->',
+        "- [x] Accept",
+      ].join("\n"));
+      assert.equal(
+        thematicBreakAfterContinuation.anchors.length,
+        2,
+        `${indentation.length}-space lazy continuation`
+      );
+    }
   });
 });
 
@@ -360,6 +367,21 @@ describe("execute", () => {
   let tempDir;
   let repoRoot;
   let reportPath;
+
+  function executeWithEffectSpies(lines) {
+    fs.writeFileSync(reportPath, lines.join("\n"));
+    const effects = { provider: [], mkdir: 0, append: 0 };
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        effects.provider.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      mkdir: () => { effects.mkdir += 1; },
+      appendFile: () => { effects.append += 1; },
+    });
+    return { result, effects };
+  }
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-apply-"));
@@ -692,12 +714,86 @@ describe("execute", () => {
     }
   });
 
+  it("rejects HTML opened on a continued list container before every effect", () => {
+    const reports = [
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "    <pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "    </pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "    <!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ],
+      },
+    ];
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, lines[2]);
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[2]);
+    }
+  });
+
+  it("requires exact type-1 HTML closing tags before every effect", () => {
+    for (const closer of ["</pre >", "</pre\t>"]) {
+      for (const listContained of [false, true]) {
+        const indent = listContained ? "  " : "";
+        const lines = [
+          listContained ? "- <pre>" : "<pre>",
+          `${indent}${closer}`,
+          `${indent}## Apply Checklist`,
+          `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+          `${indent}- [x] Must reject`,
+          `${indent}</pre>`,
+        ];
+        const { result, effects } = executeWithEffectSpies(lines);
+        assert.notEqual(result.exitCode, 0, `${closer} / list=${listContained}`);
+        assert.match(result.error, /anchor on line 4.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${closer} / list=${listContained}`
+        );
+      }
+    }
+
+    const control = executeWithEffectSpies([
+      "<pre>",
+      "literal example",
+      "</pre>",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="accepted" -->',
+      "- [x] Accept",
+    ]);
+    assert.equal(control.result.exitCode, 0);
+    assert.deepEqual(control.effects.provider, [
+      ["issue", "comment", "42", "-b", "triage: revisit — accepted"],
+    ]);
+  });
+
   it("rejects anchors after a Setext section boundary before effects", () => {
     fs.writeFileSync(reportPath, [
       "---", "generated: 2026-04-18", "---",
       "## Apply Checklist",
       '<!-- triage:revisit #103 reason="inside" -->',
       "- [x] Accept",
+      "",
       "Evidence",
       "--------",
       '<!-- triage:revisit #104 reason="outside" -->',
@@ -714,7 +810,7 @@ describe("execute", () => {
     });
 
     assert.equal(result.exitCode, 1);
-    assert.match(result.error, /anchor on line 9.*outside ## Apply Checklist/i);
+    assert.match(result.error, /anchor on line 10.*outside ## Apply Checklist/i);
     assert.deepEqual(calls, []);
     assert.equal(fs.existsSync(logPath), false);
   });
@@ -752,6 +848,24 @@ describe("execute", () => {
       assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
       assert.deepEqual(providerCalls, [], `${lines[3]} / ${lines[4]}`);
       assert.equal(appendCalls, 0, `${lines[3]} / ${lines[4]} must reject before apply-log preflight`);
+    }
+  });
+
+  it("ends the checklist at Setext headings immediately after indented code", () => {
+    for (const underline of ["===", "---"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "    code sample",
+        "Evidence",
+        underline,
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, underline);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, underline);
     }
   });
 
