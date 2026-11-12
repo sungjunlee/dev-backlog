@@ -88,6 +88,13 @@ describe("intentional behavior changes", () => {
       "--expect-change", "close-sprint-bounded-effects=#499",
     ]), /Duplicate expected change/);
   });
+
+  it("accepts an explicit pinned Backlog.md executable", () => {
+    assert.equal(parseArgs([
+      "--output", "out",
+      "--backlog-bin", "/tmp/backlog-1.50.1/bin/backlog",
+    ]).backlogBin, "/tmp/backlog-1.50.1/bin/backlog");
+  });
 });
 
 describe("read-only and bounded graders", () => {
@@ -153,6 +160,61 @@ describe("read-only and bounded graders", () => {
       const outcome = gradeScenario(scenario("backlog-authority-direct-read"), context);
       assert.equal(outcome.pass, false);
       assert.equal(outcome.checks.find((item) => item.name.includes("no Backlog or GitHub mutation")).pass, false);
+    } finally {
+      fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
+  it("grades the controlled GitHub create/read/close lifecycle from invocations", () => {
+    const context = tmpContext({}, [
+      { command: "gh", args: ["issue", "create", "--title", "Controlled lifecycle", "--body", "## Acceptance criteria\n- [ ] lifecycle is observed"], status: 0 },
+      { command: "gh", args: ["issue", "view", "77", "--json", "body,comments"], status: 0 },
+      { command: "gh", args: ["issue", "close", "77"], status: 0 },
+    ]);
+    try {
+      let outcome = gradeScenario(scenario("github-authority-lifecycle"), context);
+      assert.equal(outcome.pass, true);
+      context.invocations.push({ command: "gh", args: ["issue", "comment", "77", "--body", "extra"], status: 0 });
+      outcome = gradeScenario(scenario("github-authority-lifecycle"), context);
+      assert.equal(outcome.pass, false);
+      assert.equal(outcome.checks.find((item) => item.name.includes("only the requested")).pass, false);
+    } finally {
+      fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
+  it("grades non-GitHub triage refusal before provider or file effects", () => {
+    const context = tmpContext({ ".dev-backlog/.tracker": "backlog\n" }, [
+      { command: "node", args: ["skills/backlog-triage/scripts/triage-apply.js", "refused.md", "--apply", "--yes"], status: 1 },
+    ]);
+    try {
+      let outcome = gradeScenario(scenario("triage-non-github-refused"), context);
+      assert.equal(outcome.pass, true);
+      context.invocations.push({ command: "gh", args: ["issue", "close", "31"], status: 0 });
+      outcome = gradeScenario(scenario("triage-non-github-refused"), context);
+      assert.equal(outcome.pass, false);
+      assert.equal(outcome.checks.find((item) => item.name.includes("before any provider")).pass, false);
+    } finally {
+      fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
+  it("grades the real Backlog.md create/read/Done/read lifecycle and task-file effect", () => {
+    const taskPath = "backlog/tasks/task-1 - Controlled-local-lifecycle.md";
+    const context = tmpContext({
+      ".dev-backlog/.tracker": "backlog\n",
+      [taskPath]: "---\nid: task-1\ntitle: Controlled local lifecycle\nstatus: Done\n---\n",
+    }, [
+      { command: "backlog", args: ["task", "create", "Controlled local lifecycle", "-d", "Exercise local authority", "--ac", "Lifecycle is complete", "--plain"], status: 0 },
+      { command: "backlog", args: ["task", "1", "--plain"], status: 0 },
+      { command: "backlog", args: ["task", "edit", "TASK-1", "-s", "Done"], status: 0 },
+      { command: "backlog", args: ["task", "task-1", "--plain"], status: 0 },
+    ]);
+    context.changes = [{ path: taskPath, kind: "added", after: "digest" }];
+    try {
+      const outcome = gradeScenario(scenario("backlog-authority-lifecycle"), context);
+      assert.equal(outcome.pass, true);
+      assert.equal(outcome.checks.every((item) => item.pass), true);
     } finally {
       fs.rmSync(context.root, { recursive: true, force: true });
     }

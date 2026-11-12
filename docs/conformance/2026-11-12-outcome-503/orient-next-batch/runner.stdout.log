@@ -1,0 +1,8 @@
+The active sprint covers `src/**`, with recorded owner `fixture`.
+
+- Latest progress: **2026-11-02: Batch 1 complete.**
+- In flight, Batch 2: **#2** on branch `controlled/two`; **#4** at **PR #44**, recorded as reviewing.
+- Next waiting batch: **Batch 3**, containing **#3 — Controlled task 3**, confirmed open through the task authority.
+- Batch 3 is **not actionable**: it waits on **#2 and #4**.
+
+No implementation started or state changed.

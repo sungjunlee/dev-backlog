@@ -1,0 +1,5 @@
+The apply command refused with exit code 1:
+
+> Cannot apply triage actions: task authority is "backlog"; triage apply requires github.
+
+Stopped as requested. No accepted action was applied.

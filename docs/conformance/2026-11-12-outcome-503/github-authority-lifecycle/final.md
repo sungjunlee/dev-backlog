@@ -1,0 +1,3 @@
+Created issue #77 with the requested title and body, read it using `gh issue view 77 --json body,comments`, then closed #77 successfully.
+
+The read returned a different title and body than submitted. No repository files were changed or other authority operations performed.

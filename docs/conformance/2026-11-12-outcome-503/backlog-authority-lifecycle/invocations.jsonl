@@ -1,0 +1,8 @@
+{"command":"node","args":["/tmp/dev-backlog-503-backlog/node_modules/.bin/backlog","task","create","Controlled local lifecycle","-d","Exercise local authority","--ac","Lifecycle is complete"],"status":0}
+{"command":"backlog","args":["task","create","Controlled local lifecycle","-d","Exercise local authority","--ac","Lifecycle is complete"],"status":0}
+{"command":"node","args":["/tmp/dev-backlog-503-backlog/node_modules/.bin/backlog","task","TASK-1","--plain"],"status":0}
+{"command":"backlog","args":["task","TASK-1","--plain"],"status":0}
+{"command":"node","args":["/tmp/dev-backlog-503-backlog/node_modules/.bin/backlog","task","edit","TASK-1","-s","Done"],"status":0}
+{"command":"backlog","args":["task","edit","TASK-1","-s","Done"],"status":0}
+{"command":"node","args":["/tmp/dev-backlog-503-backlog/node_modules/.bin/backlog","task","TASK-1","--plain"],"status":0}
+{"command":"backlog","args":["task","TASK-1","--plain"],"status":0}

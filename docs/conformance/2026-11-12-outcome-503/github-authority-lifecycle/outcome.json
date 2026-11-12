@@ -1,0 +1,178 @@
+{
+  "id": "github-authority-lifecycle",
+  "title": "Create, read, and close through the controlled GitHub authority",
+  "guarantees": [
+    "G1",
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "one controlled GitHub issue was created",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "create",
+            "--title",
+            "Controlled lifecycle",
+            "--body",
+            "## Acceptance criteria\n- [ ] lifecycle is observed"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "the created issue was read with the contract JSON fields",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "77",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "the same controlled issue was closed",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "close",
+            "77"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "GitHub lifecycle order is create then read then close",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "create",
+            "--title",
+            "Controlled lifecycle",
+            "--body",
+            "## Acceptance criteria\n- [ ] lifecycle is observed"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "77",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "close",
+            "77"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "only the requested GitHub lifecycle operations occurred",
+      "pass": true,
+      "observed": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "create",
+            "--title",
+            "Controlled lifecycle",
+            "--body",
+            "## Acceptance criteria\n- [ ] lifecycle is observed"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "77",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "close",
+            "77"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "controlled GitHub lifecycle has no repository file effects",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "create",
+        "--title",
+        "Controlled lifecycle",
+        "--body",
+        "## Acceptance criteria\n- [ ] lifecycle is observed"
+      ],
+      "status": 0
+    },
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "view",
+        "77",
+        "--json",
+        "body,comments"
+      ],
+      "status": 0
+    },
+    {
+      "command": "gh",
+      "args": [
+        "issue",
+        "close",
+        "77"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": []
+}

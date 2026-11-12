@@ -20,6 +20,11 @@ mapped in [authority-contract.md](skills/dev-backlog/references/authority-contra
 npx skills add sungjunlee/dev-backlog -g -y
 ```
 
+The supported installation unit is this repository, which installs both
+`dev-backlog` and `backlog-triage`; triage intentionally imports shared files
+from its sibling. A copied `backlog-triage/` folder by itself is not a supported
+installation unit.
+
 Needs [Claude Code](https://claude.ai/code) or [Codex](https://chatgpt.com/codex),
 Git, Node.js 18+, and the task authority's CLI: an authenticated
 [`gh`](https://cli.github.com/) by default, or the [Backlog.md](https://backlog.md)
@@ -29,6 +34,10 @@ with one line:
 ```bash
 mkdir -p .dev-backlog && printf 'backlog\n' > .dev-backlog/.tracker   # or: gitlab
 ```
+
+GitLab is documented but not measured. Gitea is unverified and is not a Task
+Authority option: no maintainer-authorized Gitea target has been exercised for
+issue read, create, and close.
 
 To inspect scripts from a clone:
 

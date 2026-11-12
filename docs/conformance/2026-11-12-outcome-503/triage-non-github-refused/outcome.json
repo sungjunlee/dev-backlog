@@ -1,0 +1,61 @@
+{
+  "id": "triage-non-github-refused",
+  "title": "Refuse triage apply for a non-GitHub authority",
+  "guarantees": [
+    "G2"
+  ],
+  "checks": [
+    {
+      "name": "triage apply executed and refused the non-GitHub authority",
+      "pass": true,
+      "observed": [
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "refused.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 1
+        }
+      ]
+    },
+    {
+      "name": "refusal occurred before any provider operation",
+      "pass": true,
+      "observed": [
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "refused.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 1
+        }
+      ]
+    },
+    {
+      "name": "refusal created no repository or audit-log effect",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "node",
+      "args": [
+        "skills/backlog-triage/scripts/triage-apply.js",
+        "refused.md",
+        "--apply",
+        "--yes"
+      ],
+      "status": 1
+    }
+  ],
+  "changes": []
+}

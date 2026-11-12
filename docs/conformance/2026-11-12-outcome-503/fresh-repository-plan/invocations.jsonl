@@ -1,0 +1,2 @@
+{"command":"node","args":["skills/dev-backlog/scripts/sprint-init.js","fresh","--scope","src/fresh/**"],"status":0}
+{"command":"node","args":["skills/dev-backlog/scripts/sprint-state.js","--mode","status"],"status":0}

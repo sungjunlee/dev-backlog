@@ -44,9 +44,13 @@ if (command === "gh") {
     finish(0, JSON.stringify({
       number,
       title: "Controlled task " + number,
+      state: "open",
       body: "## Acceptance criteria\\n- [ ] preserve the controlled fixture",
       comments: [],
     }));
+  }
+  if (args[0] === "issue" && args[1] === "create") {
+    finish(0, "https://github.test/controlled/issues/77\\n");
   }
   if (args[0] === "issue" && ["comment", "edit", "close", "create"].includes(args[1])) {
     finish(0);
@@ -55,6 +59,15 @@ if (command === "gh") {
 }
 
 if (command === "backlog") {
+  if (process.env.CONFORMANCE_REAL_BACKLOG) {
+    const result = spawnSync(process.env.CONFORMANCE_REAL_BACKLOG, args, {
+      env: process.env,
+      stdio: "inherit",
+    });
+    const status = Number.isInteger(result.status) ? result.status : 1;
+    record(status);
+    process.exit(status);
+  }
   if (args[0] === "task" && args[1] === "7" && args[2] === "--plain") {
     finish(0, "# Task 7\\n\\n## Acceptance criteria\\n- [ ] preserve the Backlog.md fixture\\n");
   }
@@ -118,7 +131,11 @@ function buildRunnerEnv(binDir, shellEnv) {
   return env;
 }
 
-function installConformanceCliFixture(root, { ghMode = "ok", ghView = null } = {}) {
+function installConformanceCliFixture(root, {
+  ghMode = "ok",
+  ghView = null,
+  realBacklog = null,
+} = {}) {
   const harnessDir = path.join(root, ".harness");
   const binDir = path.join(harnessDir, "bin");
   const logPath = path.join(harnessDir, "invocations.jsonl");
@@ -141,6 +158,7 @@ function installConformanceCliFixture(root, { ghMode = "ok", ghView = null } = {
     CONFORMANCE_GH_MODE: ghMode,
   };
   if (ghView) shellEnv.CONFORMANCE_GH_VIEW_FILE = viewPath;
+  if (realBacklog) shellEnv.CONFORMANCE_REAL_BACKLOG = path.resolve(realBacklog);
   const env = buildRunnerEnv(binDir, shellEnv);
   return {
     logPath,

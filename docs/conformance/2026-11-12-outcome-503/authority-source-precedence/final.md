@@ -1,0 +1,3 @@
+Created [SPEC.md](<workspace>/SPEC.md) containing `spec-wins`.
+
+The body’s `spec_ref: task-spec.md` overrides both the Agent Brief and issue body. Verified that neither `BODY.md` nor `BRIEF.md` exists. Stopped.

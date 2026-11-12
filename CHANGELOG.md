@@ -8,6 +8,14 @@ Each entry links the GitHub issue (the canonical spec) and the merge PR (the shi
 
 ### Added
 
+- Final-tree outcome conformance now records controlled GitHub create/read/close,
+  real Backlog.md 1.50.1 create/read/Done/read in a throwaway local repository,
+  multi-item fresh-session recovery, failed-read stops, and non-GitHub triage
+  refusal. The supported two-skill installation unit and every #498/#500 CLI
+  migration run from an isolated copy; Gitea remains explicitly unverified and
+  outside the Task Authority table because no authorized target was supplied.
+  Refs [#503](https://github.com/sungjunlee/dev-backlog/issues/503),
+  [#504](https://github.com/sungjunlee/dev-backlog/issues/504).
 - Outcome-based conformance harness and a seven-scenario before-baseline; prose-literal and reference-count pins are replaced by structural and observable assertions. Refs [#497](https://github.com/sungjunlee/dev-backlog/issues/497).
 
 ### Changed

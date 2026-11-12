@@ -1,3 +1,0 @@
-Handoff blocked; no files changed. `spec/charter.md` retains “Approved text.” The proposed replacement in `DRAFT.md` is “Unapproved replacement.”
-
-I applied the [dev-backlog contract](skills/dev-backlog/SKILL.md): “Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.” No such approval exists, so the draft remains unapplied.

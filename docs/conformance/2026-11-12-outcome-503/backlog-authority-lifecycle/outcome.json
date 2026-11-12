@@ -1,0 +1,194 @@
+{
+  "id": "backlog-authority-lifecycle",
+  "title": "Create, read, and close through Backlog.md 1.50.1",
+  "guarantees": [
+    "G1",
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "real Backlog.md task create executed",
+      "pass": true,
+      "observed": {
+        "command": "backlog",
+        "args": [
+          "task",
+          "create",
+          "Controlled local lifecycle",
+          "-d",
+          "Exercise local authority",
+          "--ac",
+          "Lifecycle is complete"
+        ],
+        "status": 0
+      }
+    },
+    {
+      "name": "the created Backlog.md task was read before and after close",
+      "pass": true,
+      "observed": [
+        {
+          "call": {
+            "command": "backlog",
+            "args": [
+              "task",
+              "TASK-1",
+              "--plain"
+            ],
+            "status": 0
+          },
+          "index": 1
+        },
+        {
+          "call": {
+            "command": "backlog",
+            "args": [
+              "task",
+              "TASK-1",
+              "--plain"
+            ],
+            "status": 0
+          },
+          "index": 3
+        }
+      ]
+    },
+    {
+      "name": "the same Backlog.md task was moved to Done",
+      "pass": true,
+      "observed": {
+        "command": "backlog",
+        "args": [
+          "task",
+          "edit",
+          "TASK-1",
+          "-s",
+          "Done"
+        ],
+        "status": 0
+      }
+    },
+    {
+      "name": "only the requested Backlog.md lifecycle operations occurred",
+      "pass": true,
+      "observed": [
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "create",
+            "Controlled local lifecycle",
+            "-d",
+            "Exercise local authority",
+            "--ac",
+            "Lifecycle is complete"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "TASK-1",
+            "--plain"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "edit",
+            "TASK-1",
+            "-s",
+            "Done"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "TASK-1",
+            "--plain"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "GitHub was never called for the Backlog.md authority",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "Backlog.md wrote one local task and no unrelated file",
+      "pass": true,
+      "observed": [
+        {
+          "path": "backlog/tasks/task-1 - Controlled-local-lifecycle.md",
+          "kind": "added",
+          "after": "be9858ce5565fb36eed2c89567c543ccdac4873926464c85140041ae7be0a41b"
+        }
+      ]
+    },
+    {
+      "name": "the observed Backlog.md task file is Done",
+      "pass": true,
+      "observed": "---\nid: TASK-1\ntitle: Controlled local lifecycle\nstatus: Done\nassignee: []\ncreated_date: '2026-11-12 08:43'\nupdated_date: '2026-11-12 08:43'\nlabels: []\ndependencies: []\nordinal: 1000\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nExercise local authority\n<!-- SECTION:DESCRIPTION:END -->\n\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n- [ ] #1 Lifecycle is complete\n<!-- AC:END -->\n"
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "backlog",
+      "args": [
+        "task",
+        "create",
+        "Controlled local lifecycle",
+        "-d",
+        "Exercise local authority",
+        "--ac",
+        "Lifecycle is complete"
+      ],
+      "status": 0
+    },
+    {
+      "command": "backlog",
+      "args": [
+        "task",
+        "TASK-1",
+        "--plain"
+      ],
+      "status": 0
+    },
+    {
+      "command": "backlog",
+      "args": [
+        "task",
+        "edit",
+        "TASK-1",
+        "-s",
+        "Done"
+      ],
+      "status": 0
+    },
+    {
+      "command": "backlog",
+      "args": [
+        "task",
+        "TASK-1",
+        "--plain"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": [
+    {
+      "path": "backlog/tasks/task-1 - Controlled-local-lifecycle.md",
+      "kind": "added",
+      "after": "be9858ce5565fb36eed2c89567c543ccdac4873926464c85140041ae7be0a41b"
+    }
+  ]
+}

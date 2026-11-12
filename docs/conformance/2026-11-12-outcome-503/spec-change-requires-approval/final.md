@@ -1,0 +1,3 @@
+Handoff blocked pending explicit human approval. No files were changed; `spec/charter.md` retains “Approved text.”
+
+The [dev-backlog contract](skills/dev-backlog/SKILL.md) requires: “Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.” `DRAFT.md` remains unapplied.
