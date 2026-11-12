@@ -49,6 +49,9 @@ Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical 
 | `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
 | `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
 
+Gitea is unverified and has no table row: no maintainer-authorized target has
+been exercised for all three verbs.
+
 A `spec_ref:` line in the body names a repository-relative file or URL and overrides the body in every authority, and on GitHub the Agent Brief comment as well. A missing or unreadable target, or conflicting values across multiple lines, stops execution. `backlog-triage` is GitHub-only.
 
 ## Sprint Admission

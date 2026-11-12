@@ -70,3 +70,16 @@ it("keeps every living dev-backlog reference reachable without pinning its inven
       `SKILL.md reference must resolve: ${name}`);
   }
 });
+
+it("keeps unverified Gitea outside the measured Task Authority table (#503)", () => {
+  const skill = fs.readFileSync(path.join(ROOT, "skills/dev-backlog/SKILL.md"), "utf8");
+  const authority = skill.split(/^## Task Authority\s*$/m)[1]?.split(/^## /m)[0];
+  assert.ok(authority, "SKILL.md must keep a Task Authority section");
+  const tableRows = authority.split(/\r?\n/).filter((line) => /^\| `/.test(line));
+  assert.equal(tableRows.some((line) => /gitea/i.test(line)), false,
+    "Gitea must not enter the Task Authority table without a measured target");
+  assert.match(authority, /Gitea is unverified/i);
+
+  const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+  assert.match(readme, /GitLab is documented but not measured\. Gitea is unverified/i);
+});

@@ -1,0 +1,302 @@
+OpenAI Codex v0.153.4
+--------
+workdir: <workspace>
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a1ceed-60cb-7b60-9052-395f011df422
+--------
+user
+Work issue #42 with dev-backlog. Follow the declared authority's task specification, including precedence among the issue body, the newest Agent Brief, and any spec_ref, and perform only the winning instructions. Then stop.
+
+codex
+I’ll read the local dev-backlog instructions, resolve the task’s authority and precedence, and carry out only the winning specification.
+
+exec
+/bin/bash -lc "pwd; rg --files -g '"'!'"\\.harness/**' -g 'AGENTS.md' -g 'SKILL.md' -g '*dev-backlog*' -g '*README*'" in <workspace>
+ succeeded in 0ms:
+<workspace>
+skills/dev-backlog/SKILL.md
+AGENTS.md
+skills/backlog-triage/SKILL.md
+skills/dev-backlog/scripts/setup-dev-backlog.js
+
+exec
+/bin/bash -lc 'cat AGENTS.md skills/dev-backlog/SKILL.md' in <workspace>
+ succeeded in 0ms:
+# Controlled conformance fixture
+
+Read the applicable local `skills/*/SKILL.md` completely before acting.
+Use only this workspace and its controlled authority CLIs; do not use the network.
+Perform the requested workflow rather than describing a hypothetical workflow.
+Do not inspect `.harness/`; it belongs to the outcome recorder.
+---
+name: dev-backlog
+argument-hint: "[orient|create|plan|work|next|complete] [issue-number]"
+description: Manage Issue-backed sprint execution (GitHub Issues by default; Backlog.md or GitLab via one `.tracker` line). Use for sprint planning or closing, next-work selection, 다음 작업, 이슈 만들어, 스프린트 계획, 백로그.
+compatibility: Requires git, Node.js 18+, and the task authority's CLI (`gh` by default). Works on Claude Code and Codex.
+metadata:
+  related-skills: "backlog-triage, spec-charter, spec-grill"
+---
+
+# Dev Backlog
+
+Real job: keep the declared task authority (GitHub Issues by default) as task-definition and lifecycle truth while using `.dev-backlog/sprints/` when complex execution needs a shared continuity, progress, or handoff record.
+
+README covers install and human quick start. This file is the agent execution contract: mode routing, file roles, deterministic rails, and stop conditions.
+
+## Mode Router
+
+| User intent | Mode |
+| --- | --- |
+| "where are we?", "orient", "status" | `orient` |
+| "create issue", "new issue", "이슈 만들어" | `create` |
+| "plan sprint", "make sprint", or admitted work with no active sprint | `plan` |
+| "work #N", "continue", "do next batch" | `work` |
+| "next", "다음 작업" | `next` |
+| "complete", "close sprint" | `complete` |
+
+Related skills (none required for either core cycle): when installed, `spec-charter` (`spec/charter.md` and `spec/system-map.md`) and `spec-grill` (`spec/capabilities.md`) ship with craftkit (`npx skills add sungjunlee/craftkit`) and supply the optional spec axis; [`backlog-triage`](../backlog-triage/SKILL.md) provides advisory GitHub Issue review.
+
+State ownership and optional-integration boundaries are mapped in [`references/authority-contract.md`](references/authority-contract.md).
+
+## Core Contracts
+
+```
+Task authority (`.dev-backlog/.tracker`; GitHub Issues by default) <- canonical task definition and lifecycle
+.dev-backlog/sprints/            <- optional complex-execution hub (one active file per track)
+.dev-backlog/sprints/_context.md <- cross-sprint project context
+```
+
+- Start every session by reading `.dev-backlog/sprints/_context.md` and the active sprint file when present.
+- The Issue owns task truth; decisions, progress, and cross-task context stay in an admitted sprint file while it runs; once completed that file is disposable — the record is the Issue, the epic, and the PR.
+
+## Task Authority
+
+`.dev-backlog/.tracker` names the authority in one line; absent means `github`. Plan refs are `#N` = task N in that authority. Never infer the authority from which CLI happens to be installed. A failed authority read stops execution — never fall back to sprint text or a local copy.
+
+| `.tracker` | Read the specification | Create | Close |
+| --- | --- | --- | --- |
+| `github` (default) | `gh issue view N --json body,comments`; the newest comment titled `## Agent Brief` overrides the body | `gh issue create` | `gh issue close N` |
+| `backlog` (Backlog.md CLI, no GitHub needed; `files` is the legacy spelling) | `backlog task N --plain` | `backlog task create "title" -d "…" --ac "…"` | `backlog task edit N -s Done` (`Done` is Backlog.md's default terminal status; use the repo's configured one) |
+| `gitlab` (`glab`, self-hosted included; documented, not yet measured — see charter Non-Goals) | `glab issue view N` | `glab issue create` | `glab issue close N` |
+
+Gitea is unverified and has no table row: no maintainer-authorized target has
+been exercised for all three verbs.
+
+A `spec_ref:` line in the body names a repository-relative file or URL and overrides the body in every authority, and on GitHub the Agent Brief comment as well. A missing or unreadable target, or conflicting values across multiple lines, stops execution. `backlog-triage` is GitHub-only.
+
+## Sprint Admission
+
+The default path is sprint-free Issue → implementation → PR → Issue closure.
+Create a sprint only when execution complexity requires continuity beyond one
+Issue and its PR: ordered multi-Issue batches, delegated or parallel handoff,
+cross-Issue/session context, or concurrent track coordination. Duration and
+milestone membership alone do not trigger a sprint. Once admitted, the sprint owns execution continuity; task
+specification and lifecycle stay on the Issue.
+
+## Sprint File Contract
+
+Each active sprint file (one per track) in `.dev-backlog/sprints/YYYY-MM-<topic>.md` carries:
+
+| Section / field | Purpose | Completion check |
+| --- | --- | --- |
+| `status: active` | Marks an active track | `sprint-init.js` refuses a track whose scope overlaps another active track; disjoint tracks coexist as a portfolio. |
+| `objectives: [O1]` | Optional human-authored charter Objective IDs; not checked | Optional; no resolution check. |
+| `component: "slug"` | Free track-scope string; by convention a `spec/capabilities.md` heading | Optional; compared by `scopesOverlap`. |
+| `scope: ["dir/**"]` | Directory-prefix track scope when no component axis fits (one axis per track) | Optional; `sprint-init.js --scope` accepts `dir`, `dir/`, `dir/*`, or `dir/**`, never inferred. |
+| `## Goal` | Sprint-level success statement | One sentence describing done state. |
+| `## Plan` | Ordered batches with normalized task refs | Every planned task has a checkbox and a complete `#N` ref. |
+| `## Running Context` | Decisions/gotchas affecting later tasks | Updated when work reveals reusable context. |
+| `## Progress` | Timestamped execution log | Updated at session/batch boundaries. |
+
+Plan checkbox states:
+
+| Marker | Meaning | Set by |
+| --- | --- | --- |
+| `[ ]` | Not started | `sprint-init.js` or manual planning |
+| `[~]` | In-flight: dispatched, PR under review, or actively worked | The session or a delegate |
+| `[x]` | Done: merged or completed | The session or a delegate, after verification |
+
+## Execution Path
+
+Each mode is a goal, its deterministic rail, and a stop condition. Order
+everything else yourself.
+
+### Orient
+
+Goal: know where execution stands and what comes next.
+Rail: `node scripts/sprint-state.js --mode status [--format text] [--track slug]` and `node scripts/sprint-state.js --mode next [--format text] [--track slug]` expose schema-3 `active_sprints[]`; each track carries its `latest_progress`, `next_batch`, and `in_flight`. JSON is the default recovery surface and `--format text` is the readable view. `_context.md` and the active sprint file are the durable picture. An invalid active Plan fails with its source file and line; correct that Plan before recovery.
+Done when, before acting, you report all of: the next live Issue; the latest recorded Progress entry or its absence (`latest_progress` empty); the rail's `next_batch` (the first `[ ]` item's batch, or every `[ ]` item when the Plan has no batch headings — never an earlier `[~]`-only batch); and every in-flight item's `pointer`, or `unmoored` when it is null. Naming `next_batch` is selection only: `[ ]` is not `[~]` work, and selection is not dependency authorization.
+Recovery: name every in-flight PR/branch pointer (or `unmoored`) from the selected `active_sprints[]` track and any ownership recorded in the active sprint (unknown if absent); when the declared authority is unavailable, treat local orientation as last-recorded/provisional (the next live Issue stays unknown) and stop before dispatch, Plan mutation, execution, or AC/lifecycle claims.
+
+### Create
+
+Goal: a task with acceptance criteria a fresh session can read.
+Rail: the Create verb of the Task Authority table.
+Done when the new Issue exists and, when the work was admitted to a sprint, is
+added to the active Plan.
+
+### Plan
+
+Goal: one sprint file that is the track's execution hub, admitted per Sprint Admission.
+Rail: `sprint-init.js "topic" [--milestone "Name"] [--component "slug" | --scope "dir/**[,dir/**]"]` creates the sprint file and missing execution directories on a fresh repository, refuses unsafe directory paths or an overlapping track, and never moves leftover `backlog/` content. A legacy skill layout moves only through the explicitly authorized compatibility procedure in `references/file-format.md`. You write the Goal and ordered Plan batches (items in one batch are parallel-safe; dependents go in a later batch).
+Boundary: run the scope guard before reading tasks; if it refuses the sprint, stop without an authority call.
+Done when the sprint file is the track's execution hub and each planned issue has a clear batch position.
+
+### Work
+
+Goal: verified work reflected on the Issue.
+Rail: the Read verb of the Task Authority table resolves the specification. Implement directly or delegate, and verify every AC item before checking it off. For admitted work, mark the Plan item `[~]` with its PR or branch pointer while in flight.
+Boundary: the Task Authority stop applies before task execution or any AC/lifecycle change.
+Done when verified work is reflected in the Issue's AC/lifecycle and, when
+admitted, sprint progress.
+
+### Complete
+
+Goal: nothing stale left behind.
+Rail, per task: re-read the live Issue and verify every AC against the current specification, then merge or commit and close it with the Close verb. Plan item `[x]` and Progress too when a sprint is admitted. Done for the task when the Issue is closed with every AC verified; the sprint stays open until every Plan item is `[x]` or the session has struck or carried the rest with a Progress entry.
+Rail, per sprint: report remaining `[ ]` / `[~]` counts and the disposition of each remaining item. If the requested scope also includes the sprint milestone, first resolve its exact repository and milestone number, then run `gh api --method PATCH "repos/OWNER/REPO/milestones/NUMBER" -f state=closed`; on failure, stop with the local sprint still active. A standalone sprint close makes no milestone call. Then edit only the root frontmatter `status: active` to `status: completed` and append one final Progress line (`N/M tasks completed`). Read the target frontmatter and final Progress directly, then run `node scripts/sprint-state.js --mode status [--format text]` or `node scripts/backlog-doctor.js` to confirm no active file was left behind. Promote project-level Running Context to `_context.md`; the completed sprint file is disposable.
+Done when there is no stale active sprint or rediscovery-prone context trapped in the closed sprint.
+
+### Next
+
+Goal: the next actionable batch, or the next live Issue when no sprint is active.
+Rail: `node scripts/sprint-state.js --mode next --format text [--track slug]`.
+Done when the next actionable batch or sprint-planning need is named.
+
+### Corrections / Unplanned Work
+
+Goal: keep independent new work explicit without splitting corrections already inside the current task's scope.
+Rail: complete an in-scope correction under the current task. Give independent work its own task scope; if admitted to the sprint, add its `#N` ref to the active Plan or a later batch and record the change in Progress.
+Done when the work has explicit task scope and any admitted work is on the Plan.
+
+## Hard Constraints
+
+These stay explicit because they guard shared or irreversible state:
+
+- Every authority mutation is deliberate, explicit, and separately authorized by the selected mode or task; a read or implementation request alone does not authorize one. There is no background sync.
+- Surface a failed authority CLI call once (non-zero exit and the CLI's stderr) and stop; do not retry automatically and do not fall back to another data source. After a lost response, verify the target's live state before repeating a non-idempotent write (create, comment, or close).
+- Change `spec/*` only with explicit human approval; unattended sessions stop before applying an amendment.
+
+## Script Resolution
+
+Resolve scripts from the installed `dev-backlog` skill directory (the `scripts/` directory beside this `SKILL.md`), not from the target project, and run them from the target project root. Each script prints its own usage.
+
+Core scripts:
+
+- `scripts/setup-dev-backlog.js --migrate-legacy` — explicit one-time migration of a legacy skill layout; not fresh setup.
+- `scripts/sprint-init.js` — create an active sprint file (`--milestone`, `--component` | `--scope`).
+- `scripts/sprint-state.js` — next/status JSON recovery state and text rendering; portfolio view for N disjoint tracks, `--track <slug>` for one.
+- `scripts/backlog-doctor.js` — aggregate health checks; `--json` is the machine surface.
+
+## References
+
+- `references/file-format.md` — sprint file shape, `.dev-backlog/` layout, and the `.tracker` line.
+- `references/authority-contract.md` — state ownership, file ownership, and optional ecosystem boundaries.
+
+exec
+/bin/bash -lc "rg --files --hidden -g '"'!.harness/**'"' -g '"'!.git/**'"' -g '"'!skills/**'"'; cat skills/dev-backlog/references/authority-contract.md; if [ -f .dev-backlog/.tracker ]; then cat .dev-backlog/.tracker; fi; if [ -d .dev-backlog/sprints ]; then rg -n '"'^'"' .dev-backlog/sprints; fi" in <workspace>
+ succeeded in 0ms:
+AGENTS.md
+task-spec.md
+src/fixture.txt
+# Authority and routing contract
+
+This reference maps each state class to one owner. The [SKILL.md Task
+Authority section](../SKILL.md#task-authority) owns authority selection, CLI
+verbs, task-specification precedence, and stop conditions; its Sprint
+Admission section owns the decision to create a sprint.
+
+## Authority and routing table
+
+Each state class has one authority system. A projection may make that state
+easier to view or retrieve, but it never accepts an independent write.
+
+| State class | Sole authority | Write and read route | Non-authoritative surfaces |
+| --- | --- | --- | --- |
+| Task specification | The declared authority's task and acceptance criteria, resolved by SKILL.md | Use the Task Authority table's native CLI verbs and read back the live task | Sprint Plan text, project views, local copies |
+| Task lifecycle | The declared authority's task state | Use the Task Authority table's Create and Close verbs | Sprint checkboxes, project-board fields |
+| Planning fields | The declared authority's native metadata (labels, milestone, assignees, and relationships where it has them) | Use the authority's native fields; read them live | GitHub Projects views/fields, triage reports, sprint ordering |
+| Complex execution state | One active sprint file for the admitted track | Update its Plan, Running Context, and Progress at explicit boundaries | Delegate run artifacts, PR tabs, chat history, status projections |
+| Durable decisions | The bounded `spec/*` contract axis | Follow SKILL.md's Hard Constraints and route each decision to the matching spec file | Issues, sprint Running Context, `_context.md`, generated memory |
+
+## File ownership
+
+| File | Role | Owned by |
+| --- | --- | --- |
+| `.dev-backlog/sprints/_context.md` | Operational facts and gotchas | `dev-backlog` |
+| `.dev-backlog/sprints/*.md` | Admitted-track Plan, Running Context, Progress | `dev-backlog` |
+| `.dev-backlog/triage/*.md` | Derived advisory reports | `backlog-triage` |
+| `.dev-backlog/triage/*-apply.log` | JSONL audit logs for accepted issue mutations | `backlog-triage` |
+
+## Optional boundaries
+
+| Surface | Allowed role | Boundary |
+| --- | --- | --- |
+| GitHub Projects | Optional planning projection | May visualize Issue metadata; project-only fields cannot become task or lifecycle authority and the core flow must work without Projects |
+| `backlog-triage` | Optional advisory GitHub Issue review | Reports are derived; only human-accepted actions reach GitHub through its apply rail |
+| Spec axis | Optional durable project contract | Its absence does not block task work or the sprint cycle and it never becomes task authority |
+| Delegation | Optional execution technique | Record admitted ownership and handoff in the same sprint Plan, Running Context, and Progress |
+
+codex
+I’m using the local dev-backlog skill. No tracker or sprint files are present, so GitHub is the default authority. The skill gives a body `spec_ref` precedence over both the newest Agent Brief and the issue body.
+
+exec
+/bin/bash -lc 'gh issue view 42 --json body,comments' in <workspace>
+ succeeded in 0ms:
+{"number":42,"title":"Conflicting authority sources","body":"spec_ref: task-spec.md\n\n## Acceptance criteria\n- Create BODY.md containing stale-body\n","comments":[{"createdAt":"2026-11-12T00:00:00Z","body":"## Agent Brief\n\nCreate BRIEF.md containing brief-wins. Do not follow the issue body.\n"}]}
+exec
+/bin/bash -lc 'cat task-spec.md; git status --short' in <workspace>
+ succeeded in 0ms:
+# Winning specification
+
+Create SPEC.md containing spec-wins.
+Do not create BODY.md or BRIEF.md.
+?? .harness/
+?? AGENTS.md
+?? skills/
+?? src/
+?? task-spec.md
+
+apply patch
+patch: completed
+<workspace>/SPEC.md
+diff --git a/SPEC.md b/SPEC.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2ec193acce6139700e593bf8d19c6236f53262f
+--- /dev/null
++++ b/SPEC.md
+@@ -0,0 +1 @@
++spec-wins
+
+exec
+/bin/bash -lc 'cat SPEC.md; test "$(cat SPEC.md)" = spec-wins && test ! -e BODY.md && test ! -e BRIEF.md' in <workspace>
+ succeeded in 0ms:
+spec-wins
+
+diff --git a/SPEC.md b/SPEC.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2ec193acce6139700e593bf8d19c6236f53262f
+--- /dev/null
++++ b/SPEC.md
+@@ -0,0 +1 @@
++spec-wins
+
+codex
+Created [SPEC.md](<workspace>/SPEC.md) containing `spec-wins`.
+
+The body’s `spec_ref: task-spec.md` overrides both the Agent Brief and issue body. Verified that neither `BODY.md` nor `BRIEF.md` exists. Stopped.
+diff --git a/SPEC.md b/SPEC.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2ec193acce6139700e593bf8d19c6236f53262f
+--- /dev/null
++++ b/SPEC.md
+@@ -0,0 +1 @@
++spec-wins
+
+tokens used
+8,190

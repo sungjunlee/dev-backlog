@@ -1,0 +1,84 @@
+{
+  "id": "fresh-repository-plan",
+  "title": "Create a sprint directly in a fresh repository",
+  "guarantees": [
+    "G5"
+  ],
+  "checks": [
+    {
+      "name": "sprint-init creates the fresh execution root",
+      "pass": true,
+      "observed": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-init.js",
+            "fresh",
+            "--scope",
+            "src/fresh/**"
+          ],
+          "status": 0
+        }
+      ]
+    },
+    {
+      "name": "fresh planning does not invoke legacy migration",
+      "pass": true,
+      "observed": []
+    },
+    {
+      "name": "one sprint skeleton is created",
+      "pass": true,
+      "observed": [
+        "2026-11-fresh.md"
+      ]
+    },
+    {
+      "name": "requested scope and empty Plan are preserved",
+      "pass": true,
+      "observed": "---\nmilestone: fresh\nstatus: active\nstarted: 2026-11-12\ndue: TBD\nscope: [\"src/fresh/**\"]\n---\n\n# fresh\n\n## Goal\n[One sentence: what's true when this sprint is done]\n\n## Plan\n\n\n## Running Context\n[Decisions and discoveries that carry across tasks in this sprint]\n\n## Progress\n[Timestamped log — update at end of each session/batch]\n  "
+    },
+    {
+      "name": "legacy backlog is not created",
+      "pass": true,
+      "observed": [
+        ".dev-backlog/sprints/2026-11-fresh.md"
+      ]
+    },
+    {
+      "name": "no authority operations occurred",
+      "pass": true,
+      "observed": []
+    }
+  ],
+  "pass": true,
+  "runner_status": 0,
+  "invocations": [
+    {
+      "command": "node",
+      "args": [
+        "skills/dev-backlog/scripts/sprint-init.js",
+        "fresh",
+        "--scope",
+        "src/fresh/**"
+      ],
+      "status": 0
+    },
+    {
+      "command": "node",
+      "args": [
+        "skills/dev-backlog/scripts/sprint-state.js",
+        "--mode",
+        "status"
+      ],
+      "status": 0
+    }
+  ],
+  "changes": [
+    {
+      "path": ".dev-backlog/sprints/2026-11-fresh.md",
+      "kind": "added",
+      "after": "25ffd3b099f2c612faeba5d7158b4bf247f0d206be15e3d2cf1cf4e77b6c9284"
+    }
+  ]
+}

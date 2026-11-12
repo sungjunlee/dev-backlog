@@ -1,0 +1,1845 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-12T08:44:34.354Z",
+  "runner": "codex exec",
+  "model": "gpt-6-astra",
+  "reasoning": "low",
+  "backlog_md_version": "1.50.1",
+  "compare": null,
+  "guarantees": [
+    {
+      "id": "G1",
+      "text": "one declared authority; failed reads stop without fallback",
+      "tests": [
+        "orient-next-batch",
+        "authority-read-fails-closed",
+        "github-authority-lifecycle",
+        "backlog-authority-direct-read",
+        "backlog-authority-lifecycle",
+        "authority-source-precedence"
+      ]
+    },
+    {
+      "id": "G2",
+      "text": "authority mutations are deliberate; triage apply is accepted-only and GitHub-only",
+      "tests": [
+        "triage-human-gate",
+        "triage-non-github-refused",
+        "triage-apply-github-only"
+      ]
+    },
+    {
+      "id": "G3",
+      "text": "active tracks never overlap silently",
+      "tests": [
+        "overlapping-track-refused"
+      ]
+    },
+    {
+      "id": "G4",
+      "text": "spec changes require explicit human approval",
+      "tests": [
+        "spec-change-requires-approval"
+      ]
+    },
+    {
+      "id": "G5",
+      "text": "no adapter, background sync, or replacement lifecycle engine",
+      "tests": [
+        "authority-read-fails-closed",
+        "github-authority-lifecycle",
+        "backlog-authority-direct-read",
+        "backlog-authority-lifecycle",
+        "close-sprint-bounded-effects",
+        "fresh-repository-plan"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "orient-next-batch",
+      "title": "Orient through the recovery rail and live authority",
+      "guarantees": [
+        "G1"
+      ],
+      "checks": [
+        {
+          "name": "Node recovery rail invoked",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-state.js",
+                "--mode",
+                "status"
+              ],
+              "status": 0
+            },
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-state.js",
+                "--mode",
+                "next"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "next task read from the live authority",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "3",
+                "--json",
+                "number,title,state,body,comments"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "orientation is read-only",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no authority mutation on a read-only orientation",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "only permitted authority reads occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "next"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "3",
+            "--json",
+            "number,title,state,body,comments"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "Node recovery rail invoked",
+            "pass": true
+          },
+          {
+            "name": "next task read from the live authority",
+            "pass": true
+          },
+          {
+            "name": "orientation is read-only",
+            "pass": true
+          },
+          {
+            "name": "no authority mutation on a read-only orientation",
+            "pass": true
+          },
+          {
+            "name": "only permitted authority reads occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-state.js",
+              "--mode",
+              "status"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-state.js",
+              "--mode",
+              "next"
+            ],
+            "status": 0
+          },
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "view",
+              "3",
+              "--json",
+              "number,title,state,body,comments"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "overlapping-track-refused",
+      "title": "Refuse an overlapping active track without mutation",
+      "guarantees": [
+        "G3"
+      ],
+      "checks": [
+        {
+          "name": "overlap guard invoked",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-init.js",
+                "api",
+                "--scope",
+                "src/auth/api/**"
+              ],
+              "status": 1
+            }
+          ]
+        },
+        {
+          "name": "no second sprint created",
+          "pass": true,
+          "observed": [
+            "2026-11-auth.md"
+          ]
+        },
+        {
+          "name": "refusal leaves workspace unchanged",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no authority operations occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-init.js",
+            "api",
+            "--scope",
+            "src/auth/api/**"
+          ],
+          "status": 1
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "overlap guard invoked",
+            "pass": true
+          },
+          {
+            "name": "no second sprint created",
+            "pass": true
+          },
+          {
+            "name": "refusal leaves workspace unchanged",
+            "pass": true
+          },
+          {
+            "name": "no authority operations occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-init.js",
+              "api",
+              "--scope",
+              "src/auth/api/**"
+            ],
+            "status": 1
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "fresh-repository-plan",
+      "title": "Create a sprint directly in a fresh repository",
+      "guarantees": [
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "sprint-init creates the fresh execution root",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-init.js",
+                "fresh",
+                "--scope",
+                "src/fresh/**"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "fresh planning does not invoke legacy migration",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "one sprint skeleton is created",
+          "pass": true,
+          "observed": [
+            "2026-11-fresh.md"
+          ]
+        },
+        {
+          "name": "requested scope and empty Plan are preserved",
+          "pass": true,
+          "observed": "---\nmilestone: fresh\nstatus: active\nstarted: 2026-11-12\ndue: TBD\nscope: [\"src/fresh/**\"]\n---\n\n# fresh\n\n## Goal\n[One sentence: what's true when this sprint is done]\n\n## Plan\n\n\n## Running Context\n[Decisions and discoveries that carry across tasks in this sprint]\n\n## Progress\n[Timestamped log — update at end of each session/batch]\n  "
+        },
+        {
+          "name": "legacy backlog is not created",
+          "pass": true,
+          "observed": [
+            ".dev-backlog/sprints/2026-11-fresh.md"
+          ]
+        },
+        {
+          "name": "no authority operations occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-init.js",
+            "fresh",
+            "--scope",
+            "src/fresh/**"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [
+        {
+          "path": ".dev-backlog/sprints/2026-11-fresh.md",
+          "kind": "added",
+          "after": "25ffd3b099f2c612faeba5d7158b4bf247f0d206be15e3d2cf1cf4e77b6c9284"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "sprint-init creates the fresh execution root",
+            "pass": true
+          },
+          {
+            "name": "fresh planning does not invoke legacy migration",
+            "pass": true
+          },
+          {
+            "name": "one sprint skeleton is created",
+            "pass": true
+          },
+          {
+            "name": "requested scope and empty Plan are preserved",
+            "pass": true
+          },
+          {
+            "name": "legacy backlog is not created",
+            "pass": true
+          },
+          {
+            "name": "no authority operations occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-init.js",
+              "fresh",
+              "--scope",
+              "src/fresh/**"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-state.js",
+              "--mode",
+              "status"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": [
+          {
+            "path": ".dev-backlog/sprints/2026-11-fresh.md",
+            "kind": "added",
+            "after": "25ffd3b099f2c612faeba5d7158b4bf247f0d206be15e3d2cf1cf4e77b6c9284"
+          }
+        ]
+      }
+    },
+    {
+      "id": "authority-read-fails-closed",
+      "title": "Stop after one failed authority read without fallback",
+      "guarantees": [
+        "G1",
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "declared authority read attempted once",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "42",
+                "--json",
+                "body,comments"
+              ],
+              "status": 41
+            }
+          ]
+        },
+        {
+          "name": "no alternate authority invoked",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no authority mutation after failure",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "only the failed authority read occurred",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "failed read stops before file effects",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "42",
+            "--json",
+            "body,comments"
+          ],
+          "status": 41
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "declared authority read attempted once",
+            "pass": true
+          },
+          {
+            "name": "no alternate authority invoked",
+            "pass": true
+          },
+          {
+            "name": "no authority mutation after failure",
+            "pass": true
+          },
+          {
+            "name": "only the failed authority read occurred",
+            "pass": true
+          },
+          {
+            "name": "failed read stops before file effects",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "view",
+              "42",
+              "--json",
+              "body,comments"
+            ],
+            "status": 41
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "github-authority-lifecycle",
+      "title": "Create, read, and close through the controlled GitHub authority",
+      "guarantees": [
+        "G1",
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "one controlled GitHub issue was created",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "create",
+                "--title",
+                "Controlled lifecycle",
+                "--body",
+                "## Acceptance criteria\n- [ ] lifecycle is observed"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "the created issue was read with the contract JSON fields",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "77",
+                "--json",
+                "body,comments"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "the same controlled issue was closed",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "close",
+                "77"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "GitHub lifecycle order is create then read then close",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "create",
+                "--title",
+                "Controlled lifecycle",
+                "--body",
+                "## Acceptance criteria\n- [ ] lifecycle is observed"
+              ],
+              "status": 0
+            },
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "77",
+                "--json",
+                "body,comments"
+              ],
+              "status": 0
+            },
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "close",
+                "77"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "only the requested GitHub lifecycle operations occurred",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "create",
+                "--title",
+                "Controlled lifecycle",
+                "--body",
+                "## Acceptance criteria\n- [ ] lifecycle is observed"
+              ],
+              "status": 0
+            },
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "77",
+                "--json",
+                "body,comments"
+              ],
+              "status": 0
+            },
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "close",
+                "77"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "controlled GitHub lifecycle has no repository file effects",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "create",
+            "--title",
+            "Controlled lifecycle",
+            "--body",
+            "## Acceptance criteria\n- [ ] lifecycle is observed"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "77",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        },
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "close",
+            "77"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "one controlled GitHub issue was created",
+            "pass": true
+          },
+          {
+            "name": "the created issue was read with the contract JSON fields",
+            "pass": true
+          },
+          {
+            "name": "the same controlled issue was closed",
+            "pass": true
+          },
+          {
+            "name": "GitHub lifecycle order is create then read then close",
+            "pass": true
+          },
+          {
+            "name": "only the requested GitHub lifecycle operations occurred",
+            "pass": true
+          },
+          {
+            "name": "controlled GitHub lifecycle has no repository file effects",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "create",
+              "--title",
+              "Controlled lifecycle",
+              "--body",
+              "## Acceptance criteria\n- [ ] lifecycle is observed"
+            ],
+            "status": 0
+          },
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "view",
+              "77",
+              "--json",
+              "body,comments"
+            ],
+            "status": 0
+          },
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "close",
+              "77"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "close-sprint-bounded-effects",
+      "title": "Close a sprint by changing only status and Progress",
+      "guarantees": [
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "Node status reader invoked successfully",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-state.js",
+                "--mode",
+                "status"
+              ],
+              "status": 0
+            },
+            {
+              "command": "node",
+              "args": [
+                "skills/dev-backlog/scripts/sprint-state.js",
+                "--mode",
+                "status"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "frontmatter is completed",
+          "pass": true,
+          "observed": "status: completed"
+        },
+        {
+          "name": "reader reports no active sprint",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "body status line is untouched",
+          "pass": true,
+          "observed": [
+            "status: active"
+          ]
+        },
+        {
+          "name": "one final Progress line is recorded",
+          "pass": true,
+          "observed": "- 2026-11-01: opened.\n- 2026-11-12: Sprint completed; 1/1 tasks completed."
+        },
+        {
+          "name": "only status and Progress content changed",
+          "pass": true,
+          "observed": "---\nstatus: completed\nstarted: 2026-11-01\n---\n\n# Close fixture\n\n## Goal\nFinish.\nstatus: active\n\n## Plan\n- [x] #20 Done\n\n## Running Context\n\n## Progress\n- 2026-11-01: opened.\n- 2026-11-12: Sprint completed; 1/1 tasks completed.\n"
+        },
+        {
+          "name": "only the sprint file changed",
+          "pass": true,
+          "observed": [
+            ".dev-backlog/sprints/2026-11-close.md"
+          ]
+        },
+        {
+          "name": "unrelated operator file is untouched",
+          "pass": true,
+          "observed": "operator-owned.txt"
+        },
+        {
+          "name": "standalone local close makes no authority mutation",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/dev-backlog/scripts/sprint-state.js",
+            "--mode",
+            "status"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [
+        {
+          "path": ".dev-backlog/sprints/2026-11-close.md",
+          "kind": "modified",
+          "before": "aa5425a8c395bdd02cdbc774256be200e7e7e352674ca76ccf95cfa6324b112c",
+          "after": "2b6a4e8a36d1a4eec1255b970b3f550e595412bf6dfe45d8294e65c58b10ca44"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "Node status reader invoked successfully",
+            "pass": true
+          },
+          {
+            "name": "frontmatter is completed",
+            "pass": true
+          },
+          {
+            "name": "reader reports no active sprint",
+            "pass": true
+          },
+          {
+            "name": "body status line is untouched",
+            "pass": true
+          },
+          {
+            "name": "one final Progress line is recorded",
+            "pass": true
+          },
+          {
+            "name": "only status and Progress content changed",
+            "pass": true
+          },
+          {
+            "name": "only the sprint file changed",
+            "pass": true
+          },
+          {
+            "name": "unrelated operator file is untouched",
+            "pass": true
+          },
+          {
+            "name": "standalone local close makes no authority mutation",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-state.js",
+              "--mode",
+              "status"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/dev-backlog/scripts/sprint-state.js",
+              "--mode",
+              "status"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": [
+          {
+            "path": ".dev-backlog/sprints/2026-11-close.md",
+            "kind": "modified",
+            "before": "aa5425a8c395bdd02cdbc774256be200e7e7e352674ca76ccf95cfa6324b112c",
+            "after": "2b6a4e8a36d1a4eec1255b970b3f550e595412bf6dfe45d8294e65c58b10ca44"
+          }
+        ]
+      }
+    },
+    {
+      "id": "triage-human-gate",
+      "title": "Apply accepted triage only and reject invalid input before effects",
+      "guarantees": [
+        "G2"
+      ],
+      "checks": [
+        {
+          "name": "each named report exercised exactly once",
+          "pass": true,
+          "observed": [
+            {
+              "report": "accepted.md",
+              "status": 0
+            },
+            {
+              "report": "unchecked.md",
+              "status": 0
+            },
+            {
+              "report": "outside.md",
+              "status": 1
+            },
+            {
+              "report": "invalid.md",
+              "status": 1
+            }
+          ]
+        },
+        {
+          "name": "each named report has its expected status",
+          "pass": true,
+          "observed": [
+            {
+              "report": "accepted.md",
+              "status": 0
+            },
+            {
+              "report": "unchecked.md",
+              "status": 0
+            },
+            {
+              "report": "outside.md",
+              "status": 1
+            },
+            {
+              "report": "invalid.md",
+              "status": 1
+            }
+          ]
+        },
+        {
+          "name": "only the checked valid action mutates GitHub",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "comment",
+                "21",
+                "-b",
+                "triage: revisit — needs owner"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "outside and invalid reports create no apply logs",
+          "pass": true,
+          "observed": [
+            ".dev-backlog/triage/2026-11-10-apply.log",
+            ".dev-backlog/triage/2026-11-11-apply.log"
+          ]
+        },
+        {
+          "name": "only the two expected apply logs changed",
+          "pass": true,
+          "observed": [
+            ".dev-backlog/triage/2026-11-10-apply.log",
+            ".dev-backlog/triage/2026-11-11-apply.log"
+          ]
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "comment",
+            "21",
+            "-b",
+            "triage: revisit — needs owner"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "accepted.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "unchecked.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 0
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "outside.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 1
+        },
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "invalid.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 1
+        }
+      ],
+      "changes": [
+        {
+          "path": ".dev-backlog/triage/2026-11-10-apply.log",
+          "kind": "added",
+          "after": "74090cfd3f73cffb5e94f6a40e7d0528b33475c3f3a10ccc1a160d3e21180bf8"
+        },
+        {
+          "path": ".dev-backlog/triage/2026-11-11-apply.log",
+          "kind": "added",
+          "after": "d954a0f95a8a73d38aeeb084f3773a0b51558981f8a40a371c5a2a358efe0eb6"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "each named report exercised exactly once",
+            "pass": true
+          },
+          {
+            "name": "each named report has its expected status",
+            "pass": true
+          },
+          {
+            "name": "only the checked valid action mutates GitHub",
+            "pass": true
+          },
+          {
+            "name": "outside and invalid reports create no apply logs",
+            "pass": true
+          },
+          {
+            "name": "only the two expected apply logs changed",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "comment",
+              "21",
+              "-b",
+              "triage: revisit — needs owner"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/backlog-triage/scripts/triage-apply.js",
+              "accepted.md",
+              "--apply",
+              "--yes"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/backlog-triage/scripts/triage-apply.js",
+              "unchecked.md",
+              "--apply",
+              "--yes"
+            ],
+            "status": 0
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/backlog-triage/scripts/triage-apply.js",
+              "outside.md",
+              "--apply",
+              "--yes"
+            ],
+            "status": 1
+          },
+          {
+            "command": "node",
+            "args": [
+              "skills/backlog-triage/scripts/triage-apply.js",
+              "invalid.md",
+              "--apply",
+              "--yes"
+            ],
+            "status": 1
+          }
+        ],
+        "changes": [
+          {
+            "path": ".dev-backlog/triage/2026-11-10-apply.log",
+            "kind": "added",
+            "after": "74090cfd3f73cffb5e94f6a40e7d0528b33475c3f3a10ccc1a160d3e21180bf8"
+          },
+          {
+            "path": ".dev-backlog/triage/2026-11-11-apply.log",
+            "kind": "added",
+            "after": "d954a0f95a8a73d38aeeb084f3773a0b51558981f8a40a371c5a2a358efe0eb6"
+          }
+        ]
+      }
+    },
+    {
+      "id": "triage-non-github-refused",
+      "title": "Refuse triage apply for a non-GitHub authority",
+      "guarantees": [
+        "G2"
+      ],
+      "checks": [
+        {
+          "name": "triage apply executed and refused the non-GitHub authority",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/backlog-triage/scripts/triage-apply.js",
+                "refused.md",
+                "--apply",
+                "--yes"
+              ],
+              "status": 1
+            }
+          ]
+        },
+        {
+          "name": "refusal occurred before any provider operation",
+          "pass": true,
+          "observed": [
+            {
+              "command": "node",
+              "args": [
+                "skills/backlog-triage/scripts/triage-apply.js",
+                "refused.md",
+                "--apply",
+                "--yes"
+              ],
+              "status": 1
+            }
+          ]
+        },
+        {
+          "name": "refusal created no repository or audit-log effect",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "node",
+          "args": [
+            "skills/backlog-triage/scripts/triage-apply.js",
+            "refused.md",
+            "--apply",
+            "--yes"
+          ],
+          "status": 1
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "triage apply executed and refused the non-GitHub authority",
+            "pass": true
+          },
+          {
+            "name": "refusal occurred before any provider operation",
+            "pass": true
+          },
+          {
+            "name": "refusal created no repository or audit-log effect",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "node",
+            "args": [
+              "skills/backlog-triage/scripts/triage-apply.js",
+              "refused.md",
+              "--apply",
+              "--yes"
+            ],
+            "status": 1
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "backlog-authority-direct-read",
+      "title": "Read Backlog.md authority directly without GitHub",
+      "guarantees": [
+        "G1",
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "declared Backlog.md read verb invoked",
+          "pass": true,
+          "observed": [
+            {
+              "command": "backlog",
+              "args": [
+                "task",
+                "7",
+                "--plain"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "GitHub is never inferred or called",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "direct read is effect-free",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no Backlog or GitHub mutation on a direct read",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "only the declared Backlog read occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "7",
+            "--plain"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "declared Backlog.md read verb invoked",
+            "pass": true
+          },
+          {
+            "name": "GitHub is never inferred or called",
+            "pass": true
+          },
+          {
+            "name": "direct read is effect-free",
+            "pass": true
+          },
+          {
+            "name": "no Backlog or GitHub mutation on a direct read",
+            "pass": true
+          },
+          {
+            "name": "only the declared Backlog read occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "backlog",
+            "args": [
+              "task",
+              "7",
+              "--plain"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": []
+      }
+    },
+    {
+      "id": "backlog-authority-lifecycle",
+      "title": "Create, read, and close through Backlog.md 1.50.1",
+      "guarantees": [
+        "G1",
+        "G5"
+      ],
+      "checks": [
+        {
+          "name": "real Backlog.md task create executed",
+          "pass": true,
+          "observed": {
+            "command": "backlog",
+            "args": [
+              "task",
+              "create",
+              "Controlled local lifecycle",
+              "-d",
+              "Exercise local authority",
+              "--ac",
+              "Lifecycle is complete"
+            ],
+            "status": 0
+          }
+        },
+        {
+          "name": "the created Backlog.md task was read before and after close",
+          "pass": true,
+          "observed": [
+            {
+              "call": {
+                "command": "backlog",
+                "args": [
+                  "task",
+                  "TASK-1",
+                  "--plain"
+                ],
+                "status": 0
+              },
+              "index": 1
+            },
+            {
+              "call": {
+                "command": "backlog",
+                "args": [
+                  "task",
+                  "TASK-1",
+                  "--plain"
+                ],
+                "status": 0
+              },
+              "index": 3
+            }
+          ]
+        },
+        {
+          "name": "the same Backlog.md task was moved to Done",
+          "pass": true,
+          "observed": {
+            "command": "backlog",
+            "args": [
+              "task",
+              "edit",
+              "TASK-1",
+              "-s",
+              "Done"
+            ],
+            "status": 0
+          }
+        },
+        {
+          "name": "only the requested Backlog.md lifecycle operations occurred",
+          "pass": true,
+          "observed": [
+            {
+              "command": "backlog",
+              "args": [
+                "task",
+                "create",
+                "Controlled local lifecycle",
+                "-d",
+                "Exercise local authority",
+                "--ac",
+                "Lifecycle is complete"
+              ],
+              "status": 0
+            },
+            {
+              "command": "backlog",
+              "args": [
+                "task",
+                "TASK-1",
+                "--plain"
+              ],
+              "status": 0
+            },
+            {
+              "command": "backlog",
+              "args": [
+                "task",
+                "edit",
+                "TASK-1",
+                "-s",
+                "Done"
+              ],
+              "status": 0
+            },
+            {
+              "command": "backlog",
+              "args": [
+                "task",
+                "TASK-1",
+                "--plain"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "GitHub was never called for the Backlog.md authority",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "Backlog.md wrote one local task and no unrelated file",
+          "pass": true,
+          "observed": [
+            {
+              "path": "backlog/tasks/task-1 - Controlled-local-lifecycle.md",
+              "kind": "added",
+              "after": "be9858ce5565fb36eed2c89567c543ccdac4873926464c85140041ae7be0a41b"
+            }
+          ]
+        },
+        {
+          "name": "the observed Backlog.md task file is Done",
+          "pass": true,
+          "observed": "---\nid: TASK-1\ntitle: Controlled local lifecycle\nstatus: Done\nassignee: []\ncreated_date: '2026-11-12 08:43'\nupdated_date: '2026-11-12 08:43'\nlabels: []\ndependencies: []\nordinal: 1000\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nExercise local authority\n<!-- SECTION:DESCRIPTION:END -->\n\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n- [ ] #1 Lifecycle is complete\n<!-- AC:END -->\n"
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "create",
+            "Controlled local lifecycle",
+            "-d",
+            "Exercise local authority",
+            "--ac",
+            "Lifecycle is complete"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "TASK-1",
+            "--plain"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "edit",
+            "TASK-1",
+            "-s",
+            "Done"
+          ],
+          "status": 0
+        },
+        {
+          "command": "backlog",
+          "args": [
+            "task",
+            "TASK-1",
+            "--plain"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [
+        {
+          "path": "backlog/tasks/task-1 - Controlled-local-lifecycle.md",
+          "kind": "added",
+          "after": "be9858ce5565fb36eed2c89567c543ccdac4873926464c85140041ae7be0a41b"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "real Backlog.md task create executed",
+            "pass": true
+          },
+          {
+            "name": "the created Backlog.md task was read before and after close",
+            "pass": true
+          },
+          {
+            "name": "the same Backlog.md task was moved to Done",
+            "pass": true
+          },
+          {
+            "name": "only the requested Backlog.md lifecycle operations occurred",
+            "pass": true
+          },
+          {
+            "name": "GitHub was never called for the Backlog.md authority",
+            "pass": true
+          },
+          {
+            "name": "Backlog.md wrote one local task and no unrelated file",
+            "pass": true
+          },
+          {
+            "name": "the observed Backlog.md task file is Done",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "backlog",
+            "args": [
+              "task",
+              "create",
+              "Controlled local lifecycle",
+              "-d",
+              "Exercise local authority",
+              "--ac",
+              "Lifecycle is complete"
+            ],
+            "status": 0
+          },
+          {
+            "command": "backlog",
+            "args": [
+              "task",
+              "TASK-1",
+              "--plain"
+            ],
+            "status": 0
+          },
+          {
+            "command": "backlog",
+            "args": [
+              "task",
+              "edit",
+              "TASK-1",
+              "-s",
+              "Done"
+            ],
+            "status": 0
+          },
+          {
+            "command": "backlog",
+            "args": [
+              "task",
+              "TASK-1",
+              "--plain"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": [
+          {
+            "path": "backlog/tasks/task-1 - Controlled-local-lifecycle.md",
+            "kind": "added",
+            "after": "be9858ce5565fb36eed2c89567c543ccdac4873926464c85140041ae7be0a41b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "authority-source-precedence",
+      "title": "Follow spec_ref over Agent Brief and issue body",
+      "guarantees": [
+        "G1"
+      ],
+      "checks": [
+        {
+          "name": "declared authority was read",
+          "pass": true,
+          "observed": [
+            {
+              "command": "gh",
+              "args": [
+                "issue",
+                "view",
+                "42",
+                "--json",
+                "body,comments"
+              ],
+              "status": 0
+            }
+          ]
+        },
+        {
+          "name": "spec_ref instructions were followed",
+          "pass": true,
+          "observed": "SPEC.md"
+        },
+        {
+          "name": "stale issue body was not followed",
+          "pass": true,
+          "observed": "BODY.md"
+        },
+        {
+          "name": "Agent Brief lost to spec_ref",
+          "pass": true,
+          "observed": "BRIEF.md"
+        },
+        {
+          "name": "only permitted authority reads occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [
+        {
+          "command": "gh",
+          "args": [
+            "issue",
+            "view",
+            "42",
+            "--json",
+            "body,comments"
+          ],
+          "status": 0
+        }
+      ],
+      "changes": [
+        {
+          "path": "SPEC.md",
+          "kind": "added",
+          "after": "066f2a65e0bd9017a96257efc373963e2c1af739b5ac2a9db73119380a6a05a5"
+        }
+      ],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "declared authority was read",
+            "pass": true
+          },
+          {
+            "name": "spec_ref instructions were followed",
+            "pass": true
+          },
+          {
+            "name": "stale issue body was not followed",
+            "pass": true
+          },
+          {
+            "name": "Agent Brief lost to spec_ref",
+            "pass": true
+          },
+          {
+            "name": "only permitted authority reads occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [
+          {
+            "command": "gh",
+            "args": [
+              "issue",
+              "view",
+              "42",
+              "--json",
+              "body,comments"
+            ],
+            "status": 0
+          }
+        ],
+        "changes": [
+          {
+            "path": "SPEC.md",
+            "kind": "added",
+            "after": "066f2a65e0bd9017a96257efc373963e2c1af739b5ac2a9db73119380a6a05a5"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spec-change-requires-approval",
+      "title": "Stop an unattended spec amendment without approval",
+      "guarantees": [
+        "G4"
+      ],
+      "checks": [
+        {
+          "name": "approved spec remains byte-identical",
+          "pass": true,
+          "observed": "spec/charter.md"
+        },
+        {
+          "name": "unapproved handoff stops without effects",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no authority mutation substitutes for approval",
+          "pass": true,
+          "observed": []
+        },
+        {
+          "name": "no authority operations occurred",
+          "pass": true,
+          "observed": []
+        }
+      ],
+      "pass": true,
+      "runner_status": 0,
+      "invocations": [],
+      "changes": [],
+      "status": "PASS",
+      "signature": {
+        "checks": [
+          {
+            "name": "approved spec remains byte-identical",
+            "pass": true
+          },
+          {
+            "name": "unapproved handoff stops without effects",
+            "pass": true
+          },
+          {
+            "name": "no authority mutation substitutes for approval",
+            "pass": true
+          },
+          {
+            "name": "no authority operations occurred",
+            "pass": true
+          }
+        ],
+        "invocations": [],
+        "changes": []
+      }
+    }
+  ]
+}

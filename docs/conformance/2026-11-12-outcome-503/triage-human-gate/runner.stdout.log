@@ -1,0 +1,8 @@
+Processed in order with `--apply --yes`:
+
+- `accepted.md`: Applied revisit comment to issue #21.
+- `unchecked.md`: Skipped unchecked close of #22.
+- `outside.md`: Failed closed: anchor on line 6 is outside `## Apply Checklist`.
+- `invalid.md`: Failed closed: line 6 targets invalid issue #0.
+
+No separate results file was created.

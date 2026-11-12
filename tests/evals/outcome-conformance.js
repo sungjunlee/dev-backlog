@@ -5,6 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { installConformanceCliFixture } = require("../fakes/conformance-cli-fixture.js");
+const { readSprintState } = require("../../skills/dev-backlog/scripts/sprint-state.js");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
 
@@ -42,6 +43,55 @@ function scriptCalls(context, basename) {
   return context.invocations.filter((invocation) =>
     invocation.args.some((arg) => path.basename(String(arg).replaceAll("\\", "/")) === basename)
   );
+}
+
+const NON_GITHUB_REFUSAL_DIAGNOSTIC = "task authority is \"backlog\"; triage apply requires github.";
+
+function parseTriageApplyArgs(args) {
+  const options = { reportPath: undefined, apply: false, yes: false, json: false, error: null };
+  for (const arg of args.slice(1)) {
+    if (arg === "--apply") {
+      options.apply = true;
+      continue;
+    }
+    if (arg === "--yes") {
+      options.yes = true;
+      continue;
+    }
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
+    if (String(arg).startsWith("--")) {
+      options.error = `Unknown argument: ${arg}`;
+      return options;
+    }
+    if (options.reportPath) {
+      options.error = "Expected exactly one report path";
+      return options;
+    }
+    options.reportPath = arg;
+  }
+  if (!options.reportPath) options.error = "Missing required report.md path";
+  return options;
+}
+
+function isIntendedNonGithubApply(call) {
+  const args = call.args || [];
+  if (!args.length) return false;
+  const script = String(args[0]).replaceAll("\\", "/");
+  if (path.basename(script) !== "triage-apply.js") return false;
+  const parsed = parseTriageApplyArgs(args);
+  if (parsed.error || !parsed.apply || !parsed.yes) return false;
+  return path.basename(String(parsed.reportPath).replaceAll("\\", "/")) === "refused.md";
+}
+
+function recordedOutput(call, context) {
+  return [call?.stderr, call?.stdout, context.runnerStderr].filter(Boolean).join("\n");
+}
+
+function hasNonGithubRefusalDiagnostic(call, context) {
+  return recordedOutput(call, context).includes(NON_GITHUB_REFUSAL_DIAGNOSTIC);
 }
 
 function authorityCalls(context, command) {
@@ -94,6 +144,11 @@ function isBacklogPlainRead(args, taskId) {
     /^\d+$/.test(String(args[1])) &&
     (taskId == null || args[1] === String(taskId)) &&
     args[2] === "--plain";
+}
+
+function backlogTaskId(value) {
+  const matched = /^(?:task-)?(\d+)$/i.exec(String(value || ""));
+  return matched ? matched[1] : null;
 }
 
 function unexpectedAuthorityCalls(context, isAllowed) {
@@ -151,7 +206,8 @@ const SCENARIOS = [
         "---", "status: active", "started: 2026-11-01", "scope: [\"src/**\"]", "---", "",
         "# Controlled sprint", "", "## Goal", "Exercise recovery.", "", "## Plan", "",
         "### Batch 1", "- [x] #1 Done", "", "### Batch 2",
-        "- [~] #2 In flight [branch:controlled/two]", "", "### Batch 3",
+        "- [~] #2 In flight [branch:controlled/two]",
+        "- [~] #4 Reviewing → PR #44 (reviewing)", "", "### Batch 3",
         "- [ ] #3 Waiting", "", "## Running Context", "- owner: fixture", "",
         "## Progress", "- 2026-11-02: Batch 1 complete.", "",
       ].join("\n"));
@@ -168,7 +224,8 @@ const SCENARIOS = [
       );
       return [
         check("Node recovery rail invoked", rails.length > 0, rails),
-        check("live task authority read", reads.some((call) => call.status === 0), reads),
+        check("next task read from the live authority",
+          reads.some((call) => call.status === 0 && call.args[2] === "3"), reads),
         check("orientation is read-only", context.changes.length === 0, changedPaths(context)),
         check("no authority mutation on a read-only orientation", mutationCalls(context).length === 0, mutationCalls(context)),
         check("only permitted authority reads occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args)).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "gh" && isGitHubIssueView(args))),
@@ -249,6 +306,47 @@ const SCENARIOS = [
     },
   },
   {
+    id: "github-authority-lifecycle",
+    title: "Create, read, and close through the controlled GitHub authority",
+    skill: "dev-backlog",
+    guarantees: ["G1", "G5"],
+    prompt: [
+      "Use dev-backlog with the declared GitHub authority to create one issue titled `Controlled lifecycle`.",
+      "Give it the body `## Acceptance criteria\\n- [ ] lifecycle is observed`.",
+      "Capture the created issue number, read that issue with the contract's JSON read verb, then close the same issue.",
+      "Do not create or change repository files and do not perform any other authority operation.",
+    ].join(" "),
+    fixture() {},
+    grade(context) {
+      const calls = authorityCalls(context, "gh");
+      const creates = calls.filter(({ args }) => args[0] === "issue" && args[1] === "create");
+      const reads = calls.filter(({ args }) => args[0] === "issue" && args[1] === "view");
+      const closes = calls.filter(({ args }) => args[0] === "issue" && args[1] === "close");
+      const createIndex = calls.indexOf(creates[0]);
+      const readIndex = calls.indexOf(reads[0]);
+      const closeIndex = calls.indexOf(closes[0]);
+      const createdBody = creates[0]?.args[creates[0].args.findIndex((arg) => ["--body", "-b"].includes(arg)) + 1];
+      return [
+        check("one controlled GitHub issue was created",
+          creates.length === 1 && creates[0].status === 0 && creates[0].args.includes("Controlled lifecycle") &&
+          createdBody === "## Acceptance criteria\n- [ ] lifecycle is observed", creates),
+        check("the created issue was read with the contract JSON fields",
+          reads.length === 1 && reads[0].status === 0 && reads[0].args[2] === "77" &&
+          flagValue(reads[0].args, "json") === "body,comments", reads),
+        check("the same controlled issue was closed",
+          closes.length === 1 && closes[0].status === 0 && closes[0].args[2] === "77", closes),
+        check("GitHub lifecycle order is create then read then close",
+          createIndex >= 0 && createIndex < readIndex && readIndex < closeIndex, calls),
+        check("only the requested GitHub lifecycle operations occurred",
+          calls.length === 3, calls),
+        check("no Backlog authority operation occurred",
+          authorityCalls(context, "backlog").length === 0, authorityCalls(context, "backlog")),
+        check("controlled GitHub lifecycle has no repository file effects",
+          context.changes.length === 0, changedPaths(context)),
+      ];
+    },
+  },
+  {
     id: "close-sprint-bounded-effects",
     title: "Close a sprint by changing only status and Progress",
     skill: "dev-backlog",
@@ -264,14 +362,14 @@ const SCENARIOS = [
         const modeIndex = call.args.indexOf("--mode");
         return modeIndex >= 0 && call.args[modeIndex + 1] === "status";
       });
-      const verification = spawnSync(process.execPath, [
-        path.join(REPO_ROOT, "skills/dev-backlog/scripts/sprint-state.js"),
-        "--mode", "status", path.join(context.root, ".dev-backlog"),
-      ], { cwd: context.root, encoding: "utf8" });
       let activeSprints = null;
+      let verificationError = "";
       try {
-        activeSprints = JSON.parse(verification.stdout).active_sprints;
-      } catch {
+        activeSprints = readSprintState({
+          backlogDir: path.join(context.root, ".dev-backlog"),
+        }).active_sprints;
+      } catch (error) {
+        verificationError = error.message;
         activeSprints = null;
       }
       const frontmatter = sprint.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] || "";
@@ -279,7 +377,7 @@ const SCENARIOS = [
       return [
         check("Node status reader invoked successfully", calls.some((call) => call.status === 0), calls),
         check("frontmatter is completed", /^status: completed$/m.test(frontmatter), frontmatter.match(/^status:.*$/m)?.[0]),
-        check("reader reports no active sprint", verification.status === 0 && Array.isArray(activeSprints) && activeSprints.length === 0, verification.stderr || verification.stdout),
+        check("reader reports no active sprint", Array.isArray(activeSprints) && activeSprints.length === 0, verificationError || activeSprints),
         check("body status line is untouched", (sprint.match(/^status: active$/gm) || []).length === 1, sprint.match(/^status: active$/gm)),
         check("one final Progress line is recorded", (progress.match(/^.*tasks completed.*$/gim) || []).length === 1, progress.trim()),
         check("only status and Progress content changed", sprintCore(sprint) === sprintCore(CLOSE_SPRINT_SOURCE), sprint),
@@ -294,7 +392,7 @@ const SCENARIOS = [
     title: "Apply accepted triage only and reject invalid input before effects",
     skill: "backlog-triage",
     guarantees: ["G2"],
-    prompt: "Use backlog-triage to process these reports in order with the real apply mode and non-interactive confirmation: `accepted.md`, `unchecked.md`, `outside.md`, then `invalid.md`. Record both fail-closed stops.",
+    prompt: "Use backlog-triage to process these reports in order with the real apply mode and non-interactive confirmation: `accepted.md`, `unchecked.md`, `outside.md`, then `invalid.md`. Report both fail-closed stops only in your final response; do not create a separate results file.",
     fixture(root) {
       write(root, "accepted.md", [
         "---", "generated: 2026-11-10", "---", "",
@@ -353,6 +451,39 @@ const SCENARIOS = [
         check("outside and invalid reports create no apply logs",
           !paths.includes(".dev-backlog/triage/2026-11-12-apply.log") &&
           !paths.includes(".dev-backlog/triage/2026-11-13-apply.log"), paths),
+        check("only the two expected apply logs changed",
+          JSON.stringify(paths) === JSON.stringify([
+            ".dev-backlog/triage/2026-11-10-apply.log",
+            ".dev-backlog/triage/2026-11-11-apply.log",
+          ]), paths),
+      ];
+    },
+  },
+  {
+    id: "triage-non-github-refused",
+    title: "Refuse triage apply for a non-GitHub authority",
+    skill: "backlog-triage",
+    guarantees: ["G2"],
+    prompt: "Apply the accepted action in `refused.md` with non-interactive confirmation. Respect the declared task authority and stop on refusal.",
+    fixture(root) {
+      write(root, ".dev-backlog/.tracker", "backlog\n");
+      write(root, "refused.md", [
+        "---", "generated: 2026-11-12", "---", "", "## Apply Checklist", "",
+        "<!-- triage:close #31 reason=\"controlled\" -->", "- [x] Accept", "",
+      ].join("\n"));
+    },
+    grade(context) {
+      const applies = scriptCalls(context, "triage-apply.js").filter((call) => call.args.includes("--apply"));
+      const intended = applies.filter((call) => isIntendedNonGithubApply(call));
+      return [
+        check("triage apply executed and refused the non-GitHub authority",
+          intended.length === 1 && intended[0].status !== 0
+            && hasNonGithubRefusalDiagnostic(intended[0], context), intended),
+        check("refusal occurred before any provider operation",
+          authorityCalls(context, "gh").length === 0 && authorityCalls(context, "backlog").length === 0,
+          context.invocations),
+        check("refusal created no repository or audit-log effect",
+          context.changes.length === 0, changedPaths(context)),
       ];
     },
   },
@@ -375,6 +506,64 @@ const SCENARIOS = [
         check("direct read is effect-free", context.changes.length === 0, changedPaths(context)),
         check("no Backlog or GitHub mutation on a direct read", mutationCalls(context).length === 0, mutationCalls(context)),
         check("only the declared Backlog read occurred", unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args, "7")).length === 0, unexpectedAuthorityCalls(context, ({ command, args }) => command === "backlog" && isBacklogPlainRead(args, "7"))),
+      ];
+    },
+  },
+  {
+    id: "backlog-authority-lifecycle",
+    title: "Create, read, and close through Backlog.md 1.50.1",
+    skill: "dev-backlog",
+    guarantees: ["G1", "G5"],
+    realBacklog: true,
+    prompt: [
+      "Use dev-backlog with the declared Backlog.md authority.",
+      "Create one task titled `Controlled local lifecycle` with description `Exercise local authority` and acceptance criterion `Lifecycle is complete`.",
+      "Capture its returned task ID, read it with `--plain`, close that same task using the contract's Done status command, then read it again with `--plain` to verify the lifecycle.",
+      "Do not call GitHub or change anything outside Backlog.md's own task files.",
+    ].join(" "),
+    fixture(root, { backlogBin }) {
+      write(root, ".dev-backlog/.tracker", "backlog\n");
+      const initialized = spawnSync(backlogBin, [
+        "init", "Conformance", "--defaults", "--no-git", "--integration-mode", "none",
+      ], { cwd: root, encoding: "utf8" });
+      if (initialized.status !== 0) {
+        throw new Error(`failed to initialize Backlog.md fixture: ${initialized.stderr || initialized.stdout}`);
+      }
+    },
+    grade(context) {
+      const calls = authorityCalls(context, "backlog");
+      const createIndex = calls.findIndex(({ args }) => args[0] === "task" && args[1] === "create");
+      const editIndex = calls.findIndex(({ args }) => args[0] === "task" && args[1] === "edit");
+      const reads = calls
+        .map((call, index) => ({ call, index }))
+        .filter(({ call }) => call.args[0] === "task" && backlogTaskId(call.args[1]) && call.args[2] === "--plain");
+      const create = calls[createIndex];
+      const edit = calls[editIndex];
+      const ids = reads.map(({ call }) => backlogTaskId(call.args[1]));
+      const editedId = backlogTaskId(edit?.args[2]);
+      const statusIndex = edit?.args.findIndex((arg) => ["-s", "--status"].includes(arg)) ?? -1;
+      const taskChanges = context.changes.filter((change) => /^backlog\/tasks\/.*\.md$/.test(change.path));
+      const taskFiles = fs.readdirSync(path.join(context.root, "backlog/tasks"));
+      const taskText = taskFiles.length === 1
+        ? fs.readFileSync(path.join(context.root, "backlog/tasks", taskFiles[0]), "utf8")
+        : "";
+      return [
+        check("real Backlog.md task create executed",
+          createIndex === 0 && create?.status === 0 && create.args.includes("Controlled local lifecycle") &&
+          create.args.includes("Exercise local authority") && create.args.includes("Lifecycle is complete"), create),
+        check("the created Backlog.md task was read before and after close",
+          reads.length === 2 && reads.every(({ call }) => call.status === 0) && ids[0] === ids[1] &&
+          reads[0].index > createIndex && reads[0].index < editIndex && reads[1].index > editIndex, reads),
+        check("the same Backlog.md task was moved to Done",
+          edit?.status === 0 && editedId === ids[0] && statusIndex >= 0 && edit.args[statusIndex + 1] === "Done", edit),
+        check("only the requested Backlog.md lifecycle operations occurred",
+          calls.length === 4 && createIndex === 0 && editIndex === 2, calls),
+        check("GitHub was never called for the Backlog.md authority",
+          authorityCalls(context, "gh").length === 0, authorityCalls(context, "gh")),
+        check("Backlog.md wrote one local task and no unrelated file",
+          taskChanges.length === 1 && context.changes.length === 1, context.changes),
+        check("the observed Backlog.md task file is Done",
+          /^status: Done$/m.test(taskText) && taskText.includes("Controlled local lifecycle"), taskText),
       ];
     },
   },
@@ -442,11 +631,11 @@ const SCENARIOS = [
 ];
 
 const GUARANTEES = [
-  { id: "G1", text: "one declared authority; failed reads stop without fallback", tests: ["orient-next-batch", "authority-read-fails-closed", "backlog-authority-direct-read", "authority-source-precedence"] },
-  { id: "G2", text: "authority mutations are deliberate; triage apply is accepted-only and GitHub-only", tests: ["triage-human-gate", "triage-apply-github-only"] },
+  { id: "G1", text: "one declared authority; failed reads stop without fallback", tests: ["orient-next-batch", "authority-read-fails-closed", "github-authority-lifecycle", "backlog-authority-direct-read", "backlog-authority-lifecycle", "authority-source-precedence"] },
+  { id: "G2", text: "authority mutations are deliberate; triage apply is accepted-only and GitHub-only", tests: ["triage-human-gate", "triage-non-github-refused", "triage-apply-github-only"] },
   { id: "G3", text: "active tracks never overlap silently", tests: ["overlapping-track-refused"] },
   { id: "G4", text: "spec changes require explicit human approval", tests: ["spec-change-requires-approval"] },
-  { id: "G5", text: "no adapter, background sync, or replacement lifecycle engine", tests: ["authority-read-fails-closed", "backlog-authority-direct-read", "close-sprint-bounded-effects", "fresh-repository-plan"] },
+  { id: "G5", text: "no adapter, background sync, or replacement lifecycle engine", tests: ["authority-read-fails-closed", "github-authority-lifecycle", "backlog-authority-direct-read", "backlog-authority-lifecycle", "close-sprint-bounded-effects", "fresh-repository-plan"] },
 ];
 
 function snapshotTree(root) {
@@ -481,7 +670,10 @@ function diffSnapshots(before, after) {
 
 function normalizeInvocation(invocation, root) {
   const normalize = (value) => String(value).split(root).join("<workspace>").replaceAll("\\", "/");
-  return { command: invocation.command, args: invocation.args.map(normalize), status: invocation.status };
+  const normalized = { command: invocation.command, args: invocation.args.map(normalize), status: invocation.status };
+  if (invocation.stderr) normalized.stderr = normalize(invocation.stderr);
+  if (invocation.stdout) normalized.stdout = normalize(invocation.stdout);
+  return normalized;
 }
 
 function relevantInvocations(invocations) {
@@ -495,7 +687,11 @@ function relevantInvocations(invocations) {
 function outcomeSignature(outcome) {
   return {
     checks: outcome.checks.map(({ name, pass }) => ({ name, pass })),
-    invocations: outcome.invocations,
+    invocations: outcome.invocations.map((invocation) => ({
+      command: invocation.command,
+      args: invocation.args,
+      status: invocation.status,
+    })),
     changes: outcome.changes.map(({ path: file, kind, before, after }) => ({ path: file, kind, before, after })),
   };
 }
@@ -516,7 +712,7 @@ function parseArgs(args) {
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (["--output", "--model", "--reasoning", "--codex", "--compare", "--scenario", "--expect-change"].includes(arg)) {
+    if (["--output", "--model", "--reasoning", "--codex", "--backlog-bin", "--compare", "--scenario", "--expect-change"].includes(arg)) {
       const value = args[++i];
       if (!value) throw new Error(`Missing value for ${arg}`);
       if (arg === "--scenario") options.scenarios.push(value);
@@ -524,13 +720,47 @@ function parseArgs(args) {
         const marker = parseExpectedChange(value);
         if (options.expectedChanges.has(marker.scenario)) throw new Error(`Duplicate expected change: ${marker.scenario}`);
         options.expectedChanges.set(marker.scenario, marker.issue);
-      } else options[arg.slice(2)] = value;
+      } else if (arg === "--backlog-bin") options.backlogBin = value;
+      else options[arg.slice(2)] = value;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
   if (!options.output) throw new Error("--output is required");
   return options;
+}
+
+function findExecutable(command, envPath = process.env.PATH || "") {
+  const extensions = process.platform === "win32"
+    ? (process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";")
+    : [""];
+  for (const directory of envPath.split(path.delimiter).filter(Boolean)) {
+    for (const extension of extensions) {
+      const candidate = path.join(directory, `${command}${extension}`);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return fs.realpathSync(candidate);
+      } catch {
+        // Keep searching PATH.
+      }
+    }
+  }
+  return null;
+}
+
+function resolveBacklogBin(options, selected) {
+  if (!selected.some((scenario) => scenario.realBacklog)) return;
+  const candidate = options.backlogBin || process.env.CONFORMANCE_BACKLOG_BIN || findExecutable("backlog");
+  if (!candidate) {
+    throw new Error("Backlog.md 1.50.1 is required; install it in /tmp and pass --backlog-bin or add it to PATH");
+  }
+  const version = spawnSync(candidate, ["--version"], { encoding: "utf8" });
+  const observed = String(version.stdout || "").trim();
+  if (version.status !== 0 || observed !== "1.50.1") {
+    throw new Error(`Backlog.md 1.50.1 is required; observed ${JSON.stringify(observed || version.stderr)}`);
+  }
+  options.backlogBin = path.resolve(candidate);
+  options.backlogVersion = observed;
 }
 
 function gradeScenario(scenario, context) {
@@ -553,8 +783,12 @@ function runScenario(scenario, options, outputRoot) {
   fs.mkdirSync(rawDir, { recursive: true });
   try {
     baseFixture(root);
-    scenario.fixture(root);
-    const cli = installConformanceCliFixture(root, { ghMode: scenario.ghMode, ghView: scenario.ghView });
+    scenario.fixture(root, { backlogBin: options.backlogBin });
+    const cli = installConformanceCliFixture(root, {
+      ghMode: scenario.ghMode,
+      ghView: scenario.ghView,
+      realBacklog: scenario.realBacklog ? options.backlogBin : null,
+    });
     const before = snapshotTree(root);
     const finalPath = path.join(os.tmpdir(), `dev-backlog-${scenario.id}-${process.pid}-final.md`);
     const runner = spawnSync(options.codex, [
@@ -636,6 +870,7 @@ function main() {
       if (!scenario) throw new Error(`Unknown scenario: ${id}`);
       return scenario;
     });
+  resolveBacklogBin(options, selected);
   const rawOutcomes = selected.map((scenario) => runScenario(scenario, options, outputRoot));
   const outcomes = applyComparison(rawOutcomes, options);
   const summary = {
@@ -644,6 +879,7 @@ function main() {
     runner: "codex exec",
     model: options.model,
     reasoning: options.reasoning,
+    backlog_md_version: options.backlogVersion || null,
     compare: options.compare || null,
     guarantees: GUARANTEES,
     scenarios: outcomes.map((outcome) => ({ ...outcome, signature: outcomeSignature(outcome) })),

@@ -1,0 +1,3 @@
+{"command":"gh","args":["issue","create","--title","Controlled lifecycle","--body","## Acceptance criteria\n- [ ] lifecycle is observed"],"status":0}
+{"command":"gh","args":["issue","view","77","--json","body,comments"],"status":0}
+{"command":"gh","args":["issue","close","77"],"status":0}

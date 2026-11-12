@@ -2,8 +2,9 @@
 
 Fresh-session scenarios exercise a controlled workspace, not a model's ability
 to recite contract prose. `outcome-conformance.js` creates one clean workspace
-per scenario, installs fake authority CLIs, runs a fresh Codex session, and
-grades only observable evidence:
+per scenario, installs the controlled GitHub fake and a recorder around the
+pinned real Backlog.md CLI, runs a fresh Codex session, and grades only
+observable evidence:
 
 - recorded authority and rail invocations with exit statuses;
 - files added, removed, or changed from the before snapshot; and
@@ -12,8 +13,8 @@ grades only observable evidence:
 The final answer is retained for audit but is not an input to the grade. The
 scenario prompt never includes the grader checks or an `Expected:` answer.
 
-- `dev-backlog.md` indexes the eight dev-backlog scenarios.
-- `backlog-triage.md` indexes the triage human-gate scenario.
+- `dev-backlog.md` indexes the ten dev-backlog scenarios.
+- `backlog-triage.md` indexes the two triage scenarios.
 - `outcome-conformance.test.js` tests the deterministic recorder, guarantee
   map, and expected-change marker without launching a model.
 

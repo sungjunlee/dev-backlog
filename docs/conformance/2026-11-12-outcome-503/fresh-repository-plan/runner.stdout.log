@@ -1,0 +1,3 @@
+Created [fresh sprint skeleton](<workspace>/.dev-backlog/sprints/2026-11-fresh.md) with scope `src/fresh/**`.
+
+Verified it is active with an empty Plan. No issues were added.

@@ -6,20 +6,26 @@ changes the baseline.
 
 ## Run
 
-From the repository root, run all nine controlled scenarios with one command:
+Install the pinned local-only authority CLI in a temporary prefix, then run all
+twelve scenarios from the repository root:
 
 ```bash
+npm install --prefix /tmp/dev-backlog-conformance-backlog \
+  --cache /tmp/dev-backlog-conformance-npm-cache backlog.md@1.50.1
 node tests/evals/outcome-conformance.js \
   --model gpt-6-astra \
   --reasoning low \
+  --backlog-bin /tmp/dev-backlog-conformance-backlog/node_modules/.bin/backlog \
   --output docs/conformance/YYYY-MM-DD-outcome-before
 ```
 
 Each scenario gets a clean workspace, the current local skills, and controlled
-`gh` and `backlog` executables. Sessions have workspace write access but no need
-for network access. The output directory contains the prompt, runner logs, final
-answer, invocation log, file-change set, and machine-readable outcome for every
-scenario, plus `summary.json`.
+authority executables. GitHub operations go only to the `gh` fake; the recorded
+`backlog` wrapper delegates one lifecycle scenario to the pinned real Backlog.md
+1.50.1 binary in a throwaway, `--no-git` local repository. Sessions have
+workspace write access but no need for network access. The output directory
+contains the prompt, runner logs, final answer, invocation log, file-change set,
+and machine-readable outcome for every scenario, plus `summary.json`.
 
 The final answer is audit material only. Grading reads:
 
@@ -40,6 +46,7 @@ A later run can compare its outcome signature with a retained baseline:
 node tests/evals/outcome-conformance.js \
   --model gpt-6-astra \
   --reasoning low \
+  --backlog-bin /tmp/dev-backlog-conformance-backlog/node_modules/.bin/backlog \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
   --output /tmp/dev-backlog-outcome-after
 ```
@@ -55,6 +62,7 @@ Example for the runtime changes covered by #498 and #499:
 
 ```bash
 node tests/evals/outcome-conformance.js \
+  --backlog-bin /tmp/dev-backlog-conformance-backlog/node_modules/.bin/backlog \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
   --expect-change orient-next-batch=#498 \
   --expect-change close-sprint-bounded-effects=#498 \
