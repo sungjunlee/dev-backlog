@@ -25,8 +25,9 @@ const TYPE_3_HTML_BLOCK_START = /^ {0,3}<\?/;
 const TYPE_4_HTML_BLOCK_START = /^ {0,3}<![A-Z]/;
 const TYPE_5_HTML_BLOCK_START = /^ {0,3}<!\[CDATA\[/;
 const TYPE_6_HTML_BLOCK_START = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t ]|/?>|$)`, "i");
-const TYPE_7_HTML_BLOCK_START = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
-const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)(.*))?$/;
+const TYPE_7_HTML_BLOCK_OPENING_TAG = /^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \t\n\v\f\r]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n\v\f\r]*=[ \t\n\v\f\r]*(?:[^ \t\n\v\f\r"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t\n\v\f\r]*\/?>[ \t]*$/;
+const TYPE_7_HTML_BLOCK_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t\n\v\f\r]*>[ \t]*$/;
+const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)([\s\S]*))?$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -159,8 +160,11 @@ function buildActionKey(action) {
   return `${action.verb}|${action.issueNumber}|${stableSerialize(canonicalKeyArgs(action.verb, normalizedArgs))}`;
 }
 
-function parseFrontmatter(text) {
-  const lines = String(text || "").split(/\r?\n/);
+function markdownSourceLines(text) {
+  return String(text || "").replace(/\r\n?/g, "\n").split("\n");
+}
+
+function parseFrontmatterLines(lines) {
   if (lines[0] !== "---") return {};
 
   const endIndex = lines.indexOf("---", 1);
@@ -184,9 +188,13 @@ function parseFrontmatter(text) {
   return frontmatter;
 }
 
-function listContainerView(line) {
+function parseFrontmatter(text) {
+  return parseFrontmatterLines(markdownSourceLines(text));
+}
+
+function listContainerView(line, startColumn = 0) {
   let content = String(line || "");
-  let continuationIndent = 0;
+  let continuationIndent = startColumn;
   const listItems = [];
   let match;
   while ((match = content.match(LIST_ITEM_PATTERN))) {
@@ -218,7 +226,11 @@ function listContainerView(line) {
     listItem.contentIndent = continuationIndent;
     content = child;
   }
-  return { content, continuationIndent, listItems };
+  return {
+    content,
+    continuationIndent: listItems.length > 0 ? continuationIndent : 0,
+    listItems,
+  };
 }
 
 function parseApprovalCheckbox(line) {
@@ -281,6 +293,7 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
       ],
       startsListItem: true,
       closesActiveItem: parentListItems.length < activeListItems.length,
+      listMarkerLine: source,
     };
   }
   if (isMarkdownBlank(source)) {
@@ -302,8 +315,27 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
   if (survivingItemCount > 0) {
     const survivingListItems = activeListItems.slice(0, survivingItemCount);
     const continuationIndent = survivingListItems[survivingListItems.length - 1].contentIndent;
+    const relativeSource = stripContainerContinuation(source, continuationIndent);
+    const child = listContainerView(relativeSource, continuationIndent);
+    if (child.listItems.length > 0) {
+      const firstMarkerIndent = child.listItems[0].markerIndent;
+      const parentListItems = survivingListItems.filter(
+        (item) => item.contentIndent <= firstMarkerIndent
+      );
+      return {
+        ...child,
+        activeContinuationIndent: child.continuationIndent,
+        activeListItems: [
+          ...parentListItems,
+          ...child.listItems,
+        ],
+        startsListItem: true,
+        closesActiveItem: parentListItems.length < activeListItems.length,
+        listMarkerLine: relativeSource,
+      };
+    }
     return {
-      content: stripContainerContinuation(source, continuationIndent),
+      content: relativeSource,
       continuationIndent,
       listItems: [],
       activeContinuationIndent: continuationIndent,
@@ -356,7 +388,7 @@ function literalBlockContainerView(line, block) {
 }
 
 function parseFenceOpening(line) {
-  const opening = String(line || "").match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  const opening = String(line || "").match(/^ {0,3}(`{3,}|~{3,})([\s\S]*)$/);
   if (!opening || (opening[1][0] === "`" && opening[2].includes("`"))) return undefined;
   return { character: opening[1][0], length: opening[1].length };
 }
@@ -431,7 +463,7 @@ function markdownBlockState(lines) {
     if (
       container.startsListItem
       && paragraphOpen
-      && !interruptsParagraph(line)
+      && !interruptsParagraph(container.listMarkerLine || line)
       && !container.closesActiveItem
     ) {
       container = {
@@ -562,7 +594,13 @@ function markdownBlockState(lines) {
 
     if (
       TYPE_6_HTML_BLOCK_START.test(contextLine)
-      || (TYPE_7_HTML_BLOCK_START.test(contextLine) && !paragraphOpen)
+      || (
+        !paragraphOpen
+        && (
+          TYPE_7_HTML_BLOCK_OPENING_TAG.test(contextLine)
+          || TYPE_7_HTML_BLOCK_CLOSING_TAG.test(contextLine)
+        )
+      )
     ) {
       literalLines.add(index);
       htmlBlock = {
@@ -682,9 +720,8 @@ function isSetextHeading(lines, index, literalLines, paragraphs = new Map()) {
 }
 
 function parseReport(text) {
-  const source = String(text || "");
-  const lines = source.split(/\r?\n/);
-  const frontmatter = parseFrontmatter(source);
+  const lines = markdownSourceLines(text);
+  const frontmatter = parseFrontmatterLines(lines);
   const { literalLines, paragraphs, sectionHeadings, checklistHeadings } = markdownBlockState(lines);
   const anchors = [];
   const parsed = {
