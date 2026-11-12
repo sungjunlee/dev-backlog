@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const {
   SCENARIOS,
   GUARANTEES,
@@ -258,6 +259,30 @@ describe("read-only and bounded graders", () => {
           false,
           invocation.args.join(" "),
         );
+      } finally {
+        fs.rmSync(context.root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("accepts supported triage-apply argument order and --json as a non-GitHub refusal", () => {
+    const diagnostic = "Cannot apply triage actions: task authority is \"backlog\"; triage apply requires github.\n";
+    const tracker = { ".dev-backlog/.tracker": "backlog\n" };
+    const cases = [
+      ["skills/backlog-triage/scripts/triage-apply.js", "refused.md", "--apply", "--yes", "--json"],
+      ["skills/backlog-triage/scripts/triage-apply.js", "--apply", "--yes", "refused.md"],
+      ["skills/backlog-triage/scripts/triage-apply.js", "--json", "--apply", "refused.md", "--yes"],
+    ];
+    for (const args of cases) {
+      const context = tmpContext(tracker, [{
+        command: "node",
+        args,
+        status: 1,
+        stderr: diagnostic,
+      }]);
+      try {
+        const outcome = gradeScenario(scenario("triage-non-github-refused"), context);
+        assert.equal(outcome.pass, true, args.join(" "));
       } finally {
         fs.rmSync(context.root, { recursive: true, force: true });
       }
@@ -550,6 +575,61 @@ describe("read-only and bounded graders", () => {
         else process.env[key] = value;
       }
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("forwards stdin through delegated node and bash wrappers and records their output", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-stdin-"));
+    try {
+      const cli = installConformanceCliFixture(root);
+      const bash = path.join(root, ".harness", "bin", "bash");
+      const node = path.join(root, ".harness", "bin", "node");
+      const bashResult = spawnSync(bash, ["-s"], {
+        env: cli.env,
+        encoding: "utf8",
+        input: "printf stdin-bash\n",
+      });
+      assert.equal(bashResult.status, 0);
+      assert.match(bashResult.stdout, /stdin-bash/);
+      const nodeResult = spawnSync(node, ["-e", "let data=''; process.stdin.on('data', (chunk) => { data += chunk; }); process.stdin.on('end', () => process.stdout.write(data));"], {
+        env: cli.env,
+        encoding: "utf8",
+        input: "stdin-node\n",
+      });
+      assert.equal(nodeResult.status, 0);
+      assert.match(nodeResult.stdout, /stdin-node/);
+      const recorded = cli.invocations();
+      assert.equal(recorded.some((item) => item.command === "bash" && item.status === 0), true);
+      assert.equal(recorded.some((item) => item.command === "node" && String(item.stdout || "").includes("stdin-node")), true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not treat newly recorded stdout or stderr as a comparison regression", () => {
+    const comparisonRoot = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-signature-compare-"));
+    try {
+      const baselinePath = path.join(comparisonRoot, "baseline.json");
+      const current = {
+        id: "github-authority-lifecycle",
+        pass: true,
+        checks: [{ name: "only the requested GitHub lifecycle operations occurred", pass: true }],
+        invocations: [
+          { command: "gh", args: ["issue", "close", "77"], status: 0, stdout: "closed\n", stderr: "" },
+        ],
+        changes: [],
+      };
+      const signature = outcomeSignature({
+        ...current,
+        invocations: current.invocations.map(({ command, args, status }) => ({ command, args, status })),
+      });
+      fs.writeFileSync(baselinePath, JSON.stringify({
+        scenarios: [{ id: current.id, signature }],
+      }));
+      const compared = applyComparison([current], { compare: baselinePath, expectedChanges: new Map() });
+      assert.equal(compared[0].status, "PASS");
+    } finally {
+      fs.rmSync(comparisonRoot, { recursive: true, force: true });
     }
   });
 });

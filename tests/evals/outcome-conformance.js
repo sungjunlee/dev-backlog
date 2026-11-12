@@ -47,15 +47,43 @@ function scriptCalls(context, basename) {
 
 const NON_GITHUB_REFUSAL_DIAGNOSTIC = "task authority is \"backlog\"; triage apply requires github.";
 
+function parseTriageApplyArgs(args) {
+  const options = { reportPath: undefined, apply: false, yes: false, json: false, error: null };
+  for (const arg of args.slice(1)) {
+    if (arg === "--apply") {
+      options.apply = true;
+      continue;
+    }
+    if (arg === "--yes") {
+      options.yes = true;
+      continue;
+    }
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
+    if (String(arg).startsWith("--")) {
+      options.error = `Unknown argument: ${arg}`;
+      return options;
+    }
+    if (options.reportPath) {
+      options.error = "Expected exactly one report path";
+      return options;
+    }
+    options.reportPath = arg;
+  }
+  if (!options.reportPath) options.error = "Missing required report.md path";
+  return options;
+}
+
 function isIntendedNonGithubApply(call) {
   const args = call.args || [];
-  if (args.length !== 4) return false;
+  if (!args.length) return false;
   const script = String(args[0]).replaceAll("\\", "/");
-  const report = String(args[1]).replaceAll("\\", "/");
-  return path.basename(script) === "triage-apply.js"
-    && path.basename(report) === "refused.md"
-    && args.includes("--apply")
-    && args.includes("--yes");
+  if (path.basename(script) !== "triage-apply.js") return false;
+  const parsed = parseTriageApplyArgs(args);
+  if (parsed.error || !parsed.apply || !parsed.yes) return false;
+  return path.basename(String(parsed.reportPath).replaceAll("\\", "/")) === "refused.md";
 }
 
 function recordedOutput(call, context) {
@@ -659,7 +687,11 @@ function relevantInvocations(invocations) {
 function outcomeSignature(outcome) {
   return {
     checks: outcome.checks.map(({ name, pass }) => ({ name, pass })),
-    invocations: outcome.invocations,
+    invocations: outcome.invocations.map((invocation) => ({
+      command: invocation.command,
+      args: invocation.args,
+      status: invocation.status,
+    })),
     changes: outcome.changes.map(({ path: file, kind, before, after }) => ({ path: file, kind, before, after })),
   };
 }

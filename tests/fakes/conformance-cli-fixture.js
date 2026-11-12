@@ -25,7 +25,7 @@ if (command === "node" || command === "bash") {
   const executable = command === "node"
     ? process.env.CONFORMANCE_REAL_NODE
     : process.env.CONFORMANCE_REAL_BASH;
-  const result = spawnSync(executable, args, { env: process.env, encoding: "utf8" });
+  const result = spawnSync(executable, args, { env: process.env, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"] });
   const status = Number.isInteger(result.status) ? result.status : 1;
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
