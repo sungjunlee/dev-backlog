@@ -9,7 +9,25 @@ const { ANCHOR_PATTERN, parseAnchor } = require("./anchor.js");
 const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scripts/execution-root.js");
 
 const DEFAULT_TRIAGE_DIR = defaultTriageDir();
-const CHECKBOX_PATTERN = /^\s*-\s+\[([ xX])\]\s+/;
+const APPLY_CHECKLIST_HEADING = "## Apply Checklist";
+const CHECKBOX_PATTERN = /^ {0,3}-[ \t]+\[([ xX])\][ \t]+/;
+const HTML_BLOCK_TAGS = [
+  "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col",
+  "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+  "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hr",
+  "html", "iframe", "legend", "li", "link", "main", "menu", "menuitem", "nav", "noframes", "ol",
+  "optgroup", "option", "p", "param", "search", "section", "summary", "table", "tbody", "td", "tfoot",
+  "th", "thead", "title", "tr", "track", "ul",
+].join("|");
+const TYPE_1_HTML_BLOCK_START = /^ {0,3}<(?<tag>pre|script|style|textarea)(?=[\t >]|$)/i;
+const TYPE_2_HTML_BLOCK_START = /^ {0,3}<!--/;
+const TYPE_3_HTML_BLOCK_START = /^ {0,3}<\?/;
+const TYPE_4_HTML_BLOCK_START = /^ {0,3}<![A-Z]/;
+const TYPE_5_HTML_BLOCK_START = /^ {0,3}<!\[CDATA\[/;
+const TYPE_6_HTML_BLOCK_START = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t ]|/?>|$)`, "i");
+const TYPE_7_HTML_BLOCK_OPENING_TAG = /^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \t\n]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n]*=[ \t\n]*(?:[^ \t\n"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t\n]*\/?>[ \t]*$/;
+const TYPE_7_HTML_BLOCK_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t\n]*>[ \t]*$/;
+const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)([\s\S]*))?$/;
 const SUPPORTED_VERBS = new Set([
   "close",
   "revisit",
@@ -142,8 +160,11 @@ function buildActionKey(action) {
   return `${action.verb}|${action.issueNumber}|${stableSerialize(canonicalKeyArgs(action.verb, normalizedArgs))}`;
 }
 
-function parseFrontmatter(text) {
-  const lines = String(text || "").split(/\r?\n/);
+function markdownSourceLines(text) {
+  return String(text || "").replace(/\r\n?/g, "\n").split("\n");
+}
+
+function parseFrontmatterLines(lines) {
   if (lines[0] !== "---") return {};
 
   const endIndex = lines.indexOf("---", 1);
@@ -167,14 +188,547 @@ function parseFrontmatter(text) {
   return frontmatter;
 }
 
-function parseReport(text) {
-  const source = String(text || "");
-  if (source.includes("<!-- AC:BEGIN -->")) {
-    throw new Error("Malformed report: triage reports must not contain dev-backlog AC markers.");
+function parseFrontmatter(text) {
+  return parseFrontmatterLines(markdownSourceLines(text));
+}
+
+function listContainerView(line, startColumn = 0) {
+  let content = String(line || "");
+  let continuationIndent = startColumn;
+  const listItems = [];
+  let match;
+  while ((match = content.match(LIST_ITEM_PATTERN))) {
+    const markerIndent = columnAfter(match[1], continuationIndent);
+    const markerEnd = columnAfter(match[2], markerIndent);
+    const listItem = { markerIndent };
+    listItems.push(listItem);
+    const padding = match[3] || "";
+    const child = match[4] || "";
+    // A marker-only or whitespace-only first line has the minimum one-column
+    // list padding, regardless of how much trailing whitespace it carries.
+    if (isMarkdownBlank(child)) {
+      continuationIndent = markerEnd + 1;
+      listItem.contentIndent = continuationIndent;
+      content = "";
+      break;
+    }
+    const paddingEnd = columnAfter(padding, markerEnd);
+    const paddingColumns = paddingEnd - markerEnd;
+    // More than four columns after a marker means one column of list padding;
+    // the rest belongs to the child block and may make it indented code.
+    if (paddingColumns > 4) {
+      continuationIndent = markerEnd + 1;
+      listItem.contentIndent = continuationIndent;
+      content = `${" ".repeat(paddingColumns - 1)}${child}`;
+      break;
+    }
+    continuationIndent = paddingEnd;
+    listItem.contentIndent = continuationIndent;
+    content = child;
+  }
+  return {
+    content,
+    continuationIndent: listItems.length > 0 ? continuationIndent : 0,
+    listItems,
+  };
+}
+
+function parseApprovalCheckbox(line) {
+  const source = String(line || "");
+  const checkbox = source.match(CHECKBOX_PATTERN);
+  const listItem = source.match(LIST_ITEM_PATTERN);
+  if (!checkbox || !listItem || listItem[2] !== "-" || !listItem[3]) return undefined;
+
+  const markerIndent = columnAfter(listItem[1]);
+  const markerEnd = columnAfter(listItem[2], markerIndent);
+  const paddingEnd = columnAfter(listItem[3], markerEnd);
+  // One to four columns are list padding. With more, one column is padding
+  // and the remainder makes the apparent checkbox an indented code block.
+  if (paddingEnd - markerEnd > 4) return undefined;
+  return { checked: checkbox[1] };
+}
+
+function columnAfter(source, startColumn = 0) {
+  let column = startColumn;
+  for (const character of String(source || "")) {
+    column = character === "\t"
+      ? column + (4 - (column % 4))
+      : column + 1;
+  }
+  return column;
+}
+
+function isMarkdownBlank(line) {
+  // CommonMark blank lines contain only ASCII spaces/tabs (or no characters).
+  return /^[ \t]*$/.test(String(line || ""));
+}
+
+function leadingIndentColumns(line) {
+  const indentation = String(line || "").match(/^[ \t]*/)[0];
+  return columnAfter(indentation);
+}
+
+function stripContainerContinuation(line, continuationIndent) {
+  const source = String(line || "");
+  const indentation = source.match(/^[ \t]*/)[0];
+  // Expand every tab at its original column before removing the container so
+  // a tab that begins exactly at the boundary keeps its residual columns.
+  const indentationColumns = columnAfter(indentation);
+  if (indentationColumns < continuationIndent) return source;
+  return `${" ".repeat(indentationColumns - continuationIndent)}${source.slice(indentation.length)}`;
+}
+
+function continuedListContainerView(line, activeContinuationIndent, activeListItems) {
+  const source = String(line || "");
+  const direct = listContainerView(source);
+  if (direct.continuationIndent > 0) {
+    const firstMarkerIndent = direct.listItems[0].markerIndent;
+    const parentListItems = activeListItems.filter((item) => item.contentIndent <= firstMarkerIndent);
+    return {
+      ...direct,
+      activeContinuationIndent: direct.continuationIndent,
+      activeListItems: [
+        ...parentListItems,
+        ...direct.listItems,
+      ],
+      startsListItem: true,
+      closesActiveItem: parentListItems.length < activeListItems.length,
+      listMarkerLine: source,
+    };
+  }
+  if (isMarkdownBlank(source)) {
+    return {
+      content: source,
+      continuationIndent: 0,
+      listItems: [],
+      activeContinuationIndent,
+      activeListItems,
+      startsListItem: false,
+    };
+  }
+  const indentation = leadingIndentColumns(source);
+  let survivingItemCount = 0;
+  for (const item of activeListItems) {
+    if (indentation < item.contentIndent) break;
+    survivingItemCount += 1;
+  }
+  if (survivingItemCount > 0) {
+    const survivingListItems = activeListItems.slice(0, survivingItemCount);
+    const continuationIndent = survivingListItems[survivingListItems.length - 1].contentIndent;
+    const relativeSource = stripContainerContinuation(source, continuationIndent);
+    const child = listContainerView(relativeSource, continuationIndent);
+    if (child.listItems.length > 0) {
+      const firstMarkerIndent = child.listItems[0].markerIndent;
+      const parentListItems = survivingListItems.filter(
+        (item) => item.contentIndent <= firstMarkerIndent
+      );
+      return {
+        ...child,
+        activeContinuationIndent: child.continuationIndent,
+        activeListItems: [
+          ...parentListItems,
+          ...child.listItems,
+        ],
+        startsListItem: true,
+        closesActiveItem: parentListItems.length < activeListItems.length,
+        listMarkerLine: relativeSource,
+      };
+    }
+    return {
+      content: relativeSource,
+      continuationIndent,
+      listItems: [],
+      activeContinuationIndent: continuationIndent,
+      activeListItems: survivingListItems,
+      startsListItem: false,
+    };
+  }
+  if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
+    return {
+      content: stripContainerContinuation(source, activeContinuationIndent),
+      continuationIndent: activeContinuationIndent,
+      listItems: [],
+      activeContinuationIndent,
+      activeListItems,
+      startsListItem: false,
+    };
+  }
+  return {
+    content: source,
+    continuationIndent: 0,
+    listItems: [],
+    activeContinuationIndent: 0,
+    activeListItems: [],
+    startsListItem: false,
+  };
+}
+
+function literalBlockOwner(container) {
+  return {
+    continuationIndent: container.continuationIndent,
+    listItems: [...container.activeListItems],
+  };
+}
+
+function continuesLiteralBlockContainer(line, block) {
+  return block.listItems.length === 0
+    || isMarkdownBlank(line)
+    || leadingIndentColumns(line) >= block.continuationIndent;
+}
+
+function literalBlockContainerView(line, block) {
+  return {
+    content: stripContainerContinuation(line, block.continuationIndent),
+    continuationIndent: block.continuationIndent,
+    listItems: [],
+    activeContinuationIndent: block.continuationIndent,
+    activeListItems: block.listItems,
+    startsListItem: false,
+  };
+}
+
+function parseFenceOpening(line) {
+  const opening = String(line || "").match(/^ {0,3}(`{3,}|~{3,})([\s\S]*)$/);
+  if (!opening || (opening[1][0] === "`" && opening[2].includes("`"))) return undefined;
+  return { character: opening[1][0], length: opening[1].length };
+}
+
+function markdownBlockState(lines) {
+  const literalLines = new Set();
+  const paragraphs = new Map();
+  const sectionHeadings = new Set();
+  const checklistHeadings = new Set();
+  let start = 0;
+  if (lines[0] === "---") {
+    const end = lines.indexOf("---", 1);
+    for (let index = 0; index <= end; index += 1) literalLines.add(index);
+    start = end + 1;
   }
 
-  const lines = source.split(/\r?\n/);
-  const frontmatter = parseFrontmatter(source);
+  let fence;
+  let htmlBlock;
+  let commentBlock;
+  let indentedCode;
+  let activeContinuationIndent = 0;
+  let activeListItems = [];
+  let paragraphOpen = false;
+  let paragraphContinuationIndent = 0;
+  let paragraphListItems = [];
+  let paragraphId;
+  let nextParagraphId = 1;
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    const literalBlock = commentBlock || htmlBlock || fence;
+    if (literalBlock && continuesLiteralBlockContainer(line, literalBlock)) {
+      const container = literalBlockContainerView(line, literalBlock);
+      activeContinuationIndent = container.activeContinuationIndent;
+      activeListItems = container.activeListItems;
+
+      if (commentBlock) {
+        literalLines.add(index);
+        if (container.content.includes("-->")) commentBlock = undefined;
+        continue;
+      }
+
+      if (htmlBlock) {
+        if (htmlBlock.end === "blank") {
+          if (isMarkdownBlank(container.content)) htmlBlock = undefined;
+          else literalLines.add(index);
+        } else {
+          literalLines.add(index);
+          if (htmlBlock.end.test(container.content)) htmlBlock = undefined;
+        }
+        continue;
+      }
+
+      literalLines.add(index);
+      const closing = container.content.match(/^ {0,3}(`+|~+)[ \t]*$/);
+      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
+        fence = undefined;
+      }
+      continue;
+    }
+
+    // A literal leaf ends with its owning list item. Reprocess the current
+    // line so an outdented heading or fence belongs to the surviving container.
+    commentBlock = undefined;
+    htmlBlock = undefined;
+    fence = undefined;
+    let container = continuedListContainerView(line, activeContinuationIndent, activeListItems);
+    // Resolve surviving parent items by their content indentation before
+    // applying paragraph-interruption rules. A marker outdented from the
+    // current item's content starts a sibling or adjacent list even when its
+    // column or marker type changes. A genuinely nested noninterrupting marker
+    // remains paragraph text.
+    if (
+      container.startsListItem
+      && paragraphOpen
+      && !interruptsParagraph(container.listMarkerLine || line)
+      && !container.closesActiveItem
+    ) {
+      container = {
+        content: line,
+        continuationIndent: 0,
+        listItems: [],
+        activeContinuationIndent: paragraphContinuationIndent,
+        activeListItems: paragraphListItems,
+        startsListItem: false,
+      };
+    }
+    if (container.startsListItem) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+    }
+    const lazyParagraphIndent = (
+      !container.startsListItem
+      && container.continuationIndent < paragraphContinuationIndent
+      && paragraphOpen
+      && paragraphContinuationIndent > 0
+      && !isMarkdownBlank(line)
+      && !interruptsParagraph(line)
+    ) ? paragraphContinuationIndent : 0;
+    if (lazyParagraphIndent > 0) {
+      container.activeContinuationIndent = lazyParagraphIndent;
+      container.activeListItems = paragraphListItems;
+    }
+    activeContinuationIndent = container.activeContinuationIndent;
+    activeListItems = container.activeListItems;
+
+    if (indentedCode) {
+      const continuesOwner = continuesLiteralBlockContainer(line, indentedCode);
+      const contextLine = continuesOwner
+        ? stripContainerContinuation(line, indentedCode.continuationIndent)
+        : undefined;
+      if (
+        continuesOwner
+        && (isMarkdownBlank(contextLine) || /^(?: {4}| {0,3}\t)/.test(contextLine))
+      ) {
+        literalLines.add(index);
+        paragraphOpen = false;
+        paragraphContinuationIndent = 0;
+        paragraphListItems = [];
+        paragraphId = undefined;
+        continue;
+      }
+      indentedCode = undefined;
+    }
+
+    if (paragraphOpen && isSetextHeading(lines, index - 1, literalLines, paragraphs)) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    // A triage anchor is intentionally an HTML comment. It is executable only
+    // as a complete standalone line outside every other literal context.
+    if (parseAnchor(line)) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    const contextLine = container.content;
+    if (isMarkdownBlank(contextLine)) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+    const opening = parseFenceOpening(contextLine);
+    if (opening) {
+      literalLines.add(index);
+      fence = {
+        ...opening,
+        ...literalBlockOwner(container),
+      };
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    if (TYPE_2_HTML_BLOCK_START.test(contextLine)) {
+      literalLines.add(index);
+      if (!contextLine.includes("-->")) {
+        commentBlock = literalBlockOwner(container);
+      }
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    const rawHtmlStarts = [
+      { start: TYPE_1_HTML_BLOCK_START, end: undefined },
+      { start: TYPE_3_HTML_BLOCK_START, end: /\?>/ },
+      { start: TYPE_4_HTML_BLOCK_START, end: />/ },
+      { start: TYPE_5_HTML_BLOCK_START, end: /\]\]>/ },
+    ];
+    let rawHtml;
+    for (const candidate of rawHtmlStarts) {
+      const match = contextLine.match(candidate.start);
+      if (!match) continue;
+      const end = match.groups?.tag
+        ? /<\/(?:pre|script|style|textarea)>/i
+        : candidate.end;
+      rawHtml = { end };
+      break;
+    }
+    if (rawHtml) {
+      literalLines.add(index);
+      if (!rawHtml.end.test(contextLine)) {
+        htmlBlock = {
+          ...rawHtml,
+          ...literalBlockOwner(container),
+        };
+      }
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    if (
+      TYPE_6_HTML_BLOCK_START.test(contextLine)
+      || (
+        !paragraphOpen
+        && (
+          TYPE_7_HTML_BLOCK_OPENING_TAG.test(contextLine)
+          || TYPE_7_HTML_BLOCK_CLOSING_TAG.test(contextLine)
+        )
+      )
+    ) {
+      literalLines.add(index);
+      htmlBlock = {
+        end: "blank",
+        ...literalBlockOwner(container),
+      };
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    if (/^(?: {4}| {0,3}\t)/.test(contextLine) && !paragraphOpen) {
+      literalLines.add(index);
+      indentedCode = literalBlockOwner(container);
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
+    }
+
+    const headingLevel = atxHeadingLevel(contextLine);
+    if (headingLevel === 1 || headingLevel === 2) {
+      sectionHeadings.add(index);
+      if (isApplyChecklistHeading(contextLine)) checklistHeadings.add(index);
+    }
+
+    paragraphOpen = !interruptsParagraph(contextLine);
+    if (paragraphOpen && paragraphId === undefined) {
+      paragraphId = nextParagraphId;
+      nextParagraphId += 1;
+    } else if (!paragraphOpen) {
+      paragraphId = undefined;
+    }
+    paragraphContinuationIndent = paragraphOpen
+      ? lazyParagraphIndent || container.continuationIndent
+      : 0;
+    paragraphListItems = paragraphContinuationIndent > 0
+      ? container.activeListItems
+      : [];
+    if (paragraphOpen) {
+      paragraphs.set(index, {
+        id: paragraphId,
+        continuationIndent: paragraphContinuationIndent,
+        listItems: paragraphListItems,
+        content: contextLine,
+      });
+    }
+  }
+  return { literalLines, paragraphs, sectionHeadings, checklistHeadings };
+}
+
+function markdownLiteralLines(lines) {
+  return markdownBlockState(lines).literalLines;
+}
+
+function isApplyChecklistHeading(line) {
+  return /^ {0,3}## Apply Checklist[ \t]*$/.test(String(line || ""));
+}
+
+function atxHeadingLevel(line) {
+  const match = String(line || "").match(/^ {0,3}(#{1,6})(?:[ \t]+|$)/);
+  return match ? match[1].length : undefined;
+}
+
+function isThematicBreak(line) {
+  return /^ {0,3}(?:([-*_])[ \t]*)\1(?:[ \t]*\1)+[ \t]*$/.test(String(line || ""));
+}
+
+function interruptsParagraph(line) {
+  const source = String(line || "");
+  if (parseAnchor(source)) return true;
+  if (atxHeadingLevel(source) || /^ {0,3}>/.test(source) || parseFenceOpening(source)) return true;
+  if (/^ {0,3}[-+*][ \t]+/.test(source)) return true;
+  const ordered = source.match(/^ {0,3}(\d{1,9})[.)][ \t]+/);
+  if (ordered && Number(ordered[1]) === 1) return true;
+  return isThematicBreak(source);
+}
+
+function isSetextHeading(lines, index, literalLines, paragraphs = new Map()) {
+  if (index < 0 || index + 1 >= lines.length) return false;
+  if (literalLines.has(index) || literalLines.has(index + 1)) return false;
+  const paragraphContainer = paragraphs.get(index);
+  if (
+    paragraphContainer
+    && leadingIndentColumns(lines[index + 1]) < paragraphContainer.continuationIndent
+  ) return false;
+  const underline = paragraphContainer
+    ? stripContainerContinuation(lines[index + 1], paragraphContainer.continuationIndent)
+    : lines[index + 1];
+  if (!/^ {0,3}(?:=+|-+)[ \t]*$/.test(underline)) return false;
+
+  let paragraphStart = index;
+  if (paragraphContainer) {
+    while (paragraphs.get(paragraphStart - 1)?.id === paragraphContainer.id) {
+      paragraphStart -= 1;
+    }
+  } else {
+    while (paragraphStart > 0) {
+      const previous = paragraphStart - 1;
+      if (literalLines.has(previous) || isMarkdownBlank(lines[previous]) || interruptsParagraph(lines[previous])) break;
+      paragraphStart = previous;
+    }
+  }
+
+  const firstLine = paragraphs.get(paragraphStart)?.content ?? lines[paragraphStart];
+  if (isMarkdownBlank(firstLine) || /^ {4}/.test(firstLine)) return false;
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d{1,9}[.)])[ \t]+)/.test(firstLine)) return false;
+  if (isThematicBreak(firstLine)) return false;
+  for (let lineIndex = paragraphStart + 1; lineIndex <= index; lineIndex += 1) {
+    const paragraphLine = paragraphs.get(lineIndex)?.content ?? lines[lineIndex];
+    if (interruptsParagraph(paragraphLine)) return false;
+  }
+
+  return true;
+}
+
+function parseReport(text) {
+  const lines = markdownSourceLines(text);
+  const frontmatter = parseFrontmatterLines(lines);
+  const { literalLines, paragraphs, sectionHeadings, checklistHeadings } = markdownBlockState(lines);
   const anchors = [];
   const parsed = {
     anchors: 0,
@@ -183,24 +737,64 @@ function parseReport(text) {
     unknown_verb: 0,
   };
 
+  const anchorLines = [];
   for (let index = 0; index < lines.length; index += 1) {
+    if (parseAnchor(lines[index])) anchorLines.push(index);
+  }
+
+  const checklistHeadingLines = [...checklistHeadings];
+  if (checklistHeadingLines.length !== 1) {
+    if (checklistHeadingLines.length === 0 && anchorLines.length > 0) {
+      throw new Error(outsideChecklistMessage(anchorLines.map((index) => index + 1)));
+    }
+    const locations = checklistHeadingLines.length > 0
+      ? ` on lines ${checklistHeadingLines.map((index) => index + 1).join(", ")}`
+      : "";
+    throw new Error(
+      `Malformed report: expected exactly one ${APPLY_CHECKLIST_HEADING} heading; found ${checklistHeadingLines.length}${locations}.`
+    );
+  }
+
+  const checklistStart = checklistHeadingLines[0] + 1;
+  let checklistEnd = lines.length;
+  for (let index = checklistStart; index < lines.length; index += 1) {
+    if (sectionHeadings.has(index)) {
+      checklistEnd = index;
+      break;
+    }
+    if (isSetextHeading(lines, index, literalLines, paragraphs)) {
+      checklistEnd = index;
+      break;
+    }
+  }
+  const outsideLines = anchorLines
+    .filter((index) => literalLines.has(index) || index < checklistStart || index >= checklistEnd)
+    .map((index) => index + 1);
+  if (outsideLines.length > 0) {
+    throw new Error(outsideChecklistMessage(outsideLines));
+  }
+
+  for (let index = checklistStart; index < checklistEnd; index += 1) {
+    if (literalLines.has(index)) continue;
     const anchor = parseAnchor(lines[index]);
     if (!anchor) continue;
 
     let checkboxIndex = index + 1;
-    while (checkboxIndex < lines.length && lines[checkboxIndex].trim() === "") {
+    while (checkboxIndex < checklistEnd && isMarkdownBlank(lines[checkboxIndex])) {
       checkboxIndex += 1;
     }
 
     const checkboxLine = lines[checkboxIndex];
-    const checkboxMatch = checkboxLine ? checkboxLine.match(CHECKBOX_PATTERN) : null;
+    const checkboxMatch = checkboxIndex < checklistEnd && !literalLines.has(checkboxIndex)
+      ? parseApprovalCheckbox(checkboxLine)
+      : undefined;
     if (!checkboxMatch) {
       throw new Error(
         `Malformed report: triage anchor on line ${index + 1} must be followed by a checkbox line.`
       );
     }
 
-    const checked = checkboxMatch[1].toLowerCase() === "x";
+    const checked = checkboxMatch.checked.toLowerCase() === "x";
     const knownVerb = SUPPORTED_VERBS.has(anchor.verb);
     const normalizedArgs = normalizeArgs(anchor.args);
     const entry = {
@@ -228,7 +822,28 @@ function parseReport(text) {
     }
   }
 
+  const occurrencesByKey = new Map();
+  for (const anchor of anchors) {
+    if (!occurrencesByKey.has(anchor.key)) occurrencesByKey.set(anchor.key, []);
+    occurrencesByKey.get(anchor.key).push(anchor.anchorLine);
+  }
+  const duplicates = [...occurrencesByKey.values()].filter((lineNumbers) => lineNumbers.length > 1);
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Ambiguous report: each proposal must appear once in ${APPLY_CHECKLIST_HEADING}; `
+      + duplicates.map((lineNumbers) => `duplicate action on lines ${lineNumbers.join(", ")}`).join("; ")
+      + ". Keep one anchor for each action and explicitly recheck its approval."
+    );
+  }
+
   return { frontmatter, anchors, parsed };
+}
+
+function outsideChecklistMessage(lineNumbers) {
+  const noun = lineNumbers.length === 1 ? "anchor" : "anchors";
+  const verb = lineNumbers.length === 1 ? "is" : "are";
+  return `Malformed report: triage ${noun} on line${lineNumbers.length === 1 ? "" : "s"} ${lineNumbers.join(", ")} ${verb} outside ${APPLY_CHECKLIST_HEADING}. `
+    + `Consolidate actions in ${APPLY_CHECKLIST_HEADING}, remove every outside anchor, and explicitly recheck approvals; unchecking an outside anchor is not sufficient.`;
 }
 
 function dedupActions(anchors) {
@@ -564,6 +1179,15 @@ function appendLogLine(logPath, entry, appendFile = fs.appendFileSync, mkdir = f
   appendFile(logPath, `${JSON.stringify(entry)}\n`);
 }
 
+function preflightApplyLog(logPath, appendFile = fs.appendFileSync, mkdir = fs.mkdirSync) {
+  try {
+    mkdir(path.dirname(logPath), { recursive: true });
+    appendFile(logPath, "");
+  } catch (error) {
+    throw new Error(`Apply log is not appendable at ${logPath}: ${error.message}`);
+  }
+}
+
 function buildLogEntry(action, result, ghArgv, timestamp, extra = {}) {
   const entry = {
     timestamp,
@@ -644,6 +1268,23 @@ function recordLog(logPath, action, result, ghArgv, deps, extra = {}) {
   return entry;
 }
 
+function tryRecordLog(logPath, action, result, ghArgv, deps, extra = {}) {
+  try {
+    return { ok: true, entry: recordLog(logPath, action, result, ghArgv, deps, extra) };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function logAppendFailure(logPath, error) {
+  return `Failed to append apply log at ${logPath}: ${error.message}. No further commands were attempted.`;
+}
+
+function uncertainEffectFailure(logPath, argv, error) {
+  return `Apply log append failed after GitHub reported success for ${formatGhCommand(argv)}: ${error.message}. `
+    + `The effect may have completed but was not durably logged at ${logPath}. Verify remote state before manual recovery; do not blindly rerun this report.`;
+}
+
 function applyAcceptedAction(action, context) {
   const actionKey = action.key || buildActionKey(action);
   const appliedCommands = context.appliedCommandsByAction.get(actionKey) || new Set();
@@ -651,7 +1292,10 @@ function applyAcceptedAction(action, context) {
 
   if (action.verb === "set-priority") {
     if (appliedCommands.size > 0) {
-      const alreadyEntry = recordLog(context.logPath, action, "already-applied", [], context.deps);
+      const recorded = tryRecordLog(context.logPath, action, "already-applied", [], context.deps);
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: true,
         action: {
@@ -660,7 +1304,7 @@ function applyAcceptedAction(action, context) {
           args: action.args,
           gh_argv: [],
           result: "already-applied",
-          log: alreadyEntry,
+          log: recorded.entry,
         },
       };
     }
@@ -668,12 +1312,18 @@ function applyAcceptedAction(action, context) {
     const viewArgv = ["issue", "view", String(action.issueNumber), "--json", "labels"];
     const viewResult = context.deps.runGh(viewArgv);
     if (viewResult.status !== 0) {
-      const errorEntry = recordLog(context.logPath, action, "error", [viewArgv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [viewArgv], context.deps, {
         stderr_tail: viewResult.stderr,
       });
+      if (!recorded.ok) {
+        return {
+          ok: false,
+          message: `${logAppendFailure(context.logPath, recorded.error)} GitHub also failed: ${trimStderr(viewResult.stderr)}`,
+        };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
       };
     }
 
@@ -681,18 +1331,24 @@ function applyAcceptedAction(action, context) {
     try {
       labels = parseGhLabels(viewResult.stdout);
     } catch (error) {
-      const errorEntry = recordLog(context.logPath, action, "error", [viewArgv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [viewArgv], context.deps, {
         stderr_tail: error.message,
       });
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
       };
     }
 
     plannedCommands = toGhCommands(action, { currentPriorityLabels: labels });
     if (plannedCommands.length === 0) {
-      const alreadyEntry = recordLog(context.logPath, action, "already-applied", [], context.deps);
+      const recorded = tryRecordLog(context.logPath, action, "already-applied", [], context.deps);
+      if (!recorded.ok) {
+        return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+      }
       return {
         ok: true,
         action: {
@@ -701,7 +1357,7 @@ function applyAcceptedAction(action, context) {
           args: action.args,
           gh_argv: [],
           result: "already-applied",
-          log: alreadyEntry,
+          log: recorded.entry,
         },
       };
     }
@@ -714,7 +1370,10 @@ function applyAcceptedAction(action, context) {
   );
 
   if (missingCommands.length === 0) {
-    const alreadyEntry = recordLog(context.logPath, action, "already-applied", plannedCommands, context.deps);
+    const recorded = tryRecordLog(context.logPath, action, "already-applied", plannedCommands, context.deps);
+    if (!recorded.ok) {
+      return { ok: false, message: logAppendFailure(context.logPath, recorded.error) };
+    }
     return {
       ok: true,
       action: {
@@ -723,7 +1382,7 @@ function applyAcceptedAction(action, context) {
         args: action.args,
         gh_argv: plannedCommands,
         result: "already-applied",
-        log: alreadyEntry,
+        log: recorded.entry,
       },
     };
   }
@@ -732,12 +1391,26 @@ function applyAcceptedAction(action, context) {
   for (const argv of missingCommands) {
     const result = context.deps.runGh(argv);
     if (result.status !== 0) {
-      const errorEntry = recordLog(context.logPath, action, "error", [argv], context.deps, {
+      const recorded = tryRecordLog(context.logPath, action, "error", [argv], context.deps, {
         stderr_tail: result.stderr,
       });
+      if (!recorded.ok) {
+        return {
+          ok: false,
+          message: `${logAppendFailure(context.logPath, recorded.error)} GitHub also failed: ${trimStderr(result.stderr)}`,
+          action: {
+            verb: action.verb,
+            issueNumber: action.issueNumber,
+            args: action.args,
+            gh_argv: plannedCommands,
+            executed_gh_argv: executedCommands,
+            result: "error",
+          },
+        };
+      }
       return {
         ok: false,
-        error: errorEntry,
+        error: recorded.entry,
         action: {
           verb: action.verb,
           issueNumber: action.issueNumber,
@@ -749,7 +1422,22 @@ function applyAcceptedAction(action, context) {
       };
     }
 
-    recordLog(context.logPath, action, "applied", [argv], context.deps);
+    const recorded = tryRecordLog(context.logPath, action, "applied", [argv], context.deps);
+    if (!recorded.ok) {
+      return {
+        ok: false,
+        message: uncertainEffectFailure(context.logPath, argv, recorded.error),
+        action: {
+          verb: action.verb,
+          issueNumber: action.issueNumber,
+          args: action.args,
+          gh_argv: plannedCommands,
+          executed_gh_argv: executedCommands,
+          attempted_gh_argv: argv,
+          result: "error",
+        },
+      };
+    }
     executedCommands.push(argv);
     if (!context.appliedCommandsByAction.has(actionKey)) {
       context.appliedCommandsByAction.set(actionKey, new Set());
@@ -916,10 +1604,15 @@ function execute(argv = process.argv.slice(2), deps = {}) {
     try {
       const logState = readApplyLog(logPath, deps.readFile || fs.readFileSync);
       appliedCommandsByAction = logState.appliedCommandsByAction;
+      preflightApplyLog(
+        logPath,
+        deps.appendFile || fs.appendFileSync,
+        deps.mkdir || fs.mkdirSync
+      );
     } catch (error) {
       return {
         exitCode: 1,
-        error: error.message,
+        error: `Cannot apply triage actions: ${error.message}`,
       };
     }
   }
@@ -942,7 +1635,10 @@ function execute(argv = process.argv.slice(2), deps = {}) {
         result: "skipped-pending",
       });
       if (options.apply) {
-        recordLog(logPath, action, "skipped-pending", toGhCommands(action), effectDeps);
+        const recorded = tryRecordLog(logPath, action, "skipped-pending", toGhCommands(action), effectDeps);
+        if (!recorded.ok) {
+          return { ...result, exitCode: 1, error: logAppendFailure(logPath, recorded.error) };
+        }
       }
       continue;
     }
@@ -955,7 +1651,10 @@ function execute(argv = process.argv.slice(2), deps = {}) {
         result: "skipped-unknown-verb",
       });
       if (options.apply) {
-        recordLog(logPath, action, "skipped-unknown-verb", [], effectDeps);
+        const recorded = tryRecordLog(logPath, action, "skipped-unknown-verb", [], effectDeps);
+        if (!recorded.ok) {
+          return { ...result, exitCode: 1, error: logAppendFailure(logPath, recorded.error) };
+        }
       }
       continue;
     }
@@ -983,6 +1682,7 @@ function execute(argv = process.argv.slice(2), deps = {}) {
       }
       result.error = [
         `Failed to apply triage:${action.verb} #${action.issueNumber}.`,
+        applied.message || null,
         applied.error?.stderr_tail || null,
       ].filter(Boolean).join(" ");
       return {
@@ -1036,6 +1736,7 @@ module.exports = {
   CHECKBOX_PATTERN,
   SUPPORTED_VERBS,
   UNKNOWN_PRIORITY_PLACEHOLDER,
+  APPLY_CHECKLIST_HEADING,
   assertGitHubAuthority,
   usage,
   parseArgs,
@@ -1043,7 +1744,11 @@ module.exports = {
   stableSerialize,
   buildActionKey,
   parseFrontmatter,
+  markdownLiteralLines,
+  isApplyChecklistHeading,
+  isSetextHeading,
   parseReport,
+  outsideChecklistMessage,
   dedupActions,
   validateAcceptedActions,
   formatRevisitComment,
@@ -1057,12 +1762,16 @@ module.exports = {
   extractCommandArrays,
   readApplyLog,
   appendLogLine,
+  preflightApplyLog,
   buildLogEntry,
   resolveReportDate,
   resolveLogPath,
   readLineSync,
   confirmApply,
   ensureApplyAllowed,
+  tryRecordLog,
+  logAppendFailure,
+  uncertainEffectFailure,
   applyAcceptedAction,
   summarizeResults,
   renderText,

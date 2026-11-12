@@ -294,33 +294,65 @@ const SCENARIOS = [
     title: "Apply accepted triage only and reject invalid input before effects",
     skill: "backlog-triage",
     guarantees: ["G2"],
-    prompt: "Use backlog-triage to process these reports in order with the real apply mode and non-interactive confirmation: `accepted.md`, `unchecked.md`, then `invalid.md`. Record the observed stop on invalid input.",
+    prompt: "Use backlog-triage to process these reports in order with the real apply mode and non-interactive confirmation: `accepted.md`, `unchecked.md`, `outside.md`, then `invalid.md`. Record both fail-closed stops.",
     fixture(root) {
       write(root, "accepted.md", [
         "---", "generated: 2026-11-10", "---", "",
+        "## Apply Checklist",
         "<!-- triage:revisit #21 reason=\"needs owner\" -->", "- [x] Accept", "",
       ].join("\n"));
       write(root, "unchecked.md", [
         "---", "generated: 2026-11-11", "---", "",
+        "## Apply Checklist",
         "<!-- triage:close #22 reason=\"stale\" -->", "- [ ] Leave pending", "",
       ].join("\n"));
-      write(root, "invalid.md", [
+      write(root, "outside.md", [
         "---", "generated: 2026-11-12", "---", "",
+        "## Evidence",
+        "<!-- triage:revisit #23 reason=\"old copy\" -->", "- [ ] Old unchecked copy", "",
+        "## Apply Checklist",
+        "<!-- triage:revisit #23 reason=\"old copy\" -->", "- [x] Accept", "",
+      ].join("\n"));
+      write(root, "invalid.md", [
+        "---", "generated: 2026-11-13", "---", "",
+        "## Apply Checklist",
         "<!-- triage:close #0 reason=\"invalid\" -->", "- [x] Accept", "",
       ].join("\n"));
     },
     grade(context) {
       const applies = scriptCalls(context, "triage-apply.js").filter((call) => call.args.includes("--apply"));
+      const expectedReports = new Map([
+        ["accepted.md", "success"],
+        ["unchecked.md", "success"],
+        ["outside.md", "failure"],
+        ["invalid.md", "failure"],
+      ]);
+      const observedReports = applies.map((call) => {
+        const reportArg = call.args.find((arg) => String(arg).endsWith(".md"));
+        return { report: reportArg ? path.basename(reportArg) : null, status: call.status };
+      });
+      const runsByReport = new Map([...expectedReports.keys()].map((report) => [
+        report,
+        observedReports.filter((observed) => observed.report === report),
+      ]));
       const writes = mutationCalls(context);
       const paths = changedPaths(context);
       return [
-        check("all three reports exercised", applies.length === 3, applies),
-        check("valid and unchecked reports succeed before invalid stop",
-          applies.filter((call) => call.status === 0).length === 2 && applies.filter((call) => call.status !== 0).length === 1,
-          applies.map(({ args, status }) => ({ report: args.find((arg) => arg.endsWith(".md")), status }))),
+        check("each named report exercised exactly once",
+          applies.length === expectedReports.size && [...runsByReport.values()].every((runs) => runs.length === 1),
+          observedReports),
+        check("each named report has its expected status",
+          [...expectedReports].every(([report, expected]) => {
+            const runs = runsByReport.get(report);
+            if (runs.length !== 1) return false;
+            return expected === "success" ? runs[0].status === 0 : runs[0].status !== 0;
+          }),
+          observedReports),
         check("only the checked valid action mutates GitHub",
           writes.length === 1 && writes[0].args[1] === "comment" && writes[0].args[2] === "21", writes),
-        check("invalid report creates no apply log", !paths.includes(".dev-backlog/triage/2026-11-12-apply.log"), paths),
+        check("outside and invalid reports create no apply logs",
+          !paths.includes(".dev-backlog/triage/2026-11-12-apply.log") &&
+          !paths.includes(".dev-backlog/triage/2026-11-13-apply.log"), paths),
       ];
     },
   },
@@ -644,6 +676,7 @@ module.exports = {
   parseArgs,
   gradeScenario,
   outcomeSignature,
+  applyComparison,
   mutationCalls,
   unexpectedAuthorityCalls,
   replaceMarkdownSection,

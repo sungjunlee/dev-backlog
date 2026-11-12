@@ -31,33 +31,26 @@ function makeReport() {
     "# Backlog Triage - 2026-04-18",
     "",
     "## Obsolete Candidates",
+    "Issue #104 is stale, and #103 duplicates #101.",
+    "",
+    "## Priority Proposals",
+    "Issue #101 is part of the active auth cluster; #102 fits Sprint W17.",
+    "",
+    "## Apply Checklist",
     "<!-- triage:close #104 reason=\"stale cleanup\" -->",
     "- [x] Close #104 - stale cleanup",
     "",
     "<!-- triage:future-action #999 reason=\"wait for roadmap\" -->",
     "- [x] Future action #999 - wait for roadmap",
     "",
-    "## Priority Proposals",
-    "<!-- triage:set-priority #101 reason=\" theme auth hot \" value=high -->",
-    "- [ ] Set priority:high on #101 - theme auth hot",
-    "",
-    "## Milestone Suggestions",
-    "<!-- triage:assign-milestone #102 name=\"Sprint W17\" cluster=auth -->",
-    "",
-    "- [x] Assign Sprint W17 to #102",
-    "",
-    "## Apply Checklist",
-    "<!-- triage:close #104 reason=\"stale cleanup\" -->",
-    "- [ ] Close #104 - stale cleanup _(from Obsolete Candidates)_",
-    "",
     "<!-- triage:set-priority #101 value=high reason=\"theme auth hot\" -->",
-    "- [x] Set priority:high on #101 - theme auth hot _(from Priority Proposals)_",
+    "- [x] Set priority:high on #101 - theme auth hot",
     "",
     "<!-- triage:assign-milestone #102 cluster=auth name=\"Sprint W17\" -->",
-    "- [ ] Assign Sprint W17 to #102 _(from Milestone Suggestions)_",
+    "- [x] Assign Sprint W17 to #102",
     "",
     "<!-- triage:close-duplicate #103 target=#101 reason=\"duplicate candidate converged\" -->",
-    "- [x] Close duplicate #103 into #101 _(from Obsolete Candidates)_",
+    "- [x] Close duplicate #103 into #101",
     "",
   ].join("\n");
 }
@@ -67,6 +60,7 @@ function acceptedReport(...anchors) {
     "---",
     "generated: 2026-04-18",
     "---",
+    "## Apply Checklist",
     ...anchors.flatMap((anchor) => [anchor, "- [x] Accept", ""]),
   ].join("\n");
 }
@@ -90,9 +84,9 @@ describe("parseReport", () => {
   it("parses anchors, enforces paired checkboxes, and counts unknown verbs", () => {
     const parsed = parseReport(makeReport());
 
-    assert.equal(parsed.parsed.anchors, 8);
+    assert.equal(parsed.parsed.anchors, 5);
     assert.equal(parsed.parsed.checked, 5);
-    assert.equal(parsed.parsed.unchecked, 3);
+    assert.equal(parsed.parsed.unchecked, 0);
     assert.equal(parsed.parsed.unknown_verb, 1);
     assert.equal(parsed.frontmatter.generated, "2026-04-18");
 
@@ -107,16 +101,181 @@ describe("parseReport", () => {
           "---",
           "generated: 2026-04-18",
           "---",
+          "## Apply Checklist",
           "<!-- triage:close #42 reason=\"broken\" -->",
           "not a checkbox",
         ].join("\n")),
       /must be followed by a checkbox/i
     );
   });
+
+  it("rejects checked or unchecked anchors outside the sole checklist with migration guidance", () => {
+    for (const checkbox of ["x", " "]) {
+      assert.throws(
+        () => parseReport([
+          "## Evidence",
+          '<!-- triage:close #42 reason="old copy" -->',
+          `- [${checkbox}] Old copy`,
+          "## Apply Checklist",
+          '<!-- triage:close #42 reason="old copy" -->',
+          "- [x] Accept",
+        ].join("\n")),
+        (error) => {
+          assert.match(error.message, /line 2.*outside ## Apply Checklist/);
+          assert.match(error.message, /consolidate actions/i);
+          assert.match(error.message, /explicitly recheck approvals/i);
+          assert.match(error.message, /unchecking.*not sufficient/i);
+          return true;
+        }
+      );
+    }
+  });
+
+  it("requires exactly one checklist heading and rejects duplicate proposals within it", () => {
+    assert.throws(() => parseReport("# Evidence only\n"), /exactly one ## Apply Checklist.*found 0/i);
+    assert.throws(
+      () => parseReport("## Apply Checklist\n## Apply Checklist\n"),
+      /exactly one ## Apply Checklist.*lines 1, 2/i
+    );
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "- [x] Accept",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "- [ ] Leave pending",
+      ].join("\n")),
+      /each proposal must appear once.*lines 2, 4.*explicitly recheck/i
+    );
+  });
+
+  it("does not enforce the retired dev-backlog AC-marker protocol", () => {
+    const report = parseReport([
+      "<!-- AC:BEGIN -->",
+      "evidence text",
+      "<!-- AC:END -->",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="owner needed" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    assert.equal(report.parsed.anchors, 1);
+  });
+
+  it("never treats frontmatter, code examples, or indented lookalikes as approvals", () => {
+    const fakeHeadings = [
+      [
+        "---", "generated: 2026-04-18", "## Apply Checklist", "---",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+      [
+        "```markdown", "## Apply Checklist", "```",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+      [
+        "    ## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->', "- [x] Accept",
+      ],
+    ];
+    for (const lines of fakeHeadings) {
+      assert.throws(() => parseReport(lines.join("\n")), /anchor on line .*outside ## Apply Checklist/i);
+    }
+
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        "```markdown",
+        '<!-- triage:revisit #42 reason="example only" -->',
+        "- [x] Example",
+        "```",
+      ].join("\n")),
+      /anchor on line 3.*outside ## Apply Checklist/i
+    );
+    assert.throws(
+      () => parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #42 reason="owner needed" -->',
+        "    - [x] Indented code, not approval",
+      ].join("\n")),
+      /must be followed by a checkbox/i
+    );
+    const embedded = parseReport([
+      "## Apply Checklist",
+      '- <!-- triage:revisit #42 reason="example only" -->',
+      "- [x] Example",
+    ].join("\n"));
+    assert.equal(embedded.parsed.anchors, 0);
+  });
+
+  it("never treats HTML comments or raw HTML blocks as approval context", () => {
+    const anchor = '<!-- triage:revisit #42 reason="example only" -->';
+    const literalReports = [
+      ["<!--", "## Apply Checklist", "-->", anchor, "- [x] Example"],
+      ["<!-- ## Apply Checklist -->", anchor, "- [x] Example"],
+      ...["pre", "script", "style", "textarea", "div"].map((tag) => [
+        `<${tag}>`, "## Apply Checklist", anchor, "- [x] Example", `</${tag}>`,
+      ]),
+    ];
+    for (const lines of literalReports) {
+      assert.throws(
+        () => parseReport(lines.join("\n")),
+        /anchor on line .*outside ## Apply Checklist/i,
+        lines[0]
+      );
+    }
+
+    const parsed = parseReport(["## Apply Checklist", anchor, "- [x] Accept"].join("\n"));
+    assert.equal(parsed.anchors.length, 1, "a standalone triage anchor comment remains executable");
+  });
+
+  it("ends the checklist at Setext H1/H2 headings without mistaking thematic breaks for headings", () => {
+    for (const underline of ["========", "--------"]) {
+      assert.throws(
+        () => parseReport([
+          "## Apply Checklist",
+          '<!-- triage:revisit #41 reason="inside" -->',
+          "- [x] Accept",
+          "",
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ].join("\n")),
+        /anchor on line 7.*outside ## Apply Checklist/i
+      );
+    }
+
+    const thematicBreak = parseReport([
+      "## Apply Checklist",
+      '<!-- triage:revisit #41 reason="first" -->',
+      "- [x] Accept",
+      "",
+      "---",
+      '<!-- triage:revisit #42 reason="second" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    assert.equal(thematicBreak.anchors.length, 2);
+
+    for (const indentation of ["", " ", "  "]) {
+      const thematicBreakAfterContinuation = parseReport([
+        "## Apply Checklist",
+        '<!-- triage:revisit #41 reason="first" -->',
+        "- [x] Accept",
+        `${indentation}checkbox continuation`,
+        "---",
+        '<!-- triage:revisit #42 reason="second" -->',
+        "- [x] Accept",
+      ].join("\n"));
+      assert.equal(
+        thematicBreakAfterContinuation.anchors.length,
+        2,
+        `${indentation.length}-space lazy continuation`
+      );
+    }
+  });
 });
 
 describe("dedupActions", () => {
-  it("dedups by normalized args and accepts a checked box in any location", () => {
+  it("keeps one normalized action for each checklist proposal", () => {
     const parsed = parseReport(makeReport());
     const deduped = dedupActions(parsed.anchors);
 
@@ -124,7 +283,7 @@ describe("dedupActions", () => {
 
     const closeAction = deduped.find((action) => action.verb === "close");
     assert.equal(closeAction.checked, true);
-    assert.equal(closeAction.occurrences.length, 2);
+    assert.equal(closeAction.occurrences.length, 1);
 
     const milestoneAction = deduped.find((action) => action.verb === "assign-milestone");
     assert.equal(milestoneAction.checked, true);
@@ -208,6 +367,21 @@ describe("execute", () => {
   let tempDir;
   let repoRoot;
   let reportPath;
+
+  function executeWithEffectSpies(source) {
+    fs.writeFileSync(reportPath, Array.isArray(source) ? source.join("\n") : source);
+    const effects = { provider: [], mkdir: 0, append: 0 };
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        effects.provider.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      mkdir: () => { effects.mkdir += 1; },
+      appendFile: () => { effects.append += 1; },
+    });
+    return { result, effects };
+  }
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "triage-apply-"));
@@ -371,6 +545,7 @@ describe("execute", () => {
         "---",
         "generated: 2026-04-18",
         "---",
+        "## Apply Checklist",
         "<!-- triage:close-duplicate #103 target=#101 reason=\"duplicate candidate converged\" -->",
         "- [x] Close duplicate #103 into #101",
         "",
@@ -432,36 +607,1891 @@ describe("execute", () => {
     assert.deepEqual(second.actions.map((action) => action.result), ["already-applied", "already-applied"]);
   });
 
-  it("applies a report whose source anchors and checklist copies are all checked exactly once", () => {
-    fs.writeFileSync(reportPath, makeReport().replace(/- \[ \]/g, "- [x]"));
+  it("applies exactly one action from the one approval surface", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:revisit #104 reason="needs owner" -->'
+    ));
     const calls = [];
     const runGh = (argv) => {
       calls.push(argv);
-      return { status: 0, stdout: argv[1] === "view" ? '{"labels":[]}' : "", stderr: "" };
+      return { status: 0, stdout: "", stderr: "" };
     };
     const result = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
 
     assert.equal(result.exitCode, 0);
-    const writes = calls.filter((argv) => argv[1] !== "view").map((argv) => argv.slice(0, 3).join(" "));
-    assert.deepEqual(writes.sort(), [
-      "issue close 103",
-      "issue close 104",
-      "issue comment 103",
-      "issue comment 104",
-      "issue edit 101",
-      "issue edit 102",
+    assert.deepEqual(calls, [["issue", "comment", "104", "-b", "triage: revisit — needs owner"]]);
+  });
+
+  it("rejects an outside anchor before any GitHub call or log write", () => {
+    fs.writeFileSync(reportPath, [
+      "---", "generated: 2026-04-18", "---",
+      "## Evidence",
+      '<!-- triage:revisit #104 reason="old copy" -->',
+      "- [ ] Old unchecked copy",
+      "## Apply Checklist",
+      '<!-- triage:revisit #104 reason="old copy" -->',
+      "- [x] Accept",
+    ].join("\n"));
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    fs.writeFileSync(logPath, "preserve history exactly\n");
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: () => assert.fail("GitHub invoked"),
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /line 5.*outside ## Apply Checklist/);
+    assert.equal(fs.readFileSync(logPath, "utf8"), "preserve history exactly\n");
+  });
+
+  it("rejects HTML-hidden approvals before any GitHub call or log write", () => {
+    const reports = [
+      [
+        "---", "generated: 2026-04-18", "---",
+        "<!--", "## Apply Checklist", "-->",
+        '<!-- triage:revisit #104 reason="comment wrapped" -->',
+        "- [x] Accept",
+      ],
+      [
+        "---", "generated: 2026-04-18", "---",
+        "<pre>", "## Apply Checklist",
+        '<!-- triage:revisit #104 reason="pre wrapped" -->',
+        "- [x] Accept", "</pre>",
+      ],
+    ];
+    const calls = [];
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          calls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      });
+      assert.equal(result.exitCode, 1);
+      assert.match(result.error, /outside ## Apply Checklist/i);
+      assert.deepEqual(calls, []);
+      assert.equal(fs.existsSync(logPath), false);
+    }
+  });
+
+  it("rejects list-contained HTML approvals before provider or preflight log effects", () => {
+    const reports = [
+      [
+        "- <pre>",
+        "  ## Apply Checklist",
+        '  <!-- triage:revisit #42 reason="hidden" -->',
+        "  - [x] Must reject",
+        "  </pre>",
+      ],
+      [
+        "- <!--",
+        "  ## Apply Checklist",
+        "  -->",
+        '  <!-- triage:revisit #42 reason="hidden" -->',
+        "  - [x] Must reject",
+      ],
+    ];
+
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const providerCalls = [];
+      let appendCalls = 0;
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          providerCalls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        appendFile: () => { appendCalls += 1; },
+      });
+
+      assert.notEqual(result.exitCode, 0, lines[0]);
+      assert.deepEqual(providerCalls, [], lines[0]);
+      assert.equal(appendCalls, 0, `${lines[0]} must reject before apply-log preflight`);
+    }
+  });
+
+  it("rejects HTML opened on a continued list container before every effect", () => {
+    const reports = [
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "    <pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "    </pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "    <!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ],
+      },
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "\t<pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "\t</pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "\t<!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ],
+      },
+      {
+        anchorLine: 5,
+        lines: [
+          "- Evidence",
+          "",
+          "  \t<pre>",
+          "  ## Apply Checklist",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+          "  \t</pre>",
+        ],
+      },
+      {
+        anchorLine: 6,
+        lines: [
+          "- Evidence",
+          "",
+          "  \t<!--",
+          "  ## Apply Checklist",
+          "  -->",
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject",
+        ],
+      },
+    ];
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, lines[2]);
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[2]);
+    }
+
+    const partialTabControl = executeWithEffectSpies([
+      "- Evidence",
+      "",
+      "\t  <pre>",
+      "  ## Apply Checklist",
+      '  <!-- triage:revisit #42 reason="accepted" -->',
+      "  - [x] Accept",
+    ]);
+    assert.equal(partialTabControl.result.exitCode, 0);
+    assert.deepEqual(partialTabControl.effects.provider, [
+      ["issue", "comment", "42", "-b", "triage: revisit — accepted"],
     ]);
   });
 
-  it("treats the legacy milestone alias as the canonical key within a report and across reruns", () => {
+  it("rejects HTML opened after an empty list-item first line before every effect", () => {
+    const reports = [];
+    for (const firstLine of ["-", "-    "]) {
+      reports.push(
+        {
+          anchorLine: 4,
+          lines: [
+            firstLine,
+            "    <pre>",
+            "  ## Apply Checklist",
+            '  <!-- triage:revisit #42 reason="outside" -->',
+            "  - [x] Must reject",
+            "    </pre>",
+          ],
+        },
+        {
+          anchorLine: 5,
+          lines: [
+            firstLine,
+            "    <!--",
+            "  ## Apply Checklist",
+            "  -->",
+            '  <!-- triage:revisit #42 reason="outside" -->',
+            "  - [x] Must reject",
+          ],
+        }
+      );
+    }
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, JSON.stringify(lines[0]));
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, JSON.stringify(lines[0]));
+    }
+  });
+
+  it("requires exact type-1 HTML closing tags before every effect", () => {
+    for (const closer of ["</pre >", "</pre\t>"]) {
+      for (const listContained of [false, true]) {
+        const indent = listContained ? "  " : "";
+        const lines = [
+          listContained ? "- <pre>" : "<pre>",
+          `${indent}${closer}`,
+          `${indent}## Apply Checklist`,
+          `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+          `${indent}- [x] Must reject`,
+          `${indent}</pre>`,
+        ];
+        const { result, effects } = executeWithEffectSpies(lines);
+        assert.notEqual(result.exitCode, 0, `${closer} / list=${listContained}`);
+        assert.match(result.error, /anchor on line 4.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${closer} / list=${listContained}`
+        );
+      }
+    }
+
+    const control = executeWithEffectSpies([
+      "<pre>",
+      "literal example",
+      "</pre>",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="accepted" -->',
+      "- [x] Accept",
+    ]);
+    assert.equal(control.result.exitCode, 0);
+    assert.deepEqual(control.effects.provider, [
+      ["issue", "comment", "42", "-b", "triage: revisit — accepted"],
+    ]);
+  });
+
+  it("rejects anchors after a Setext section boundary before effects", () => {
+    fs.writeFileSync(reportPath, [
+      "---", "generated: 2026-04-18", "---",
+      "## Apply Checklist",
+      '<!-- triage:revisit #103 reason="inside" -->',
+      "- [x] Accept",
+      "",
+      "Evidence",
+      "--------",
+      '<!-- triage:revisit #104 reason="outside" -->',
+      "- [x] Must reject",
+    ].join("\n"));
+    const calls = [];
+    const logPath = resolveLogPath("2026-04-18", repoRoot);
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /anchor on line 10.*outside ## Apply Checklist/i);
+    assert.deepEqual(calls, []);
+    assert.equal(fs.existsSync(logPath), false);
+  });
+
+  it("rejects anchors after multiline Setext H1/H2 boundaries before effects", () => {
+    const reports = [];
+    for (const continuation of ["    continued", "2. More evidence"]) {
+      for (const underline of ["===", "---"]) {
+        reports.push([
+          "## Apply Checklist",
+          "",
+          "Evidence",
+          continuation,
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+      }
+    }
+
+    for (const lines of reports) {
+      fs.writeFileSync(reportPath, lines.join("\n"));
+      const providerCalls = [];
+      let appendCalls = 0;
+      const result = execute([reportPath, "--apply", "--yes"], {
+        cwd: repoRoot,
+        runGh: (argv) => {
+          providerCalls.push(argv);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        appendFile: () => { appendCalls += 1; },
+      });
+
+      assert.notEqual(result.exitCode, 0, `${lines[3]} / ${lines[4]}`);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(providerCalls, [], `${lines[3]} / ${lines[4]}`);
+      assert.equal(appendCalls, 0, `${lines[3]} / ${lines[4]} must reject before apply-log preflight`);
+    }
+  });
+
+  it("keeps noninterrupting ordered text in a genuine outer paragraph", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "Evidence",
+      "2. More evidence",
+      '<!-- triage:revisit #42 reason="valid" -->',
+      "- [x] Accept",
+    ]);
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(effects, {
+      provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+      mkdir: 2,
+      append: 2,
+    });
+  });
+
+  it("ends the checklist at Setext headings immediately after indented code", () => {
+    for (const underline of ["===", "---"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "    code sample",
+        "Evidence",
+        underline,
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, underline);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, underline);
+    }
+  });
+
+  it("ends the checklist at Setext headings after non-paragraph list items", () => {
+    for (const listItem of ["- ### Item", "- ***", "-     code", "-\t\tcode"]) {
+      for (const underline of ["===", "---"]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          listItem,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${listItem} / ${underline}`
+        );
+      }
+    }
+  });
+
+  it("scopes an interrupting list item's indented code independently of an outer paragraph", () => {
+    for (const listItem of ["-     code", "-\t\tcode"]) {
+      for (const underline of ["---", "==="]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          "Some evidence",
+          listItem,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${listItem} / ${underline}`
+        );
+      }
+    }
+  });
+
+  it("classifies shifted and changed-type list items independently before Setext boundaries", () => {
+    const transitions = [
+      ["1. Evidence", " 2."],
+      ["1. Evidence", "  2."],
+      [" 1. Evidence", "2."],
+      ["1. Evidence", "2)"],
+      ["- Evidence", "2."],
+    ];
+    const children = ["     code", "\t\tcode", " ### Item", " ***", ""];
+    for (const [firstItem, nextMarker] of transitions) {
+      for (const child of children) {
+        for (const underline of ["---", "==="]) {
+          const listItem = `${nextMarker}${child}`;
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            firstItem,
+            listItem,
+            "Evidence",
+            underline,
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${firstItem} / ${listItem} / ${underline}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+
+    for (const nextMarker of [" -", "+"]) {
+      for (const underline of ["---", "==="]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          "- Evidence",
+          nextMarker,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${nextMarker} / ${underline}`);
+        assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${nextMarker} / ${underline}`
+        );
+      }
+    }
+  });
+
+  it("recognizes HTML opened across list indentation and type transitions before every effect", () => {
+    const reports = [];
+    for (const [firstItem, nextMarker] of [
+      [" 1. Evidence", "2."],
+      ["1. Evidence", "2)"],
+      ["- Evidence", "2."],
+    ]) {
+      reports.push(
+        {
+          anchorLine: 4,
+          lines: [
+            firstItem,
+            `${nextMarker} <pre>`,
+            "   ## Apply Checklist",
+            '   <!-- triage:revisit #42 reason="outside" -->',
+            "   - [x] Must reject",
+            "   </pre>",
+          ],
+        },
+        {
+          anchorLine: 5,
+          lines: [
+            firstItem,
+            `${nextMarker} <!--`,
+            "   ## Apply Checklist",
+            "   -->",
+            '   <!-- triage:revisit #42 reason="outside" -->',
+            "   - [x] Must reject",
+          ],
+        }
+      );
+    }
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, lines[1]);
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[1]);
+    }
+  });
+
+  it("keeps type-7 HTML tags in open paragraphs so later section boundaries remain visible", () => {
+    for (const tag of ["<img src=\"evidence.png\">", "<span>", "</span>", "<custom-element />"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        tag,
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, tag);
+      assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, tag);
+    }
+  });
+
+  it("opens type-7 HTML after a completed Setext heading before every effect", () => {
+    for (const tag of ["<img src=\"evidence.png\">", "<span>", "</span>", "<custom-element />"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "Evidence",
+        "===",
+        tag,
+        "## Apply Checklist",
+        "",
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, tag);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, tag);
+    }
+  });
+
+  it("preserves standalone type-7 and paragraph-interrupting type-6 HTML blocks", () => {
+    const reports = [
+      [
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        "",
+        '<img src="evidence.png">',
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ],
+      [
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        "<div>",
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ],
+    ];
+
+    for (const lines of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.equal(result.exitCode, 0, lines[3]);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, lines[3]);
+    }
+  });
+
+  it("keeps list-looking HTML payload in its owning item before every effect", () => {
+    const tags = [
+      ["<pre>", "</pre>"],
+      ["<script>", "</script>"],
+      ["<style>", "</style>"],
+      ["<textarea>", "</textarea>"],
+      ["<div>", "</div>"],
+      ["<section>", "</section>"],
+      ['<img src="evidence.png">'],
+      ["<custom-element />"],
+    ];
+    for (const [opener, closer] of tags) {
+      for (const prefix of ["- ", "1. "]) {
+        for (const literalContent of ["- literal", "1. literal", "-"]) {
+          const indent = " ".repeat(prefix.length);
+          const lines = [
+            `${prefix}${opener}`,
+            `${indent}${literalContent}`,
+            `${indent}## Apply Checklist`,
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ];
+          if (closer) lines.push(`${indent}${closer}`);
+
+          const { result, effects } = executeWithEffectSpies(lines);
+          const label = `${prefix}${opener} / ${literalContent}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 4.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("rejects malformed type-1 and type-6 HTML openers before every effect", () => {
+    let caseCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const tag of ["pre", "script", "style", "textarea", "div", "section"]) {
+        for (const suffix of ["/", "/wat", "/ >", "//>"]) {
+          for (const heading of ["## Outside", "# Outside"]) {
+            const { result, effects } = executeWithEffectSpies([
+              "## Apply Checklist",
+              "",
+              `${prefix}<${tag}${suffix}`,
+              `${indent}${heading}`,
+              `${indent}</${tag}>`,
+              "",
+              `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+              `${indent}- [x] Must reject`,
+            ]);
+
+            const label = `${prefix}<${tag}${suffix} / ${heading}`;
+            assert.notEqual(result.exitCode, 0, label);
+            assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i, label);
+            assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            caseCount += 1;
+          }
+        }
+      }
+    }
+    assert.equal(caseCount, 144);
+
+    for (const opener of ["<pre/>", "<div/>", "<section/>"]) {
+      const { result, effects } = executeWithEffectSpies([
+        opener,
+        "## Literal",
+        "",
+        "## Apply Checklist",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ]);
+      assert.equal(result.exitCode, 0, opener);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, opener);
+    }
+  });
+
+  it("rejects incomplete type-7 closing tags and tab-only attribute values before every effect", () => {
+    const exact = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "</span/>",
+      "## Outside",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(exact.result.exitCode, 0);
+    assert.match(exact.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(exact.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const tab = "	";
+    assert.equal(tab.codePointAt(0), 0x0009);
+    let caseCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const tag of ["span", "custom-element"]) {
+        for (const malformedTag of [
+          `</${tag}/>`,
+          `</${tag} />`,
+          `</${tag} a=x>`,
+          `<${tag} a=${tab}>`,
+        ]) {
+          for (const heading of ["# Outside", "## Outside"]) {
+            const { result, effects } = executeWithEffectSpies([
+              "## Apply Checklist",
+              "",
+              `${prefix}${malformedTag}`,
+              `${indent}${heading}`,
+              "",
+              `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+              `${indent}- [x] Must reject`,
+            ]);
+            const label = `${prefix}${malformedTag} / ${heading}`;
+            assert.notEqual(result.exitCode, 0, label);
+            assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i, label);
+            assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            caseCount += 1;
+          }
+        }
+      }
+    }
+    assert.equal(caseCount, 48);
+
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const validTag of ["<span/>", "<custom-element a=x />"]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          `${prefix}${validTag}`,
+          `${indent}## Literal`,
+          "",
+          `${indent}<!-- triage:revisit #42 reason="valid" -->`,
+          `${indent}- [x] Accept`,
+        ]);
+        assert.equal(result.exitCode, 0, `${prefix}${validTag}`);
+        assert.deepEqual(effects, {
+          provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+          mkdir: 2,
+          append: 2,
+        }, `${prefix}${validTag}`);
+      }
+    }
+  });
+
+  it("distinguishes type-7 tag separators from unquoted attribute values before every effect", () => {
+    const verticalTab = String.fromCodePoint(0x000b);
+    const formFeed = String.fromCodePoint(0x000c);
+    assert.deepEqual(
+      [verticalTab, formFeed].map((character) => character.codePointAt(0)),
+      [0x000b, 0x000c]
+    );
+
+    const exactInvalid = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      `<span${verticalTab}>`,
+      "## Outside",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(exactInvalid.result.exitCode, 0);
+    assert.match(exactInvalid.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactInvalid.effects, { provider: [], mkdir: 0, append: 0 });
+
+    let invalidSeparatorCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const tag of ["span", "custom-element"]) {
+        for (const character of [verticalTab, formFeed]) {
+          for (const malformedTag of [
+            `<${tag}${character}>`,
+            `<${tag}${character}a=x>`,
+            `</${tag}${character}>`,
+          ]) {
+            for (const heading of ["# Outside", "## Outside"]) {
+              const { result, effects } = executeWithEffectSpies([
+                "## Apply Checklist",
+                "",
+                `${prefix}${malformedTag}`,
+                `${indent}${heading}`,
+                "",
+                `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+                `${indent}- [x] Must reject`,
+              ]);
+              const label = [
+                prefix,
+                tag,
+                `U+${character.codePointAt(0).toString(16)}`,
+                malformedTag,
+                heading,
+              ].join(" / ");
+              assert.notEqual(result.exitCode, 0, label);
+              assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i, label);
+              assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+              invalidSeparatorCount += 1;
+            }
+          }
+        }
+      }
+    }
+    assert.equal(invalidSeparatorCount, 72);
+
+    const exactValue = executeWithEffectSpies([
+      `<span a=${verticalTab}>`,
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(exactValue.result.exitCode, 0);
+    assert.match(exactValue.result.error, /anchor on line 3.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactValue.effects, { provider: [], mkdir: 0, append: 0 });
+
+    let unquotedValueCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const tag of ["span", "custom-element"]) {
+        for (const character of [verticalTab, formFeed]) {
+          const { result, effects } = executeWithEffectSpies([
+            `${prefix}<${tag} a=${character}>`,
+            `${indent}## Apply Checklist`,
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ]);
+          const label = [
+            prefix,
+            tag,
+            `U+${character.codePointAt(0).toString(16)}`,
+          ].join(" / ");
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 3.*outside ## Apply Checklist/i, label);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          unquotedValueCount += 1;
+        }
+      }
+    }
+    assert.equal(unquotedValueCount, 12);
+  });
+
+  it("uses container-relative ATX headings as checklist boundaries before every effect", () => {
+    const exact = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    ## Outside",
+      "",
+      '  <!-- triage:revisit #42 reason="outside" -->',
+      "  - [x] Must reject",
+    ]);
+    assert.notEqual(exact.result.exitCode, 0);
+    assert.match(exact.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(exact.effects, { provider: [], mkdir: 0, append: 0 });
+
+    let caseCount = 0;
+    const spaceCases = [
+      { marker: "-", indent: "  ", relativeIndents: [2, 3] },
+      { marker: "1.", indent: "   ", relativeIndents: [1, 2, 3] },
+      { marker: " -", indent: "   ", relativeIndents: [1, 2, 3] },
+    ];
+    for (const { marker, indent, relativeIndents } of spaceCases) {
+      for (const relativeIndent of relativeIndents) {
+        for (const heading of ["# Outside", "## Outside"]) {
+          for (const blankBeforeAnchor of [true, false]) {
+            const lines = [
+              marker,
+              `${indent}## Apply Checklist`,
+              "",
+              `${indent}${" ".repeat(relativeIndent)}${heading}`,
+            ];
+            if (blankBeforeAnchor) lines.push("");
+            lines.push(
+              `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+              `${indent}- [x] Must reject`
+            );
+            const { result, effects } = executeWithEffectSpies(lines);
+            const anchorLine = lines.length - 1;
+            const label = `${marker} / ${relativeIndent} / ${heading} / ${blankBeforeAnchor}`;
+            assert.notEqual(result.exitCode, 0, label);
+            assert.match(
+              result.error,
+              new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"),
+              label
+            );
+            assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            caseCount += 1;
+          }
+        }
+      }
+    }
+    assert.equal(caseCount, 32);
+
+    const tab = "	";
+    let tabCaseCount = 0;
+    for (const [marker, indent] of [["-", "  "], ["1.", "   "]]) {
+      for (const heading of ["# Outside", "## Outside"]) {
+        for (const suffix of ["", " "]) {
+          const lines = [
+            marker,
+            `${indent}## Apply Checklist`,
+            "",
+            `${tab}${suffix}${heading}`,
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ];
+          const { result, effects } = executeWithEffectSpies(lines);
+          const label = `${marker} / tab${suffix.length} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i, label);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          tabCaseCount += 1;
+        }
+      }
+    }
+    assert.equal(tabCaseCount, 8);
+  });
+
+  it("parses nested list headings relative to surviving parent items before every effect", () => {
+    const exactAtx = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    - ## Outside",
+      "",
+      '  <!-- triage:revisit #42 reason="outside" -->',
+      "  - [x] Must reject",
+    ]);
+    assert.notEqual(exactAtx.result.exitCode, 0);
+    assert.match(exactAtx.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactAtx.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const exactSetext = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    - Evidence",
+      "      ---",
+      "",
+      '  <!-- triage:revisit #42 reason="outside" -->',
+      "  - [x] Must reject",
+    ]);
+    assert.notEqual(exactSetext.result.exitCode, 0);
+    assert.match(exactSetext.result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactSetext.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const headingCases = [
+      { label: "ATX H1", atx: "# Outside" },
+      { label: "ATX H2", atx: "## Outside" },
+      { label: "Setext H1", underline: "===" },
+      { label: "Setext H2", underline: "---" },
+    ];
+    const outerCases = [
+      { marker: "- ", indent: "  ", relativeIndents: [2, 3] },
+      { marker: "1. ", indent: "   ", relativeIndents: [1, 2, 3] },
+    ];
+    let spaceCaseCount = 0;
+    for (const outer of outerCases) {
+      for (const relativeIndent of outer.relativeIndents) {
+        for (const childMarker of ["- ", "1. ", "2. ", "2) "]) {
+          for (const heading of headingCases) {
+            for (const blankBeforeAnchor of [true, false]) {
+              const childPrefix = `${outer.indent}${" ".repeat(relativeIndent)}${childMarker}`;
+              const lines = [
+                `${outer.marker}Evidence`,
+                `${outer.indent}## Apply Checklist`,
+                "",
+              ];
+              if (heading.atx) {
+                lines.push(`${childPrefix}${heading.atx}`);
+              } else {
+                lines.push(
+                  `${childPrefix}Evidence`,
+                  `${" ".repeat(childPrefix.length)}${heading.underline}`
+                );
+              }
+              if (blankBeforeAnchor) lines.push("");
+              lines.push(
+                `${outer.indent}<!-- triage:revisit #42 reason="outside" -->`,
+                `${outer.indent}- [x] Must reject`
+              );
+              const { result, effects } = executeWithEffectSpies(lines);
+              const anchorLine = lines.length - 1;
+              const label = [
+                outer.marker,
+                relativeIndent,
+                childMarker,
+                heading.label,
+                blankBeforeAnchor,
+              ].join(" / ");
+              assert.notEqual(result.exitCode, 0, label);
+              assert.match(
+                result.error,
+                new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"),
+                label
+              );
+              assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+              spaceCaseCount += 1;
+            }
+          }
+        }
+      }
+    }
+    assert.equal(spaceCaseCount, 160);
+
+    const tab = "	";
+    assert.equal(tab.codePointAt(0), 0x0009);
+    let tabCaseCount = 0;
+    for (const [outerMarker, outerIndent] of [["- ", "  "], ["1. ", "   "]]) {
+      for (const childMarker of ["- ", "1. "]) {
+        for (const heading of ["# Outside", "## Outside"]) {
+          const { result, effects } = executeWithEffectSpies([
+            `${outerMarker}Evidence`,
+            `${outerIndent}## Apply Checklist`,
+            "",
+            `${tab}${childMarker}${heading}`,
+            "",
+            `${outerIndent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${outerIndent}- [x] Must reject`,
+          ]);
+          const label = `${outerMarker} / tab / ${childMarker}${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i, label);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          tabCaseCount += 1;
+        }
+      }
+    }
+    assert.equal(tabCaseCount, 8);
+
+    let neighboringControlCount = 0;
+    for (const childIndent of ["  ", "   "]) {
+      for (const heading of headingCases) {
+        const childPrefix = `${childIndent}- `;
+        const lines = ["- Evidence", "  ## Apply Checklist", ""];
+        if (heading.atx) {
+          lines.push(`${childPrefix}${heading.atx}`);
+        } else {
+          lines.push(
+            `${childPrefix}Evidence`,
+            `${" ".repeat(childPrefix.length)}${heading.underline}`
+          );
+        }
+        lines.push(
+          '  <!-- triage:revisit #42 reason="outside" -->',
+          "  - [x] Must reject"
+        );
+        const { result, effects } = executeWithEffectSpies(lines);
+        assert.notEqual(result.exitCode, 0, `${childIndent.length} / ${heading.label}`);
+        assert.match(result.error, /outside ## Apply Checklist/i);
+        assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 });
+        neighboringControlCount += 1;
+      }
+    }
+    assert.equal(neighboringControlCount, 8);
+  });
+
+  it("ends indented code with its owning item before sibling headings and parent fences", () => {
+    const exactSibling = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    -     code",
+      "    - ## Outside",
+      "",
+      '  <!-- triage:revisit #42 reason="outside" -->',
+      "  - [x] Must reject",
+    ]);
+    assert.notEqual(exactSibling.result.exitCode, 0);
+    assert.match(exactSibling.result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactSibling.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const headingCases = [
+      { label: "ATX H1", atx: "# Outside" },
+      { label: "ATX H2", atx: "## Outside" },
+      { label: "Setext H1", underline: "===" },
+      { label: "Setext H2", underline: "---" },
+    ];
+    const outerCases = [
+      { marker: "- ", indent: "  ", relativeIndents: [2, 3] },
+      { marker: "1. ", indent: "   ", relativeIndents: [1, 2, 3] },
+    ];
+    let siblingHeadingCount = 0;
+    for (const outer of outerCases) {
+      for (const relativeIndent of outer.relativeIndents) {
+        for (const childMarker of ["- ", "1. "]) {
+          for (const heading of headingCases) {
+            for (const blankBeforeAnchor of [true, false]) {
+              const childPrefix = `${outer.indent}${" ".repeat(relativeIndent)}${childMarker}`;
+              const lines = [
+                `${outer.marker}Evidence`,
+                `${outer.indent}## Apply Checklist`,
+                "",
+                `${childPrefix}    code`,
+              ];
+              if (heading.atx) {
+                lines.push(`${childPrefix}${heading.atx}`);
+              } else {
+                lines.push(
+                  `${childPrefix}Outside`,
+                  `${" ".repeat(childPrefix.length)}${heading.underline}`
+                );
+              }
+              if (blankBeforeAnchor) lines.push("");
+              lines.push(
+                `${outer.indent}<!-- triage:revisit #42 reason="outside" -->`,
+                `${outer.indent}- [x] Must reject`
+              );
+              const { result, effects } = executeWithEffectSpies(lines);
+              const anchorLine = lines.length - 1;
+              const label = [
+                outer.marker,
+                relativeIndent,
+                childMarker,
+                heading.label,
+                blankBeforeAnchor,
+              ].join(" / ");
+              assert.notEqual(result.exitCode, 0, label);
+              assert.match(
+                result.error,
+                new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"),
+                label
+              );
+              assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+              siblingHeadingCount += 1;
+            }
+          }
+        }
+      }
+    }
+    assert.equal(siblingHeadingCount, 80);
+
+    const exactFence = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    -     code",
+      "    ~~~",
+      "",
+      '  <!-- triage:revisit #42 reason="outside" -->',
+      "  - [x] Must reject",
+    ]);
+    assert.notEqual(exactFence.result.exitCode, 0);
+    assert.match(exactFence.result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactFence.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const tab = "	";
+    assert.equal(tab.codePointAt(0), 0x0009);
+    let fenceCount = 0;
+    for (const [outerMarker, outerIndent] of [["- ", "  "], ["1. ", "   "]]) {
+      for (const fence of ["```", "~~~"]) {
+        for (const codeMarker of ["-", "1."]) {
+          const { result, effects } = executeWithEffectSpies([
+            `${outerMarker}Evidence`,
+            `${outerIndent}## Apply Checklist`,
+            "",
+            `${tab}${codeMarker}${tab}${tab}code`,
+            `${tab}${fence}`,
+            "",
+            `${outerIndent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${outerIndent}- [x] Must reject`,
+          ]);
+          const label = `${outerMarker} / ${codeMarker} / ${fence}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i, label);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          fenceCount += 1;
+        }
+      }
+    }
+    assert.equal(fenceCount, 8);
+
+    const trueContinuation = executeWithEffectSpies([
+      "- Evidence",
+      "  ## Apply Checklist",
+      "",
+      "    -     code",
+      "          ## Literal",
+      "",
+      '  <!-- triage:revisit #42 reason="valid" -->',
+      "  - [x] Accept",
+    ]);
+    assert.equal(trueContinuation.result.exitCode, 0);
+    assert.deepEqual(trueContinuation.effects, {
+      provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+      mkdir: 2,
+      append: 2,
+    });
+  });
+
+  it("retains the deepest paragraph owner across partial lazy outdents", () => {
+    const exactAtx = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "- - Evidence",
+      "   continued",
+      "      ## Outside",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(exactAtx.result.exitCode, 0);
+    assert.match(exactAtx.result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactAtx.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const exactSetext = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "- - Evidence",
+      "   continued",
+      "      Outside",
+      "      ---",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(exactSetext.result.exitCode, 0);
+    assert.match(exactSetext.result.error, /anchor on line 8.*outside ## Apply Checklist/i);
+    assert.deepEqual(exactSetext.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const headingCases = [
+      { label: "ATX H1", atx: "# Outside" },
+      { label: "ATX H2", atx: "## Outside" },
+      { label: "Setext H1", underline: "===" },
+      { label: "Setext H2", underline: "---" },
+    ];
+    let caseCount = 0;
+    for (const outerMarker of ["- ", "1. "]) {
+      for (const innerMarker of ["- ", "1. "]) {
+        for (
+          let lazyIndent = outerMarker.length;
+          lazyIndent < outerMarker.length + innerMarker.length;
+          lazyIndent += 1
+        ) {
+          for (
+            let headingIndent = outerMarker.length + 4;
+            headingIndent <= outerMarker.length + innerMarker.length + 3;
+            headingIndent += 1
+          ) {
+            for (const heading of headingCases) {
+              for (const blankBeforeAnchor of [true, false]) {
+                const headingPrefix = " ".repeat(headingIndent);
+                const lines = [
+                  "## Apply Checklist",
+                  "",
+                  `${outerMarker}${innerMarker}Evidence`,
+                  `${" ".repeat(lazyIndent)}continued`,
+                ];
+                if (heading.atx) {
+                  lines.push(`${headingPrefix}${heading.atx}`);
+                } else {
+                  lines.push(
+                    `${headingPrefix}Outside`,
+                    `${headingPrefix}${heading.underline}`
+                  );
+                }
+                if (blankBeforeAnchor) lines.push("");
+                lines.push(
+                  '<!-- triage:revisit #42 reason="outside" -->',
+                  "- [x] Must reject"
+                );
+                const { result, effects } = executeWithEffectSpies(lines);
+                const anchorLine = lines.length - 1;
+                const label = [
+                  outerMarker,
+                  innerMarker,
+                  lazyIndent,
+                  headingIndent,
+                  heading.label,
+                  blankBeforeAnchor,
+                ].join(" / ");
+                assert.notEqual(result.exitCode, 0, label);
+                assert.match(
+                  result.error,
+                  new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"),
+                  label
+                );
+                assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+                caseCount += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+    assert.equal(caseCount, 208);
+  });
+
+  it("treats lone carriage returns as Markdown line endings before every effect", () => {
+    const carriageReturn = String.fromCodePoint(0x000d);
+    assert.equal(carriageReturn.codePointAt(0), 0x000d);
+    const exactSource = [
+      "## Apply Checklist",
+      "",
+      `Evidence${carriageReturn}## Outside`,
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ].join("\n");
+    assert.equal(Buffer.from(exactSource).includes(0x000d), true);
+    const exact = executeWithEffectSpies(exactSource);
+    assert.notEqual(exact.result.exitCode, 0);
+    assert.match(exact.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(exact.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const headingCases = [
+      { label: "ATX H1", title: "# Outside", anchorLine: 6 },
+      { label: "ATX H2", title: "## Outside", anchorLine: 6 },
+      { label: "Setext H1", title: "Outside", underline: "===", anchorLine: 7 },
+      { label: "Setext H2", title: "Outside", underline: "---", anchorLine: 7 },
+    ];
+    let caseCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const heading of headingCases) {
+        for (const paragraph of ["Evidence", "More context"]) {
+          const lines = [
+            "## Apply Checklist",
+            "",
+            `${prefix}${paragraph}${carriageReturn}${indent}${heading.title}`,
+          ];
+          if (heading.underline) lines.push(`${indent}${heading.underline}`);
+          lines.push(
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`
+          );
+          const { result, effects } = executeWithEffectSpies(lines);
+          const label = `${prefix} / ${heading.label} / ${paragraph}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(
+            result.error,
+            new RegExp(`anchor on line ${heading.anchorLine}.*outside ## Apply Checklist`, "i"),
+            label
+          );
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          caseCount += 1;
+        }
+      }
+    }
+    assert.equal(caseCount, 24);
+
+    const frontmatterControl = parseReport([
+      "---",
+      "generated: 2026-04-18",
+      "---",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="valid" -->',
+      "- [x] Accept",
+    ].join(carriageReturn));
+    assert.equal(frontmatterControl.frontmatter.generated, "2026-04-18");
+    assert.equal(frontmatterControl.anchors[0].anchorLine, 5);
+
+    const mixed = executeWithEffectSpies([
+      "## Apply Checklist\r\n",
+      "Evidence\r## Outside\n",
+      '<!-- triage:revisit #42 reason="outside" -->\r\n',
+      "- [x] Must reject",
+    ].join("\r\n"));
+    assert.notEqual(mixed.result.exitCode, 0);
+    assert.match(mixed.result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+    assert.deepEqual(mixed.effects, { provider: [], mkdir: 0, append: 0 });
+
+    for (const lineEnding of ["\n", "\r\n"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ].join(lineEnding));
+      assert.notEqual(result.exitCode, 0, JSON.stringify(lineEnding));
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 });
+    }
+  });
+
+  it("keeps Unicode whitespace inside HTML blocks before every effect", () => {
+    const falseBlanks = [" ", "", "", " ", " "];
+    assert.deepEqual(
+      falseBlanks.map((character) => character.codePointAt(0)),
+      [0x00a0, 0x000b, 0x000c, 0x2003, 0x202f]
+    );
+
+    let caseCount = 0;
+    for (const tag of ["<div>", "<section>", "<custom-element />"]) {
+      for (const character of falseBlanks) {
+        for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+          const { result, effects } = executeWithEffectSpies([
+            `${prefix}${tag}`,
+            `${indent}${character}`,
+            `${indent}## Apply Checklist`,
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ]);
+
+          const label = `${prefix}${tag} / U+${character.codePointAt(0).toString(16)}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 4.*outside ## Apply Checklist/i, label);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+          caseCount += 1;
+        }
+      }
+    }
+    assert.equal(caseCount, 45);
+
+    for (const blank of ["", " ", "	"]) {
+      for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+        const { result, effects } = executeWithEffectSpies([
+          `${prefix}<div>`,
+          `${indent}${blank}`,
+          `${indent}## Apply Checklist`,
+          `${indent}<!-- triage:revisit #42 reason="valid" -->`,
+          `${indent}- [x] Accept`,
+        ]);
+        const label = `${prefix} / ${JSON.stringify(blank)}`;
+        assert.equal(result.exitCode, 0, label);
+        assert.deepEqual(effects, {
+          provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+          mkdir: 2,
+          append: 2,
+        }, label);
+      }
+    }
+  });
+
+  it("rejects indented-code checkbox lookalikes before every effect", () => {
+    const tab = "	";
+    const paddingByLeadingIndent = [
+      ["", ["     ", "      ", `${tab}${tab}`, ` ${tab}${tab}`]],
+      [" ", ["     ", "      ", `${tab}${tab}`, ` ${tab}${tab}`]],
+      ["  ", ["     ", "      ", `${tab}${tab}`, ` ${tab}`, ` ${tab}${tab}`]],
+      ["   ", ["     ", "      ", `${tab}${tab}`, ` ${tab}${tab}`, `${tab} `]],
+    ];
+
+    let caseCount = 0;
+    for (const [leadingIndent, paddings] of paddingByLeadingIndent) {
+      for (const padding of paddings) {
+        for (const checked of ["x", "X"]) {
+          const checkbox = `${leadingIndent}-${padding}[${checked}] Must reject`;
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            '<!-- triage:revisit #42 reason="outside" -->',
+            checkbox,
+          ]);
+
+          assert.notEqual(result.exitCode, 0, JSON.stringify(checkbox));
+          assert.match(result.error, /anchor on line 3.*must be followed by a checkbox/i);
+          assert.deepEqual(
+            effects,
+            { provider: [], mkdir: 0, append: 0 },
+            JSON.stringify(checkbox)
+          );
+          caseCount += 1;
+        }
+      }
+    }
+    assert.equal(caseCount, 36);
+
+    for (const padding of [" ", "    ", "	", " 	"]) {
+      for (const checked of ["x", " "]) {
+        const parsed = parseReport([
+          "## Apply Checklist",
+          '<!-- triage:revisit #42 reason="valid" -->',
+          `-${padding}[${checked}] Accept`,
+        ].join("\n"));
+        assert.equal(parsed.anchors[0].checked, checked === "x", JSON.stringify(padding));
+      }
+    }
+
+    const outside = executeWithEffectSpies([
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "## Outside",
+      "- [x] Must reject",
+    ]);
+    assert.notEqual(outside.result.exitCode, 0);
+    assert.match(outside.result.error, /anchor on line 2.*must be followed by a checkbox/i);
+    assert.deepEqual(outside.effects, { provider: [], mkdir: 0, append: 0 });
+  });
+
+  it("ends list-contained fences before outdented headings and every effect", () => {
+    for (const prefix of ["- ", "1. "]) {
+      for (const heading of ["## Outside", " # Outside"]) {
+        for (const fence of ["```", "~~~"]) {
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${prefix}${fence}`,
+            heading,
+            fence,
+            "",
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${prefix}${fence} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("rejects invalid backtick fence info before every effect", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const heading of ["## Outside", "# Outside"]) {
+        for (const opener of ["``` foo`bar", "``` `", "```` a`b"]) {
+          const indent = " ".repeat(prefix.length);
+          const closer = opener.startsWith("````") ? "````" : "```";
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${prefix}${opener}`,
+            `${indent}${heading}`,
+            `${indent}${closer}`,
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+            `${indent}${closer}`,
+          ]);
+
+          const label = `${prefix}${opener} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("preserves valid backtick and tilde fence info strings", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const [opener, closer] of [
+        ["``` markdown", "```"],
+        ["```` longer fence", "````"],
+        ["~~~ info`with`backticks", "~~~"],
+      ]) {
+        const indent = " ".repeat(prefix.length);
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          `${prefix}${opener}`,
+          `${indent}## Literal`,
+          `${indent}${closer}`,
+          "",
+          '<!-- triage:revisit #42 reason="valid" -->',
+          "- [x] Accept",
+        ]);
+
+        const label = `${prefix}${opener}`;
+        assert.equal(result.exitCode, 0, label);
+        assert.deepEqual(effects, {
+          provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+          mkdir: 2,
+          append: 2,
+        }, label);
+      }
+    }
+  });
+
+  it("keeps U+2028 and U+2029 inside valid fence info strings before every effect", () => {
+    const exact = executeWithEffectSpies([
+      "``` ",
+      "## Apply Checklist",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+      "```",
+    ]);
+    assert.notEqual(exact.result.exitCode, 0);
+    assert.match(exact.result.error, /anchor on line 3.*outside ## Apply Checklist/i);
+    assert.deepEqual(exact.effects, { provider: [], mkdir: 0, append: 0 });
+
+    const separators = [" ", " "];
+    assert.deepEqual(separators.map((character) => character.codePointAt(0)), [0x2028, 0x2029]);
+    let caseCount = 0;
+    for (const [prefix, indent] of [["", ""], ["- ", "  "], ["1. ", "   "]]) {
+      for (const fence of ["```", "~~~"]) {
+        for (const separator of separators) {
+          for (const info of [separator, `info${separator}lang`, ` ${separator} `]) {
+            const { result, effects } = executeWithEffectSpies([
+              `${prefix}${fence}${info}`,
+              `${indent}## Apply Checklist`,
+              `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+              `${indent}- [x] Must reject`,
+              `${indent}${fence}`,
+            ]);
+            const label = `${prefix}${fence} / U+${separator.codePointAt(0).toString(16)} / ${JSON.stringify(info)}`;
+            assert.notEqual(result.exitCode, 0, label);
+            assert.match(result.error, /anchor on line 3.*outside ## Apply Checklist/i, label);
+            assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            caseCount += 1;
+          }
+        }
+      }
+    }
+    assert.equal(caseCount, 36);
+  });
+
+  it("ends list-contained comments before outdented headings and every effect", () => {
+    for (const prefix of ["- ", "1. "]) {
+      for (const heading of ["## Outside", " # Outside"]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          `${prefix}<!--`,
+          heading,
+          "-->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        const label = `${prefix}<!-- / ${heading}`;
+        assert.notEqual(result.exitCode, 0, label);
+        assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+        assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+      }
+    }
+  });
+
+  it("ends comments at the first terminator before every effect", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const heading of ["## Outside", "# Outside"]) {
+        for (const additionalOpeners of [1, 2]) {
+          const indent = " ".repeat(prefix.length);
+          const lines = [
+            "## Apply Checklist",
+            "",
+            `${prefix}<!--`,
+            ...Array(additionalOpeners).fill(`${indent}<!--`),
+            `${indent}-->`,
+            `${indent}${heading}`,
+            ...Array(additionalOpeners).fill(`${indent}-->`),
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ];
+          const { result, effects } = executeWithEffectSpies(lines);
+
+          const anchorLine = lines.length - 1;
+          const label = `${prefix}<!-- / ${heading} / ${additionalOpeners}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(
+            result.error,
+            new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i")
+          );
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("keeps same-container and top-level fence and comment payload literal", () => {
+    const reports = [
+      ["## Apply Checklist", "", "```", "## Literal", "```"],
+      ["## Apply Checklist", "", "<!--", "## Literal", "-->"],
+      ["## Apply Checklist", "", "- ```", "  ## Literal", "  ```"],
+      ["## Apply Checklist", "", "1. <!--", "   ## Literal", "   -->"],
+    ];
+
+    for (const prefix of reports) {
+      const { result, effects } = executeWithEffectSpies([
+        ...prefix,
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ]);
+
+      assert.equal(result.exitCode, 0, prefix[2]);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, prefix[2]);
+    }
+  });
+
+  it("retains an outer item when an inner literal leaf ends before every effect", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "- - ```",
+      "  <div>",
+      "## Outside",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+
+    assert.notEqual(result.exitCode, 0);
+    assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 });
+  });
+
+  it("retains the deepest surviving literal-leaf ancestor before every effect", () => {
+    const innerOpeners = ["<pre>", "<!--", "```", "~~~"];
+    const parentOpeners = [
+      "<div>",
+      "<section>",
+      '<img src="evidence.png">',
+      "<custom-element />",
+    ];
+    for (const outerPrefix of ["- ", "1. "]) {
+      for (const innerPrefix of ["- ", "1. "]) {
+        for (const innerOpener of innerOpeners) {
+          for (const parentOpener of parentOpeners) {
+            for (const heading of ["## Outside", " # Outside"]) {
+              const { result, effects } = executeWithEffectSpies([
+                "## Apply Checklist",
+                "",
+                `${outerPrefix}${innerPrefix}${innerOpener}`,
+                `${" ".repeat(outerPrefix.length)}${parentOpener}`,
+                heading,
+                "",
+                '<!-- triage:revisit #42 reason="outside" -->',
+                "- [x] Must reject",
+              ]);
+
+              const label = [
+                outerPrefix,
+                innerPrefix,
+                innerOpener,
+                parentOpener,
+                heading,
+              ].join(" / ");
+              assert.notEqual(result.exitCode, 0, label);
+              assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+              assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("ends list-contained HTML before an outdented heading and every effect", () => {
+    for (const marker of ["-", "1."]) {
+      for (const tag of [
+        "<div></div>",
+        "<section></section>",
+        '<img src="evidence.png">',
+        "<custom-element />",
+      ]) {
+        for (const heading of ["## Outside", " # Outside"]) {
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${marker} ${tag}`,
+            heading,
+            "",
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${marker} ${tag} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("keeps genuinely nested noninterrupting ordered text in its parent paragraph", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "1. Evidence",
+      "   2.     code",
+      "Evidence",
+      "---",
+      '<!-- triage:revisit #42 reason="valid" -->',
+      "- [x] Accept",
+    ]);
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(effects, {
+      provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+      mkdir: 2,
+      append: 2,
+    });
+  });
+
+  it("keeps a later list-contained paragraph and its lazy continuation inside the checklist", () => {
+    for (const listItem of ["-     code", "- ### Item"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        listItem,
+        "  More evidence",
+        "continued",
+        "---",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ]);
+
+      assert.equal(result.exitCode, 0, listItem);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, listItem);
+    }
+  });
+
+  it("ends a list-contained checklist at a Setext heading in the same container", () => {
+    for (const underline of ["---", "==="]) {
+      const { result, effects } = executeWithEffectSpies([
+        "- Evidence",
+        "  ## Apply Checklist",
+        "",
+        "  Evidence",
+        `  ${underline}`,
+        '  <!-- triage:revisit #42 reason="outside" -->',
+        "  - [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, underline);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, underline);
+    }
+  });
+
+  it("preflights the actual apply-log append path before provider effects", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:revisit #104 reason="needs owner" -->'
+    ));
+    const calls = [];
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      appendFile: () => {
+        const error = new Error("permission denied");
+        error.code = "EACCES";
+        throw error;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /apply log is not appendable/i);
+    assert.match(result.error, /permission denied/);
+    assert.deepEqual(calls, []);
+  });
+
+  it("stops and reports an uncertain effect when append fails after provider success", () => {
+    fs.writeFileSync(reportPath, acceptedReport(
+      '<!-- triage:close #104 reason="stale cleanup" -->'
+    ));
+    const calls = [];
+    let appendCount = 0;
+    const result = execute([reportPath, "--apply", "--yes"], {
+      cwd: repoRoot,
+      runGh: (argv) => {
+        calls.push(argv);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      appendFile: (target, content) => {
+        appendCount += 1;
+        if (appendCount === 1) return fs.appendFileSync(target, content);
+        const error = new Error("injected ledger failure");
+        error.code = "EIO";
+        throw error;
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.deepEqual(calls, [["issue", "comment", "104", "-b", "stale cleanup"]]);
+    assert.match(result.error, /gh issue comment 104 -b 'stale cleanup'/);
+    assert.match(result.error, /effect may have completed/i);
+    assert.match(result.error, /verify remote state before manual recovery/i);
+    assert.match(result.error, /do not blindly rerun/i);
+    assert.equal(fs.readFileSync(resolveLogPath("2026-04-18", repoRoot), "utf8"), "");
+  });
+
+  it("treats the legacy milestone alias as the canonical key across migrated reruns", () => {
     const calls = [];
     const runGh = (argv) => {
       calls.push(argv);
       return { status: 0, stdout: "", stderr: "" };
     };
     fs.writeFileSync(reportPath, acceptedReport(
-      '<!-- triage:assign-milestone #102 name="Sprint W17" -->',
-      '<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'
+      '<!-- triage:assign-milestone #102 name="Sprint W17" -->'
     ));
     const first = execute([reportPath, "--apply", "--yes"], { cwd: repoRoot, runGh });
     fs.writeFileSync(reportPath, acceptedReport('<!-- triage:assign-milestone #102 milestone="Sprint W17" -->'));
@@ -502,7 +2532,7 @@ describe("execute", () => {
       });
       assert.equal(result.status, 1, anchor);
       assert.match(result.stderr, expected, anchor);
-      assert.match(result.stderr, /line 4/, anchor);
+      assert.match(result.stderr, /line 5/, anchor);
       assert.equal(fixture.calls().length, 0, anchor);
       assert.equal(fs.existsSync(logPath), false, anchor);
     }
@@ -532,14 +2562,14 @@ describe("execute", () => {
         env: fixture.env,
       });
       assert.equal(result.status, 1);
-      for (const line of [10, 16, 22, 25, 28, 31, 34]) assert.match(result.stderr, new RegExp(`line ${line}:`));
+      for (const line of [11, 17, 23, 26, 29, 32, 35]) assert.match(result.stderr, new RegExp(`line ${line}:`));
       assert.match(result.stderr, /conflicting priority/);
       assert.match(result.stderr, /conflicting milestone/);
       assert.match(result.stderr, /conflicting duplicate target/);
       assert.match(result.stderr, /reason is required/);
-      assert.match(result.stderr, /line 28: .*issue number must be a positive safe integer/);
-      assert.match(result.stderr, /line 31: .*milestone must not contain a NUL character/);
-      assert.match(result.stderr, /line 34: .*reason must be at most 16000 bytes/);
+      assert.match(result.stderr, /line 29: .*issue number must be a positive safe integer/);
+      assert.match(result.stderr, /line 32: .*milestone must not contain a NUL character/);
+      assert.match(result.stderr, /line 35: .*reason must be at most 16000 bytes/);
       assert.equal(fixture.calls().length, 0);
       assert.equal(fs.readFileSync(logPath, "utf-8"), "existing log\n");
     }
@@ -562,7 +2592,7 @@ describe("execute", () => {
           env: fixture.env,
         });
         assert.equal(result.status, 1, second);
-        assert.match(result.stderr, /line 7: .*more than one accepted closing action for #42; line 4 already closes it/, second);
+        assert.match(result.stderr, /line 8: .*more than one accepted closing action for #42; line 5 already closes it/, second);
         assert.equal(fixture.calls().length, 0, second);
         assert.equal(fs.existsSync(logPath), false, second);
       }
@@ -571,8 +2601,8 @@ describe("execute", () => {
 
   it("rejects a repeated same-value assignment that differs in other arguments, including the legacy alias", () => {
     const pairs = [
-      ['<!-- triage:assign-milestone #42 milestone="A" reason="one" -->', '<!-- triage:assign-milestone #42 name="A" reason="two" -->', /milestone "A" is already assigned on line 4/],
-      ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 4/],
+      ['<!-- triage:assign-milestone #42 milestone="A" reason="one" -->', '<!-- triage:assign-milestone #42 name="A" reason="two" -->', /milestone "A" is already assigned on line 5/],
+      ['<!-- triage:set-priority #42 value=high -->', '<!-- triage:set-priority #42 value=high reason="again" -->', /priority "high" is already assigned on line 5/],
     ];
     const fixture = writeGhFixture(tempDir);
     const logPath = resolveLogPath("2026-04-18", repoRoot);
@@ -584,7 +2614,7 @@ describe("execute", () => {
         env: fixture.env,
       });
       assert.equal(result.status, 1, second);
-      assert.match(result.stderr, new RegExp(`line 7: .*${expected.source}`), second);
+      assert.match(result.stderr, new RegExp(`line 8: .*${expected.source}`), second);
       assert.equal(fixture.calls().length, 0, second);
       assert.equal(fs.existsSync(logPath), false, second);
     }
@@ -593,6 +2623,7 @@ describe("execute", () => {
   it("leaves unchecked invalid anchors inert and unknown verbs skipped", () => {
     fs.writeFileSync(reportPath, [
       "---", "generated: 2026-04-18", "---",
+      "## Apply Checklist",
       '<!-- triage:set-priority #42 value=urgent -->', "- [ ] Leave pending", "",
       '<!-- triage:future-action #42 -->', "- [x] Accept unknown", "",
     ].join("\n"));

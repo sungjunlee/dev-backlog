@@ -1,4 +1,4 @@
-const ANCHOR_PATTERN = /<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->/;
+const ANCHOR_PATTERN = /^ {0,3}<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->[ \t]*$/;
 
 function parseAnchorArgs(argText) {
   const args = {};

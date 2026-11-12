@@ -69,6 +69,7 @@ describe("triage-apply fails loud under provider failure", () => {
     const report = path.join(fixture.root, "report.md");
     fs.writeFileSync(report, [
       "---", "generated: 2026-07-31", "---", "",
+      "## Apply Checklist",
       "<!-- triage:close #42 reason=\"stale cleanup\" -->",
       "- [x] Close #42 - stale cleanup",
       "",

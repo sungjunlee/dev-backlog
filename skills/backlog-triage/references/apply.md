@@ -2,7 +2,7 @@
 
 **Purpose.** Authoritative reference for the anchor-comment apply contract used by the session-written backlog-triage report and the apply step in #65.
 
-The report is a two-surface document:
+The report has one approval surface, `## Apply Checklist`, where each proposal pairs:
 
 - The anchor comment is the machine contract.
 - The paired checkbox is the human confirmation surface.
@@ -12,7 +12,7 @@ The report is a two-surface document:
 The single regex contract for parsing a triage anchor is:
 
 ```regex
-<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->
+^ {0,3}<!--\s*triage:([\w-]+)\s+#(\d+)(?:\s+(.*?))?\s*-->[ \t]*$
 ```
 
 `skills/backlog-triage/scripts/anchor.js` exports `parseAnchor(line)` so downstream code can import the shared parser instead of re-implementing this regex. `triage-apply.js` consumes that helper.
@@ -77,18 +77,10 @@ Rules:
 - The anchor lives on its own line.
 - The next non-blank line is the checkbox.
 - One blank line between the anchor and checkbox is allowed.
+- Frontmatter, fenced or indented code, and an anchor embedded in other text are never approval syntax.
 - Reflowing surrounding markdown must not change the anchor line.
 
 The checkbox is the approval toggle. The anchor without a checked box is inert.
-
-## Collision Rules
-
-The `triage:` prefix is intentionally distinct from the dev-backlog task-file acceptance marker syntax:
-
-- Triaged reports may contain `<!-- triage:... -->`
-- Dev-backlog task files may contain `<!-- AC:BEGIN -->` / `<!-- AC:END -->`
-
-They must not be mixed in the same artifact. A task file must never contain `<!-- triage:` and a triage report must never contain `<!-- AC:BEGIN -->`.
 
 ## Duplicate Anchors Per Issue
 
@@ -106,7 +98,7 @@ For `assign-milestone`, `milestone=` is canonical. Apply accepts legacy `name=` 
 - an issue number that is not a positive safe integer;
 - argument text that is not whitespace-separated `key=value` / `key="value"` pairs, or a key given twice;
 - a missing or blank required argument, an invalid `set-priority` value or `close-duplicate` target (`#N` with N a positive safe integer, not the issue itself), or any value containing a NUL character or more than 16,000 UTF-8 bytes;
-- two priority or two milestone assignments for the same issue, whether the values differ or repeat with other arguments changed (legacy `name=` counts as `milestone=`; an otherwise identical alias pair is one action, in the report and in the apply log), or two different duplicate targets;
+- two priority or two milestone assignments for the same issue, whether the values differ or repeat with other arguments changed (legacy `name=` counts as `milestone=`), or two different duplicate targets;
 - more than one accepted closing action (`close` or `close-duplicate`) for the same issue.
 
 Unchecked actions remain inert and unknown verbs keep their skip-and-log behavior. In apply mode, an absent `.dev-backlog/.tracker` or a first line of `github` is required; any other or unreadable authority stops before a write.
@@ -117,31 +109,26 @@ The invalid case is duplicating the exact same action for the same issue without
 
 The session-written report is responsible for:
 
-- Emitting syntactically valid anchor comments
+- Emitting each syntactically valid anchor exactly once under `## Apply Checklist`
 - Pairing every anchor with a checkbox
 
 The apply step in #65 is responsible for:
 
-- Parsing anchors with the shared `parseAnchor(line)` helper
+- Rejecting any anchor outside the single `## Apply Checklist`, then parsing checklist anchors with the shared `parseAnchor(line)` helper
 - Inspecting the paired checkbox state
 - Logging and skipping unknown verbs
 - Avoiding duplicate mutations when re-run
 
 ## Report Boundaries
 
-The report emits anchor+checkbox pairs in four sections:
+Prose sections carry recommendation evidence without anchors. `## Apply Checklist` is the only fixed heading, the only parsed section, and the only location for anchor+checkbox pairs. Each proposal appears once. Exact duplicate actions in the checklist are ambiguous and rejected; distinct actions for one issue remain valid subject to the conflict checks above.
 
-- `## Obsolete Candidates` — source section with evidence sub-bullet
-- `## Priority Proposals` — source section with rationale
-- `## Milestone Suggestions` — source section grouped by sprint/cluster
-- `## Apply Checklist` — flattened summary for humans reviewing all proposed mutations in one place
+An anchor anywhere else is rejected before a GitHub call or apply-log write, whether its checkbox is checked or unchecked. To migrate an older duplicated report, consolidate each action under `## Apply Checklist`, remove every outside anchor, and explicitly recheck the intended approvals. Merely unchecking the outside copy is insufficient.
 
-Every proposal emitted in a source section is re-emitted in `## Apply Checklist` as an anchor+checkbox pair. This is intentional duplication — the same action anchor appears twice in the report.
+The action key remains `(verb, issueNumber, normalizedArgs)`, where normalized args have sorted keys and trimmed string values. For `assign-milestone`, legacy `name=` is keyed as `milestone=` when the values do not disagree, preserving valid apply-log history across migration and preventing completed commands from repeating.
 
-`triage-apply.js` does **not** restrict parsing to `## Apply Checklist`. Its `parseReport()` walk accepts any valid anchor+checkbox pair anywhere in the report, then `dedupActions()` collapses repeated proposals into one action before execution. `## Apply Checklist` is still the canonical review summary, but not the only parse surface.
+## Apply log and recovery
 
-### Deduplication rule for the apply step
+Apply validates the whole accepted set and GitHub authority before creating an empty ledger, then opens the actual append path before any provider call. A known unwritable sink therefore stops with no GitHub effect. Successful commands are logged one at a time; after an ordinary later provider failure, re-running logs completed commands as `already-applied` and executes only the remaining accepted work.
 
-Because the same action anchor appears in both its source section and the Apply Checklist, `triage-apply.js` deduplicates by `(verb, issueNumber, normalizedArgs)`, where `normalizedArgs` means sorted keys with trimmed string values before stable serialization; for `assign-milestone`, a legacy `name=` that does not disagree with `milestone=` is rewritten to `milestone=` first, so the alias pair is one action in the report and in the apply log.
-
-A user may check the box in either location to accept the action; the deduped action is treated as accepted when *any* occurrence of that anchor is checked. Unknown verbs still parse, but `triage-apply.js` logs and skips them during execution.
+If a provider reports success and the following append fails, Apply stops before the next command, identifies the attempted command, and says the effect may have completed. Verify remote state before manual recovery. Apply does not retry within that invocation, and without a durable uncertainty record a separate blind invocation cannot be made safe automatically; there is no intent journal, lock, or exactly-once guarantee.
