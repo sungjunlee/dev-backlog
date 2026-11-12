@@ -1204,6 +1204,110 @@ describe("execute", () => {
     }
   });
 
+  it("keeps list-looking HTML payload in its owning item before every effect", () => {
+    const tags = [
+      ["<pre>", "</pre>"],
+      ["<script>", "</script>"],
+      ["<style>", "</style>"],
+      ["<textarea>", "</textarea>"],
+      ["<div>", "</div>"],
+      ["<section>", "</section>"],
+      ['<img src="evidence.png">'],
+      ["<custom-element />"],
+    ];
+    for (const [opener, closer] of tags) {
+      for (const prefix of ["- ", "1. "]) {
+        for (const literalContent of ["- literal", "1. literal", "-"]) {
+          const indent = " ".repeat(prefix.length);
+          const lines = [
+            `${prefix}${opener}`,
+            `${indent}${literalContent}`,
+            `${indent}## Apply Checklist`,
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ];
+          if (closer) lines.push(`${indent}${closer}`);
+
+          const { result, effects } = executeWithEffectSpies(lines);
+          const label = `${prefix}${opener} / ${literalContent}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 4.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("ends list-contained fences before outdented headings and every effect", () => {
+    for (const prefix of ["- ", "1. "]) {
+      for (const heading of ["## Outside", " # Outside"]) {
+        for (const fence of ["```", "~~~"]) {
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${prefix}${fence}`,
+            heading,
+            fence,
+            "",
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${prefix}${fence} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("ends list-contained comments before outdented headings and every effect", () => {
+    for (const prefix of ["- ", "1. "]) {
+      for (const heading of ["## Outside", " # Outside"]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          `${prefix}<!--`,
+          heading,
+          "-->",
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        const label = `${prefix}<!-- / ${heading}`;
+        assert.notEqual(result.exitCode, 0, label);
+        assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+        assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+      }
+    }
+  });
+
+  it("keeps same-container and top-level fence and comment payload literal", () => {
+    const reports = [
+      ["## Apply Checklist", "", "```", "## Literal", "```"],
+      ["## Apply Checklist", "", "<!--", "## Literal", "-->"],
+      ["## Apply Checklist", "", "- ```", "  ## Literal", "  ```"],
+      ["## Apply Checklist", "", "1. <!--", "   ## Literal", "   -->"],
+    ];
+
+    for (const prefix of reports) {
+      const { result, effects } = executeWithEffectSpies([
+        ...prefix,
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ]);
+
+      assert.equal(result.exitCode, 0, prefix[2]);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, prefix[2]);
+    }
+  });
+
   it("ends list-contained HTML before an outdented heading and every effect", () => {
     for (const marker of ["-", "1."]) {
       for (const tag of [

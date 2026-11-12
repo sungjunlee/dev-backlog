@@ -289,6 +289,30 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
   };
 }
 
+function literalBlockOwner(container) {
+  return {
+    continuationIndent: container.continuationIndent,
+    listItems: [...container.activeListItems],
+  };
+}
+
+function continuesLiteralBlockContainer(line, block) {
+  return block.listItems.length === 0
+    || String(line || "").trim() === ""
+    || leadingIndentColumns(line) >= block.continuationIndent;
+}
+
+function literalBlockContainerView(line, block) {
+  return {
+    content: stripContainerContinuation(line, block.continuationIndent),
+    continuationIndent: block.continuationIndent,
+    listItems: [],
+    activeContinuationIndent: block.continuationIndent,
+    activeListItems: block.listItems,
+    startsListItem: false,
+  };
+}
+
 function markdownBlockState(lines) {
   const literalLines = new Set();
   const paragraphs = new Map();
@@ -312,6 +336,44 @@ function markdownBlockState(lines) {
   let nextParagraphId = 1;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
+    const literalBlock = commentBlock || htmlBlock || fence;
+    if (literalBlock && continuesLiteralBlockContainer(line, literalBlock)) {
+      const container = literalBlockContainerView(line, literalBlock);
+      activeContinuationIndent = container.activeContinuationIndent;
+      activeListItems = container.activeListItems;
+
+      if (commentBlock) {
+        literalLines.add(index);
+        commentBlock.depth += (container.content.match(/<!--/g) || []).length;
+        commentBlock.depth -= (container.content.match(/-->/g) || []).length;
+        if (commentBlock.depth <= 0) commentBlock = undefined;
+        continue;
+      }
+
+      if (htmlBlock) {
+        if (htmlBlock.end === "blank") {
+          if (container.content.trim() === "") htmlBlock = undefined;
+          else literalLines.add(index);
+        } else {
+          literalLines.add(index);
+          if (htmlBlock.end.test(container.content)) htmlBlock = undefined;
+        }
+        continue;
+      }
+
+      literalLines.add(index);
+      const closing = container.content.match(/^ {0,3}(`+|~+)[ \t]*$/);
+      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
+        fence = undefined;
+      }
+      continue;
+    }
+
+    // A literal leaf ends with its owning list item. Reprocess the current
+    // line so an outdented heading or fence belongs to the surviving container.
+    commentBlock = undefined;
+    htmlBlock = undefined;
+    fence = undefined;
     let container = continuedListContainerView(line, activeContinuationIndent, activeListItems);
     // Resolve surviving parent items by their content indentation before
     // applying paragraph-interruption rules. A marker outdented from the
@@ -353,40 +415,6 @@ function markdownBlockState(lines) {
     }
     activeContinuationIndent = container.activeContinuationIndent;
     activeListItems = container.activeListItems;
-    if (commentBlock) {
-      literalLines.add(index);
-      const contextLine = stripContainerContinuation(line, commentBlock.continuationIndent);
-      commentBlock.depth += (contextLine.match(/<!--/g) || []).length;
-      commentBlock.depth -= (contextLine.match(/-->/g) || []).length;
-      if (commentBlock.depth <= 0) commentBlock = undefined;
-      continue;
-    }
-
-    if (htmlBlock?.listItem && !activeListItems.includes(htmlBlock.listItem)) {
-      htmlBlock = undefined;
-    }
-    if (htmlBlock) {
-      const contextLine = stripContainerContinuation(line, htmlBlock.continuationIndent);
-      if (htmlBlock.end === "blank") {
-        if (contextLine.trim() === "") htmlBlock = undefined;
-        else literalLines.add(index);
-        if (htmlBlock) continue;
-      } else {
-        literalLines.add(index);
-        if (htmlBlock.end.test(contextLine)) htmlBlock = undefined;
-        continue;
-      }
-    }
-
-    if (fence) {
-      literalLines.add(index);
-      const contextLine = stripContainerContinuation(line, fence.continuationIndent);
-      const closing = contextLine.match(/^ {0,3}(`+|~+)[ \t]*$/);
-      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
-        fence = undefined;
-      }
-      continue;
-    }
 
     if (indentedCode) {
       const contextLine = stripContainerContinuation(line, indentedCode.continuationIndent);
@@ -433,7 +461,7 @@ function markdownBlockState(lines) {
       fence = {
         character: opening[1][0],
         length: opening[1].length,
-        continuationIndent: container.continuationIndent,
+        ...literalBlockOwner(container),
       };
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
@@ -446,7 +474,7 @@ function markdownBlockState(lines) {
       literalLines.add(index);
       const depth = (contextLine.match(/<!--/g) || []).length - (contextLine.match(/-->/g) || []).length;
       if (depth > 0) {
-        commentBlock = { depth, continuationIndent: container.continuationIndent };
+        commentBlock = { depth, ...literalBlockOwner(container) };
       }
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
@@ -476,8 +504,7 @@ function markdownBlockState(lines) {
       if (!rawHtml.end.test(contextLine)) {
         htmlBlock = {
           ...rawHtml,
-          continuationIndent: container.continuationIndent,
-          listItem: container.activeListItems[container.activeListItems.length - 1],
+          ...literalBlockOwner(container),
         };
       }
       paragraphOpen = false;
@@ -494,8 +521,7 @@ function markdownBlockState(lines) {
       literalLines.add(index);
       htmlBlock = {
         end: "blank",
-        continuationIndent: container.continuationIndent,
-        listItem: container.activeListItems[container.activeListItems.length - 1],
+        ...literalBlockOwner(container),
       };
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
