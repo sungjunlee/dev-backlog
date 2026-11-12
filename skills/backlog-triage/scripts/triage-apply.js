@@ -10,7 +10,7 @@ const { DEFAULT_BACKLOG_DIR, defaultTriageDir } = require("../../dev-backlog/scr
 
 const DEFAULT_TRIAGE_DIR = defaultTriageDir();
 const APPLY_CHECKLIST_HEADING = "## Apply Checklist";
-const CHECKBOX_PATTERN = /^ {0,3}-\s+\[([ xX])\]\s+/;
+const CHECKBOX_PATTERN = /^ {0,3}-[ \t]+\[([ xX])\][ \t]+/;
 const HTML_BLOCK_TAGS = [
   "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col",
   "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure",
@@ -19,8 +19,13 @@ const HTML_BLOCK_TAGS = [
   "optgroup", "option", "p", "param", "search", "section", "summary", "table", "tbody", "td", "tfoot",
   "th", "thead", "title", "tr", "track", "ul",
 ].join("|");
-const HTML_BLOCK_TAG_PATTERN = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t />]|$)`, "i");
-const COMPLETE_HTML_TAG_PATTERN = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
+const TYPE_1_HTML_BLOCK_START = /^ {0,3}<(?<tag>pre|script|style|textarea)(?=[\t >]|$)/i;
+const TYPE_2_HTML_BLOCK_START = /^ {0,3}<!--/;
+const TYPE_3_HTML_BLOCK_START = /^ {0,3}<\?/;
+const TYPE_4_HTML_BLOCK_START = /^ {0,3}<![A-Z]/;
+const TYPE_5_HTML_BLOCK_START = /^ {0,3}<!\[CDATA\[/;
+const TYPE_6_HTML_BLOCK_START = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t ]|/?>|$)`, "i");
+const TYPE_7_HTML_BLOCK_START = /^ {0,3}(?:<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^ "'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>)[ \t]*$/;
 const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)(.*))?$/;
 const SUPPORTED_VERBS = new Set([
   "close",
@@ -193,7 +198,7 @@ function listContainerView(line) {
     const child = match[4] || "";
     // A marker-only or whitespace-only first line has the minimum one-column
     // list padding, regardless of how much trailing whitespace it carries.
-    if (!child.trim()) {
+    if (isMarkdownBlank(child)) {
       continuationIndent = markerEnd + 1;
       listItem.contentIndent = continuationIndent;
       content = "";
@@ -216,6 +221,21 @@ function listContainerView(line) {
   return { content, continuationIndent, listItems };
 }
 
+function parseApprovalCheckbox(line) {
+  const source = String(line || "");
+  const checkbox = source.match(CHECKBOX_PATTERN);
+  const listItem = source.match(LIST_ITEM_PATTERN);
+  if (!checkbox || !listItem || listItem[2] !== "-" || !listItem[3]) return undefined;
+
+  const markerIndent = columnAfter(listItem[1]);
+  const markerEnd = columnAfter(listItem[2], markerIndent);
+  const paddingEnd = columnAfter(listItem[3], markerEnd);
+  // One to four columns are list padding. With more, one column is padding
+  // and the remainder makes the apparent checkbox an indented code block.
+  if (paddingEnd - markerEnd > 4) return undefined;
+  return { checked: checkbox[1] };
+}
+
 function columnAfter(source, startColumn = 0) {
   let column = startColumn;
   for (const character of String(source || "")) {
@@ -224,6 +244,11 @@ function columnAfter(source, startColumn = 0) {
       : column + 1;
   }
   return column;
+}
+
+function isMarkdownBlank(line) {
+  // CommonMark blank lines contain only ASCII spaces/tabs (or no characters).
+  return /^[ \t]*$/.test(String(line || ""));
 }
 
 function leadingIndentColumns(line) {
@@ -258,7 +283,7 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
       closesActiveItem: parentListItems.length < activeListItems.length,
     };
   }
-  if (source.trim() === "") {
+  if (isMarkdownBlank(source)) {
     return {
       content: source,
       continuationIndent: 0,
@@ -315,7 +340,7 @@ function literalBlockOwner(container) {
 
 function continuesLiteralBlockContainer(line, block) {
   return block.listItems.length === 0
-    || String(line || "").trim() === ""
+    || isMarkdownBlank(line)
     || leadingIndentColumns(line) >= block.continuationIndent;
 }
 
@@ -339,6 +364,8 @@ function parseFenceOpening(line) {
 function markdownBlockState(lines) {
   const literalLines = new Set();
   const paragraphs = new Map();
+  const sectionHeadings = new Set();
+  const checklistHeadings = new Set();
   let start = 0;
   if (lines[0] === "---") {
     const end = lines.indexOf("---", 1);
@@ -373,7 +400,7 @@ function markdownBlockState(lines) {
 
       if (htmlBlock) {
         if (htmlBlock.end === "blank") {
-          if (container.content.trim() === "") htmlBlock = undefined;
+          if (isMarkdownBlank(container.content)) htmlBlock = undefined;
           else literalLines.add(index);
         } else {
           literalLines.add(index);
@@ -427,7 +454,7 @@ function markdownBlockState(lines) {
       && container.continuationIndent === 0
       && paragraphOpen
       && paragraphContinuationIndent > 0
-      && line.trim() !== ""
+      && !isMarkdownBlank(line)
       && !interruptsParagraph(line)
     ) ? paragraphContinuationIndent : 0;
     if (lazyParagraphIndent > 0) {
@@ -439,7 +466,7 @@ function markdownBlockState(lines) {
 
     if (indentedCode) {
       const contextLine = stripContainerContinuation(line, indentedCode.continuationIndent);
-      if (contextLine.trim() === "" || /^(?: {4}| {0,3}\t)/.test(contextLine)) {
+      if (isMarkdownBlank(contextLine) || /^(?: {4}| {0,3}\t)/.test(contextLine)) {
         literalLines.add(index);
         paragraphOpen = false;
         paragraphContinuationIndent = 0;
@@ -469,7 +496,7 @@ function markdownBlockState(lines) {
     }
 
     const contextLine = container.content;
-    if (contextLine.trim() === "") {
+    if (isMarkdownBlank(contextLine)) {
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
       paragraphListItems = [];
@@ -490,7 +517,7 @@ function markdownBlockState(lines) {
       continue;
     }
 
-    if (/^ {0,3}<!--/.test(contextLine)) {
+    if (TYPE_2_HTML_BLOCK_START.test(contextLine)) {
       literalLines.add(index);
       if (!contextLine.includes("-->")) {
         commentBlock = literalBlockOwner(container);
@@ -503,10 +530,10 @@ function markdownBlockState(lines) {
     }
 
     const rawHtmlStarts = [
-      { start: /^ {0,3}<(?<tag>pre|script|style|textarea)(?=[\t />]|$)/i, end: undefined },
-      { start: /^ {0,3}<\?/, end: /\?>/ },
-      { start: /^ {0,3}<!\[CDATA\[/, end: /\]\]>/ },
-      { start: /^ {0,3}<![A-Z]/, end: />/ },
+      { start: TYPE_1_HTML_BLOCK_START, end: undefined },
+      { start: TYPE_3_HTML_BLOCK_START, end: /\?>/ },
+      { start: TYPE_4_HTML_BLOCK_START, end: />/ },
+      { start: TYPE_5_HTML_BLOCK_START, end: /\]\]>/ },
     ];
     let rawHtml;
     for (const candidate of rawHtmlStarts) {
@@ -534,8 +561,8 @@ function markdownBlockState(lines) {
     }
 
     if (
-      HTML_BLOCK_TAG_PATTERN.test(contextLine)
-      || (COMPLETE_HTML_TAG_PATTERN.test(contextLine) && !paragraphOpen)
+      TYPE_6_HTML_BLOCK_START.test(contextLine)
+      || (TYPE_7_HTML_BLOCK_START.test(contextLine) && !paragraphOpen)
     ) {
       literalLines.add(index);
       htmlBlock = {
@@ -556,6 +583,12 @@ function markdownBlockState(lines) {
       paragraphListItems = [];
       paragraphId = undefined;
       continue;
+    }
+
+    const headingLevel = atxHeadingLevel(contextLine);
+    if (headingLevel === 1 || headingLevel === 2) {
+      sectionHeadings.add(index);
+      if (isApplyChecklistHeading(contextLine)) checklistHeadings.add(index);
     }
 
     paragraphOpen = !interruptsParagraph(contextLine);
@@ -580,7 +613,7 @@ function markdownBlockState(lines) {
       });
     }
   }
-  return { literalLines, paragraphs };
+  return { literalLines, paragraphs, sectionHeadings, checklistHeadings };
 }
 
 function markdownLiteralLines(lines) {
@@ -591,6 +624,11 @@ function isApplyChecklistHeading(line) {
   return /^ {0,3}## Apply Checklist[ \t]*$/.test(String(line || ""));
 }
 
+function atxHeadingLevel(line) {
+  const match = String(line || "").match(/^ {0,3}(#{1,6})(?:[ \t]+|$)/);
+  return match ? match[1].length : undefined;
+}
+
 function isThematicBreak(line) {
   return /^ {0,3}(?:([-*_])[ \t]*)\1(?:[ \t]*\1)+[ \t]*$/.test(String(line || ""));
 }
@@ -598,7 +636,7 @@ function isThematicBreak(line) {
 function interruptsParagraph(line) {
   const source = String(line || "");
   if (parseAnchor(source)) return true;
-  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>)/.test(source) || parseFenceOpening(source)) return true;
+  if (atxHeadingLevel(source) || /^ {0,3}>/.test(source) || parseFenceOpening(source)) return true;
   if (/^ {0,3}[-+*][ \t]+/.test(source)) return true;
   const ordered = source.match(/^ {0,3}(\d{1,9})[.)][ \t]+/);
   if (ordered && Number(ordered[1]) === 1) return true;
@@ -626,13 +664,13 @@ function isSetextHeading(lines, index, literalLines, paragraphs = new Map()) {
   } else {
     while (paragraphStart > 0) {
       const previous = paragraphStart - 1;
-      if (literalLines.has(previous) || !lines[previous].trim() || interruptsParagraph(lines[previous])) break;
+      if (literalLines.has(previous) || isMarkdownBlank(lines[previous]) || interruptsParagraph(lines[previous])) break;
       paragraphStart = previous;
     }
   }
 
   const firstLine = paragraphs.get(paragraphStart)?.content ?? lines[paragraphStart];
-  if (!firstLine.trim() || /^ {4}/.test(firstLine)) return false;
+  if (isMarkdownBlank(firstLine) || /^ {4}/.test(firstLine)) return false;
   if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d{1,9}[.)])[ \t]+)/.test(firstLine)) return false;
   if (isThematicBreak(firstLine)) return false;
   for (let lineIndex = paragraphStart + 1; lineIndex <= index; lineIndex += 1) {
@@ -647,7 +685,7 @@ function parseReport(text) {
   const source = String(text || "");
   const lines = source.split(/\r?\n/);
   const frontmatter = parseFrontmatter(source);
-  const { literalLines, paragraphs } = markdownBlockState(lines);
+  const { literalLines, paragraphs, sectionHeadings, checklistHeadings } = markdownBlockState(lines);
   const anchors = [];
   const parsed = {
     anchors: 0,
@@ -656,29 +694,28 @@ function parseReport(text) {
     unknown_verb: 0,
   };
 
-  const checklistHeadings = [];
   const anchorLines = [];
   for (let index = 0; index < lines.length; index += 1) {
-    if (!literalLines.has(index) && isApplyChecklistHeading(lines[index])) checklistHeadings.push(index);
     if (parseAnchor(lines[index])) anchorLines.push(index);
   }
 
-  if (checklistHeadings.length !== 1) {
-    if (checklistHeadings.length === 0 && anchorLines.length > 0) {
+  const checklistHeadingLines = [...checklistHeadings];
+  if (checklistHeadingLines.length !== 1) {
+    if (checklistHeadingLines.length === 0 && anchorLines.length > 0) {
       throw new Error(outsideChecklistMessage(anchorLines.map((index) => index + 1)));
     }
-    const locations = checklistHeadings.length > 0
-      ? ` on lines ${checklistHeadings.map((index) => index + 1).join(", ")}`
+    const locations = checklistHeadingLines.length > 0
+      ? ` on lines ${checklistHeadingLines.map((index) => index + 1).join(", ")}`
       : "";
     throw new Error(
-      `Malformed report: expected exactly one ${APPLY_CHECKLIST_HEADING} heading; found ${checklistHeadings.length}${locations}.`
+      `Malformed report: expected exactly one ${APPLY_CHECKLIST_HEADING} heading; found ${checklistHeadingLines.length}${locations}.`
     );
   }
 
-  const checklistStart = checklistHeadings[0] + 1;
+  const checklistStart = checklistHeadingLines[0] + 1;
   let checklistEnd = lines.length;
   for (let index = checklistStart; index < lines.length; index += 1) {
-    if (!literalLines.has(index) && /^ {0,3}#{1,2}(?:\s+|$)/.test(lines[index])) {
+    if (sectionHeadings.has(index)) {
       checklistEnd = index;
       break;
     }
@@ -700,19 +737,21 @@ function parseReport(text) {
     if (!anchor) continue;
 
     let checkboxIndex = index + 1;
-    while (checkboxIndex < lines.length && lines[checkboxIndex].trim() === "") {
+    while (checkboxIndex < checklistEnd && isMarkdownBlank(lines[checkboxIndex])) {
       checkboxIndex += 1;
     }
 
     const checkboxLine = lines[checkboxIndex];
-    const checkboxMatch = checkboxLine ? checkboxLine.match(CHECKBOX_PATTERN) : null;
+    const checkboxMatch = checkboxIndex < checklistEnd && !literalLines.has(checkboxIndex)
+      ? parseApprovalCheckbox(checkboxLine)
+      : undefined;
     if (!checkboxMatch) {
       throw new Error(
         `Malformed report: triage anchor on line ${index + 1} must be followed by a checkbox line.`
       );
     }
 
-    const checked = checkboxMatch[1].toLowerCase() === "x";
+    const checked = checkboxMatch.checked.toLowerCase() === "x";
     const knownVerb = SUPPORTED_VERBS.has(anchor.verb);
     const normalizedArgs = normalizeArgs(anchor.args);
     const entry = {
