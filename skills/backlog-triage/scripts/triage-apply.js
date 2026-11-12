@@ -330,6 +330,12 @@ function literalBlockContainerView(line, block) {
   };
 }
 
+function parseFenceOpening(line) {
+  const opening = String(line || "").match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  if (!opening || (opening[1][0] === "`" && opening[2].includes("`"))) return undefined;
+  return { character: opening[1][0], length: opening[1].length };
+}
+
 function markdownBlockState(lines) {
   const literalLines = new Set();
   const paragraphs = new Map();
@@ -361,9 +367,7 @@ function markdownBlockState(lines) {
 
       if (commentBlock) {
         literalLines.add(index);
-        commentBlock.depth += (container.content.match(/<!--/g) || []).length;
-        commentBlock.depth -= (container.content.match(/-->/g) || []).length;
-        if (commentBlock.depth <= 0) commentBlock = undefined;
+        if (container.content.includes("-->")) commentBlock = undefined;
         continue;
       }
 
@@ -472,12 +476,11 @@ function markdownBlockState(lines) {
       paragraphId = undefined;
       continue;
     }
-    const opening = contextLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    const opening = parseFenceOpening(contextLine);
     if (opening) {
       literalLines.add(index);
       fence = {
-        character: opening[1][0],
-        length: opening[1].length,
+        ...opening,
         ...literalBlockOwner(container),
       };
       paragraphOpen = false;
@@ -489,9 +492,8 @@ function markdownBlockState(lines) {
 
     if (/^ {0,3}<!--/.test(contextLine)) {
       literalLines.add(index);
-      const depth = (contextLine.match(/<!--/g) || []).length - (contextLine.match(/-->/g) || []).length;
-      if (depth > 0) {
-        commentBlock = { depth, ...literalBlockOwner(container) };
+      if (!contextLine.includes("-->")) {
+        commentBlock = literalBlockOwner(container);
       }
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
@@ -596,7 +598,7 @@ function isThematicBreak(line) {
 function interruptsParagraph(line) {
   const source = String(line || "");
   if (parseAnchor(source)) return true;
-  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|`{3,}|~{3,})/.test(source)) return true;
+  if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>)/.test(source) || parseFenceOpening(source)) return true;
   if (/^ {0,3}[-+*][ \t]+/.test(source)) return true;
   const ordered = source.match(/^ {0,3}(\d{1,9})[.)][ \t]+/);
   if (ordered && Number(ordered[1]) === 1) return true;

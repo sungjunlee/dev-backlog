@@ -1262,6 +1262,63 @@ describe("execute", () => {
     }
   });
 
+  it("rejects invalid backtick fence info before every effect", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const heading of ["## Outside", "# Outside"]) {
+        for (const opener of ["``` foo`bar", "``` `", "```` a`b"]) {
+          const indent = " ".repeat(prefix.length);
+          const closer = opener.startsWith("````") ? "````" : "```";
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${prefix}${opener}`,
+            `${indent}${heading}`,
+            `${indent}${closer}`,
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+            `${indent}${closer}`,
+          ]);
+
+          const label = `${prefix}${opener} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+  });
+
+  it("preserves valid backtick and tilde fence info strings", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const [opener, closer] of [
+        ["``` markdown", "```"],
+        ["```` longer fence", "````"],
+        ["~~~ info`with`backticks", "~~~"],
+      ]) {
+        const indent = " ".repeat(prefix.length);
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          `${prefix}${opener}`,
+          `${indent}## Literal`,
+          `${indent}${closer}`,
+          "",
+          '<!-- triage:revisit #42 reason="valid" -->',
+          "- [x] Accept",
+        ]);
+
+        const label = `${prefix}${opener}`;
+        assert.equal(result.exitCode, 0, label);
+        assert.deepEqual(effects, {
+          provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+          mkdir: 2,
+          append: 2,
+        }, label);
+      }
+    }
+  });
+
   it("ends list-contained comments before outdented headings and every effect", () => {
     for (const prefix of ["- ", "1. "]) {
       for (const heading of ["## Outside", " # Outside"]) {
@@ -1279,6 +1336,38 @@ describe("execute", () => {
         assert.notEqual(result.exitCode, 0, label);
         assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
         assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+      }
+    }
+  });
+
+  it("ends comments at the first terminator before every effect", () => {
+    for (const prefix of ["", "- ", "1. "]) {
+      for (const heading of ["## Outside", "# Outside"]) {
+        for (const additionalOpeners of [1, 2]) {
+          const indent = " ".repeat(prefix.length);
+          const lines = [
+            "## Apply Checklist",
+            "",
+            `${prefix}<!--`,
+            ...Array(additionalOpeners).fill(`${indent}<!--`),
+            `${indent}-->`,
+            `${indent}${heading}`,
+            ...Array(additionalOpeners).fill(`${indent}-->`),
+            "",
+            `${indent}<!-- triage:revisit #42 reason="outside" -->`,
+            `${indent}- [x] Must reject`,
+          ];
+          const { result, effects } = executeWithEffectSpies(lines);
+
+          const anchorLine = lines.length - 1;
+          const label = `${prefix}<!-- / ${heading} / ${additionalOpeners}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(
+            result.error,
+            new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i")
+          );
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
       }
     }
   });
