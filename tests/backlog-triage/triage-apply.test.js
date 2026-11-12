@@ -1308,6 +1308,64 @@ describe("execute", () => {
     }
   });
 
+  it("retains an outer item when an inner literal leaf ends before every effect", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "- - ```",
+      "  <div>",
+      "## Outside",
+      "",
+      '<!-- triage:revisit #42 reason="outside" -->',
+      "- [x] Must reject",
+    ]);
+
+    assert.notEqual(result.exitCode, 0);
+    assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+    assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 });
+  });
+
+  it("retains the deepest surviving literal-leaf ancestor before every effect", () => {
+    const innerOpeners = ["<pre>", "<!--", "```", "~~~"];
+    const parentOpeners = [
+      "<div>",
+      "<section>",
+      '<img src="evidence.png">',
+      "<custom-element />",
+    ];
+    for (const outerPrefix of ["- ", "1. "]) {
+      for (const innerPrefix of ["- ", "1. "]) {
+        for (const innerOpener of innerOpeners) {
+          for (const parentOpener of parentOpeners) {
+            for (const heading of ["## Outside", " # Outside"]) {
+              const { result, effects } = executeWithEffectSpies([
+                "## Apply Checklist",
+                "",
+                `${outerPrefix}${innerPrefix}${innerOpener}`,
+                `${" ".repeat(outerPrefix.length)}${parentOpener}`,
+                heading,
+                "",
+                '<!-- triage:revisit #42 reason="outside" -->',
+                "- [x] Must reject",
+              ]);
+
+              const label = [
+                outerPrefix,
+                innerPrefix,
+                innerOpener,
+                parentOpener,
+                heading,
+              ].join(" / ");
+              assert.notEqual(result.exitCode, 0, label);
+              assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+              assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+            }
+          }
+        }
+      }
+    }
+  });
+
   it("ends list-contained HTML before an outdented heading and every effect", () => {
     for (const marker of ["-", "1."]) {
       for (const tag of [

@@ -269,6 +269,23 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
     };
   }
   const indentation = leadingIndentColumns(source);
+  let survivingItemCount = 0;
+  for (const item of activeListItems) {
+    if (indentation < item.contentIndent) break;
+    survivingItemCount += 1;
+  }
+  if (survivingItemCount > 0) {
+    const survivingListItems = activeListItems.slice(0, survivingItemCount);
+    const continuationIndent = survivingListItems[survivingListItems.length - 1].contentIndent;
+    return {
+      content: stripContainerContinuation(source, continuationIndent),
+      continuationIndent,
+      listItems: [],
+      activeContinuationIndent: continuationIndent,
+      activeListItems: survivingListItems,
+      startsListItem: false,
+    };
+  }
   if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
     return {
       content: stripContainerContinuation(source, activeContinuationIndent),
