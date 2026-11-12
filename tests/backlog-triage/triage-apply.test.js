@@ -949,6 +949,24 @@ describe("execute", () => {
     }
   });
 
+  it("keeps noninterrupting ordered text in a genuine outer paragraph", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "Evidence",
+      "2. More evidence",
+      '<!-- triage:revisit #42 reason="valid" -->',
+      "- [x] Accept",
+    ]);
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(effects, {
+      provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+      mkdir: 2,
+      append: 2,
+    });
+  });
+
   it("ends the checklist at Setext headings immediately after indented code", () => {
     for (const underline of ["===", "---"]) {
       const { result, effects } = executeWithEffectSpies([
@@ -1016,77 +1034,94 @@ describe("execute", () => {
     }
   });
 
-  it("classifies ordered and empty sibling list items independently before Setext boundaries", () => {
-    for (const listItem of ["2.     code", "2.\t\tcode", "2. ### Item", "2. ***"]) {
+  it("classifies shifted and changed-type list items independently before Setext boundaries", () => {
+    const transitions = [
+      ["1. Evidence", " 2."],
+      ["1. Evidence", "  2."],
+      [" 1. Evidence", "2."],
+      ["1. Evidence", "2)"],
+      ["- Evidence", "2."],
+    ];
+    const children = ["     code", "\t\tcode", " ### Item", " ***", ""];
+    for (const [firstItem, nextMarker] of transitions) {
+      for (const child of children) {
+        for (const underline of ["---", "==="]) {
+          const listItem = `${nextMarker}${child}`;
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            firstItem,
+            listItem,
+            "Evidence",
+            underline,
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${firstItem} / ${listItem} / ${underline}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
+    }
+
+    for (const nextMarker of [" -", "+"]) {
       for (const underline of ["---", "==="]) {
         const { result, effects } = executeWithEffectSpies([
           "## Apply Checklist",
           "",
-          "1. Evidence",
-          listItem,
+          "- Evidence",
+          nextMarker,
           "Evidence",
           underline,
           '<!-- triage:revisit #42 reason="outside" -->',
           "- [x] Must reject",
         ]);
 
-        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.notEqual(result.exitCode, 0, `${nextMarker} / ${underline}`);
         assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
         assert.deepEqual(
           effects,
           { provider: [], mkdir: 0, append: 0 },
-          `${listItem} / ${underline}`
+          `${nextMarker} / ${underline}`
         );
       }
     }
-
-    for (const underline of ["---", "==="]) {
-      const { result, effects } = executeWithEffectSpies([
-        "## Apply Checklist",
-        "",
-        "- Evidence",
-        "-",
-        "Evidence",
-        underline,
-        '<!-- triage:revisit #42 reason="outside" -->',
-        "- [x] Must reject",
-      ]);
-
-      assert.notEqual(result.exitCode, 0, `empty sibling / ${underline}`);
-      assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
-      assert.deepEqual(
-        effects,
-        { provider: [], mkdir: 0, append: 0 },
-        `empty sibling / ${underline}`
-      );
-    }
   });
 
-  it("recognizes HTML opened by an ordered sibling before every effect", () => {
-    const reports = [
-      {
-        anchorLine: 4,
-        lines: [
-          "1. Evidence",
-          "2. <pre>",
-          "   ## Apply Checklist",
-          '   <!-- triage:revisit #42 reason="outside" -->',
-          "   - [x] Must reject",
-          "   </pre>",
-        ],
-      },
-      {
-        anchorLine: 5,
-        lines: [
-          "1. Evidence",
-          "2. <!--",
-          "   ## Apply Checklist",
-          "   -->",
-          '   <!-- triage:revisit #42 reason="outside" -->',
-          "   - [x] Must reject",
-        ],
-      },
-    ];
+  it("recognizes HTML opened across list indentation and type transitions before every effect", () => {
+    const reports = [];
+    for (const [firstItem, nextMarker] of [
+      [" 1. Evidence", "2."],
+      ["1. Evidence", "2)"],
+      ["- Evidence", "2."],
+    ]) {
+      reports.push(
+        {
+          anchorLine: 4,
+          lines: [
+            firstItem,
+            `${nextMarker} <pre>`,
+            "   ## Apply Checklist",
+            '   <!-- triage:revisit #42 reason="outside" -->',
+            "   - [x] Must reject",
+            "   </pre>",
+          ],
+        },
+        {
+          anchorLine: 5,
+          lines: [
+            firstItem,
+            `${nextMarker} <!--`,
+            "   ## Apply Checklist",
+            "   -->",
+            '   <!-- triage:revisit #42 reason="outside" -->',
+            "   - [x] Must reject",
+          ],
+        }
+      );
+    }
 
     for (const { anchorLine, lines } of reports) {
       const { result, effects } = executeWithEffectSpies(lines);
@@ -1094,6 +1129,81 @@ describe("execute", () => {
       assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
       assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[1]);
     }
+  });
+
+  it("keeps type-7 HTML tags in open paragraphs so later section boundaries remain visible", () => {
+    for (const tag of ["<img src=\"evidence.png\">", "<span>", "</span>", "<custom-element />"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        tag,
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, tag);
+      assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, tag);
+    }
+  });
+
+  it("preserves standalone type-7 and paragraph-interrupting type-6 HTML blocks", () => {
+    const reports = [
+      [
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        "",
+        '<img src="evidence.png">',
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ],
+      [
+        "## Apply Checklist",
+        "",
+        "Evidence",
+        "<div>",
+        "## Outside",
+        "",
+        '<!-- triage:revisit #42 reason="valid" -->',
+        "- [x] Accept",
+      ],
+    ];
+
+    for (const lines of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.equal(result.exitCode, 0, lines[3]);
+      assert.deepEqual(effects, {
+        provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+        mkdir: 2,
+        append: 2,
+      }, lines[3]);
+    }
+  });
+
+  it("keeps genuinely nested noninterrupting ordered text in its parent paragraph", () => {
+    const { result, effects } = executeWithEffectSpies([
+      "## Apply Checklist",
+      "",
+      "1. Evidence",
+      "   2.     code",
+      "Evidence",
+      "---",
+      '<!-- triage:revisit #42 reason="valid" -->',
+      "- [x] Accept",
+    ]);
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(effects, {
+      provider: [["issue", "comment", "42", "-b", "triage: revisit — valid"]],
+      mkdir: 2,
+      append: 2,
+    });
   });
 
   it("keeps a later list-contained paragraph and its lazy continuation inside the checklist", () => {

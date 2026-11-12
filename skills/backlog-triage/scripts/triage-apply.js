@@ -187,17 +187,15 @@ function listContainerView(line) {
   while ((match = content.match(LIST_ITEM_PATTERN))) {
     const markerIndent = columnAfter(match[1], continuationIndent);
     const markerEnd = columnAfter(match[2], markerIndent);
-    const marker = match[2];
-    listItems.push({
-      markerIndent,
-      markerType: /^\d/.test(marker) ? `ordered${marker.slice(-1)}` : `bullet${marker}`,
-    });
+    const listItem = { markerIndent };
+    listItems.push(listItem);
     const padding = match[3] || "";
     const child = match[4] || "";
     // A marker-only or whitespace-only first line has the minimum one-column
     // list padding, regardless of how much trailing whitespace it carries.
     if (!child.trim()) {
       continuationIndent = markerEnd + 1;
+      listItem.contentIndent = continuationIndent;
       content = "";
       break;
     }
@@ -207,10 +205,12 @@ function listContainerView(line) {
     // the rest belongs to the child block and may make it indented code.
     if (paddingColumns > 4) {
       continuationIndent = markerEnd + 1;
+      listItem.contentIndent = continuationIndent;
       content = `${" ".repeat(paddingColumns - 1)}${child}`;
       break;
     }
     continuationIndent = paddingEnd;
+    listItem.contentIndent = continuationIndent;
     content = child;
   }
   return { content, continuationIndent, listItems };
@@ -246,14 +246,16 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
   const direct = listContainerView(source);
   if (direct.continuationIndent > 0) {
     const firstMarkerIndent = direct.listItems[0].markerIndent;
+    const parentListItems = activeListItems.filter((item) => item.contentIndent <= firstMarkerIndent);
     return {
       ...direct,
       activeContinuationIndent: direct.continuationIndent,
       activeListItems: [
-        ...activeListItems.filter((item) => item.markerIndent < firstMarkerIndent),
+        ...parentListItems,
         ...direct.listItems,
       ],
       startsListItem: true,
+      closesActiveItem: parentListItems.length < activeListItems.length,
     };
   }
   if (source.trim() === "") {
@@ -287,13 +289,6 @@ function continuedListContainerView(line, activeContinuationIndent, activeListIt
   };
 }
 
-function continuesActiveList(container, activeListItems) {
-  return container.listItems.some((candidate) => activeListItems.some((active) => (
-    candidate.markerIndent === active.markerIndent
-    && candidate.markerType === active.markerType
-  )));
-}
-
 function markdownBlockState(lines) {
   const literalLines = new Set();
   const paragraphs = new Map();
@@ -318,14 +313,16 @@ function markdownBlockState(lines) {
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
     let container = continuedListContainerView(line, activeContinuationIndent, activeListItems);
-    // A marker that cannot interrupt an open paragraph stays paragraph text
-    // unless it is a sibling in an already-open list container. Ordered
-    // siblings need not start at 1, and an empty sibling need not interrupt.
+    // Resolve surviving parent items by their content indentation before
+    // applying paragraph-interruption rules. A marker outdented from the
+    // current item's content starts a sibling or adjacent list even when its
+    // column or marker type changes. A genuinely nested noninterrupting marker
+    // remains paragraph text.
     if (
       container.startsListItem
       && paragraphOpen
       && !interruptsParagraph(line)
-      && !continuesActiveList(container, activeListItems)
+      && !container.closesActiveItem
     ) {
       container = {
         content: line,
@@ -475,7 +472,10 @@ function markdownBlockState(lines) {
       continue;
     }
 
-    if (HTML_BLOCK_TAG_PATTERN.test(contextLine) || COMPLETE_HTML_TAG_PATTERN.test(contextLine)) {
+    if (
+      HTML_BLOCK_TAG_PATTERN.test(contextLine)
+      || (COMPLETE_HTML_TAG_PATTERN.test(contextLine) && !paragraphOpen)
+    ) {
       literalLines.add(index);
       htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
       paragraphOpen = false;
