@@ -362,6 +362,9 @@ function markdownBlockState(lines) {
       continue;
     }
 
+    if (htmlBlock?.listItem && !activeListItems.includes(htmlBlock.listItem)) {
+      htmlBlock = undefined;
+    }
     if (htmlBlock) {
       const contextLine = stripContainerContinuation(line, htmlBlock.continuationIndent);
       if (htmlBlock.end === "blank") {
@@ -396,6 +399,14 @@ function markdownBlockState(lines) {
         continue;
       }
       indentedCode = undefined;
+    }
+
+    if (paragraphOpen && isSetextHeading(lines, index - 1, literalLines, paragraphs)) {
+      paragraphOpen = false;
+      paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
+      continue;
     }
 
     // A triage anchor is intentionally an HTML comment. It is executable only
@@ -463,7 +474,11 @@ function markdownBlockState(lines) {
     if (rawHtml) {
       literalLines.add(index);
       if (!rawHtml.end.test(contextLine)) {
-        htmlBlock = { ...rawHtml, continuationIndent: container.continuationIndent };
+        htmlBlock = {
+          ...rawHtml,
+          continuationIndent: container.continuationIndent,
+          listItem: container.activeListItems[container.activeListItems.length - 1],
+        };
       }
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
@@ -477,7 +492,11 @@ function markdownBlockState(lines) {
       || (COMPLETE_HTML_TAG_PATTERN.test(contextLine) && !paragraphOpen)
     ) {
       literalLines.add(index);
-      htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
+      htmlBlock = {
+        end: "blank",
+        continuationIndent: container.continuationIndent,
+        listItem: container.activeListItems[container.activeListItems.length - 1],
+      };
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
       paragraphListItems = [];

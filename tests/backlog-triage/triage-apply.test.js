@@ -1150,6 +1150,24 @@ describe("execute", () => {
     }
   });
 
+  it("opens type-7 HTML after a completed Setext heading before every effect", () => {
+    for (const tag of ["<img src=\"evidence.png\">", "<span>", "</span>", "<custom-element />"]) {
+      const { result, effects } = executeWithEffectSpies([
+        "Evidence",
+        "===",
+        tag,
+        "## Apply Checklist",
+        "",
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, tag);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, tag);
+    }
+  });
+
   it("preserves standalone type-7 and paragraph-interrupting type-6 HTML blocks", () => {
     const reports = [
       [
@@ -1183,6 +1201,34 @@ describe("execute", () => {
         mkdir: 2,
         append: 2,
       }, lines[3]);
+    }
+  });
+
+  it("ends list-contained HTML before an outdented heading and every effect", () => {
+    for (const marker of ["-", "1."]) {
+      for (const tag of [
+        "<div></div>",
+        "<section></section>",
+        '<img src="evidence.png">',
+        "<custom-element />",
+      ]) {
+        for (const heading of ["## Outside", " # Outside"]) {
+          const { result, effects } = executeWithEffectSpies([
+            "## Apply Checklist",
+            "",
+            `${marker} ${tag}`,
+            heading,
+            "",
+            '<!-- triage:revisit #42 reason="outside" -->',
+            "- [x] Must reject",
+          ]);
+
+          const label = `${marker} ${tag} / ${heading}`;
+          assert.notEqual(result.exitCode, 0, label);
+          assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+          assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, label);
+        }
+      }
     }
   });
 
