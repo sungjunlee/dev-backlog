@@ -582,24 +582,31 @@ describe("read-only and bounded graders", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "outcome-stdin-"));
     try {
       const cli = installConformanceCliFixture(root);
-      const bash = path.join(root, ".harness", "bin", "bash");
-      const node = path.join(root, ".harness", "bin", "node");
-      const bashResult = spawnSync(bash, ["-s"], {
-        env: cli.env,
-        encoding: "utf8",
-        input: "printf stdin-bash\n",
-      });
-      assert.equal(bashResult.status, 0);
-      assert.match(bashResult.stdout, /stdin-bash/);
-      const nodeResult = spawnSync(node, ["-e", "let data=''; process.stdin.on('data', (chunk) => { data += chunk; }); process.stdin.on('end', () => process.stdout.write(data));"], {
+      const nodeWrapper = path.join(root, ".harness", "bin", "node");
+      const nodeResult = spawnSync(process.execPath, [nodeWrapper, "-e", "let data=''; process.stdin.on('data', (chunk) => { data += chunk; }); process.stdin.on('end', () => process.stdout.write(data));"], {
         env: cli.env,
         encoding: "utf8",
         input: "stdin-node\n",
       });
-      assert.equal(nodeResult.status, 0);
+      assert.equal(nodeResult.error, undefined, nodeResult.error && nodeResult.error.message);
+      assert.equal(nodeResult.status, 0, nodeResult.stderr);
       assert.match(nodeResult.stdout, /stdin-node/);
+
+      const bashPath = cli.shellEnv.CONFORMANCE_REAL_BASH;
+      if (bashPath && fs.existsSync(bashPath)) {
+        const bashWrapper = path.join(root, ".harness", "bin", "bash");
+        const bashResult = spawnSync(process.execPath, [bashWrapper, "-s"], {
+          env: cli.env,
+          encoding: "utf8",
+          input: "printf stdin-bash\n",
+        });
+        assert.equal(bashResult.error, undefined, bashResult.error && bashResult.error.message);
+        assert.equal(bashResult.status, 0, bashResult.stderr);
+        assert.match(bashResult.stdout, /stdin-bash/);
+        assert.equal(cli.invocations().some((item) => item.command === "bash" && item.status === 0), true);
+      }
+
       const recorded = cli.invocations();
-      assert.equal(recorded.some((item) => item.command === "bash" && item.status === 0), true);
       assert.equal(recorded.some((item) => item.command === "node" && String(item.stdout || "").includes("stdin-node")), true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
