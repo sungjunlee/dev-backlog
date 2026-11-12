@@ -25,8 +25,8 @@ const TYPE_3_HTML_BLOCK_START = /^ {0,3}<\?/;
 const TYPE_4_HTML_BLOCK_START = /^ {0,3}<![A-Z]/;
 const TYPE_5_HTML_BLOCK_START = /^ {0,3}<!\[CDATA\[/;
 const TYPE_6_HTML_BLOCK_START = new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?=[\\t ]|/?>|$)`, "i");
-const TYPE_7_HTML_BLOCK_OPENING_TAG = /^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \t\n\v\f\r]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n\v\f\r]*=[ \t\n\v\f\r]*(?:[^ \t\n\v\f\r"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t\n\v\f\r]*\/?>[ \t]*$/;
-const TYPE_7_HTML_BLOCK_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t\n\v\f\r]*>[ \t]*$/;
+const TYPE_7_HTML_BLOCK_OPENING_TAG = /^ {0,3}<[A-Za-z][A-Za-z0-9-]*(?:[ \t\n]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t\n]*=[ \t\n]*(?:[^ \t\n"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t\n]*\/?>[ \t]*$/;
+const TYPE_7_HTML_BLOCK_CLOSING_TAG = /^ {0,3}<\/[A-Za-z][A-Za-z0-9-]*[ \t\n]*>[ \t]*$/;
 const LIST_ITEM_PATTERN = /^( {0,3})([-+*]|\d{1,9}[.)])(?:([ \t]+)([\s\S]*))?$/;
 const SUPPORTED_VERBS = new Set([
   "close",
@@ -483,7 +483,7 @@ function markdownBlockState(lines) {
     }
     const lazyParagraphIndent = (
       !container.startsListItem
-      && container.continuationIndent === 0
+      && container.continuationIndent < paragraphContinuationIndent
       && paragraphOpen
       && paragraphContinuationIndent > 0
       && !isMarkdownBlank(line)
@@ -497,8 +497,14 @@ function markdownBlockState(lines) {
     activeListItems = container.activeListItems;
 
     if (indentedCode) {
-      const contextLine = stripContainerContinuation(line, indentedCode.continuationIndent);
-      if (isMarkdownBlank(contextLine) || /^(?: {4}| {0,3}\t)/.test(contextLine)) {
+      const continuesOwner = continuesLiteralBlockContainer(line, indentedCode);
+      const contextLine = continuesOwner
+        ? stripContainerContinuation(line, indentedCode.continuationIndent)
+        : undefined;
+      if (
+        continuesOwner
+        && (isMarkdownBlank(contextLine) || /^(?: {4}| {0,3}\t)/.test(contextLine))
+      ) {
         literalLines.add(index);
         paragraphOpen = false;
         paragraphContinuationIndent = 0;
@@ -616,7 +622,7 @@ function markdownBlockState(lines) {
 
     if (/^(?: {4}| {0,3}\t)/.test(contextLine) && !paragraphOpen) {
       literalLines.add(index);
-      indentedCode = { continuationIndent: container.continuationIndent };
+      indentedCode = literalBlockOwner(container);
       paragraphContinuationIndent = 0;
       paragraphListItems = [];
       paragraphId = undefined;
@@ -637,7 +643,7 @@ function markdownBlockState(lines) {
       paragraphId = undefined;
     }
     paragraphContinuationIndent = paragraphOpen
-      ? container.continuationIndent || lazyParagraphIndent
+      ? lazyParagraphIndent || container.continuationIndent
       : 0;
     paragraphListItems = paragraphContinuationIndent > 0
       ? container.activeListItems
