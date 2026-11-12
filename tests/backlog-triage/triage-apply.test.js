@@ -1016,6 +1016,86 @@ describe("execute", () => {
     }
   });
 
+  it("classifies ordered and empty sibling list items independently before Setext boundaries", () => {
+    for (const listItem of ["2.     code", "2.\t\tcode", "2. ### Item", "2. ***"]) {
+      for (const underline of ["---", "==="]) {
+        const { result, effects } = executeWithEffectSpies([
+          "## Apply Checklist",
+          "",
+          "1. Evidence",
+          listItem,
+          "Evidence",
+          underline,
+          '<!-- triage:revisit #42 reason="outside" -->',
+          "- [x] Must reject",
+        ]);
+
+        assert.notEqual(result.exitCode, 0, `${listItem} / ${underline}`);
+        assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+        assert.deepEqual(
+          effects,
+          { provider: [], mkdir: 0, append: 0 },
+          `${listItem} / ${underline}`
+        );
+      }
+    }
+
+    for (const underline of ["---", "==="]) {
+      const { result, effects } = executeWithEffectSpies([
+        "## Apply Checklist",
+        "",
+        "- Evidence",
+        "-",
+        "Evidence",
+        underline,
+        '<!-- triage:revisit #42 reason="outside" -->',
+        "- [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, `empty sibling / ${underline}`);
+      assert.match(result.error, /anchor on line 7.*outside ## Apply Checklist/i);
+      assert.deepEqual(
+        effects,
+        { provider: [], mkdir: 0, append: 0 },
+        `empty sibling / ${underline}`
+      );
+    }
+  });
+
+  it("recognizes HTML opened by an ordered sibling before every effect", () => {
+    const reports = [
+      {
+        anchorLine: 4,
+        lines: [
+          "1. Evidence",
+          "2. <pre>",
+          "   ## Apply Checklist",
+          '   <!-- triage:revisit #42 reason="outside" -->',
+          "   - [x] Must reject",
+          "   </pre>",
+        ],
+      },
+      {
+        anchorLine: 5,
+        lines: [
+          "1. Evidence",
+          "2. <!--",
+          "   ## Apply Checklist",
+          "   -->",
+          '   <!-- triage:revisit #42 reason="outside" -->',
+          "   - [x] Must reject",
+        ],
+      },
+    ];
+
+    for (const { anchorLine, lines } of reports) {
+      const { result, effects } = executeWithEffectSpies(lines);
+      assert.notEqual(result.exitCode, 0, lines[1]);
+      assert.match(result.error, new RegExp(`anchor on line ${anchorLine}.*outside ## Apply Checklist`, "i"));
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, lines[1]);
+    }
+  });
+
   it("keeps a later list-contained paragraph and its lazy continuation inside the checklist", () => {
     for (const listItem of ["-     code", "- ### Item"]) {
       const { result, effects } = executeWithEffectSpies([
@@ -1035,6 +1115,24 @@ describe("execute", () => {
         mkdir: 2,
         append: 2,
       }, listItem);
+    }
+  });
+
+  it("ends a list-contained checklist at a Setext heading in the same container", () => {
+    for (const underline of ["---", "==="]) {
+      const { result, effects } = executeWithEffectSpies([
+        "- Evidence",
+        "  ## Apply Checklist",
+        "",
+        "  Evidence",
+        `  ${underline}`,
+        '  <!-- triage:revisit #42 reason="outside" -->',
+        "  - [x] Must reject",
+      ]);
+
+      assert.notEqual(result.exitCode, 0, underline);
+      assert.match(result.error, /anchor on line 6.*outside ## Apply Checklist/i);
+      assert.deepEqual(effects, { provider: [], mkdir: 0, append: 0 }, underline);
     }
   });
 

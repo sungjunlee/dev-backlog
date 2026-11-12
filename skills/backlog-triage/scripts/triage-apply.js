@@ -182,9 +182,16 @@ function parseFrontmatter(text) {
 function listContainerView(line) {
   let content = String(line || "");
   let continuationIndent = 0;
+  const listItems = [];
   let match;
   while ((match = content.match(LIST_ITEM_PATTERN))) {
-    const markerEnd = columnAfter(`${match[1]}${match[2]}`, continuationIndent);
+    const markerIndent = columnAfter(match[1], continuationIndent);
+    const markerEnd = columnAfter(match[2], markerIndent);
+    const marker = match[2];
+    listItems.push({
+      markerIndent,
+      markerType: /^\d/.test(marker) ? `ordered${marker.slice(-1)}` : `bullet${marker}`,
+    });
     const padding = match[3] || "";
     const child = match[4] || "";
     // A marker-only or whitespace-only first line has the minimum one-column
@@ -206,7 +213,7 @@ function listContainerView(line) {
     continuationIndent = paddingEnd;
     content = child;
   }
-  return { content, continuationIndent };
+  return { content, continuationIndent, listItems };
 }
 
 function columnAfter(source, startColumn = 0) {
@@ -234,30 +241,62 @@ function stripContainerContinuation(line, continuationIndent) {
   return `${" ".repeat(indentationColumns - continuationIndent)}${source.slice(indentation.length)}`;
 }
 
-function continuedListContainerView(line, activeContinuationIndent) {
+function continuedListContainerView(line, activeContinuationIndent, activeListItems) {
   const source = String(line || "");
   const direct = listContainerView(source);
   if (direct.continuationIndent > 0) {
-    return { ...direct, activeContinuationIndent: direct.continuationIndent, startsListItem: true };
+    const firstMarkerIndent = direct.listItems[0].markerIndent;
+    return {
+      ...direct,
+      activeContinuationIndent: direct.continuationIndent,
+      activeListItems: [
+        ...activeListItems.filter((item) => item.markerIndent < firstMarkerIndent),
+        ...direct.listItems,
+      ],
+      startsListItem: true,
+    };
   }
   if (source.trim() === "") {
-    return { content: source, continuationIndent: 0, activeContinuationIndent, startsListItem: false };
+    return {
+      content: source,
+      continuationIndent: 0,
+      listItems: [],
+      activeContinuationIndent,
+      activeListItems,
+      startsListItem: false,
+    };
   }
   const indentation = leadingIndentColumns(source);
   if (activeContinuationIndent > 0 && indentation >= activeContinuationIndent) {
     return {
       content: stripContainerContinuation(source, activeContinuationIndent),
       continuationIndent: activeContinuationIndent,
+      listItems: [],
       activeContinuationIndent,
+      activeListItems,
       startsListItem: false,
     };
   }
-  return { content: source, continuationIndent: 0, activeContinuationIndent: 0, startsListItem: false };
+  return {
+    content: source,
+    continuationIndent: 0,
+    listItems: [],
+    activeContinuationIndent: 0,
+    activeListItems: [],
+    startsListItem: false,
+  };
+}
+
+function continuesActiveList(container, activeListItems) {
+  return container.listItems.some((candidate) => activeListItems.some((active) => (
+    candidate.markerIndent === active.markerIndent
+    && candidate.markerType === active.markerType
+  )));
 }
 
 function markdownBlockState(lines) {
   const literalLines = new Set();
-  const listParagraphLines = new Set();
+  const paragraphs = new Map();
   let start = 0;
   if (lines[0] === "---") {
     const end = lines.indexOf("---", 1);
@@ -270,24 +309,38 @@ function markdownBlockState(lines) {
   let commentBlock;
   let indentedCode;
   let activeContinuationIndent = 0;
+  let activeListItems = [];
   let paragraphOpen = false;
   let paragraphContinuationIndent = 0;
+  let paragraphListItems = [];
+  let paragraphId;
+  let nextParagraphId = 1;
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
-    let container = continuedListContainerView(line, activeContinuationIndent);
+    let container = continuedListContainerView(line, activeContinuationIndent, activeListItems);
     // A marker that cannot interrupt an open paragraph stays paragraph text
-    // instead of manufacturing a new list container.
-    if (container.startsListItem && paragraphOpen && !interruptsParagraph(line)) {
+    // unless it is a sibling in an already-open list container. Ordered
+    // siblings need not start at 1, and an empty sibling need not interrupt.
+    if (
+      container.startsListItem
+      && paragraphOpen
+      && !interruptsParagraph(line)
+      && !continuesActiveList(container, activeListItems)
+    ) {
       container = {
         content: line,
         continuationIndent: 0,
+        listItems: [],
         activeContinuationIndent: paragraphContinuationIndent,
+        activeListItems: paragraphListItems,
         startsListItem: false,
       };
     }
     if (container.startsListItem) {
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
     }
     const lazyParagraphIndent = (
       !container.startsListItem
@@ -299,8 +352,10 @@ function markdownBlockState(lines) {
     ) ? paragraphContinuationIndent : 0;
     if (lazyParagraphIndent > 0) {
       container.activeContinuationIndent = lazyParagraphIndent;
+      container.activeListItems = paragraphListItems;
     }
     activeContinuationIndent = container.activeContinuationIndent;
+    activeListItems = container.activeListItems;
     if (commentBlock) {
       literalLines.add(index);
       const contextLine = stripContainerContinuation(line, commentBlock.continuationIndent);
@@ -339,6 +394,8 @@ function markdownBlockState(lines) {
         literalLines.add(index);
         paragraphOpen = false;
         paragraphContinuationIndent = 0;
+        paragraphListItems = [];
+        paragraphId = undefined;
         continue;
       }
       indentedCode = undefined;
@@ -349,6 +406,8 @@ function markdownBlockState(lines) {
     if (parseAnchor(line)) {
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
@@ -356,6 +415,8 @@ function markdownBlockState(lines) {
     if (contextLine.trim() === "") {
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
     const opening = contextLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
@@ -368,6 +429,8 @@ function markdownBlockState(lines) {
       };
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
@@ -379,6 +442,8 @@ function markdownBlockState(lines) {
       }
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
@@ -405,6 +470,8 @@ function markdownBlockState(lines) {
       }
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
@@ -413,6 +480,8 @@ function markdownBlockState(lines) {
       htmlBlock = { end: "blank", continuationIndent: container.continuationIndent };
       paragraphOpen = false;
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
@@ -420,16 +489,34 @@ function markdownBlockState(lines) {
       literalLines.add(index);
       indentedCode = { continuationIndent: container.continuationIndent };
       paragraphContinuationIndent = 0;
+      paragraphListItems = [];
+      paragraphId = undefined;
       continue;
     }
 
     paragraphOpen = !interruptsParagraph(contextLine);
+    if (paragraphOpen && paragraphId === undefined) {
+      paragraphId = nextParagraphId;
+      nextParagraphId += 1;
+    } else if (!paragraphOpen) {
+      paragraphId = undefined;
+    }
     paragraphContinuationIndent = paragraphOpen
       ? container.continuationIndent || lazyParagraphIndent
       : 0;
-    if (paragraphContinuationIndent > 0) listParagraphLines.add(index);
+    paragraphListItems = paragraphContinuationIndent > 0
+      ? container.activeListItems
+      : [];
+    if (paragraphOpen) {
+      paragraphs.set(index, {
+        id: paragraphId,
+        continuationIndent: paragraphContinuationIndent,
+        listItems: paragraphListItems,
+        content: contextLine,
+      });
+    }
   }
-  return { literalLines, listParagraphLines };
+  return { literalLines, paragraphs };
 }
 
 function markdownLiteralLines(lines) {
@@ -454,25 +541,39 @@ function interruptsParagraph(line) {
   return isThematicBreak(source);
 }
 
-function isSetextHeading(lines, index, literalLines, listParagraphLines = new Set()) {
+function isSetextHeading(lines, index, literalLines, paragraphs = new Map()) {
   if (index < 0 || index + 1 >= lines.length) return false;
   if (literalLines.has(index) || literalLines.has(index + 1)) return false;
-  if (!/^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[index + 1])) return false;
-  if (listParagraphLines.has(index)) return false;
+  const paragraphContainer = paragraphs.get(index);
+  if (
+    paragraphContainer
+    && leadingIndentColumns(lines[index + 1]) < paragraphContainer.continuationIndent
+  ) return false;
+  const underline = paragraphContainer
+    ? stripContainerContinuation(lines[index + 1], paragraphContainer.continuationIndent)
+    : lines[index + 1];
+  if (!/^ {0,3}(?:=+|-+)[ \t]*$/.test(underline)) return false;
 
   let paragraphStart = index;
-  while (paragraphStart > 0) {
-    const previous = paragraphStart - 1;
-    if (literalLines.has(previous) || !lines[previous].trim() || interruptsParagraph(lines[previous])) break;
-    paragraphStart = previous;
+  if (paragraphContainer) {
+    while (paragraphs.get(paragraphStart - 1)?.id === paragraphContainer.id) {
+      paragraphStart -= 1;
+    }
+  } else {
+    while (paragraphStart > 0) {
+      const previous = paragraphStart - 1;
+      if (literalLines.has(previous) || !lines[previous].trim() || interruptsParagraph(lines[previous])) break;
+      paragraphStart = previous;
+    }
   }
 
-  const firstLine = lines[paragraphStart];
+  const firstLine = paragraphs.get(paragraphStart)?.content ?? lines[paragraphStart];
   if (!firstLine.trim() || /^ {4}/.test(firstLine)) return false;
   if (/^ {0,3}(?:#{1,6}(?:[ \t]+|$)|>|(?:[-+*]|\d{1,9}[.)])[ \t]+)/.test(firstLine)) return false;
   if (isThematicBreak(firstLine)) return false;
   for (let lineIndex = paragraphStart + 1; lineIndex <= index; lineIndex += 1) {
-    if (interruptsParagraph(lines[lineIndex])) return false;
+    const paragraphLine = paragraphs.get(lineIndex)?.content ?? lines[lineIndex];
+    if (interruptsParagraph(paragraphLine)) return false;
   }
 
   return true;
@@ -482,7 +583,7 @@ function parseReport(text) {
   const source = String(text || "");
   const lines = source.split(/\r?\n/);
   const frontmatter = parseFrontmatter(source);
-  const { literalLines, listParagraphLines } = markdownBlockState(lines);
+  const { literalLines, paragraphs } = markdownBlockState(lines);
   const anchors = [];
   const parsed = {
     anchors: 0,
@@ -517,7 +618,7 @@ function parseReport(text) {
       checklistEnd = index;
       break;
     }
-    if (isSetextHeading(lines, index, literalLines, listParagraphLines)) {
+    if (isSetextHeading(lines, index, literalLines, paragraphs)) {
       checklistEnd = index;
       break;
     }
