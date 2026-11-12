@@ -45,6 +45,27 @@ function scriptCalls(context, basename) {
   );
 }
 
+const NON_GITHUB_REFUSAL_DIAGNOSTIC = "task authority is \"backlog\"; triage apply requires github.";
+
+function isIntendedNonGithubApply(call) {
+  const args = call.args || [];
+  if (args.length !== 4) return false;
+  const script = String(args[0]).replaceAll("\\", "/");
+  const report = String(args[1]).replaceAll("\\", "/");
+  return path.basename(script) === "triage-apply.js"
+    && path.basename(report) === "refused.md"
+    && args.includes("--apply")
+    && args.includes("--yes");
+}
+
+function recordedOutput(call, context) {
+  return [call?.stderr, call?.stdout, context.runnerStderr].filter(Boolean).join("\n");
+}
+
+function hasNonGithubRefusalDiagnostic(call, context) {
+  return recordedOutput(call, context).includes(NON_GITHUB_REFUSAL_DIAGNOSTIC);
+}
+
 function authorityCalls(context, command) {
   return context.invocations.filter((invocation) => invocation.command === command);
 }
@@ -290,6 +311,8 @@ const SCENARIOS = [
           createIndex >= 0 && createIndex < readIndex && readIndex < closeIndex, calls),
         check("only the requested GitHub lifecycle operations occurred",
           calls.length === 3, calls),
+        check("no Backlog authority operation occurred",
+          authorityCalls(context, "backlog").length === 0, authorityCalls(context, "backlog")),
         check("controlled GitHub lifecycle has no repository file effects",
           context.changes.length === 0, changedPaths(context)),
       ];
@@ -423,9 +446,11 @@ const SCENARIOS = [
     },
     grade(context) {
       const applies = scriptCalls(context, "triage-apply.js").filter((call) => call.args.includes("--apply"));
+      const intended = applies.filter((call) => isIntendedNonGithubApply(call));
       return [
         check("triage apply executed and refused the non-GitHub authority",
-          applies.length === 1 && applies[0].status !== 0, applies),
+          intended.length === 1 && intended[0].status !== 0
+            && hasNonGithubRefusalDiagnostic(intended[0], context), intended),
         check("refusal occurred before any provider operation",
           authorityCalls(context, "gh").length === 0 && authorityCalls(context, "backlog").length === 0,
           context.invocations),
@@ -617,7 +642,10 @@ function diffSnapshots(before, after) {
 
 function normalizeInvocation(invocation, root) {
   const normalize = (value) => String(value).split(root).join("<workspace>").replaceAll("\\", "/");
-  return { command: invocation.command, args: invocation.args.map(normalize), status: invocation.status };
+  const normalized = { command: invocation.command, args: invocation.args.map(normalize), status: invocation.status };
+  if (invocation.stderr) normalized.stderr = normalize(invocation.stderr);
+  if (invocation.stdout) normalized.stdout = normalize(invocation.stdout);
+  return normalized;
 }
 
 function relevantInvocations(invocations) {

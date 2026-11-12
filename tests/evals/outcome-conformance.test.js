@@ -166,11 +166,12 @@ describe("read-only and bounded graders", () => {
   });
 
   it("grades the controlled GitHub create/read/close lifecycle from invocations", () => {
-    const context = tmpContext({}, [
+    const lifecycle = [
       { command: "gh", args: ["issue", "create", "--title", "Controlled lifecycle", "--body", "## Acceptance criteria\n- [ ] lifecycle is observed"], status: 0 },
       { command: "gh", args: ["issue", "view", "77", "--json", "body,comments"], status: 0 },
       { command: "gh", args: ["issue", "close", "77"], status: 0 },
-    ]);
+    ];
+    const context = tmpContext({}, lifecycle);
     try {
       let outcome = gradeScenario(scenario("github-authority-lifecycle"), context);
       assert.equal(outcome.pass, true);
@@ -183,10 +184,35 @@ describe("read-only and bounded graders", () => {
     }
   });
 
+  it("rejects a GitHub lifecycle that also invokes Backlog, whether that extra call succeeds or fails", () => {
+    const lifecycle = [
+      { command: "gh", args: ["issue", "create", "--title", "Controlled lifecycle", "--body", "## Acceptance criteria\n- [ ] lifecycle is observed"], status: 0 },
+      { command: "gh", args: ["issue", "view", "77", "--json", "body,comments"], status: 0 },
+      { command: "gh", args: ["issue", "close", "77"], status: 0 },
+    ];
+    for (const extra of [
+      { command: "backlog", args: ["task", "edit", "7", "-s", "Done"], status: 0 },
+      { command: "backlog", args: ["task", "edit", "7", "-s", "Done"], status: 93 },
+    ]) {
+      const context = tmpContext({}, [...lifecycle, extra]);
+      try {
+        const outcome = gradeScenario(scenario("github-authority-lifecycle"), context);
+        assert.equal(outcome.pass, false);
+        assert.equal(outcome.checks.find((item) => item.name.includes("no Backlog authority")).pass, false);
+      } finally {
+        fs.rmSync(context.root, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("grades non-GitHub triage refusal before provider or file effects", () => {
-    const context = tmpContext({ ".dev-backlog/.tracker": "backlog\n" }, [
-      { command: "node", args: ["skills/backlog-triage/scripts/triage-apply.js", "refused.md", "--apply", "--yes"], status: 1 },
-    ]);
+    const refusal = {
+      command: "node",
+      args: ["skills/backlog-triage/scripts/triage-apply.js", "refused.md", "--apply", "--yes"],
+      status: 1,
+      stderr: "Cannot apply triage actions: task authority is \"backlog\"; triage apply requires github.\n",
+    };
+    const context = tmpContext({ ".dev-backlog/.tracker": "backlog\n" }, [refusal]);
     try {
       let outcome = gradeScenario(scenario("triage-non-github-refused"), context);
       assert.equal(outcome.pass, true);
@@ -196,6 +222,45 @@ describe("read-only and bounded graders", () => {
       assert.equal(outcome.checks.find((item) => item.name.includes("before any provider")).pass, false);
     } finally {
       fs.rmSync(context.root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not treat argument errors, a missing report, or a different script as a non-GitHub authority refusal", () => {
+    const diagnostic = "Cannot apply triage actions: task authority is \"backlog\"; triage apply requires github.\n";
+    const tracker = { ".dev-backlog/.tracker": "backlog\n" };
+    const cases = [
+      {
+        command: "node",
+        args: ["skills/backlog-triage/scripts/triage-apply.js", "refused.md", "--apply", "--yes", "--bogus"],
+        status: 1,
+        stderr: "Unknown argument: --bogus\n",
+      },
+      {
+        command: "node",
+        args: ["skills/backlog-triage/scripts/triage-apply.js", "missing.md", "--apply", "--yes"],
+        status: 1,
+        stderr: diagnostic,
+      },
+      {
+        command: "node",
+        args: ["skills/backlog-triage/scripts/other-apply.js", "refused.md", "--apply", "--yes"],
+        status: 1,
+        stderr: diagnostic,
+      },
+    ];
+    for (const invocation of cases) {
+      const context = tmpContext(tracker, [invocation]);
+      try {
+        const outcome = gradeScenario(scenario("triage-non-github-refused"), context);
+        assert.equal(outcome.pass, false, invocation.args.join(" "));
+        assert.equal(
+          outcome.checks.find((item) => item.name.includes("refused the non-GitHub authority")).pass,
+          false,
+          invocation.args.join(" "),
+        );
+      } finally {
+        fs.rmSync(context.root, { recursive: true, force: true });
+      }
     }
   });
 

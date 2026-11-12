@@ -46,6 +46,7 @@ A later run can compare its outcome signature with a retained baseline:
 node tests/evals/outcome-conformance.js \
   --model gpt-6-astra \
   --reasoning low \
+  --backlog-bin /tmp/dev-backlog-conformance-backlog/node_modules/.bin/backlog \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
   --output /tmp/dev-backlog-outcome-after
 ```
@@ -61,6 +62,7 @@ Example for the runtime changes covered by #498 and #499:
 
 ```bash
 node tests/evals/outcome-conformance.js \
+  --backlog-bin /tmp/dev-backlog-conformance-backlog/node_modules/.bin/backlog \
   --compare docs/conformance/YYYY-MM-DD-outcome-before/summary.json \
   --expect-change orient-next-batch=#498 \
   --expect-change close-sprint-bounded-effects=#498 \

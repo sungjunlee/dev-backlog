@@ -25,9 +25,15 @@ if (command === "node" || command === "bash") {
   const executable = command === "node"
     ? process.env.CONFORMANCE_REAL_NODE
     : process.env.CONFORMANCE_REAL_BASH;
-  const result = spawnSync(executable, args, { env: process.env, stdio: "inherit" });
+  const result = spawnSync(executable, args, { env: process.env, encoding: "utf8" });
   const status = Number.isInteger(result.status) ? result.status : 1;
-  record(status);
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  fs.appendFileSync(logPath, JSON.stringify({
+    command, args, status,
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+  }) + "\\n");
   process.exit(status);
 }
 
